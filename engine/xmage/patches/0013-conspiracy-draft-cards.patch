@@ -1,0 +1,1197 @@
+Conspiracy's draft-matters cards, played as printed outside a draft (Commander Duels v0.9.4).
+
+Reason: Commander Duels deals these cards from Conspiracy and Conspiracy: Take the Crown packs, but
+it has no draft, and XMage had no implementation of them, so they played as stand-ins. Outside a
+draft nothing is noted, revealed, chosen or removed as the cards are drafted, and by the cards'
+rulings their other abilities then do nothing: a noted number is 0 (Lurking Automaton, Pyretic
+Hunter and Cogwork Grinder enter with no counters, Garbage Fire deals 0 damage, Custodi
+Peacekeeper taps a creature with power 0 or less), no color was chosen (Regicide has no legal
+target, Paliano, the High City adds no mana), and no name, type or card was noted (Aether Searcher
+and Smuggler Captain may search and find nothing, then shuffle). The draft text is kept as printed
+(XMage's InfoEffect, as Agent of Acquisitions already does upstream). Grenzo's Rebuttal has no draft
+ability and plays in full: the player to a player's left is the next in turn order, or the one
+before it while the turn order is reversed (XMage's PlayersLeftRightHint). 18 card classes and the
+two sets' card lists; Spy Kit ("has all names of nonlegendary creature cards") is not here.
+Upstream: none.
+Remove when: XMage implements these cards.
+diff --git a/Mage.Sets/src/mage/cards/a/AetherSearcher.java b/Mage.Sets/src/mage/cards/a/AetherSearcher.java
+new file mode 100644
+index 00000000..37018f5d
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/a/AetherSearcher.java
+@@ -0,0 +1,72 @@
++package mage.cards.a;
++
++import java.util.UUID;
++import mage.MageInt;
++import mage.MageObject;
++import mage.abilities.Ability;
++import mage.abilities.common.EntersBattlefieldTriggeredAbility;
++import mage.abilities.common.SimpleStaticAbility;
++import mage.abilities.effects.common.InfoEffect;
++import mage.abilities.effects.common.search.SearchLibraryPutInHandEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.SubType;
++import mage.constants.Zone;
++import mage.filter.FilterCard;
++import mage.filter.predicate.Predicate;
++import mage.game.Game;
++import mage.target.common.TargetCardInLibrary;
++
++/**
++ * Aether Searcher (Commander Duels, XMage patch 0013).
++ *
++ * Draft abilities: Commander Duels has no draft, so nothing is ever noted, revealed or
++ * removed as these cards are drafted. By the cards' rulings their other abilities then do
++ * nothing (a noted number is 0, and no name, color or card was noted). The draft text
++ * still shows, as printed.
++ */
++public final class AetherSearcher extends CardImpl {
++
++    public AetherSearcher(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.ARTIFACT, CardType.CREATURE}, "{7}");
++        this.subtype.add(SubType.CONSTRUCT);
++        this.power = new MageInt(6);
++        this.toughness = new MageInt(4);
++
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("Reveal this card as you draft it. Reveal the next card you draft and note its name.")));
++        // Nothing was noted, so the search finds no card; a search of the library still shuffles it.
++        FilterCard filter = new FilterCard();
++        filter.add(NothingNotedPredicate.instance);
++        Ability ability = new EntersBattlefieldTriggeredAbility(
++                new SearchLibraryPutInHandEffect(new TargetCardInLibrary(filter), true)
++                        .setText("you may search your hand and/or library for a card with a name noted as you drafted cards named Aether Searcher. You may cast it without paying its mana cost. If you search your library this way, shuffle"), true);
++        this.addAbility(ability);
++    }
++
++    private AetherSearcher(final AetherSearcher card) {
++        super(card);
++    }
++
++    @Override
++    public AetherSearcher copy() {
++        return new AetherSearcher(this);
++    }
++}
++
++/**
++ * Nothing was noted as this card was drafted, so no card matches.
++ */
++enum NothingNotedPredicate implements Predicate<MageObject> {
++    instance;
++
++    @Override
++    public boolean apply(MageObject input, Game game) {
++        return false;
++    }
++
++    @Override
++    public String toString() {
++        return "Nothing noted";
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/a/AnimusOfPredation.java b/Mage.Sets/src/mage/cards/a/AnimusOfPredation.java
+new file mode 100644
+index 00000000..709c2076
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/a/AnimusOfPredation.java
+@@ -0,0 +1,42 @@
++package mage.cards.a;
++
++import java.util.UUID;
++import mage.MageInt;
++import mage.abilities.common.SimpleStaticAbility;
++import mage.abilities.effects.common.InfoEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.SubType;
++import mage.constants.Zone;
++
++/**
++ * Animus of Predation (Commander Duels, XMage patch 0013).
++ *
++ * Draft abilities: Commander Duels has no draft, so nothing is ever noted, revealed or
++ * removed as these cards are drafted. By the cards' rulings their other abilities then do
++ * nothing (a noted number is 0, and no name, color or card was noted). The draft text
++ * still shows, as printed.
++ */
++public final class AnimusOfPredation extends CardImpl {
++
++    public AnimusOfPredation(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.CREATURE}, "{4}{G}");
++        this.subtype.add(SubType.AVATAR);
++        this.power = new MageInt(4);
++        this.toughness = new MageInt(4);
++
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("Draft this card face up.")));
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("As you draft a card, you may remove it from the draft face up. (It isn't in your card pool.)")));
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("If you removed a creature card with flying from the draft with cards named Animus of Predation, this creature has flying. The same is true for first strike, double strike, deathtouch, haste, hexproof, indestructible, lifelink, menace, reach, and vigilance.")));
++    }
++
++    private AnimusOfPredation(final AnimusOfPredation card) {
++        super(card);
++    }
++
++    @Override
++    public AnimusOfPredation copy() {
++        return new AnimusOfPredation(this);
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/a/ArcaneSavant.java b/Mage.Sets/src/mage/cards/a/ArcaneSavant.java
+new file mode 100644
+index 00000000..7e06e545
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/a/ArcaneSavant.java
+@@ -0,0 +1,42 @@
++package mage.cards.a;
++
++import java.util.UUID;
++import mage.MageInt;
++import mage.abilities.common.SimpleStaticAbility;
++import mage.abilities.effects.common.InfoEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.SubType;
++import mage.constants.Zone;
++
++/**
++ * Arcane Savant (Commander Duels, XMage patch 0013).
++ *
++ * Draft abilities: Commander Duels has no draft, so nothing is ever noted, revealed or
++ * removed as these cards are drafted. By the cards' rulings their other abilities then do
++ * nothing (a noted number is 0, and no name, color or card was noted). The draft text
++ * still shows, as printed.
++ */
++public final class ArcaneSavant extends CardImpl {
++
++    public ArcaneSavant(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.CREATURE}, "{3}{U}{U}");
++        this.subtype.add(SubType.HUMAN);
++        this.subtype.add(SubType.WIZARD);
++        this.power = new MageInt(3);
++        this.toughness = new MageInt(3);
++
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("Before you shuffle your deck to start the game, you may reveal this card from your deck and exile an instant or sorcery card you drafted that isn't in your deck.")));
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("When this creature enters, copy a card you exiled with cards named Arcane Savant. You may cast the copy without paying its mana cost.")));
++    }
++
++    private ArcaneSavant(final ArcaneSavant card) {
++        super(card);
++    }
++
++    @Override
++    public ArcaneSavant copy() {
++        return new ArcaneSavant(this);
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/c/CallerOfTheUntamed.java b/Mage.Sets/src/mage/cards/c/CallerOfTheUntamed.java
+new file mode 100644
+index 00000000..098a6b54
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/c/CallerOfTheUntamed.java
+@@ -0,0 +1,42 @@
++package mage.cards.c;
++
++import java.util.UUID;
++import mage.MageInt;
++import mage.abilities.common.SimpleStaticAbility;
++import mage.abilities.effects.common.InfoEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.SubType;
++import mage.constants.Zone;
++
++/**
++ * Caller of the Untamed (Commander Duels, XMage patch 0013).
++ *
++ * Draft abilities: Commander Duels has no draft, so nothing is ever noted, revealed or
++ * removed as these cards are drafted. By the cards' rulings their other abilities then do
++ * nothing (a noted number is 0, and no name, color or card was noted). The draft text
++ * still shows, as printed.
++ */
++public final class CallerOfTheUntamed extends CardImpl {
++
++    public CallerOfTheUntamed(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.CREATURE}, "{3}{G}");
++        this.subtype.add(SubType.ELF);
++        this.subtype.add(SubType.SHAMAN);
++        this.power = new MageInt(2);
++        this.toughness = new MageInt(4);
++
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("Before you shuffle your deck to start the game, you may reveal this card from your deck and exile a creature card you drafted that isn't in your deck.")));
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("{X}, {T}: Create a token that's a copy of a card you exiled with cards named Caller of the Untamed. X is the mana value of that card.")));
++    }
++
++    private CallerOfTheUntamed(final CallerOfTheUntamed card) {
++        super(card);
++    }
++
++    @Override
++    public CallerOfTheUntamed copy() {
++        return new CallerOfTheUntamed(this);
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/c/CogworkGrinder.java b/Mage.Sets/src/mage/cards/c/CogworkGrinder.java
+new file mode 100644
+index 00000000..ab3fc6b1
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/c/CogworkGrinder.java
+@@ -0,0 +1,42 @@
++package mage.cards.c;
++
++import java.util.UUID;
++import mage.MageInt;
++import mage.abilities.common.SimpleStaticAbility;
++import mage.abilities.effects.common.InfoEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.SubType;
++import mage.constants.Zone;
++
++/**
++ * Cogwork Grinder (Commander Duels, XMage patch 0013).
++ *
++ * Draft abilities: Commander Duels has no draft, so nothing is ever noted, revealed or
++ * removed as these cards are drafted. By the cards' rulings their other abilities then do
++ * nothing (a noted number is 0, and no name, color or card was noted). The draft text
++ * still shows, as printed.
++ */
++public final class CogworkGrinder extends CardImpl {
++
++    public CogworkGrinder(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.ARTIFACT, CardType.CREATURE}, "{6}");
++        this.subtype.add(SubType.CONSTRUCT);
++        this.power = new MageInt(0);
++        this.toughness = new MageInt(0);
++
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("Draft this card face up.")));
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("As you draft a card, you may remove it from the draft face down. (Those cards aren't in your card pool.)")));
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("This creature enters with X +1/+1 counters on it, where X is the number of cards you removed from the draft with cards named Cogwork Grinder.")));
++    }
++
++    private CogworkGrinder(final CogworkGrinder card) {
++        super(card);
++    }
++
++    @Override
++    public CogworkGrinder copy() {
++        return new CogworkGrinder(this);
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/c/CogworkTracker.java b/Mage.Sets/src/mage/cards/c/CogworkTracker.java
+new file mode 100644
+index 00000000..78f75e63
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/c/CogworkTracker.java
+@@ -0,0 +1,44 @@
++package mage.cards.c;
++
++import java.util.UUID;
++import mage.MageInt;
++import mage.abilities.common.AttacksEachCombatStaticAbility;
++import mage.abilities.common.SimpleStaticAbility;
++import mage.abilities.effects.common.InfoEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.SubType;
++import mage.constants.Zone;
++
++/**
++ * Cogwork Tracker (Commander Duels, XMage patch 0013).
++ *
++ * Draft abilities: Commander Duels has no draft, so nothing is ever noted, revealed or
++ * removed as these cards are drafted. By the cards' rulings their other abilities then do
++ * nothing (a noted number is 0, and no name, color or card was noted). The draft text
++ * still shows, as printed.
++ */
++public final class CogworkTracker extends CardImpl {
++
++    public CogworkTracker(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.ARTIFACT, CardType.CREATURE}, "{4}");
++        this.subtype.add(SubType.DOG);
++        this.subtype.add(SubType.CONSTRUCT);
++        this.power = new MageInt(4);
++        this.toughness = new MageInt(4);
++
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("Reveal this card as you draft it and note the player who passed it to you.")));
++        this.addAbility(new AttacksEachCombatStaticAbility());
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("This creature attacks a player you noted for cards named Cogwork Tracker each combat if able.")));
++    }
++
++    private CogworkTracker(final CogworkTracker card) {
++        super(card);
++    }
++
++    @Override
++    public CogworkTracker copy() {
++        return new CogworkTracker(this);
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/c/CustodiPeacekeeper.java b/Mage.Sets/src/mage/cards/c/CustodiPeacekeeper.java
+new file mode 100644
+index 00000000..3f192b4b
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/c/CustodiPeacekeeper.java
+@@ -0,0 +1,63 @@
++package mage.cards.c;
++
++import mage.MageInt;
++import mage.abilities.Ability;
++import mage.abilities.common.SimpleActivatedAbility;
++import mage.abilities.common.SimpleStaticAbility;
++import mage.abilities.costs.common.TapSourceCost;
++import mage.abilities.costs.mana.ManaCostsImpl;
++import mage.abilities.effects.common.InfoEffect;
++import mage.abilities.effects.common.TapTargetEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.ComparisonType;
++import mage.constants.SubType;
++import mage.constants.Zone;
++import mage.filter.common.FilterCreaturePermanent;
++import mage.filter.predicate.mageobject.PowerPredicate;
++import mage.target.TargetPermanent;
++
++import java.util.UUID;
++
++/**
++ * Custodi Peacekeeper (Commander Duels, XMage patch 0013).
++ * <p>
++ * Draft abilities: Commander Duels has no draft, so no number is ever noted, and the highest number
++ * noted is 0 (the card's rulings): it taps a creature with power 0 or less.
++ */
++public final class CustodiPeacekeeper extends CardImpl {
++
++    private static final FilterCreaturePermanent filter = new FilterCreaturePermanent(
++            "creature with power less than or equal to the highest number you noted for cards named Custodi Peacekeeper");
++
++    static {
++        filter.add(new PowerPredicate(ComparisonType.OR_LESS, 0));
++    }
++
++    public CustodiPeacekeeper(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.CREATURE}, "{2}{W}");
++
++        this.subtype.add(SubType.HUMAN);
++        this.subtype.add(SubType.CLERIC);
++        this.power = new MageInt(2);
++        this.toughness = new MageInt(3);
++
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("Reveal this card as you draft it and note how many cards you've drafted this draft round, including this card.")));
++
++        // {W}, {T}: Tap target creature with power less than or equal to the highest number you noted for cards named Custodi Peacekeeper.
++        Ability ability = new SimpleActivatedAbility(new TapTargetEffect(), new ManaCostsImpl<>("{W}"));
++        ability.addCost(new TapSourceCost());
++        ability.addTarget(new TargetPermanent(filter));
++        this.addAbility(ability);
++    }
++
++    private CustodiPeacekeeper(final CustodiPeacekeeper card) {
++        super(card);
++    }
++
++    @Override
++    public CustodiPeacekeeper copy() {
++        return new CustodiPeacekeeper(this);
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/g/GarbageFire.java b/Mage.Sets/src/mage/cards/g/GarbageFire.java
+new file mode 100644
+index 00000000..0309c96d
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/g/GarbageFire.java
+@@ -0,0 +1,39 @@
++package mage.cards.g;
++
++import mage.abilities.common.SimpleStaticAbility;
++import mage.abilities.effects.common.DamageTargetEffect;
++import mage.abilities.effects.common.InfoEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.Zone;
++import mage.target.common.TargetCreaturePermanent;
++
++import java.util.UUID;
++
++/**
++ * Garbage Fire (Commander Duels, XMage patch 0013).
++ * <p>
++ * Draft abilities: Commander Duels has no draft, so no number is ever noted, and the highest number
++ * noted is 0 (the card's rulings): it deals 0 damage to its target.
++ */
++public final class GarbageFire extends CardImpl {
++
++    public GarbageFire(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.INSTANT}, "{2}{R}");
++
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("Reveal this card as you draft it and note how many cards you've drafted this draft round, including this card.")));
++        this.getSpellAbility().addEffect(new DamageTargetEffect(0)
++                .setText("{this} deals damage to target creature equal to the highest number you noted for cards named Garbage Fire"));
++        this.getSpellAbility().addTarget(new TargetCreaturePermanent());
++    }
++
++    private GarbageFire(final GarbageFire card) {
++        super(card);
++    }
++
++    @Override
++    public GarbageFire copy() {
++        return new GarbageFire(this);
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/g/GrenzosRebuttal.java b/Mage.Sets/src/mage/cards/g/GrenzosRebuttal.java
+new file mode 100644
+index 00000000..a4494eba
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/g/GrenzosRebuttal.java
+@@ -0,0 +1,123 @@
++package mage.cards.g;
++
++import mage.abilities.Ability;
++import mage.abilities.effects.OneShotEffect;
++import mage.abilities.effects.common.CreateTokenEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.Outcome;
++import mage.constants.SubType;
++import mage.filter.FilterPermanent;
++import mage.filter.common.FilterArtifactPermanent;
++import mage.filter.common.FilterCreaturePermanent;
++import mage.filter.common.FilterLandPermanent;
++import mage.filter.predicate.permanent.ControllerIdPredicate;
++import mage.game.Game;
++import mage.game.permanent.Permanent;
++import mage.game.permanent.token.custom.CreatureToken;
++import mage.players.Player;
++import mage.players.PlayerList;
++import mage.target.TargetPermanent;
++
++import java.util.ArrayList;
++import java.util.LinkedHashSet;
++import java.util.List;
++import java.util.Set;
++import java.util.UUID;
++
++/**
++ * Grenzo's Rebuttal (Commander Duels, XMage patch 0013).
++ */
++public final class GrenzosRebuttal extends CardImpl {
++
++    public GrenzosRebuttal(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.SORCERY}, "{4}{R}{R}");
++
++        // Create a 4/4 red Ogre creature token.
++        this.getSpellAbility().addEffect(new CreateTokenEffect(
++                new CreatureToken(4, 4, "4/4 red Ogre creature token", SubType.OGRE)
++                        .withName("Ogre Token")
++                        .withColor("R")));
++        // Starting with you, each player chooses an artifact, a creature, and a land from among the
++        // permanents controlled by the player to their left. Destroy each permanent chosen this way.
++        this.getSpellAbility().addEffect(new GrenzosRebuttalEffect());
++    }
++
++    private GrenzosRebuttal(final GrenzosRebuttal card) {
++        super(card);
++    }
++
++    @Override
++    public GrenzosRebuttal copy() {
++        return new GrenzosRebuttal(this);
++    }
++}
++
++class GrenzosRebuttalEffect extends OneShotEffect {
++
++    GrenzosRebuttalEffect() {
++        super(Outcome.DestroyPermanent);
++        staticText = "Starting with you, each player chooses an artifact, a creature, and a land from among "
++                + "the permanents controlled by the player to their left. Destroy each permanent chosen this way";
++    }
++
++    private GrenzosRebuttalEffect(final GrenzosRebuttalEffect effect) {
++        super(effect);
++    }
++
++    @Override
++    public GrenzosRebuttalEffect copy() {
++        return new GrenzosRebuttalEffect(this);
++    }
++
++    @Override
++    public boolean apply(Game game, Ability source) {
++        Player controller = game.getPlayer(source.getControllerId());
++        if (controller == null) {
++            return false;
++        }
++        // The players in turn order, starting with you. The player to a player's left is the next one
++        // in turn order, or the one before it while the turn order is reversed.
++        PlayerList players = game.getState().getPlayersInRange(controller.getId(), game, true);
++        if (!players.setCurrent(controller.getId())) {
++            return false;
++        }
++        List<UUID> order = new ArrayList<>();
++        order.add(controller.getId());
++        for (int i = 1; i < players.size(); i++) {
++            order.add(game.isTurnOrderReversed() ? players.getPrevious() : players.getNext());
++        }
++        Set<UUID> chosen = new LinkedHashSet<>();
++        for (int i = 0; i < order.size(); i++) {
++            Player chooser = game.getPlayer(order.get(i));
++            Player left = game.getPlayer(order.get((i + 1) % order.size()));
++            if (chooser == null || left == null || order.size() < 2) {
++                continue;
++            }
++            for (FilterPermanent filter : new FilterPermanent[]{
++                    new FilterArtifactPermanent("artifact controlled by " + left.getName()),
++                    new FilterCreaturePermanent("creature controlled by " + left.getName()),
++                    new FilterLandPermanent("land controlled by " + left.getName())}) {
++                filter.add(new ControllerIdPredicate(left.getId()));
++                TargetPermanent target = new TargetPermanent(1, 1, filter, true);
++                if (!target.canChoose(chooser.getId(), source, game)) {
++                    continue;
++                }
++                chooser.choose(Outcome.DestroyPermanent, target, source, game);
++                Permanent permanent = game.getPermanent(target.getFirstTarget());
++                if (permanent != null) {
++                    chosen.add(permanent.getId());
++                    game.informPlayers(chooser.getLogName() + " chooses " + permanent.getLogName());
++                }
++            }
++        }
++        for (UUID permanentId : chosen) {
++            Permanent permanent = game.getPermanent(permanentId);
++            if (permanent != null) {
++                permanent.destroy(source, game, false);
++            }
++        }
++        return true;
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/l/LurkingAutomaton.java b/Mage.Sets/src/mage/cards/l/LurkingAutomaton.java
+new file mode 100644
+index 00000000..6c838af3
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/l/LurkingAutomaton.java
+@@ -0,0 +1,41 @@
++package mage.cards.l;
++
++import java.util.UUID;
++import mage.MageInt;
++import mage.abilities.common.SimpleStaticAbility;
++import mage.abilities.effects.common.InfoEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.SubType;
++import mage.constants.Zone;
++
++/**
++ * Lurking Automaton (Commander Duels, XMage patch 0013).
++ *
++ * Draft abilities: Commander Duels has no draft, so nothing is ever noted, revealed or
++ * removed as these cards are drafted. By the cards' rulings their other abilities then do
++ * nothing (a noted number is 0, and no name, color or card was noted). The draft text
++ * still shows, as printed.
++ */
++public final class LurkingAutomaton extends CardImpl {
++
++    public LurkingAutomaton(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.ARTIFACT, CardType.CREATURE}, "{5}");
++        this.subtype.add(SubType.CONSTRUCT);
++        this.power = new MageInt(0);
++        this.toughness = new MageInt(0);
++
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("Reveal this card as you draft it and note how many cards you've drafted this draft round, including this card.")));
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("This creature enters with X +1/+1 counters on it, where X is the highest number you noted for cards named Lurking Automaton.")));
++    }
++
++    private LurkingAutomaton(final LurkingAutomaton card) {
++        super(card);
++    }
++
++    @Override
++    public LurkingAutomaton copy() {
++        return new LurkingAutomaton(this);
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/n/NobleBanneret.java b/Mage.Sets/src/mage/cards/n/NobleBanneret.java
+new file mode 100644
+index 00000000..7a804701
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/n/NobleBanneret.java
+@@ -0,0 +1,43 @@
++package mage.cards.n;
++
++import java.util.UUID;
++import mage.MageInt;
++import mage.abilities.common.SimpleStaticAbility;
++import mage.abilities.effects.common.InfoEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.SubType;
++import mage.constants.Zone;
++
++/**
++ * Noble Banneret (Commander Duels, XMage patch 0013).
++ *
++ * Draft abilities: Commander Duels has no draft, so nothing is ever noted, revealed or
++ * removed as these cards are drafted. By the cards' rulings their other abilities then do
++ * nothing (a noted number is 0, and no name, color or card was noted). The draft text
++ * still shows, as printed.
++ */
++public final class NobleBanneret extends CardImpl {
++
++    public NobleBanneret(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.CREATURE}, "{2}{W}{W}");
++        this.subtype.add(SubType.HUMAN);
++        this.subtype.add(SubType.KNIGHT);
++        this.power = new MageInt(3);
++        this.toughness = new MageInt(3);
++
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("Draft this card face up.")));
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("As you draft a creature card, you may reveal it, note its name, then turn this card face down.")));
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("As long as you control one or more creatures with a name you noted for cards named Noble Banneret, this creature and those creatures get +1/+1 and have lifelink.")));
++    }
++
++    private NobleBanneret(final NobleBanneret card) {
++        super(card);
++    }
++
++    @Override
++    public NobleBanneret copy() {
++        return new NobleBanneret(this);
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/p/PalianoTheHighCity.java b/Mage.Sets/src/mage/cards/p/PalianoTheHighCity.java
+new file mode 100644
+index 00000000..9f7a31d9
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/p/PalianoTheHighCity.java
+@@ -0,0 +1,38 @@
++package mage.cards.p;
++
++import java.util.UUID;
++import mage.abilities.common.SimpleStaticAbility;
++import mage.abilities.effects.common.InfoEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.SuperType;
++import mage.constants.Zone;
++
++/**
++ * Paliano, the High City (Commander Duels, XMage patch 0013).
++ *
++ * Draft abilities: Commander Duels has no draft, so nothing is ever noted, revealed or
++ * removed as these cards are drafted. By the cards' rulings their other abilities then do
++ * nothing (a noted number is 0, and no name, color or card was noted). The draft text
++ * still shows, as printed.
++ */
++public final class PalianoTheHighCity extends CardImpl {
++
++    public PalianoTheHighCity(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.LAND}, null);
++        this.supertype.add(SuperType.LEGENDARY);
++
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("Reveal this card as you draft it. The player to your right chooses a color, you choose another color, then the player to your left chooses a third color.")));
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("{T}: Add one mana of any color chosen as you drafted cards named Paliano, the High City.")));
++    }
++
++    private PalianoTheHighCity(final PalianoTheHighCity card) {
++        super(card);
++    }
++
++    @Override
++    public PalianoTheHighCity copy() {
++        return new PalianoTheHighCity(this);
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/p/PalianoVanguard.java b/Mage.Sets/src/mage/cards/p/PalianoVanguard.java
+new file mode 100644
+index 00000000..fbd1a2a3
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/p/PalianoVanguard.java
+@@ -0,0 +1,43 @@
++package mage.cards.p;
++
++import java.util.UUID;
++import mage.MageInt;
++import mage.abilities.common.SimpleStaticAbility;
++import mage.abilities.effects.common.InfoEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.SubType;
++import mage.constants.Zone;
++
++/**
++ * Paliano Vanguard (Commander Duels, XMage patch 0013).
++ *
++ * Draft abilities: Commander Duels has no draft, so nothing is ever noted, revealed or
++ * removed as these cards are drafted. By the cards' rulings their other abilities then do
++ * nothing (a noted number is 0, and no name, color or card was noted). The draft text
++ * still shows, as printed.
++ */
++public final class PalianoVanguard extends CardImpl {
++
++    public PalianoVanguard(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.CREATURE}, "{1}{W}");
++        this.subtype.add(SubType.HUMAN);
++        this.subtype.add(SubType.SOLDIER);
++        this.power = new MageInt(2);
++        this.toughness = new MageInt(2);
++
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("Draft this card face up.")));
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("As you draft a creature card, you may reveal it, note its creature types, then turn this card face down.")));
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("Other creatures you control of a type you noted for cards named Paliano Vanguard get +1/+1.")));
++    }
++
++    private PalianoVanguard(final PalianoVanguard card) {
++        super(card);
++    }
++
++    @Override
++    public PalianoVanguard copy() {
++        return new PalianoVanguard(this);
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/p/PyreticHunter.java b/Mage.Sets/src/mage/cards/p/PyreticHunter.java
+new file mode 100644
+index 00000000..076e5a3d
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/p/PyreticHunter.java
+@@ -0,0 +1,44 @@
++package mage.cards.p;
++
++import java.util.UUID;
++import mage.MageInt;
++import mage.abilities.common.SimpleStaticAbility;
++import mage.abilities.effects.common.InfoEffect;
++import mage.abilities.keyword.MenaceAbility;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.SubType;
++import mage.constants.Zone;
++
++/**
++ * Pyretic Hunter (Commander Duels, XMage patch 0013).
++ *
++ * Draft abilities: Commander Duels has no draft, so nothing is ever noted, revealed or
++ * removed as these cards are drafted. By the cards' rulings their other abilities then do
++ * nothing (a noted number is 0, and no name, color or card was noted). The draft text
++ * still shows, as printed.
++ */
++public final class PyreticHunter extends CardImpl {
++
++    public PyreticHunter(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.CREATURE}, "{4}{R}");
++        this.subtype.add(SubType.ELEMENTAL);
++        this.subtype.add(SubType.CAT);
++        this.power = new MageInt(0);
++        this.toughness = new MageInt(0);
++
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("Reveal this card as you draft it and note how many cards you've drafted this draft round, including this card.")));
++        this.addAbility(new MenaceAbility(false));
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("This creature enters with X +1/+1 counters on it, where X is the highest number you noted for cards named Pyretic Hunter.")));
++    }
++
++    private PyreticHunter(final PyreticHunter card) {
++        super(card);
++    }
++
++    @Override
++    public PyreticHunter copy() {
++        return new PyreticHunter(this);
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/r/Regicide.java b/Mage.Sets/src/mage/cards/r/Regicide.java
+new file mode 100644
+index 00000000..feb31ec6
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/r/Regicide.java
+@@ -0,0 +1,61 @@
++package mage.cards.r;
++
++import mage.abilities.common.SimpleStaticAbility;
++import mage.abilities.effects.common.DestroyTargetEffect;
++import mage.abilities.effects.common.InfoEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.Zone;
++import mage.filter.common.FilterCreaturePermanent;
++import mage.filter.predicate.Predicate;
++import mage.game.Game;
++import mage.game.permanent.Permanent;
++import mage.target.TargetPermanent;
++
++import java.util.UUID;
++
++/**
++ * Regicide (Commander Duels, XMage patch 0013).
++ * <p>
++ * Draft abilities: Commander Duels has no draft, so no color was chosen as it was drafted, no
++ * creature is one of the chosen colors, and the spell has no legal target.
++ */
++public final class Regicide extends CardImpl {
++
++    private static final FilterCreaturePermanent filter
++            = new FilterCreaturePermanent("creature that's one or more of the colors chosen as you drafted cards named Regicide");
++
++    static {
++        filter.add(RegicideChosenColorPredicate.instance);
++    }
++
++    public Regicide(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.INSTANT}, "{B}");
++
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("Reveal this card as you draft it. The player to your right chooses a color, you choose another color, then the player to your left chooses a third color.")));
++        this.getSpellAbility().addEffect(new DestroyTargetEffect());
++        this.getSpellAbility().addTarget(new TargetPermanent(filter));
++    }
++
++    private Regicide(final Regicide card) {
++        super(card);
++    }
++
++    @Override
++    public Regicide copy() {
++        return new Regicide(this);
++    }
++}
++
++/**
++ * No color was chosen as the card was drafted, so no creature is of a chosen color.
++ */
++enum RegicideChosenColorPredicate implements Predicate<Permanent> {
++    instance;
++
++    @Override
++    public boolean apply(Permanent input, Game game) {
++        return false;
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/s/SmugglerCaptain.java b/Mage.Sets/src/mage/cards/s/SmugglerCaptain.java
+new file mode 100644
+index 00000000..351888e9
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/s/SmugglerCaptain.java
+@@ -0,0 +1,74 @@
++package mage.cards.s;
++
++import java.util.UUID;
++import mage.MageInt;
++import mage.MageObject;
++import mage.abilities.Ability;
++import mage.abilities.common.EntersBattlefieldTriggeredAbility;
++import mage.abilities.common.SimpleStaticAbility;
++import mage.abilities.effects.common.InfoEffect;
++import mage.abilities.effects.common.search.SearchLibraryPutInHandEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.SubType;
++import mage.constants.Zone;
++import mage.filter.FilterCard;
++import mage.filter.predicate.Predicate;
++import mage.game.Game;
++import mage.target.common.TargetCardInLibrary;
++
++/**
++ * Smuggler Captain (Commander Duels, XMage patch 0013).
++ *
++ * Draft abilities: Commander Duels has no draft, so nothing is ever noted, revealed or
++ * removed as these cards are drafted. By the cards' rulings their other abilities then do
++ * nothing (a noted number is 0, and no name, color or card was noted). The draft text
++ * still shows, as printed.
++ */
++public final class SmugglerCaptain extends CardImpl {
++
++    public SmugglerCaptain(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.CREATURE}, "{3}{B}");
++        this.subtype.add(SubType.HUMAN);
++        this.subtype.add(SubType.PIRATE);
++        this.power = new MageInt(2);
++        this.toughness = new MageInt(2);
++
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("Draft this card face up.")));
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("As you draft a card, you may reveal it, note its name, then turn this card face down.")));
++        // Nothing was noted, so the search finds no card; a search of the library still shuffles it.
++        FilterCard filter = new FilterCard();
++        filter.add(NothingNotedPredicate.instance);
++        Ability ability = new EntersBattlefieldTriggeredAbility(
++                new SearchLibraryPutInHandEffect(new TargetCardInLibrary(filter), true)
++                        .setText("you may search your library for a card with a name you noted for cards named Smuggler Captain, reveal it, put it into your hand, then shuffle"), true);
++        this.addAbility(ability);
++    }
++
++    private SmugglerCaptain(final SmugglerCaptain card) {
++        super(card);
++    }
++
++    @Override
++    public SmugglerCaptain copy() {
++        return new SmugglerCaptain(this);
++    }
++}
++
++/**
++ * Nothing was noted as this card was drafted, so no card matches.
++ */
++enum NothingNotedPredicate implements Predicate<MageObject> {
++    instance;
++
++    @Override
++    public boolean apply(MageObject input, Game game) {
++        return false;
++    }
++
++    @Override
++    public String toString() {
++        return "Nothing noted";
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/s/SpirePhantasm.java b/Mage.Sets/src/mage/cards/s/SpirePhantasm.java
+new file mode 100644
+index 00000000..de209b97
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/s/SpirePhantasm.java
+@@ -0,0 +1,44 @@
++package mage.cards.s;
++
++import java.util.UUID;
++import mage.MageInt;
++import mage.abilities.common.SimpleStaticAbility;
++import mage.abilities.effects.common.InfoEffect;
++import mage.abilities.keyword.FlyingAbility;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.SubType;
++import mage.constants.Zone;
++
++/**
++ * Spire Phantasm (Commander Duels, XMage patch 0013).
++ *
++ * Draft abilities: Commander Duels has no draft, so nothing is ever noted, revealed or
++ * removed as these cards are drafted. By the cards' rulings their other abilities then do
++ * nothing (a noted number is 0, and no name, color or card was noted). The draft text
++ * still shows, as printed.
++ */
++public final class SpirePhantasm extends CardImpl {
++
++    public SpirePhantasm(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.CREATURE}, "{2}{U}{U}");
++        this.subtype.add(SubType.GARGOYLE);
++        this.subtype.add(SubType.ILLUSION);
++        this.power = new MageInt(3);
++        this.toughness = new MageInt(2);
++
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("Reveal this card as you draft it. The next time a player drafts a card from this booster pack, guess that card's name. Then that player reveals the drafted card.")));
++        this.addAbility(FlyingAbility.getInstance());
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("When this creature enters, if you guessed correctly for a card named Spire Phantasm, draw a card.")));
++    }
++
++    private SpirePhantasm(final SpirePhantasm card) {
++        super(card);
++    }
++
++    @Override
++    public SpirePhantasm copy() {
++        return new SpirePhantasm(this);
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/v/VolatileChimera.java b/Mage.Sets/src/mage/cards/v/VolatileChimera.java
+new file mode 100644
+index 00000000..d3feeeef
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/v/VolatileChimera.java
+@@ -0,0 +1,42 @@
++package mage.cards.v;
++
++import java.util.UUID;
++import mage.MageInt;
++import mage.abilities.common.SimpleStaticAbility;
++import mage.abilities.effects.common.InfoEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.SubType;
++import mage.constants.Zone;
++
++/**
++ * Volatile Chimera (Commander Duels, XMage patch 0013).
++ *
++ * Draft abilities: Commander Duels has no draft, so nothing is ever noted, revealed or
++ * removed as these cards are drafted. By the cards' rulings their other abilities then do
++ * nothing (a noted number is 0, and no name, color or card was noted). The draft text
++ * still shows, as printed.
++ */
++public final class VolatileChimera extends CardImpl {
++
++    public VolatileChimera(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.CREATURE}, "{2}{R}");
++        this.subtype.add(SubType.ELEMENTAL);
++        this.subtype.add(SubType.CHIMERA);
++        this.power = new MageInt(3);
++        this.toughness = new MageInt(2);
++
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("Before you shuffle your deck to start the game, you may reveal this card from your deck and exile three or more creature cards you drafted that aren't in your deck.")));
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new InfoEffect("{1}{R}: Choose a card at random you exiled with cards named Volatile Chimera. This creature becomes a copy of that card, except it has this ability.")));
++    }
++
++    private VolatileChimera(final VolatileChimera card) {
++        super(card);
++    }
++
++    @Override
++    public VolatileChimera copy() {
++        return new VolatileChimera(this);
++    }
++}
+diff --git a/Mage.Sets/src/mage/sets/Conspiracy.java b/Mage.Sets/src/mage/sets/Conspiracy.java
+index 2a186c69..769aaa3f 100644
+--- a/Mage.Sets/src/mage/sets/Conspiracy.java
++++ b/Mage.Sets/src/mage/sets/Conspiracy.java
+@@ -27,6 +27,7 @@ public final class Conspiracy extends ExpansionSet {
+         this.numBoosterRare = 1;
+         this.ratioBoosterMythic = 8;
+         cards.add(new SetCardInfo("Academy Elite", 20, Rarity.RARE, mage.cards.a.AcademyElite.class));
++        cards.add(new SetCardInfo("Aether Searcher", 53, Rarity.RARE, mage.cards.a.AetherSearcher.class));
+         cards.add(new SetCardInfo("Aether Tradewinds", 89, Rarity.COMMON, mage.cards.a.AetherTradewinds.class));
+         cards.add(new SetCardInfo("Agent of Acquisitions", 54, Rarity.UNCOMMON, mage.cards.a.AgentOfAcquisitions.class)); // draftmatters ability not implemented
+         cards.add(new SetCardInfo("Air Servant", 90, Rarity.UNCOMMON, mage.cards.a.AirServant.class));
+@@ -49,8 +50,10 @@ public final class Conspiracy extends ExpansionSet {
+         cards.add(new SetCardInfo("Chartooth Cougar", 139, Rarity.COMMON, mage.cards.c.ChartoothCougar.class));
+         cards.add(new SetCardInfo("Cinder Wall", 140, Rarity.COMMON, mage.cards.c.CinderWall.class));
+         cards.add(new SetCardInfo("Coercive Portal", 56, Rarity.MYTHIC, mage.cards.c.CoercivePortal.class));
++        cards.add(new SetCardInfo("Cogwork Grinder", 57, Rarity.RARE, mage.cards.c.CogworkGrinder.class));
+         cards.add(new SetCardInfo("Cogwork Librarian", 58, Rarity.COMMON, mage.cards.c.CogworkLibrarian.class)); // draftmatters ability not implemented
+         cards.add(new SetCardInfo("Cogwork Spy", 59, Rarity.COMMON, mage.cards.c.CogworkSpy.class)); // draftmatters ability not implemented
++        cards.add(new SetCardInfo("Cogwork Tracker", 60, Rarity.UNCOMMON, mage.cards.c.CogworkTracker.class));
+         cards.add(new SetCardInfo("Compulsive Research", 93, Rarity.COMMON, mage.cards.c.CompulsiveResearch.class));
+         cards.add(new SetCardInfo("Copperhorn Scout", 160, Rarity.COMMON, mage.cards.c.CopperhornScout.class));
+         cards.add(new SetCardInfo("Council Guardian", 15, Rarity.UNCOMMON, mage.cards.c.CouncilGuardian.class));
+@@ -90,6 +93,7 @@ public final class Conspiracy extends ExpansionSet {
+         cards.add(new SetCardInfo("Gamekeeper", 165, Rarity.UNCOMMON, mage.cards.g.Gamekeeper.class));
+         cards.add(new SetCardInfo("Glimmerpoint Stag", 70, Rarity.UNCOMMON, mage.cards.g.GlimmerpointStag.class));
+         cards.add(new SetCardInfo("Gnarlid Pack", 166, Rarity.COMMON, mage.cards.g.GnarlidPack.class));
++        cards.add(new SetCardInfo("Grenzo's Rebuttal", 33, Rarity.RARE, mage.cards.g.GrenzosRebuttal.class));
+         cards.add(new SetCardInfo("Grenzo, Dungeon Warden", 47, Rarity.RARE, mage.cards.g.GrenzoDungeonWarden.class));
+         cards.add(new SetCardInfo("Grenzo's Cutthroat", 32, Rarity.COMMON, mage.cards.g.GrenzosCutthroat.class));
+         cards.add(new SetCardInfo("Grixis Illusionist", 99, Rarity.COMMON, mage.cards.g.GrixisIllusionist.class));
+@@ -110,6 +114,7 @@ public final class Conspiracy extends ExpansionSet {
+         cards.add(new SetCardInfo("Liliana's Specter", 116, Rarity.COMMON, mage.cards.l.LilianasSpecter.class));
+         cards.add(new SetCardInfo("Lizard Warrior", 146, Rarity.COMMON, mage.cards.l.LizardWarrior.class));
+         cards.add(new SetCardInfo("Lore Seeker", 62, Rarity.RARE, mage.cards.l.LoreSeeker.class)); // draftmatters ability not implemented
++        cards.add(new SetCardInfo("Lurking Automaton", 63, Rarity.COMMON, mage.cards.l.LurkingAutomaton.class));
+         cards.add(new SetCardInfo("Magister of Worth", 48, Rarity.RARE, mage.cards.m.MagisterOfWorth.class));
+         cards.add(new SetCardInfo("Magus of the Mirror", 117, Rarity.RARE, mage.cards.m.MagusOfTheMirror.class));
+         cards.add(new SetCardInfo("Mana Geyser", 147, Rarity.COMMON, mage.cards.m.ManaGeyser.class));
+@@ -129,6 +134,7 @@ public final class Conspiracy extends ExpansionSet {
+         cards.add(new SetCardInfo("Necromantic Thirst", 119, Rarity.COMMON, mage.cards.n.NecromanticThirst.class));
+         cards.add(new SetCardInfo("Noble Templar", 75, Rarity.COMMON, mage.cards.n.NobleTemplar.class));
+         cards.add(new SetCardInfo("Orcish Cannonade", 148, Rarity.COMMON, mage.cards.o.OrcishCannonade.class));
++        cards.add(new SetCardInfo("Paliano, the High City", 65, Rarity.RARE, mage.cards.p.PalianoTheHighCity.class));
+         cards.add(new SetCardInfo("Peace Strider", 201, Rarity.UNCOMMON, mage.cards.p.PeaceStrider.class));
+         cards.add(new SetCardInfo("Pelakka Wurm", 172, Rarity.UNCOMMON, mage.cards.p.PelakkaWurm.class));
+         cards.add(new SetCardInfo("Pernicious Deed", 191, Rarity.MYTHIC, mage.cards.p.PerniciousDeed.class));
+diff --git a/Mage.Sets/src/mage/sets/ConspiracyTakeTheCrown.java b/Mage.Sets/src/mage/sets/ConspiracyTakeTheCrown.java
+index 05464b11..22e89b5f 100644
+--- a/Mage.Sets/src/mage/sets/ConspiracyTakeTheCrown.java
++++ b/Mage.Sets/src/mage/sets/ConspiracyTakeTheCrown.java
+@@ -32,6 +32,8 @@ public final class ConspiracyTakeTheCrown extends ExpansionSet {
+         cards.add(new SetCardInfo("Affa Guard Hound", 81, Rarity.UNCOMMON, mage.cards.a.AffaGuardHound.class));
+         cards.add(new SetCardInfo("Akroan Hoplite", 197, Rarity.UNCOMMON, mage.cards.a.AkroanHoplite.class));
+         cards.add(new SetCardInfo("Altar's Reap", 127, Rarity.COMMON, mage.cards.a.AltarsReap.class));
++        cards.add(new SetCardInfo("Animus of Predation", 60, Rarity.UNCOMMON, mage.cards.a.AnimusOfPredation.class));
++        cards.add(new SetCardInfo("Arcane Savant", 27, Rarity.RARE, mage.cards.a.ArcaneSavant.class));
+         cards.add(new SetCardInfo("Archdemon of Paliano", 39, Rarity.RARE, mage.cards.a.ArchdemonOfPaliano.class)); // draftmatters ability not implemented
+         cards.add(new SetCardInfo("Ascended Lawmage", 198, Rarity.UNCOMMON, mage.cards.a.AscendedLawmage.class));
+         cards.add(new SetCardInfo("Avatar of Woe", 128, Rarity.MYTHIC, mage.cards.a.AvatarOfWoe.class));
+@@ -49,6 +51,7 @@ public final class ConspiracyTakeTheCrown extends ExpansionSet {
+         cards.add(new SetCardInfo("Burn Away", 151, Rarity.UNCOMMON, mage.cards.b.BurnAway.class));
+         cards.add(new SetCardInfo("Burning Wish", 152, Rarity.RARE, mage.cards.b.BurningWish.class));
+         cards.add(new SetCardInfo("Caller of Gales", 103, Rarity.COMMON, mage.cards.c.CallerOfGales.class));
++        cards.add(new SetCardInfo("Caller of the Untamed", 62, Rarity.RARE, mage.cards.c.CallerOfTheUntamed.class));
+         cards.add(new SetCardInfo("Canal Courier", 28, Rarity.COMMON, mage.cards.c.CanalCourier.class));
+         cards.add(new SetCardInfo("Capital Punishment", 40, Rarity.RARE, mage.cards.c.CapitalPunishment.class));
+         cards.add(new SetCardInfo("Carnage Gladiator", 199, Rarity.UNCOMMON, mage.cards.c.CarnageGladiator.class));
+@@ -62,6 +65,7 @@ public final class ConspiracyTakeTheCrown extends ExpansionSet {
+         cards.add(new SetCardInfo("Coveted Peacock", 29, Rarity.UNCOMMON, mage.cards.c.CovetedPeacock.class));
+         cards.add(new SetCardInfo("Crown-Hunter Hireling", 50, Rarity.COMMON, mage.cards.c.CrownHunterHireling.class));
+         cards.add(new SetCardInfo("Custodi Lich", 41, Rarity.RARE, mage.cards.c.CustodiLich.class));
++        cards.add(new SetCardInfo("Custodi Peacekeeper", 14, Rarity.COMMON, mage.cards.c.CustodiPeacekeeper.class));
+         cards.add(new SetCardInfo("Custodi Soulcaller", 15, Rarity.UNCOMMON, mage.cards.c.CustodiSoulcaller.class));
+         cards.add(new SetCardInfo("Daretti, Ingenious Iconoclast", 74, Rarity.MYTHIC, mage.cards.d.DarettiIngeniousIconoclast.class));
+         cards.add(new SetCardInfo("Deadly Designs", 42, Rarity.UNCOMMON, mage.cards.d.DeadlyDesigns.class));
+@@ -97,6 +101,7 @@ public final class ConspiracyTakeTheCrown extends ExpansionSet {
+         cards.add(new SetCardInfo("Followed Footsteps", 111, Rarity.RARE, mage.cards.f.FollowedFootsteps.class));
+         cards.add(new SetCardInfo("Forgotten Ancient", 182, Rarity.RARE, mage.cards.f.ForgottenAncient.class));
+         cards.add(new SetCardInfo("Gang of Devils", 158, Rarity.UNCOMMON, mage.cards.g.GangOfDevils.class));
++        cards.add(new SetCardInfo("Garbage Fire", 52, Rarity.COMMON, mage.cards.g.GarbageFire.class));
+         cards.add(new SetCardInfo("Garrulous Sycophant", 43, Rarity.COMMON, mage.cards.g.GarrulousSycophant.class));
+         cards.add(new SetCardInfo("Ghostly Possession", 85, Rarity.COMMON, mage.cards.g.GhostlyPossession.class));
+         cards.add(new SetCardInfo("Ghostly Prison", 86, Rarity.UNCOMMON, mage.cards.g.GhostlyPrison.class));
+@@ -158,6 +163,7 @@ public final class ConspiracyTakeTheCrown extends ExpansionSet {
+         cards.add(new SetCardInfo("Negate", 117, Rarity.COMMON, mage.cards.n.Negate.class));
+         cards.add(new SetCardInfo("Nessian Asp", 187, Rarity.UNCOMMON, mage.cards.n.NessianAsp.class));
+         cards.add(new SetCardInfo("Netcaster Spider", 188, Rarity.COMMON, mage.cards.n.NetcasterSpider.class));
++        cards.add(new SetCardInfo("Noble Banneret", 17, Rarity.UNCOMMON, mage.cards.n.NobleBanneret.class));
+         cards.add(new SetCardInfo("Ogre Sentry", 168, Rarity.COMMON, mage.cards.o.OgreSentry.class));
+         cards.add(new SetCardInfo("Omenspeaker", 118, Rarity.COMMON, mage.cards.o.Omenspeaker.class));
+         cards.add(new SetCardInfo("Opaline Unicorn", 213, Rarity.COMMON, mage.cards.o.OpalineUnicorn.class));
+@@ -165,6 +171,7 @@ public final class ConspiracyTakeTheCrown extends ExpansionSet {
+         cards.add(new SetCardInfo("Overrun", 189, Rarity.UNCOMMON, mage.cards.o.Overrun.class));
+         cards.add(new SetCardInfo("Palace Jailer", 18, Rarity.UNCOMMON, mage.cards.p.PalaceJailer.class));
+         cards.add(new SetCardInfo("Palace Sentinels", 19, Rarity.COMMON, mage.cards.p.PalaceSentinels.class));
++        cards.add(new SetCardInfo("Paliano Vanguard", 20, Rarity.RARE, mage.cards.p.PalianoVanguard.class));
+         cards.add(new SetCardInfo("Pariah", 95, Rarity.RARE, mage.cards.p.Pariah.class));
+         cards.add(new SetCardInfo("Pharika's Mender", 205, Rarity.UNCOMMON, mage.cards.p.PharikasMender.class));
+         cards.add(new SetCardInfo("Phyrexian Arena", 144, Rarity.RARE, mage.cards.p.PhyrexianArena.class));
+@@ -174,12 +181,14 @@ public final class ConspiracyTakeTheCrown extends ExpansionSet {
+         cards.add(new SetCardInfo("Protector of the Crown", 21, Rarity.RARE, mage.cards.p.ProtectorOfTheCrown.class));
+         cards.add(new SetCardInfo("Psychosis Crawler", 215, Rarity.RARE, mage.cards.p.PsychosisCrawler.class));
+         cards.add(new SetCardInfo("Public Execution", 145, Rarity.UNCOMMON, mage.cards.p.PublicExecution.class));
++        cards.add(new SetCardInfo("Pyretic Hunter", 56, Rarity.UNCOMMON, mage.cards.p.PyreticHunter.class));
+         cards.add(new SetCardInfo("Queen Marchesa", 78, Rarity.MYTHIC, mage.cards.q.QueenMarchesa.class));
+         cards.add(new SetCardInfo("Raise Dead", 146, Rarity.COMMON, mage.cards.r.RaiseDead.class));
+         cards.add(new SetCardInfo("Raise the Alarm", 96, Rarity.COMMON, mage.cards.r.RaiseTheAlarm.class));
+         cards.add(new SetCardInfo("Ravenous Leucrocota", 192, Rarity.COMMON, mage.cards.r.RavenousLeucrocota.class));
+         cards.add(new SetCardInfo("Recruiter of the Guard", 22, Rarity.RARE, mage.cards.r.RecruiterOfTheGuard.class));
+         cards.add(new SetCardInfo("Regal Behemoth", 69, Rarity.RARE, mage.cards.r.RegalBehemoth.class));
++        cards.add(new SetCardInfo("Regicide", 45, Rarity.COMMON, mage.cards.r.Regicide.class));
+         cards.add(new SetCardInfo("Repulse", 119, Rarity.COMMON, mage.cards.r.Repulse.class));
+         cards.add(new SetCardInfo("Reviving Dose", 97, Rarity.COMMON, mage.cards.r.RevivingDose.class));
+         cards.add(new SetCardInfo("Rogue's Passage", 220, Rarity.UNCOMMON, mage.cards.r.RoguesPassage.class));
+@@ -196,8 +205,10 @@ public final class ConspiracyTakeTheCrown extends ExpansionSet {
+         cards.add(new SetCardInfo("Sinuous Vermin", 46, Rarity.COMMON, mage.cards.s.SinuousVermin.class));
+         cards.add(new SetCardInfo("Skittering Crustacean", 36, Rarity.COMMON, mage.cards.s.SkitteringCrustacean.class));
+         cards.add(new SetCardInfo("Skyline Despot", 57, Rarity.RARE, mage.cards.s.SkylineDespot.class));
++        cards.add(new SetCardInfo("Smuggler Captain", 47, Rarity.UNCOMMON, mage.cards.s.SmugglerCaptain.class));
+         cards.add(new SetCardInfo("Spectral Grasp", 24, Rarity.UNCOMMON, mage.cards.s.SpectralGrasp.class));
+         cards.add(new SetCardInfo("Sphinx of Magosi", 122, Rarity.RARE, mage.cards.s.SphinxOfMagosi.class));
++        cards.add(new SetCardInfo("Spire Phantasm", 37, Rarity.UNCOMMON, mage.cards.s.SpirePhantasm.class));
+         cards.add(new SetCardInfo("Spirit of the Hearth", 98, Rarity.RARE, mage.cards.s.SpiritOfTheHearth.class));
+         cards.add(new SetCardInfo("Splitting Slime", 72, Rarity.RARE, mage.cards.s.SplittingSlime.class));
+         cards.add(new SetCardInfo("Stoneshock Giant", 169, Rarity.UNCOMMON, mage.cards.s.StoneshockGiant.class));
+@@ -218,6 +229,7 @@ public final class ConspiracyTakeTheCrown extends ExpansionSet {
+         cards.add(new SetCardInfo("Unnerve", 150, Rarity.COMMON, mage.cards.u.Unnerve.class));
+         cards.add(new SetCardInfo("Vaporkin", 124, Rarity.COMMON, mage.cards.v.Vaporkin.class));
+         cards.add(new SetCardInfo("Vertigo Spawn", 125, Rarity.UNCOMMON, mage.cards.v.VertigoSpawn.class));
++        cards.add(new SetCardInfo("Volatile Chimera", 59, Rarity.RARE, mage.cards.v.VolatileChimera.class));
+         cards.add(new SetCardInfo("Voyaging Satyr", 195, Rarity.COMMON, mage.cards.v.VoyagingSatyr.class));
+         cards.add(new SetCardInfo("Wild Griffin", 99, Rarity.COMMON, mage.cards.w.WildGriffin.class));
+         cards.add(new SetCardInfo("Wild Pair", 196, Rarity.RARE, mage.cards.w.WildPair.class));

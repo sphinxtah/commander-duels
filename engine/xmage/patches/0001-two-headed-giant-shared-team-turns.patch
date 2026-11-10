@@ -13,7 +13,7 @@ Upstream: none yet; to be offered to magefree/mage once the format is proven.
 Remove when: XMage upstream implements shared team turns, or Two-Headed Giant is dropped.
 
 diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPlayer.java b/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPlayer.java
-index e13acd2..2c5f1b9 100644
+index e13acd23..2c5f1b94 100644
 --- a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPlayer.java
 +++ b/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPlayer.java
 @@ -1346,7 +1346,7 @@ public class HumanPlayer extends PlayerImpl {
@@ -53,7 +53,7 @@ index e13acd2..2c5f1b9 100644
              } else {
                  return !controllingUserData.getUserSkipPrioritySteps().getOpponentTurn().isPhaseStepSet(game.getTurnStepType());
 diff --git a/Mage/src/main/java/mage/abilities/effects/common/DontUntapInControllersUntapStepEnchantedEffect.java b/Mage/src/main/java/mage/abilities/effects/common/DontUntapInControllersUntapStepEnchantedEffect.java
-index eb67d9d..c966b7a 100644
+index eb67d9d7..c966b7a8 100644
 --- a/Mage/src/main/java/mage/abilities/effects/common/DontUntapInControllersUntapStepEnchantedEffect.java
 +++ b/Mage/src/main/java/mage/abilities/effects/common/DontUntapInControllersUntapStepEnchantedEffect.java
 @@ -55,7 +55,8 @@ public class DontUntapInControllersUntapStepEnchantedEffect extends ContinuousRu
@@ -67,7 +67,7 @@ index eb67d9d..c966b7a 100644
                  }
              }
 diff --git a/Mage/src/main/java/mage/abilities/effects/common/DontUntapInControllersUntapStepSourceEffect.java b/Mage/src/main/java/mage/abilities/effects/common/DontUntapInControllersUntapStepSourceEffect.java
-index 62b0f9b..c06891c 100644
+index 62b0f9b1..c06891ce 100644
 --- a/Mage/src/main/java/mage/abilities/effects/common/DontUntapInControllersUntapStepSourceEffect.java
 +++ b/Mage/src/main/java/mage/abilities/effects/common/DontUntapInControllersUntapStepSourceEffect.java
 @@ -44,7 +44,8 @@ public class DontUntapInControllersUntapStepSourceEffect extends ContinuousRuleM
@@ -81,7 +81,7 @@ index 62b0f9b..c06891c 100644
              }
          }
 diff --git a/Mage/src/main/java/mage/abilities/triggers/AtStepTriggeredAbility.java b/Mage/src/main/java/mage/abilities/triggers/AtStepTriggeredAbility.java
-index 4bfc454..51e17e4 100644
+index 4bfc4541..51e17e46 100644
 --- a/Mage/src/main/java/mage/abilities/triggers/AtStepTriggeredAbility.java
 +++ b/Mage/src/main/java/mage/abilities/triggers/AtStepTriggeredAbility.java
 @@ -43,10 +43,13 @@ public abstract class AtStepTriggeredAbility extends TriggeredAbilityImpl {
@@ -101,7 +101,7 @@ index 4bfc454..51e17e4 100644
              case NEXT:
              case EACH_PLAYER:
 diff --git a/Mage/src/main/java/mage/game/Game.java b/Mage/src/main/java/mage/game/Game.java
-index 651a572..7c3754e 100644
+index b531a573..e99e9d44 100644
 --- a/Mage/src/main/java/mage/game/Game.java
 +++ b/Mage/src/main/java/mage/game/Game.java
 @@ -214,26 +214,42 @@ public interface Game extends MageItem, Serializable, Copyable<Game> {
@@ -155,10 +155,10 @@ index 651a572..7c3754e 100644
  
      Turn getTurn();
 diff --git a/Mage/src/main/java/mage/game/GameImpl.java b/Mage/src/main/java/mage/game/GameImpl.java
-index 2b6dbb6..24eee39 100644
+index 798c65da..5ccd7038 100644
 --- a/Mage/src/main/java/mage/game/GameImpl.java
 +++ b/Mage/src/main/java/mage/game/GameImpl.java
-@@ -1112,7 +1112,7 @@ public abstract class GameImpl implements Game {
+@@ -1135,7 +1135,7 @@ public abstract class GameImpl implements Game {
                  }
  
                  GameEvent event = new GameEvent(GameEvent.EventType.PLAY_TURN, null, null, playerByOrder.getId());
@@ -167,7 +167,7 @@ index 2b6dbb6..24eee39 100644
                      if (!playTurn(playerByOrder)) {
                          break;
                      }
-@@ -1149,6 +1149,19 @@ public abstract class GameImpl implements Game {
+@@ -1172,6 +1172,19 @@ public abstract class GameImpl implements Game {
          }
      }
  
@@ -188,10 +188,10 @@ index 2b6dbb6..24eee39 100644
          //20091005 - 500.7
          TurnMod extraTurn = useNextExtraTurn();
 diff --git a/Mage/src/main/java/mage/game/combat/Combat.java b/Mage/src/main/java/mage/game/combat/Combat.java
-index c3228d6..fa416da 100644
+index dc03748e..a8d9ef06 100644
 --- a/Mage/src/main/java/mage/game/combat/Combat.java
 +++ b/Mage/src/main/java/mage/game/combat/Combat.java
-@@ -260,15 +260,23 @@ public class Combat implements Serializable, Copyable<Combat> {
+@@ -336,15 +336,23 @@ public class Combat implements Serializable, Copyable<Combat> {
  
      public void selectAttackers(Game game) {
          if (!game.replaceEvent(GameEvent.getEvent(GameEvent.EventType.DECLARING_ATTACKERS, attackingPlayerId, attackingPlayerId))) {
@@ -220,7 +220,7 @@ index c3228d6..fa416da 100644
                      }
                      firstTime = false;
                      if (game.isPaused()
-@@ -673,7 +681,12 @@ public class Combat implements Serializable, Copyable<Combat> {
+@@ -749,7 +757,12 @@ public class Combat implements Serializable, Copyable<Combat> {
          //20101001 - 509.1c
          game.getCombat().retrieveMustBlockAttackerRequirements(attacker, game);
          Player controller;
@@ -235,7 +235,7 @@ index c3228d6..fa416da 100644
              if (defender == null) {
                  continue;
 diff --git a/Mage/src/main/java/mage/game/combat/CombatGroup.java b/Mage/src/main/java/mage/game/combat/CombatGroup.java
-index deecf76..5f4ed13 100644
+index deecf769..5f4ed13d 100644
 --- a/Mage/src/main/java/mage/game/combat/CombatGroup.java
 +++ b/Mage/src/main/java/mage/game/combat/CombatGroup.java
 @@ -547,8 +547,9 @@ public class CombatGroup implements Serializable, Copyable<CombatGroup> {
@@ -251,7 +251,7 @@ index deecf76..5f4ed13 100644
          }
          for (UUID attackerId : attackers) {
 diff --git a/Mage/src/main/java/mage/game/turn/CleanupStep.java b/Mage/src/main/java/mage/game/turn/CleanupStep.java
-index be102a7..3a760b4 100644
+index be102a78..3a760b48 100644
 --- a/Mage/src/main/java/mage/game/turn/CleanupStep.java
 +++ b/Mage/src/main/java/mage/game/turn/CleanupStep.java
 @@ -36,6 +36,13 @@ public class CleanupStep extends Step {
@@ -269,7 +269,7 @@ index be102a7..3a760b4 100644
          // 514.2
          // Second, the following actions happen simultaneously: all damage marked on permanents
 diff --git a/Mage/src/main/java/mage/game/turn/DrawStep.java b/Mage/src/main/java/mage/game/turn/DrawStep.java
-index d075097..2f788b4 100644
+index d0750978..2f788b4e 100644
 --- a/Mage/src/main/java/mage/game/turn/DrawStep.java
 +++ b/Mage/src/main/java/mage/game/turn/DrawStep.java
 @@ -28,6 +28,13 @@ public class DrawStep extends Step {
@@ -287,7 +287,7 @@ index d075097..2f788b4 100644
          for (UUID playerId : game.getState().getPlayersInRange(activePlayerId, game)) {
              Player player = game.getPlayer(playerId);
 diff --git a/Mage/src/main/java/mage/game/turn/Turn.java b/Mage/src/main/java/mage/game/turn/Turn.java
-index 1b32915..4c3ee3b 100644
+index 1b329156..4c3ee3b5 100644
 --- a/Mage/src/main/java/mage/game/turn/Turn.java
 +++ b/Mage/src/main/java/mage/game/turn/Turn.java
 @@ -107,6 +107,15 @@ public class Turn implements Serializable {
@@ -307,7 +307,7 @@ index 1b32915..4c3ee3b 100644
          game.fireEvent(event);
          for (Phase phase : phases) {
 diff --git a/Mage/src/main/java/mage/game/turn/UntapStep.java b/Mage/src/main/java/mage/game/turn/UntapStep.java
-index 4f32d68..3c1627b 100644
+index 4f32d680..3c1627b5 100644
 --- a/Mage/src/main/java/mage/game/turn/UntapStep.java
 +++ b/Mage/src/main/java/mage/game/turn/UntapStep.java
 @@ -43,6 +43,14 @@ public class UntapStep extends Step {

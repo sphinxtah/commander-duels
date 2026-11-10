@@ -1,0 +1,85 @@
+name: Campaign difficulty
+# The campaign's difficulty measured on GitHub's runners (v0.9.4): one job a ward, in parallel, each
+# playing the reference deck suite against that ward's deck (CampaignDifficulty, engine tests), then
+# one summary of all fourteen. Too long for CI on every push, so it runs on demand: from Actions ›
+# Campaign difficulty › Run workflow, or by pushing a branch named difficulty/<anything>.
+on:
+  workflow_dispatch:
+    inputs:
+      games:
+        description: Games per reference deck and ward (three references, so 10 is 30 games a ward)
+        default: '10'
+      wards:
+        description: Wards to measure, as a JSON list
+        default: '[1,2,3,4,5,6,7,8,9,10,11,12,13,14]'
+  push:
+    branches: ['difficulty/**']
+permissions:
+  contents: read
+jobs:
+  ward:
+    runs-on: ubuntu-24.04
+    # Ward 13 at skill 6 takes up to about 5 minutes a game: 30 games fit in under three hours.
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        ward: ${{ fromJSON(inputs.wards || '[1,2,3,4,5,6,7,8,9,10,11,12,13,14]') }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      # The compiled XMage and its card database, from the engine job's cache when the pin matches.
+      - name: Build the card database stage
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: engine/Dockerfile
+          target: carddb
+          tags: commander-duels-carddb:latest
+          load: true
+          cache-from: type=gha,scope=engine
+      - name: Play the ward
+        env:
+          GAMES: ${{ inputs.games || '10' }}
+          WARD: ${{ matrix.ward }}
+        run: |
+          mkdir -p out
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/out:/out" commander-duels-carddb:latest sh -c "
+            cp -r /src /build && cd /build/engine && ln -s /xmage/carddb/db db &&
+            mvn -B -ntp -q -Dmaven.repo.local.tail=/xmage/m2 test -Dtest=CampaignDifficulty \
+              -Dsurefire.failIfNoSpecifiedTests=false \
+              -Dcampaign.measure=$GAMES -Dcampaign.wards=$WARD -Dcampaign.budget=900 \
+              -Dcampaign.out=/out/ward-$WARD.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ward-${{ matrix.ward }}
+          path: out/ward-${{ matrix.ward }}.json
+          retention-days: 30
+  summary:
+    needs: ward
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: ward-*
+          merge-multiple: true
+          path: out
+      - name: Merge and summarize
+        run: |
+          python3 - <<'EOF'
+          import json, pathlib
+          merged = {"games": []}
+          for f in sorted(pathlib.Path("out").glob("ward-*.json")):
+              report = json.loads(f.read_text())
+              merged["games"] += report.pop("games")
+              merged.update(report)
+          pathlib.Path("out/campaign-difficulty.json").write_text(json.dumps(merged))
+          EOF
+          python3 scripts/campaign_difficulty.py out/campaign-difficulty.json | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: campaign-difficulty
+          path: out/campaign-difficulty.json
+          retention-days: 90

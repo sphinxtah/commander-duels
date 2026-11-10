@@ -20,12 +20,14 @@ Upstream: none yet; offered with the other Two-Headed Giant patches.
 Remove when: XMage upstream implements shared team turns, or Two-Headed Giant is dropped.
 
 diff --git a/Mage/src/main/java/mage/game/Game.java b/Mage/src/main/java/mage/game/Game.java
+index 605a46df..bc26d977 100644
 --- a/Mage/src/main/java/mage/game/Game.java
 +++ b/Mage/src/main/java/mage/game/Game.java
-@@ -240,6 +240,38 @@
+@@ -239,6 +239,38 @@ public interface Game extends MageItem, Serializable, Copyable<Game> {
+         return team;
      }
  
-     /**
++    /**
 +     * 805.3a, 805.6, 805.7: with shared team turns, players who act or choose in turn order do so
 +     * team by team: the given players in their order, each followed at once by those of their
 +     * teammates among them. From the active player that is the active team first, then each other
@@ -57,11 +59,10 @@ diff --git a/Mage/src/main/java/mage/game/Game.java b/Mage/src/main/java/mage/ga
 +        return playerId;
 +    }
 +
-+    /**
+     /**
       * 805.4a, 805.9: with shared team turns, the team whose turn it is is the active team, and each
       * of its players is an active player.
-      */
-@@ -281,8 +313,8 @@
+@@ -281,8 +313,8 @@ public interface Game extends MageItem, Serializable, Copyable<Game> {
  
      /**
       * 810.9d: with a shared team life total, an effect that sets each player's life total sets one
@@ -72,7 +73,7 @@ diff --git a/Mage/src/main/java/mage/game/Game.java b/Mage/src/main/java/mage/ga
       * one outside team games.
       */
      default List<UUID> chooseLifeTotalsToSet(List<UUID> playerIds, java.util.function.ToIntFunction<UUID> newLife) {
-@@ -295,7 +327,8 @@
+@@ -295,7 +327,8 @@ public interface Game extends MageItem, Serializable, Copyable<Game> {
              List<UUID> team = playerIds.stream().filter(getTeam(playerId)::contains).collect(Collectors.toList());
              decided.addAll(team);
              UUID pick = playerId;
@@ -83,9 +84,10 @@ diff --git a/Mage/src/main/java/mage/game/Game.java b/Mage/src/main/java/mage/ga
                  Map<String, UUID> options = new LinkedHashMap<>();
                  for (UUID teamPlayerId : team) {
 diff --git a/Mage/src/main/java/mage/game/GameImpl.java b/Mage/src/main/java/mage/game/GameImpl.java
+index 8f541140..e41b7954 100644
 --- a/Mage/src/main/java/mage/game/GameImpl.java
 +++ b/Mage/src/main/java/mage/game/GameImpl.java
-@@ -1424,8 +1424,8 @@
+@@ -1447,8 +1447,8 @@ public abstract class GameImpl implements Game {
          getState().setChoosingPlayerId(null);
          state.resetWatchers(); // watcher objects from cards are reused during match so reset all card watchers already added
  
@@ -96,7 +98,7 @@ diff --git a/Mage/src/main/java/mage/game/GameImpl.java b/Mage/src/main/java/mag
              Player player = getPlayer(playerId);
              Cards cardsWithOpeningAction = new CardsImpl();
              for (Card card : player.getHand().getCards(this)) {
-@@ -1950,7 +1950,7 @@
+@@ -1973,7 +1973,7 @@ public abstract class GameImpl implements Game {
                              throw new MageException(UNIT_TESTS_ERROR_TEXT + ": " + e.getMessage(), e);
                          }
                      }
@@ -105,7 +107,7 @@ diff --git a/Mage/src/main/java/mage/game/GameImpl.java b/Mage/src/main/java/mag
                  }
              }
          } catch (Exception e) {
-@@ -1974,6 +1974,26 @@
+@@ -1997,6 +1997,26 @@ public abstract class GameImpl implements Game {
          }
      }
  
@@ -132,7 +134,7 @@ diff --git a/Mage/src/main/java/mage/game/GameImpl.java b/Mage/src/main/java/mag
      protected void resolve() {
          StackObject top = null;
          boolean wasError = false;
-@@ -2467,7 +2487,16 @@
+@@ -2490,7 +2510,16 @@ public abstract class GameImpl implements Game {
      boolean checkTriggered() {
          boolean played = false;
          state.getTriggers().checkStateTriggers(this);
@@ -150,11 +152,10 @@ diff --git a/Mage/src/main/java/mage/game/GameImpl.java b/Mage/src/main/java/mag
              Player player = getPlayer(playerId);
              while (player.canRespond()) { // player can die or win caused by triggered abilities or leave the game
                  List<TriggeredAbility> abilities = state.getTriggered(player.getId());
-@@ -2500,6 +2529,49 @@
-         }
+@@ -2524,6 +2553,49 @@ public abstract class GameImpl implements Game {
          return played;
      }
-+
+ 
 +    /**
 +     * 805.7: with shared team turns, the members of a team put all triggered abilities any of them
 +     * controls on the stack in any order they choose. Abilities that don't use the stack are
@@ -197,13 +198,15 @@ diff --git a/Mage/src/main/java/mage/game/GameImpl.java b/Mage/src/main/java/mag
 +        }
 +        return played;
 +    }
- 
++
      /**
       * 704.5a, 810.8a: a player with 0 or less life loses, unless an effect says they don't lose for
+      * it (Transcendence and the like). With a shared life total, such an effect on any player of the
 diff --git a/Mage/src/main/java/mage/game/combat/Combat.java b/Mage/src/main/java/mage/game/combat/Combat.java
+index d1847658..5760245f 100644
 --- a/Mage/src/main/java/mage/game/combat/Combat.java
 +++ b/Mage/src/main/java/mage/game/combat/Combat.java
-@@ -273,6 +273,20 @@
+@@ -350,6 +350,20 @@ public class Combat implements Serializable, Copyable<Combat> {
              List<UUID> attackingTeam = new ArrayList<>();
              attackingTeam.add(attackingPlayerId);
              attackingTeam.addAll(game.getTeammates(attackingPlayerId));
@@ -224,7 +227,7 @@ diff --git a/Mage/src/main/java/mage/game/combat/Combat.java b/Mage/src/main/jav
              for (UUID attackingTeamPlayerId : attackingTeam) {
                  //20101001 - 508.1d
                  Player player = game.getPlayer(attackingTeamPlayerId);
-@@ -300,6 +314,121 @@
+@@ -377,6 +391,121 @@ public class Combat implements Serializable, Copyable<Combat> {
          }
      }
  
@@ -346,7 +349,7 @@ diff --git a/Mage/src/main/java/mage/game/combat/Combat.java b/Mage/src/main/jav
      @SuppressWarnings("deprecation")
      public void resumeSelectAttackers(Game game) {
          Map<UUID, Set<MageObjectReference>> morSetMap = new HashMap<>();
-@@ -694,6 +823,26 @@
+@@ -771,6 +900,26 @@ public class Combat implements Serializable, Copyable<Combat> {
          for (UUID defenderId : new ArrayList<>(blockingPlayers)) {
              blockingPlayers.addAll(game.getTeammates(defenderId));
          }
@@ -373,7 +376,7 @@ diff --git a/Mage/src/main/java/mage/game/combat/Combat.java b/Mage/src/main/jav
          for (UUID defenderId : blockingPlayers) {
              Player defender = game.getPlayer(defenderId);
              if (defender == null) {
-@@ -767,6 +916,144 @@
+@@ -844,6 +993,144 @@ public class Combat implements Serializable, Copyable<Combat> {
          }
      }
  
@@ -519,9 +522,10 @@ diff --git a/Mage/src/main/java/mage/game/combat/Combat.java b/Mage/src/main/jav
          if (controller.isComputer() || !controller.isHuman()) {
              // TODO: wtf, AI will freeze forever here in games with attacker/blocker restrictions,
 diff --git a/Mage/src/main/java/mage/game/mulligan/Mulligan.java b/Mage/src/main/java/mage/game/mulligan/Mulligan.java
+index f29900ab..35247482 100644
 --- a/Mage/src/main/java/mage/game/mulligan/Mulligan.java
 +++ b/Mage/src/main/java/mage/game/mulligan/Mulligan.java
-@@ -40,7 +40,8 @@
+@@ -40,7 +40,8 @@ public abstract class Mulligan implements Serializable {
          List<UUID> mulliganPlayers = new ArrayList<>();
          do {
              mulliganPlayers.clear();

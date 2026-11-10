@@ -376,7 +376,7 @@ index 080cf4a7..cc928d2a 100644
      }
  
 diff --git a/Mage/src/main/java/mage/game/Game.java b/Mage/src/main/java/mage/game/Game.java
-index 3816ee33..78edacf5 100644
+index bc26d977..cc6fbfcf 100644
 --- a/Mage/src/main/java/mage/game/Game.java
 +++ b/Mage/src/main/java/mage/game/Game.java
 @@ -215,10 +215,57 @@ public interface Game extends MageItem, Serializable, Copyable<Game> {
@@ -459,10 +459,10 @@ index 3816ee33..78edacf5 100644
  
      Turn getTurn();
 diff --git a/Mage/src/main/java/mage/game/GameImpl.java b/Mage/src/main/java/mage/game/GameImpl.java
-index deb847a9..4d2b70b6 100644
+index e41b7954..1dfbc2bd 100644
 --- a/Mage/src/main/java/mage/game/GameImpl.java
 +++ b/Mage/src/main/java/mage/game/GameImpl.java
-@@ -1412,7 +1412,7 @@ public abstract class GameImpl implements Game {
+@@ -1435,7 +1435,7 @@ public abstract class GameImpl implements Game {
              Player player = getPlayer(playerId);
              player.initStartingDeckSize();
              if (!gameOptions.testMode || player.getLife() == 0) {
@@ -472,10 +472,10 @@ index deb847a9..4d2b70b6 100644
              if (!gameOptions.testMode) {
                  mulligan.drawHand(startingHandSize, player, this);
 diff --git a/Mage/src/main/java/mage/game/combat/Combat.java b/Mage/src/main/java/mage/game/combat/Combat.java
-index 9fcc301f..0717f51d 100644
+index 5760245f..b6dd61e4 100644
 --- a/Mage/src/main/java/mage/game/combat/Combat.java
 +++ b/Mage/src/main/java/mage/game/combat/Combat.java
-@@ -1692,11 +1692,20 @@ public class Combat implements Serializable, Copyable<Combat> {
+@@ -1769,11 +1769,20 @@ public class Combat implements Serializable, Copyable<Combat> {
  
      public void setDefenders(Game game) {
          // player + planeswalkers
@@ -498,7 +498,7 @@ index 9fcc301f..0717f51d 100644
          for (Permanent permanent : game.getBattlefield().getActivePermanents(filterBattles, attackingPlayerId, game)) {
              defenders.add(permanent.getId());
          }
-@@ -1736,7 +1745,7 @@ public class Combat implements Serializable, Copyable<Combat> {
+@@ -1813,7 +1822,7 @@ public class Combat implements Serializable, Copyable<Combat> {
                      break;
              }
          }
@@ -508,7 +508,7 @@ index 9fcc301f..0717f51d 100644
  
      private void addDefendersFromPlayer(UUID playerId, Game game) {
 diff --git a/Mage/src/main/java/mage/players/PlayerImpl.java b/Mage/src/main/java/mage/players/PlayerImpl.java
-index dde7d66d..3fd39c2e 100644
+index 8f48d226..566df12d 100644
 --- a/Mage/src/main/java/mage/players/PlayerImpl.java
 +++ b/Mage/src/main/java/mage/players/PlayerImpl.java
 @@ -431,7 +431,7 @@ public abstract class PlayerImpl implements Player, Serializable {
@@ -520,7 +520,7 @@ index dde7d66d..3fd39c2e 100644
          this.wins = false;
          this.draws = false;
          this.loses = false;
-@@ -5611,7 +5611,7 @@ public abstract class PlayerImpl implements Player, Serializable {
+@@ -5612,7 +5612,7 @@ public abstract class PlayerImpl implements Player, Serializable {
      public boolean hasOpponent(UUID playerToCheckId, Game game) {
          return !this.getId().equals(playerToCheckId)
                  && game.isOpponent(this, playerToCheckId)

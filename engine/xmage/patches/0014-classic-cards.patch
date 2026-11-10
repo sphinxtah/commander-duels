@@ -1,0 +1,649 @@
+Classic cards XMage lacked, as printed (Commander Duels v0.9.4): Undergrowth and Taste of Paradise
+(Alliances), Chromatic Armor and Barbarian Guides (Ice Age), Whippoorwill (The Dark).
+
+Reason: Commander Duels deals these cards from their sets' packs, and XMage had no implementation
+of them, so they played as stand-ins. Two pieces of the core come with them: an optional additional
+mana cost that is not kicker ("As an additional cost to cast this spell, you may pay {2}{R}", and
+"... any number of times"; OptionalAdditionalManaCostAbility, the times paid kept in the spell's
+costs tags, and a spell cast with it is not kicked), and the sleight counter (CounterType.SLEIGHT).
+Chromatic Armor's "last chosen color" is the Aura's own chosen-color value, which each choice
+replaces. Whippoorwill's "can't be dealt instead to another permanent or player" is shown and not
+enforced: XMage carries redirection as replacement effects of the damage, with no event of their
+own; regeneration, prevention and the exile are enforced.
+Upstream: none.
+Remove when: XMage implements these cards.
+diff --git a/Mage.Sets/src/mage/cards/b/BarbarianGuides.java b/Mage.Sets/src/mage/cards/b/BarbarianGuides.java
+new file mode 100644
+index 00000000..c6d9be9e
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/b/BarbarianGuides.java
+@@ -0,0 +1,107 @@
++package mage.cards.b;
++
++import mage.MageInt;
++import mage.abilities.Ability;
++import mage.abilities.common.SimpleActivatedAbility;
++import mage.abilities.common.delayed.AtTheBeginOfNextEndStepDelayedTriggeredAbility;
++import mage.abilities.costs.common.TapSourceCost;
++import mage.abilities.costs.mana.ManaCostsImpl;
++import mage.abilities.effects.OneShotEffect;
++import mage.abilities.effects.common.ReturnToHandTargetEffect;
++import mage.abilities.effects.common.continuous.GainAbilityTargetEffect;
++import mage.abilities.keyword.LandwalkAbility;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.choices.ChoiceImpl;
++import mage.constants.CardType;
++import mage.constants.Duration;
++import mage.constants.Outcome;
++import mage.constants.SubType;
++import mage.constants.SuperType;
++import mage.filter.common.FilterControlledLandPermanent;
++import mage.game.Game;
++import mage.game.permanent.Permanent;
++import mage.players.Player;
++import mage.target.common.TargetControlledCreaturePermanent;
++import mage.target.targetpointer.FixedTarget;
++
++import java.util.UUID;
++import java.util.stream.Collectors;
++
++/**
++ * Barbarian Guides (Commander Duels, XMage patch 0014).
++ */
++public final class BarbarianGuides extends CardImpl {
++
++    public BarbarianGuides(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.CREATURE}, "{2}{R}");
++
++        this.subtype.add(SubType.HUMAN);
++        this.subtype.add(SubType.BARBARIAN);
++        this.power = new MageInt(1);
++        this.toughness = new MageInt(2);
++
++        // {2}{R}, {T}: Choose a land type. Target creature you control gains snow landwalk of the
++        // chosen type until end of turn. Return that creature to its owner's hand at the beginning
++        // of the next end step.
++        Ability ability = new SimpleActivatedAbility(new BarbarianGuidesEffect(), new ManaCostsImpl<>("{2}{R}"));
++        ability.addCost(new TapSourceCost());
++        ability.addTarget(new TargetControlledCreaturePermanent());
++        this.addAbility(ability);
++    }
++
++    private BarbarianGuides(final BarbarianGuides card) {
++        super(card);
++    }
++
++    @Override
++    public BarbarianGuides copy() {
++        return new BarbarianGuides(this);
++    }
++}
++
++class BarbarianGuidesEffect extends OneShotEffect {
++
++    BarbarianGuidesEffect() {
++        super(Outcome.AddAbility);
++        staticText = "Choose a land type. Target creature you control gains snow landwalk of the chosen type "
++                + "until end of turn. Return that creature to its owner's hand at the beginning of the next end step";
++    }
++
++    private BarbarianGuidesEffect(final BarbarianGuidesEffect effect) {
++        super(effect);
++    }
++
++    @Override
++    public BarbarianGuidesEffect copy() {
++        return new BarbarianGuidesEffect(this);
++    }
++
++    @Override
++    public boolean apply(Game game, Ability source) {
++        Player controller = game.getPlayer(source.getControllerId());
++        Permanent creature = game.getPermanent(getTargetPointer().getFirst(game, source));
++        if (controller == null || creature == null) {
++            return false;
++        }
++        ChoiceImpl choice = new ChoiceImpl(true);
++        choice.setMessage("Choose a land type");
++        choice.setChoices(SubType.getLandTypes().stream().map(SubType::toString).collect(Collectors.toSet()));
++        if (!controller.choose(Outcome.AddAbility, choice, game)) {
++            return false;
++        }
++        SubType landType = SubType.byDescription(choice.getChoice());
++        if (landType == null) {
++            return false;
++        }
++        game.informPlayers(controller.getLogName() + " chooses " + landType);
++        FilterControlledLandPermanent filter = new FilterControlledLandPermanent("snow " + landType.toString());
++        filter.add(SuperType.SNOW.getPredicate());
++        filter.add(landType.getPredicate());
++        game.addEffect(new GainAbilityTargetEffect(new LandwalkAbility(filter), Duration.EndOfTurn)
++                .setTargetPointer(new FixedTarget(creature, game)), source);
++        game.addDelayedTriggeredAbility(new AtTheBeginOfNextEndStepDelayedTriggeredAbility(
++                new ReturnToHandTargetEffect().setTargetPointer(new FixedTarget(creature, game))), source);
++        return true;
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/c/ChromaticArmor.java b/Mage.Sets/src/mage/cards/c/ChromaticArmor.java
+new file mode 100644
+index 00000000..ac7e16cc
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/c/ChromaticArmor.java
+@@ -0,0 +1,101 @@
++package mage.cards.c;
++
++import mage.MageObject;
++import mage.ObjectColor;
++import mage.abilities.Ability;
++import mage.abilities.common.AsEntersBattlefieldAbility;
++import mage.abilities.common.EntersBattlefieldWithCountersAbility;
++import mage.abilities.common.SimpleActivatedAbility;
++import mage.abilities.common.SimpleStaticAbility;
++import mage.abilities.costs.common.DynamicValueGenericManaCost;
++import mage.abilities.dynamicvalue.common.CountersSourceCount;
++import mage.abilities.effects.common.AttachEffect;
++import mage.abilities.effects.common.ChooseColorEffect;
++import mage.abilities.effects.common.PreventDamageToAttachedEffect;
++import mage.abilities.effects.common.counter.AddCountersSourceEffect;
++import mage.abilities.keyword.EnchantAbility;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.AttachmentType;
++import mage.constants.CardType;
++import mage.constants.Duration;
++import mage.constants.Outcome;
++import mage.constants.SubType;
++import mage.counters.CounterType;
++import mage.game.Game;
++import mage.game.events.GameEvent;
++import mage.target.TargetPermanent;
++import mage.target.common.TargetCreaturePermanent;
++
++import java.util.UUID;
++
++/**
++ * Chromatic Armor (Commander Duels, XMage patch 0014). The last chosen color is the one kept under
++ * the Aura's own "_color" value, which each choice replaces.
++ */
++public final class ChromaticArmor extends CardImpl {
++
++    public ChromaticArmor(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.ENCHANTMENT}, "{1}{W}{U}");
++
++        this.subtype.add(SubType.AURA);
++
++        // Enchant creature
++        TargetPermanent auraTarget = new TargetCreaturePermanent();
++        this.getSpellAbility().addTarget(auraTarget);
++        this.getSpellAbility().addEffect(new AttachEffect(Outcome.BoostCreature));
++        this.addAbility(new EnchantAbility(auraTarget));
++
++        // As this Aura enters, choose a color.
++        this.addAbility(new AsEntersBattlefieldAbility(new ChooseColorEffect(Outcome.Benefit)));
++
++        // This Aura enters with a sleight counter on it.
++        this.addAbility(new EntersBattlefieldWithCountersAbility(CounterType.SLEIGHT.createInstance()));
++
++        // Prevent all damage that would be dealt to enchanted creature by sources of the last chosen color.
++        this.addAbility(new SimpleStaticAbility(new ChromaticArmorEffect()));
++
++        // {X}: Put a sleight counter on this Aura and choose a color. X is the number of sleight counters on this Aura.
++        Ability ability = new SimpleActivatedAbility(
++                new AddCountersSourceEffect(CounterType.SLEIGHT.createInstance()),
++                new DynamicValueGenericManaCost(new CountersSourceCount(CounterType.SLEIGHT), "{X}"));
++        ability.addEffect(new ChooseColorEffect(Outcome.Benefit).concatBy("and"));
++        this.addAbility(ability);
++    }
++
++    private ChromaticArmor(final ChromaticArmor card) {
++        super(card);
++    }
++
++    @Override
++    public ChromaticArmor copy() {
++        return new ChromaticArmor(this);
++    }
++}
++
++class ChromaticArmorEffect extends PreventDamageToAttachedEffect {
++
++    ChromaticArmorEffect() {
++        super(Duration.WhileOnBattlefield, AttachmentType.AURA, false);
++        staticText = "Prevent all damage that would be dealt to enchanted creature by sources of the last chosen color";
++    }
++
++    private ChromaticArmorEffect(final ChromaticArmorEffect effect) {
++        super(effect);
++    }
++
++    @Override
++    public ChromaticArmorEffect copy() {
++        return new ChromaticArmorEffect(this);
++    }
++
++    @Override
++    public boolean applies(GameEvent event, Ability source, Game game) {
++        if (!super.applies(event, source, game)) {
++            return false;
++        }
++        ObjectColor chosen = (ObjectColor) game.getState().getValue(source.getSourceId() + "_color");
++        MageObject damageSource = game.getObject(event.getSourceId());
++        return chosen != null && damageSource != null && damageSource.getColor(game).shares(chosen);
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/t/TasteOfParadise.java b/Mage.Sets/src/mage/cards/t/TasteOfParadise.java
+new file mode 100644
+index 00000000..1d8650a8
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/t/TasteOfParadise.java
+@@ -0,0 +1,68 @@
++package mage.cards.t;
++
++import mage.abilities.Ability;
++import mage.abilities.effects.OneShotEffect;
++import mage.abilities.keyword.OptionalAdditionalManaCostAbility;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.Outcome;
++import mage.game.Game;
++import mage.players.Player;
++
++import java.util.UUID;
++
++/**
++ * Taste of Paradise (Commander Duels, XMage patch 0014).
++ */
++public final class TasteOfParadise extends CardImpl {
++
++    static final String PAID = "TasteOfParadisePaid";
++
++    public TasteOfParadise(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.SORCERY}, "{3}{G}");
++
++        // As an additional cost to cast this spell, you may pay {1}{G} any number of times.
++        this.addAbility(new OptionalAdditionalManaCostAbility(PAID, "{1}{G}", true));
++
++        // You gain 3 life plus an additional 3 life for each additional {1}{G} you paid.
++        this.getSpellAbility().addEffect(new TasteOfParadiseEffect());
++    }
++
++    private TasteOfParadise(final TasteOfParadise card) {
++        super(card);
++    }
++
++    @Override
++    public TasteOfParadise copy() {
++        return new TasteOfParadise(this);
++    }
++}
++
++class TasteOfParadiseEffect extends OneShotEffect {
++
++    TasteOfParadiseEffect() {
++        super(Outcome.GainLife);
++        staticText = "You gain 3 life plus an additional 3 life for each additional {1}{G} you paid";
++    }
++
++    private TasteOfParadiseEffect(final TasteOfParadiseEffect effect) {
++        super(effect);
++    }
++
++    @Override
++    public TasteOfParadiseEffect copy() {
++        return new TasteOfParadiseEffect(this);
++    }
++
++    @Override
++    public boolean apply(Game game, Ability source) {
++        Player controller = game.getPlayer(source.getControllerId());
++        if (controller == null) {
++            return false;
++        }
++        int paid = OptionalAdditionalManaCostAbility.timesPaid(game, source, TasteOfParadise.PAID);
++        controller.gainLife(3 + 3 * paid, game, source);
++        return true;
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/u/Undergrowth.java b/Mage.Sets/src/mage/cards/u/Undergrowth.java
+new file mode 100644
+index 00000000..500bcf08
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/u/Undergrowth.java
+@@ -0,0 +1,74 @@
++package mage.cards.u;
++
++import mage.ObjectColor;
++import mage.abilities.Ability;
++import mage.abilities.effects.OneShotEffect;
++import mage.abilities.effects.common.PreventAllDamageByAllPermanentsEffect;
++import mage.abilities.keyword.OptionalAdditionalManaCostAbility;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.Duration;
++import mage.constants.Outcome;
++import mage.filter.FilterPermanent;
++import mage.filter.predicate.Predicates;
++import mage.filter.predicate.mageobject.ColorPredicate;
++import mage.game.Game;
++
++import java.util.UUID;
++
++/**
++ * Undergrowth (Commander Duels, XMage patch 0014).
++ */
++public final class Undergrowth extends CardImpl {
++
++    static final String PAID = "UndergrowthPaid";
++
++    public Undergrowth(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.INSTANT}, "{G}");
++
++        // As an additional cost to cast this spell, you may pay {2}{R}.
++        this.addAbility(new OptionalAdditionalManaCostAbility(PAID, "{2}{R}", false));
++
++        // Prevent all combat damage that would be dealt this turn. If this spell's additional cost
++        // was paid, this effect doesn't affect combat damage that would be dealt by red creatures.
++        this.getSpellAbility().addEffect(new UndergrowthEffect());
++    }
++
++    private Undergrowth(final Undergrowth card) {
++        super(card);
++    }
++
++    @Override
++    public Undergrowth copy() {
++        return new Undergrowth(this);
++    }
++}
++
++class UndergrowthEffect extends OneShotEffect {
++
++    UndergrowthEffect() {
++        super(Outcome.PreventDamage);
++        staticText = "Prevent all combat damage that would be dealt this turn. If this spell's additional cost "
++                + "was paid, this effect doesn't affect combat damage that would be dealt by red creatures";
++    }
++
++    private UndergrowthEffect(final UndergrowthEffect effect) {
++        super(effect);
++    }
++
++    @Override
++    public UndergrowthEffect copy() {
++        return new UndergrowthEffect(this);
++    }
++
++    @Override
++    public boolean apply(Game game, Ability source) {
++        FilterPermanent filter = new FilterPermanent();
++        if (OptionalAdditionalManaCostAbility.timesPaid(game, source, Undergrowth.PAID) > 0) {
++            filter.add(Predicates.not(new ColorPredicate(ObjectColor.RED)));
++        }
++        game.addEffect(new PreventAllDamageByAllPermanentsEffect(filter, Duration.EndOfTurn, true), source);
++        return true;
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/w/Whippoorwill.java b/Mage.Sets/src/mage/cards/w/Whippoorwill.java
+new file mode 100644
+index 00000000..2183d3c6
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/w/Whippoorwill.java
+@@ -0,0 +1,88 @@
++package mage.cards.w;
++
++import mage.MageInt;
++import mage.abilities.Ability;
++import mage.abilities.common.SimpleActivatedAbility;
++import mage.abilities.costs.common.TapSourceCost;
++import mage.abilities.costs.mana.ManaCostsImpl;
++import mage.abilities.effects.ContinuousRuleModifyingEffectImpl;
++import mage.abilities.effects.common.CantBeRegeneratedTargetEffect;
++import mage.abilities.effects.common.ExileTargetIfDiesEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.Duration;
++import mage.constants.Outcome;
++import mage.constants.SubType;
++import mage.game.Game;
++import mage.game.events.GameEvent;
++import mage.target.common.TargetCreaturePermanent;
++
++import java.util.UUID;
++
++/**
++ * Whippoorwill (Commander Duels, XMage patch 0014).
++ * <p>
++ * XMage carries redirection ("dealt instead to another permanent or player") as replacement
++ * effects of the damage itself, with no event of their own, so the clause that damage can't be
++ * dealt instead elsewhere is shown and not enforced; regeneration, prevention and the exile are.
++ */
++public final class Whippoorwill extends CardImpl {
++
++    public Whippoorwill(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.CREATURE}, "{G}");
++
++        this.subtype.add(SubType.BIRD);
++        this.power = new MageInt(1);
++        this.toughness = new MageInt(1);
++
++        // {G}{G}, {T}: Target creature can't be regenerated this turn. Damage that would be dealt to
++        // that creature this turn can't be prevented or dealt instead to another permanent or player.
++        // When the creature dies this turn, exile the creature.
++        Ability ability = new SimpleActivatedAbility(
++                new CantBeRegeneratedTargetEffect(Duration.EndOfTurn), new ManaCostsImpl<>("{G}{G}"));
++        ability.addCost(new TapSourceCost());
++        ability.addEffect(new WhippoorwillEffect());
++        ability.addEffect(new ExileTargetIfDiesEffect()
++                .setText("When the creature dies this turn, exile the creature"));
++        ability.addTarget(new TargetCreaturePermanent());
++        this.addAbility(ability);
++    }
++
++    private Whippoorwill(final Whippoorwill card) {
++        super(card);
++    }
++
++    @Override
++    public Whippoorwill copy() {
++        return new Whippoorwill(this);
++    }
++}
++
++class WhippoorwillEffect extends ContinuousRuleModifyingEffectImpl {
++
++    WhippoorwillEffect() {
++        super(Duration.EndOfTurn, Outcome.Detriment);
++        staticText = "Damage that would be dealt to that creature this turn can't be prevented "
++                + "or dealt instead to another permanent or player";
++    }
++
++    private WhippoorwillEffect(final WhippoorwillEffect effect) {
++        super(effect);
++    }
++
++    @Override
++    public WhippoorwillEffect copy() {
++        return new WhippoorwillEffect(this);
++    }
++
++    @Override
++    public boolean checksEventType(GameEvent event, Game game) {
++        return event.getType() == GameEvent.EventType.PREVENT_DAMAGE;
++    }
++
++    @Override
++    public boolean applies(GameEvent event, Ability source, Game game) {
++        return event.getTargetId().equals(getTargetPointer().getFirst(game, source));
++    }
++}
+diff --git a/Mage.Sets/src/mage/sets/Alliances.java b/Mage.Sets/src/mage/sets/Alliances.java
+index b01c236c..8800beec 100644
+--- a/Mage.Sets/src/mage/sets/Alliances.java
++++ b/Mage.Sets/src/mage/sets/Alliances.java
+@@ -193,10 +193,14 @@ public final class Alliances extends ExpansionSet {
+         cards.add(new SetCardInfo("Swamp Mosquito", "63a", Rarity.COMMON, mage.cards.s.SwampMosquito.class, RETRO_ART_USE_VARIOUS));
+         cards.add(new SetCardInfo("Swamp Mosquito", "63b", Rarity.COMMON, mage.cards.s.SwampMosquito.class, RETRO_ART_USE_VARIOUS));
+         cards.add(new SetCardInfo("Sworn Defender", 19, Rarity.RARE, mage.cards.s.SwornDefender.class, RETRO_ART));
++        cards.add(new SetCardInfo("Taste of Paradise", "100a", Rarity.COMMON, mage.cards.t.TasteOfParadise.class, RETRO_ART_USE_VARIOUS));
++        cards.add(new SetCardInfo("Taste of Paradise", "100b", Rarity.COMMON, mage.cards.t.TasteOfParadise.class, RETRO_ART_USE_VARIOUS));
+         cards.add(new SetCardInfo("Thawing Glaciers", 144, Rarity.RARE, mage.cards.t.ThawingGlaciers.class, RETRO_ART));
+         cards.add(new SetCardInfo("Thought Lash", 39, Rarity.RARE, mage.cards.t.ThoughtLash.class, RETRO_ART));
+         cards.add(new SetCardInfo("Tidal Control", 40, Rarity.RARE, mage.cards.t.TidalControl.class, RETRO_ART));
+         cards.add(new SetCardInfo("Tornado", 101, Rarity.RARE, mage.cards.t.Tornado.class, RETRO_ART));
++        cards.add(new SetCardInfo("Undergrowth", "102a", Rarity.COMMON, mage.cards.u.Undergrowth.class, RETRO_ART_USE_VARIOUS));
++        cards.add(new SetCardInfo("Undergrowth", "102b", Rarity.COMMON, mage.cards.u.Undergrowth.class, RETRO_ART_USE_VARIOUS));
+         cards.add(new SetCardInfo("Unlikely Alliance", 20, Rarity.UNCOMMON, mage.cards.u.UnlikelyAlliance.class, RETRO_ART));
+         cards.add(new SetCardInfo("Urza's Engine", 135, Rarity.UNCOMMON, mage.cards.u.UrzasEngine.class, RETRO_ART));
+         cards.add(new SetCardInfo("Varchild's Crusader", "82a", Rarity.COMMON, mage.cards.v.VarchildsCrusader.class, RETRO_ART_USE_VARIOUS));
+diff --git a/Mage.Sets/src/mage/sets/IceAge.java b/Mage.Sets/src/mage/sets/IceAge.java
+index 491acae3..ff684111 100644
+--- a/Mage.Sets/src/mage/sets/IceAge.java
++++ b/Mage.Sets/src/mage/sets/IceAge.java
+@@ -46,6 +46,7 @@ public final class IceAge extends ExpansionSet {
+         cards.add(new SetCardInfo("Balduvian Bears", 226, Rarity.COMMON, mage.cards.b.BalduvianBears.class, RETRO_ART));
+         cards.add(new SetCardInfo("Balduvian Conjurer", 58, Rarity.UNCOMMON, mage.cards.b.BalduvianConjurer.class, RETRO_ART));
+         cards.add(new SetCardInfo("Balduvian Hydra", 173, Rarity.RARE, mage.cards.b.BalduvianHydra.class, RETRO_ART));
++        cards.add(new SetCardInfo("Barbarian Guides", 174, Rarity.COMMON, mage.cards.b.BarbarianGuides.class));
+         cards.add(new SetCardInfo("Barbed Sextant", 312, Rarity.COMMON, mage.cards.b.BarbedSextant.class, RETRO_ART));
+         cards.add(new SetCardInfo("Baton of Morale", 313, Rarity.UNCOMMON, mage.cards.b.BatonOfMorale.class, RETRO_ART));
+         cards.add(new SetCardInfo("Battle Cry", 5, Rarity.UNCOMMON, mage.cards.b.BattleCry.class, RETRO_ART));
+@@ -70,6 +71,7 @@ public final class IceAge extends ExpansionSet {
+         cards.add(new SetCardInfo("Centaur Archer", 282, Rarity.UNCOMMON, mage.cards.c.CentaurArcher.class, RETRO_ART));
+         cards.add(new SetCardInfo("Chaos Lord", 178, Rarity.RARE, mage.cards.c.ChaosLord.class, RETRO_ART));
+         cards.add(new SetCardInfo("Chaos Moon", 179, Rarity.RARE, mage.cards.c.ChaosMoon.class, RETRO_ART));
++        cards.add(new SetCardInfo("Chromatic Armor", 283, Rarity.RARE, mage.cards.c.ChromaticArmor.class));
+         cards.add(new SetCardInfo("Chub Toad", 229, Rarity.COMMON, mage.cards.c.ChubToad.class, RETRO_ART));
+         cards.add(new SetCardInfo("Circle of Protection: Black", 12, Rarity.COMMON, mage.cards.c.CircleOfProtectionBlack.class, RETRO_ART));
+         cards.add(new SetCardInfo("Circle of Protection: Blue", 13, Rarity.COMMON, mage.cards.c.CircleOfProtectionBlue.class, RETRO_ART));
+diff --git a/Mage.Sets/src/mage/sets/TheDark.java b/Mage.Sets/src/mage/sets/TheDark.java
+index e8af9fd5..e7ed7900 100644
+--- a/Mage.Sets/src/mage/sets/TheDark.java
++++ b/Mage.Sets/src/mage/sets/TheDark.java
+@@ -140,6 +140,7 @@ public final class TheDark extends ExpansionSet {
+         cards.add(new SetCardInfo("Wand of Ith", 114, Rarity.UNCOMMON, mage.cards.w.WandOfIth.class, RETRO_ART));
+         cards.add(new SetCardInfo("War Barge", 115, Rarity.UNCOMMON, mage.cards.w.WarBarge.class, RETRO_ART));
+         cards.add(new SetCardInfo("Water Wurm", 38, Rarity.COMMON, mage.cards.w.WaterWurm.class, RETRO_ART));
++        cards.add(new SetCardInfo("Whippoorwill", 91, Rarity.UNCOMMON, mage.cards.w.Whippoorwill.class));
+         cards.add(new SetCardInfo("Witch Hunter", 19, Rarity.RARE, mage.cards.w.WitchHunter.class, RETRO_ART));
+         cards.add(new SetCardInfo("Word of Binding", 55, Rarity.COMMON, mage.cards.w.WordOfBinding.class, RETRO_ART));
+         cards.add(new SetCardInfo("Worms of the Earth", 56, Rarity.RARE, mage.cards.w.WormsOfTheEarth.class, RETRO_ART));
+diff --git a/Mage/src/main/java/mage/abilities/keyword/OptionalAdditionalManaCostAbility.java b/Mage/src/main/java/mage/abilities/keyword/OptionalAdditionalManaCostAbility.java
+new file mode 100644
+index 00000000..812c8073
+--- /dev/null
++++ b/Mage/src/main/java/mage/abilities/keyword/OptionalAdditionalManaCostAbility.java
+@@ -0,0 +1,98 @@
++package mage.abilities.keyword;
++
++import mage.abilities.Ability;
++import mage.abilities.SpellAbility;
++import mage.abilities.StaticAbility;
++import mage.abilities.costs.OptionalAdditionalSourceCosts;
++import mage.abilities.costs.mana.ManaCostsImpl;
++import mage.constants.Outcome;
++import mage.constants.Zone;
++import mage.game.Game;
++import mage.players.Player;
++import mage.util.CardUtil;
++
++/**
++ * "As an additional cost to cast this spell, you may pay {cost}" and "... you may pay {cost} any
++ * number of times": an optional additional mana cost that is not a kicker, as older cards print it
++ * (Undergrowth, Taste of Paradise; Commander Duels, XMage patch 0014). Unlike kicker, a spell cast
++ * this way is not kicked. The times the cost was paid are kept in the spell's costs tags under the
++ * ability's key: {@link #timesPaid(Game, Ability, String)}.
++ */
++public class OptionalAdditionalManaCostAbility extends StaticAbility implements OptionalAdditionalSourceCosts {
++
++    private final String key;
++    private final String manaString;
++    private final boolean repeatable;
++    private final String rule;
++
++    /**
++     * @param key        the costs tag the times paid are kept under, unique to the card
++     * @param manaString the cost, e.g. "{2}{R}"
++     * @param repeatable whether it may be paid any number of times
++     */
++    public OptionalAdditionalManaCostAbility(String key, String manaString, boolean repeatable) {
++        super(Zone.STACK, null);
++        this.key = key;
++        this.manaString = manaString;
++        this.repeatable = repeatable;
++        this.rule = "As an additional cost to cast this spell, you may pay " + manaString
++                + (repeatable ? " any number of times." : ".");
++        this.setRuleAtTheTop(true);
++    }
++
++    protected OptionalAdditionalManaCostAbility(final OptionalAdditionalManaCostAbility ability) {
++        super(ability);
++        this.key = ability.key;
++        this.manaString = ability.manaString;
++        this.repeatable = ability.repeatable;
++        this.rule = ability.rule;
++    }
++
++    @Override
++    public OptionalAdditionalManaCostAbility copy() {
++        return new OptionalAdditionalManaCostAbility(this);
++    }
++
++    @Override
++    public void addOptionalAdditionalCosts(Ability ability, Game game) {
++        if (!(ability instanceof SpellAbility)) {
++            return;
++        }
++        Player player = game.getPlayer(ability.getControllerId());
++        if (player == null) {
++            return;
++        }
++        int paid = 0;
++        while (player.canRespond()) {
++            ManaCostsImpl<?> cost = new ManaCostsImpl<>(manaString);
++            String times = repeatable ? (paid + 1) + (paid == 0 ? " time" : " times") + " " : "";
++            if (!cost.canPay(ability, this, ability.getControllerId(), game)
++                    || !player.chooseUse(Outcome.AIDontUseIt, "Pay " + times + manaString + "?", ability, game)) {
++                break;
++            }
++            ability.addManaCostsToPay(cost);
++            paid++;
++            ability.setCostsTag(key, paid);
++            if (!repeatable) {
++                break;
++            }
++        }
++    }
++
++    @Override
++    public String getCastMessageSuffix() {
++        return "";
++    }
++
++    @Override
++    public String getRule() {
++        return rule;
++    }
++
++    /**
++     * How many times the spell's controller paid the optional cost as it was cast (0 if never).
++     */
++    public static int timesPaid(Game game, Ability source, String key) {
++        return CardUtil.getSourceCostsTag(game, source, key, 0);
++    }
++}
+diff --git a/Mage/src/main/java/mage/counters/CounterType.java b/Mage/src/main/java/mage/counters/CounterType.java
+index f2816025..319e043a 100644
+--- a/Mage/src/main/java/mage/counters/CounterType.java
++++ b/Mage/src/main/java/mage/counters/CounterType.java
+@@ -213,6 +213,7 @@ public enum CounterType {
+     SKEWER("skewer"),
+     SIN("sin"),
+     SLEEP("sleep"),
++    SLEIGHT("sleight"),
+     SLIME("slime"),
+     SLUMBER("slumber"),
+     SOOT("soot"),

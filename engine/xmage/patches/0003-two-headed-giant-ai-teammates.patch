@@ -13,7 +13,7 @@ Upstream: none yet; to be offered to magefree/mage with parts 1 and 2.
 Remove when: XMage upstream's AI supports teams, or Two-Headed Giant is dropped.
 
 diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/SimulatedPlayer2.java b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/SimulatedPlayer2.java
-index 9d7347f..fa89ecc 100644
+index 9d7347f7..fa89ecc2 100644
 --- a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/SimulatedPlayer2.java
 +++ b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/SimulatedPlayer2.java
 @@ -208,7 +208,9 @@ public final class SimulatedPlayer2 extends ComputerPlayer {
@@ -28,7 +28,7 @@ index 9d7347f..fa89ecc 100644
                      }
                  }
 diff --git a/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/PossibleTargetsSelector.java b/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/PossibleTargetsSelector.java
-index 4b4d6fd..b7cd140 100644
+index 4b4d6fd8..b7cd1400 100644
 --- a/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/PossibleTargetsSelector.java
 +++ b/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/PossibleTargetsSelector.java
 @@ -63,7 +63,8 @@ public class PossibleTargetsSelector {
@@ -61,7 +61,7 @@ index 4b4d6fd..b7cd140 100644
          boolean isAnyEffect = outcome.anyTargetHasSameValue();
  
 diff --git a/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/score/GameStateEvaluator2.java b/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/score/GameStateEvaluator2.java
-index 9c96a61..68879b7 100644
+index 9c96a619..68879b74 100644
 --- a/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/score/GameStateEvaluator2.java
 +++ b/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/score/GameStateEvaluator2.java
 @@ -28,6 +28,15 @@ public final class GameStateEvaluator2 {

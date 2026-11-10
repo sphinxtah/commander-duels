@@ -11,10 +11,10 @@ Upstream: none yet; to be offered to magefree/mage with part 1.
 Remove when: XMage upstream implements Two-Headed Giant's life and poison, or the format is dropped.
 
 diff --git a/Mage/src/main/java/mage/game/GameImpl.java b/Mage/src/main/java/mage/game/GameImpl.java
-index 2b6dbb6..24eee39 100644
+index 5ccd7038..9a8e3d1e 100644
 --- a/Mage/src/main/java/mage/game/GameImpl.java
 +++ b/Mage/src/main/java/mage/game/GameImpl.java
-@@ -2467,6 +2480,19 @@ public abstract class GameImpl implements Game {
+@@ -2503,6 +2503,19 @@ public abstract class GameImpl implements Game {
          return played;
      }
  
@@ -34,7 +34,7 @@ index 2b6dbb6..24eee39 100644
      /**
       * 117.5. Each time a player would get priority, the game first performs all
       * applicable state-based actions as a single event (see rule 704,
-@@ -2489,8 +2515,8 @@ public abstract class GameImpl implements Game {
+@@ -2525,8 +2538,8 @@ public abstract class GameImpl implements Game {
                  if (player.getLibrary().isEmptyDraw()) {
                      lostReason = "drawing from an empty library";
                  }
@@ -46,10 +46,10 @@ index 2b6dbb6..24eee39 100644
                  if (!lostReason.isEmpty() && player.lost(this)) {
                      this.informPlayers(player.getLogName() + " lost the game due " + lostReason);
 diff --git a/Mage/src/main/java/mage/players/PlayerImpl.java b/Mage/src/main/java/mage/players/PlayerImpl.java
-index 22f49e0..91297a1 100644
+index e15c7353..35aad97a 100644
 --- a/Mage/src/main/java/mage/players/PlayerImpl.java
 +++ b/Mage/src/main/java/mage/players/PlayerImpl.java
-@@ -2302,13 +2302,14 @@ public abstract class PlayerImpl implements Player, Serializable {
+@@ -2303,13 +2303,14 @@ public abstract class PlayerImpl implements Player, Serializable {
  
      @Override
      public int loseLife(int amount, Game game, Ability source, boolean atCombat, UUID attackerId) {
@@ -65,7 +65,7 @@ index 22f49e0..91297a1 100644
              if (!game.isSimulation()) {
                  UUID needId = attackerId;
                  if (needId == null) {
-@@ -2344,7 +2345,7 @@ public abstract class PlayerImpl implements Player, Serializable {
+@@ -2345,7 +2346,7 @@ public abstract class PlayerImpl implements Player, Serializable {
  
      @Override
      public int gainLife(int amount, Game game, Ability source) {
@@ -74,7 +74,7 @@ index 22f49e0..91297a1 100644
              return 0;
          }
          GameEvent event = new GameEvent(GameEvent.EventType.GAIN_LIFE,
-@@ -2354,6 +2355,7 @@ public abstract class PlayerImpl implements Player, Serializable {
+@@ -2355,6 +2356,7 @@ public abstract class PlayerImpl implements Player, Serializable {
              // (https://magic.wizards.com/en/articles/archive/news/unstable-faqawaslfaqpaftidawabiajtbt-2017-12-06 - "infinite" life total stays infinite no matter how much is gained or lost)
              // this.life += event.getAmount();
              this.life = CardUtil.overflowInc(this.life, event.getAmount());
@@ -82,7 +82,7 @@ index 22f49e0..91297a1 100644
              if (!game.isSimulation()) {
                  game.informPlayers(this.getLogName() + " gains " + event.getAmount() + " life" + CardUtil.getSourceLogName(game, source));
              }
-@@ -2364,6 +2366,31 @@ public abstract class PlayerImpl implements Player, Serializable {
+@@ -2365,6 +2367,31 @@ public abstract class PlayerImpl implements Player, Serializable {
          return 0;
      }
  

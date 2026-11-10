@@ -17,62 +17,11 @@ Upstream: none yet; XMage's own TODOs ("add support computer over computer", "co
 ask for it.
 Remove when: XMage upstream lets computer players control turns.
 
-diff --git a/Mage/src/main/java/mage/players/Player.java b/Mage/src/main/java/mage/players/Player.java
---- a/Mage/src/main/java/mage/players/Player.java
-+++ b/Mage/src/main/java/mage/players/Player.java
-@@ -1318,4 +1318,13 @@
-     default Player prepareControllableProxy(Player playerUnderControl) {
-         return this;
-     }
-+
-+    /**
-+     * Whether this player can make another player's decisions while controlling their turn (723.5):
-+     * a human player through their client, and a computer player only if it makes an AI stand-in for
-+     * the controlled player (prepareControllableProxy). A player who can't is refused the control.
-+     */
-+    default boolean canControlOtherPlayers() {
-+        return !isComputer();
-+    }
- }
-diff --git a/Mage/src/main/java/mage/players/PlayerImpl.java b/Mage/src/main/java/mage/players/PlayerImpl.java
---- a/Mage/src/main/java/mage/players/PlayerImpl.java
-+++ b/Mage/src/main/java/mage/players/PlayerImpl.java
-@@ -604,9 +604,9 @@
-     public boolean controlPlayersTurn(Game game, UUID playerUnderControlId, String info) {
-         Player playerUnderControl = game.getPlayer(playerUnderControlId);
- 
--        // TODO: add support computer over computer
--        // TODO: add support computer over human
--        if (this.isComputer()) {
-+        // a computer player controls another player's turn only when it can make that player's
-+        // decisions (canControlOtherPlayers): through an AI stand-in for them
-+        if (!this.canControlOtherPlayers()) {
-             // not supported yet
-             game.informPlayers(getLogName() + " is AI and can't take control over " + playerUnderControl.getLogName() + info);
-             return false;
-diff --git a/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/ComputerPlayer.java b/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/ComputerPlayer.java
---- a/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/ComputerPlayer.java
-+++ b/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/ComputerPlayer.java
-@@ -103,6 +103,15 @@
-         super(player);
-     }
- 
-+    /**
-+     * An AI stand-in for another player, human or computer: that player's identity and state, with
-+     * the AI's own decisions. Used while a computer player controls that player's turn (723.5).
-+     */
-+    protected ComputerPlayer(final PlayerImpl playerUnderControl) {
-+        super(playerUnderControl);
-+        human = false;
-+    }
-+
-     @Override
-     public boolean chooseMulligan(Game game) {
-         if (hand.size() < 6
 diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java
+index b39ddd4a..935806f3 100644
 --- a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java
 +++ b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java
-@@ -28,6 +28,7 @@
+@@ -28,6 +28,7 @@ import mage.player.ai.score.GameStateEvaluator2;
  import mage.player.ai.util.CombatInfo;
  import mage.player.ai.util.CombatUtil;
  import mage.players.Player;
@@ -80,7 +29,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerP
  import mage.target.Target;
  import mage.target.TargetAmount;
  import mage.target.TargetCard;
-@@ -100,6 +101,18 @@
+@@ -100,6 +101,18 @@ public class ComputerPlayer6 extends ComputerPlayer {
          this.actionCache = new HashSet<>();
      }
  
@@ -100,9 +49,10 @@ diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerP
          super(player);
          this.maxDepth = player.maxDepth;
 diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer7.java b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer7.java
+index 09af732d..f2a6737e 100644
 --- a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer7.java
 +++ b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer7.java
-@@ -4,6 +4,7 @@
+@@ -4,6 +4,7 @@ import mage.abilities.Ability;
  import mage.constants.RangeOfInfluence;
  import mage.game.Game;
  import mage.player.ai.score.GameStateEvaluator2;
@@ -110,7 +60,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerP
  import org.apache.log4j.Logger;
  
  import java.util.Date;
-@@ -29,6 +30,12 @@
+@@ -29,6 +30,12 @@ public class ComputerPlayer7 extends ComputerPlayer6 {
          this.allowBadMoves = player.allowBadMoves;
      }
  
@@ -124,9 +74,10 @@ diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerP
      public ComputerPlayer7 copy() {
          return new ComputerPlayer7(this);
 diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayerControllableProxy.java b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayerControllableProxy.java
+index 57e1bc42..d0d1e2db 100644
 --- a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayerControllableProxy.java
 +++ b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayerControllableProxy.java
-@@ -12,10 +12,14 @@
+@@ -12,10 +12,14 @@ import mage.constants.MultiAmountType;
  import mage.constants.Outcome;
  import mage.constants.RangeOfInfluence;
  import mage.game.Game;
@@ -141,7 +92,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerP
  import mage.target.Target;
  import mage.target.TargetAmount;
  import mage.target.TargetCard;
-@@ -44,6 +48,12 @@
+@@ -44,6 +48,12 @@ public class ComputerPlayerControllableProxy extends ComputerPlayer7 {
  
      Player lastControllingPlayer = null;
  
@@ -154,7 +105,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerP
      public ComputerPlayerControllableProxy(String name, RangeOfInfluence range, int skill) {
          super(name, range, skill);
      }
-@@ -51,6 +61,22 @@
+@@ -51,6 +61,22 @@ public class ComputerPlayerControllableProxy extends ComputerPlayer7 {
      public ComputerPlayerControllableProxy(final ComputerPlayerControllableProxy player) {
          super(player);
          this.lastControllingPlayer = player;
@@ -177,7 +128,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerP
      }
  
      @Override
-@@ -59,7 +85,71 @@
+@@ -59,7 +85,71 @@ public class ComputerPlayerControllableProxy extends ComputerPlayer7 {
      }
  
      private boolean isUnderMe(Game game) {
@@ -250,10 +201,31 @@ diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerP
      }
  
      private Player getControllingPlayer(Game game) {
+diff --git a/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/ComputerPlayer.java b/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/ComputerPlayer.java
+index 890badaf..32bf12ca 100644
+--- a/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/ComputerPlayer.java
++++ b/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/ComputerPlayer.java
+@@ -96,6 +96,15 @@ public class ComputerPlayer extends PlayerImpl {
+         super(player);
+     }
+ 
++    /**
++     * An AI stand-in for another player, human or computer: that player's identity and state, with
++     * the AI's own decisions. Used while a computer player controls that player's turn (723.5).
++     */
++    protected ComputerPlayer(final PlayerImpl playerUnderControl) {
++        super(playerUnderControl);
++        human = false;
++    }
++
+     @Override
+     public boolean chooseMulligan(Game game) {
+         if (hand.size() < 6
 diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPlayer.java b/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPlayer.java
+index 2c5f1b94..6b6b4e6f 100644
 --- a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPlayer.java
 +++ b/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPlayer.java
-@@ -433,8 +433,30 @@
+@@ -433,8 +433,30 @@ public class HumanPlayer extends PlayerImpl {
          return !gameInCheckPlayableState(game) && !game.isSimulation();
      }
  
@@ -284,7 +256,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPl
          if (!canCallFeedback(game)) {
              return false;
          }
-@@ -471,11 +493,19 @@
+@@ -471,11 +493,19 @@ public class HumanPlayer extends PlayerImpl {
  
      @Override
      public boolean chooseUse(Outcome outcome, String message, Ability source, Game game) {
@@ -304,7 +276,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPl
          if (!canCallFeedback(game)) {
              return false;
          }
-@@ -567,6 +597,10 @@
+@@ -567,6 +597,10 @@ public class HumanPlayer extends PlayerImpl {
  
      @Override
      public int chooseReplacementEffect(Map<String, String> effectsMap, Map<String, MageObject> objectsMap, Game game) {
@@ -315,7 +287,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPl
          if (gameInCheckPlayableState(game, true) || game.isSimulation()) { // TODO: ignore warning logs until double call for TAPPED_FOR_MANA will be fix
              return 0;
          }
-@@ -673,6 +707,10 @@
+@@ -673,6 +707,10 @@ public class HumanPlayer extends PlayerImpl {
  
      @Override
      public boolean choose(Outcome outcome, Choice choice, Game game) {
@@ -326,7 +298,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPl
          if (!canCallFeedback(game)) {
              return false;
          }
-@@ -731,11 +769,19 @@
+@@ -731,11 +769,19 @@ public class HumanPlayer extends PlayerImpl {
  
      @Override
      public boolean choose(Outcome outcome, Target target, Ability source, Game game) {
@@ -346,7 +318,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPl
          if (!canCallFeedback(game)) {
              return false;
          }
-@@ -823,6 +869,10 @@
+@@ -823,6 +869,10 @@ public class HumanPlayer extends PlayerImpl {
  
      @Override
      public boolean chooseTarget(Outcome outcome, Target target, Ability source, Game game) {
@@ -357,7 +329,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPl
          if (!canCallFeedback(game)) {
              return false;
          }
-@@ -905,6 +955,10 @@
+@@ -905,6 +955,10 @@ public class HumanPlayer extends PlayerImpl {
  
      @Override
      public boolean choose(Outcome outcome, Cards cards, TargetCard target, Ability source, Game game) {
@@ -368,7 +340,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPl
          if (!canCallFeedback(game)) {
              return false;
          }
-@@ -995,6 +1049,10 @@
+@@ -995,6 +1049,10 @@ public class HumanPlayer extends PlayerImpl {
      // choose one or multiple target cards
      @Override
      public boolean chooseTarget(Outcome outcome, Cards cards, TargetCard target, Ability source, Game game) {
@@ -379,7 +351,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPl
          if (!canCallFeedback(game)) {
              return false;
          }
-@@ -1087,6 +1145,10 @@
+@@ -1087,6 +1145,10 @@ public class HumanPlayer extends PlayerImpl {
  
      @Override
      public boolean chooseTargetAmount(Outcome outcome, TargetAmount target, Ability source, Game game) {
@@ -390,7 +362,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPl
          // choose amount
          // human can choose or un-choose MULTIPLE targets at once
          if (!canCallFeedback(game)) {
-@@ -1256,6 +1318,14 @@
+@@ -1256,6 +1318,14 @@ public class HumanPlayer extends PlayerImpl {
  
      @Override
      public boolean priority(Game game) {
@@ -405,7 +377,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPl
          passed = false;
          // TODO: fix problems with turn under out control:
          // TODO: change pass and other states like passedUntilStackResolved for controlling player, not for "this"
-@@ -1556,6 +1626,10 @@
+@@ -1556,6 +1626,10 @@ public class HumanPlayer extends PlayerImpl {
  
      @Override
      public TriggeredAbility chooseTriggeredAbility(java.util.List<TriggeredAbility> abilities, Game game) {
@@ -416,7 +388,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPl
          // choose triggered ability from list
          if (!canCallFeedback(game)) {
              return abilities.isEmpty() ? null : abilities.get(0);
-@@ -1676,6 +1750,10 @@
+@@ -1676,6 +1750,10 @@ public class HumanPlayer extends PlayerImpl {
  
      @Override
      public boolean playMana(Ability abilityToCast, ManaCost unpaid, String promptText, Game game) {
@@ -427,7 +399,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPl
          payManaMode = true;
          try {
              return playManaHandling(abilityToCast, unpaid, promptText, game);
-@@ -1758,6 +1836,10 @@
+@@ -1758,6 +1836,10 @@ public class HumanPlayer extends PlayerImpl {
       */
      @Override
      public int announceX(int min, int max, String message, Game game, Ability source, boolean isManaPay) {
@@ -438,7 +410,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPl
          if (!canCallFeedback(game)) {
              return min;
          }
-@@ -1840,6 +1922,11 @@
+@@ -1840,6 +1922,11 @@ public class HumanPlayer extends PlayerImpl {
  
      @Override
      public void selectAttackers(Game game, UUID attackingPlayerId) {
@@ -450,7 +422,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPl
          if (!canCallFeedback(game)) {
              return;
          }
-@@ -2110,6 +2197,11 @@
+@@ -2110,6 +2197,11 @@ public class HumanPlayer extends PlayerImpl {
  
      @Override
      public void selectBlockers(Ability source, Game game, UUID defendingPlayerId) {
@@ -462,7 +434,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPl
          if (!canCallFeedback(game)) {
              return;
          }
-@@ -2227,6 +2319,10 @@
+@@ -2227,6 +2319,10 @@ public class HumanPlayer extends PlayerImpl {
  
      @Override
      public int getAmount(int min, int max, String message, Ability source, Game game) {
@@ -473,7 +445,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPl
          if (!canCallFeedback(game)) {
              return min;
          }
-@@ -2268,6 +2364,10 @@
+@@ -2268,6 +2364,10 @@ public class HumanPlayer extends PlayerImpl {
              MultiAmountType type,
              Game game
      ) {
@@ -484,7 +456,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPl
          int needCount = messages.size();
          List<Integer> defaultList = MultiAmountType.prepareDefaultValues(messages, totalMin, totalMax);
          if (needCount == 0 || (needCount == 1 && totalMin == totalMax)
-@@ -2468,6 +2568,10 @@
+@@ -2468,6 +2568,10 @@ public class HumanPlayer extends PlayerImpl {
  
      @Override
      public SpellAbility chooseAbilityForCast(Card card, Game game, boolean noMana) {
@@ -495,7 +467,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPl
          if (!canCallFeedback(game)) {
              return null;
          }
-@@ -2508,6 +2612,10 @@
+@@ -2508,6 +2612,10 @@ public class HumanPlayer extends PlayerImpl {
  
      @Override
      public ActivatedAbility chooseLandOrSpellAbility(Card card, Game game, boolean noMana) {
@@ -506,7 +478,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPl
          if (!canCallFeedback(game)) {
              return null;
          }
-@@ -2554,6 +2662,10 @@
+@@ -2554,6 +2662,10 @@ public class HumanPlayer extends PlayerImpl {
  
      @Override
      public Mode chooseMode(Modes modes, Ability source, Game game) {
@@ -517,7 +489,7 @@ diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPl
          // choose mode to activate
          if (!canCallFeedback(game)) {
              return null;
-@@ -2694,6 +2806,10 @@
+@@ -2694,6 +2806,10 @@ public class HumanPlayer extends PlayerImpl {
  
      @Override
      public boolean choosePile(Outcome outcome, String message, java.util.List<? extends Card> pile1, java.util.List<? extends Card> pile2, Game game) {
@@ -528,3 +500,38 @@ diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPl
          if (!canCallFeedback(game)) {
              return false;
          }
+diff --git a/Mage/src/main/java/mage/players/Player.java b/Mage/src/main/java/mage/players/Player.java
+index 2ba4a85a..b17f2115 100644
+--- a/Mage/src/main/java/mage/players/Player.java
++++ b/Mage/src/main/java/mage/players/Player.java
+@@ -1329,4 +1329,13 @@ public interface Player extends MageItem, Copyable<Player> {
+     default Player prepareControllableProxy(Player playerUnderControl) {
+         return this;
+     }
++
++    /**
++     * Whether this player can make another player's decisions while controlling their turn (723.5):
++     * a human player through their client, and a computer player only if it makes an AI stand-in for
++     * the controlled player (prepareControllableProxy). A player who can't is refused the control.
++     */
++    default boolean canControlOtherPlayers() {
++        return !isComputer();
++    }
+ }
+diff --git a/Mage/src/main/java/mage/players/PlayerImpl.java b/Mage/src/main/java/mage/players/PlayerImpl.java
+index 9267ce05..8f48d226 100644
+--- a/Mage/src/main/java/mage/players/PlayerImpl.java
++++ b/Mage/src/main/java/mage/players/PlayerImpl.java
+@@ -604,9 +604,9 @@ public abstract class PlayerImpl implements Player, Serializable {
+     public boolean controlPlayersTurn(Game game, UUID playerUnderControlId, String info) {
+         Player playerUnderControl = game.getPlayer(playerUnderControlId);
+ 
+-        // TODO: add support computer over computer
+-        // TODO: add support computer over human
+-        if (this.isComputer()) {
++        // a computer player controls another player's turn only when it can make that player's
++        // decisions (canControlOtherPlayers): through an AI stand-in for them
++        if (!this.canControlOtherPlayers()) {
+             // not supported yet
+             game.informPlayers(getLogName() + " is AI and can't take control over " + playerUnderControl.getLogName() + info);
+             return false;

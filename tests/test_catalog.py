@@ -23,7 +23,7 @@ from api.models import (
 )
 from catalog.importer import Fence, Fenced
 from catalog.scryfall import Limits, Reader, SyncError
-from catalog.statuses import unplayable_reason
+from catalog.statuses import EngineCards, Implementation, loose, unplayable_reason
 from catalog.text import normalize, type_parts
 
 
@@ -418,3 +418,24 @@ def test_text_normalization_and_type_lines():
         ["Creature", "Sorcery"],
         ["Elf", "Druid", "Adventure"],
     )
+
+
+def test_names_xmage_spells_differently_still_find_their_card():
+    """v0.9.4: XMage drops the modifier-letter colon and closes a spaced ellipsis; only that
+    punctuation is loosened, so a different card with a similar name is not found."""
+    assert loose("Ratonhnhaké꞉ton") == loose("Ratonhnhaketon")
+    assert loose("Set Phasers to . . .") == loose("Set Phasers to...")
+    assert loose("Ransack, the Lab") != loose("Ransack the Lab")
+
+    def implementation(name: str) -> Implementation:
+        return Implementation(name, "mage.cards.x.X", "normal", True, {}, {})
+
+    names = ("Ratonhnhaketon", "Set Phasers to...", "Lightning Bolt")
+    cards = EngineCards("build", {normalize(name): implementation(name) for name in names})
+    found = cards.find("Ratonhnhaké꞉ton")
+    assert found is not None and found.name == "Ratonhnhaketon"
+    phasers = cards.find("Set Phasers to . . .")
+    assert phasers is not None and phasers.name == "Set Phasers to..."
+    bolt = cards.find("Lightning Bolt")
+    assert bolt is not None and bolt.name == "Lightning Bolt"
+    assert cards.find("Ransack, the Lab") is None

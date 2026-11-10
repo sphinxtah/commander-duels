@@ -205,10 +205,10 @@ index 0ab9c54c..12b8619f 100644
      public ContestedGameBallEffect copy() {
          return new ContestedGameBallEffect(this);
 diff --git a/Mage.Sets/src/mage/cards/e/EllieBrickMaster.java b/Mage.Sets/src/mage/cards/e/EllieBrickMaster.java
-index 53b6d244..65d976cd 100644
+index 29bffd56..51860f69 100644
 --- a/Mage.Sets/src/mage/cards/e/EllieBrickMaster.java
 +++ b/Mage.Sets/src/mage/cards/e/EllieBrickMaster.java
-@@ -77,10 +77,33 @@ class EllieBrickMasterTriggeredAbility extends TriggeredAbilityImpl {
+@@ -78,10 +78,33 @@ class EllieBrickMasterTriggeredAbility extends TriggeredAbilityImpl {
          this.getEffects().setTargetPointer(new FixedTarget(event.getTargetId()));
          return true;
      }
@@ -242,7 +242,7 @@ index 53b6d244..65d976cd 100644
      EllieBrickMasterEffect() {
          super(Outcome.Benefit);
          staticText = "that attacking player creates a tapped 1/1 black Fungus Zombie creature token " +
-@@ -98,8 +121,9 @@ class EllieBrickMasterEffect extends OneShotEffect {
+@@ -99,8 +122,9 @@ class EllieBrickMasterEffect extends OneShotEffect {
  
      @Override
      public boolean apply(Game game, Ability source) {
@@ -250,7 +250,7 @@ index 53b6d244..65d976cd 100644
          return new CordycepsInfectedToken().putOntoBattlefield(
 -                1, game, source, game.getActivePlayerId(),
 +                1, game, source, attackingPlayerId == null ? game.getActivePlayerId() : attackingPlayerId,
-                 true, true, getTargetPointer().getFirst(game, source)
+                 true, true, Collections.singleton(getTargetPointer().getFirst(game, source))
          );
      }
 diff --git a/Mage.Sets/src/mage/cards/e/EmberwildeCaptain.java b/Mage.Sets/src/mage/cards/e/EmberwildeCaptain.java

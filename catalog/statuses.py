@@ -23,7 +23,7 @@ deck holds, cards Scryfall no longer lists and cards the staff suspended stay ou
 
 import html
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from sqlalchemy import ColumnElement, and_, func, or_, select
@@ -71,10 +71,38 @@ class Implementation:
     data: dict[str, Any]
 
 
+# How XMage spells a few printed names differently (v0.9.4): it drops the modifier-letter colon
+# ("Ratonhnhaké꞉ton" is "Ratonhnhaketon") and closes a spaced ellipsis ("Set Phasers to . . ." is
+# "Set Phasers to..."). Only punctuation is loosened, so no two different cards meet.
+LOOSE_DROPS = str.maketrans({"\ua789": None})
+LOOSE_ELLIPSIS = re.compile(r"\s*\.(?:\s*\.)+")
+
+
+def loose(name: str) -> str:
+    """A normalized name with XMage's spelling of its punctuation."""
+    return LOOSE_ELLIPSIS.sub("...", normalize(name).translate(LOOSE_DROPS))
+
+
 @dataclass
 class EngineCards:
     build: str
     by_name: dict[str, Implementation]
+
+    def find(self, *names: str) -> "Implementation | None":
+        """The implementation named by any of the names, exactly first, then loosely (above)."""
+        for name in names:
+            found = self.by_name.get(normalize(name))
+            if found is not None:
+                return found
+        if self._loose is None:
+            self._loose = {loose(key): value for key, value in self.by_name.items()}
+        for name in names:
+            found = self._loose.get(loose(name))
+            if found is not None:
+                return found
+        return None
+
+    _loose: "dict[str, Implementation] | None" = field(default=None, init=False, repr=False)
 
     @classmethod
     def load(cls, session: Session, build: str) -> "EngineCards | None":
@@ -188,9 +216,7 @@ def decide(card: Concept, current: Any, engine: EngineCards | None) -> Decision:
         return blocked(
             "catalog_only", "engine_unchecked", "Not yet checked against the game engine."
         )
-    found = engine.by_name.get(normalize(card.game_name)) or engine.by_name.get(
-        normalize(card.name)
-    )
+    found = engine.find(card.game_name, card.name)
     if found is None:
         return blocked(
             "unsupported",

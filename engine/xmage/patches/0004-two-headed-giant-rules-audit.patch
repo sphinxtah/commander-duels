@@ -301,10 +301,10 @@ index 36f5196c..4579b436 100644
                  .collect(Collectors.toList());
          if (attackers.size() < minAttackers) {
 diff --git a/Mage/src/main/java/mage/abilities/common/CardsLeaveGraveyardTriggeredAbility.java b/Mage/src/main/java/mage/abilities/common/CardsLeaveGraveyardTriggeredAbility.java
-index 3e7e2ea1..bc5b5cac 100644
+index c38eeb7e..4e5e681c 100644
 --- a/Mage/src/main/java/mage/abilities/common/CardsLeaveGraveyardTriggeredAbility.java
 +++ b/Mage/src/main/java/mage/abilities/common/CardsLeaveGraveyardTriggeredAbility.java
-@@ -48,7 +48,7 @@ public class CardsLeaveGraveyardTriggeredAbility extends TriggeredAbilityImpl {
+@@ -60,7 +60,7 @@ public class CardsLeaveGraveyardTriggeredAbility extends TriggeredAbilityImpl im
  
      @Override
      public boolean checkTrigger(GameEvent event, Game game) {
@@ -312,7 +312,7 @@ index 3e7e2ea1..bc5b5cac 100644
 +        if (yourTurn && !game.isActivePlayer(getControllerId())) { // 805.9: or your team's turn
              return false;
          }
-         ZoneChangeGroupEvent zEvent = (ZoneChangeGroupEvent) event;
+         return !getFilteredEvents((ZoneChangeBatchEvent) event, game).isEmpty();
 diff --git a/Mage/src/main/java/mage/abilities/common/GainLoseLifeYourTurnTriggeredAbility.java b/Mage/src/main/java/mage/abilities/common/GainLoseLifeYourTurnTriggeredAbility.java
 index 1a366c33..759029a2 100644
 --- a/Mage/src/main/java/mage/abilities/common/GainLoseLifeYourTurnTriggeredAbility.java
@@ -677,7 +677,7 @@ index 7a23c604..dde456ca 100644
              case TOOK_INITIATIVE:
                  playerId = event.getPlayerId();
 diff --git a/Mage/src/main/java/mage/game/Game.java b/Mage/src/main/java/mage/game/Game.java
-index 7c3754ee..b2cd163f 100644
+index e99e9d44..605a46df 100644
 --- a/Mage/src/main/java/mage/game/Game.java
 +++ b/Mage/src/main/java/mage/game/Game.java
 @@ -17,6 +17,7 @@ import mage.cards.MeldCard;
@@ -781,7 +781,7 @@ index 7c3754ee..b2cd163f 100644
       * Checks if the given playerToCheckId is an opponent of player. Every other
       * player is an opponent, except teammates in a team game (see
 diff --git a/Mage/src/main/java/mage/game/GameImpl.java b/Mage/src/main/java/mage/game/GameImpl.java
-index 24eee397..3d5265bc 100644
+index 9a8e3d1e..8f541140 100644
 --- a/Mage/src/main/java/mage/game/GameImpl.java
 +++ b/Mage/src/main/java/mage/game/GameImpl.java
 @@ -164,6 +164,10 @@ public abstract class GameImpl implements Game {
@@ -795,7 +795,7 @@ index 24eee397..3d5265bc 100644
      // infinite loop check (temporary data, do not copy)
      private transient int infiniteLoopCounter; // used to check if the game is in an infinite loop
      private transient int lastNumberOfAbilitiesOnTheStack; // used to check how long no new ability was put to stack
-@@ -1112,8 +1116,13 @@ public abstract class GameImpl implements Game {
+@@ -1135,8 +1139,13 @@ public abstract class GameImpl implements Game {
                  }
  
                  GameEvent event = new GameEvent(GameEvent.EventType.PLAY_TURN, null, null, playerByOrder.getId());
@@ -811,7 +811,7 @@ index 24eee397..3d5265bc 100644
                          break;
                      }
                  }
-@@ -1162,6 +1171,18 @@ public abstract class GameImpl implements Game {
+@@ -1185,6 +1194,18 @@ public abstract class GameImpl implements Game {
                  && (lastActivePlayerId.equals(playerId) || teammates.contains(lastActivePlayerId));
      }
  
@@ -830,7 +830,7 @@ index 24eee397..3d5265bc 100644
      private boolean playExtraTurns() {
          //20091005 - 500.7
          TurnMod extraTurn = useNextExtraTurn();
-@@ -2481,16 +2502,18 @@ public abstract class GameImpl implements Game {
+@@ -2504,16 +2525,18 @@ public abstract class GameImpl implements Game {
      }
  
      /**
@@ -858,7 +858,7 @@ index 24eee397..3d5265bc 100644
      }
  
      /**
-@@ -2509,13 +2532,14 @@ public abstract class GameImpl implements Game {
+@@ -2532,13 +2555,14 @@ public abstract class GameImpl implements Game {
          for (Player player : state.getPlayers().values()) {
              if (!player.hasLost()) {
                  String lostReason = "";
@@ -875,7 +875,7 @@ index 24eee397..3d5265bc 100644
                      lostReason = "to having " + getPoisonCountersToLose() + " or more poison counters";
                  }
                  if (!lostReason.isEmpty() && player.lost(this)) {
-@@ -3632,7 +3656,21 @@ public abstract class GameImpl implements Game {
+@@ -3655,7 +3679,21 @@ public abstract class GameImpl implements Game {
  
      @Override
      public UUID getActivePlayerId() {
@@ -899,12 +899,22 @@ index 24eee397..3d5265bc 100644
  
      @Override
 diff --git a/Mage/src/main/java/mage/game/combat/Combat.java b/Mage/src/main/java/mage/game/combat/Combat.java
-index fa416dab..ed68d5ea 100644
+index a8d9ef06..d1847658 100644
 --- a/Mage/src/main/java/mage/game/combat/Combat.java
 +++ b/Mage/src/main/java/mage/game/combat/Combat.java
-@@ -240,6 +240,14 @@ public class Combat implements Serializable, Copyable<Combat> {
-             possibleDefenders = new HashSet<>(defenders);
-         }
+@@ -227,7 +227,8 @@ public class Combat implements Serializable, Copyable<Combat> {
+             if (!permanent.isCreature(game)
+                     || permanent.isBattle(game)
+                     || attackingPlayerId == null
+-                    || !permanent.isControlledBy(attackingPlayerId)) {
++                    // 805.10a: with shared team turns, each player of the active team is an attacking player
++                    || !isAttackingPlayer(permanent.getControllerId(), game)) {
+                 continue;
+             }
+             Set<UUID> possibleDefenders = permanent.getEntersAttackingDefenders()
+@@ -316,6 +317,14 @@ public class Combat implements Serializable, Copyable<Combat> {
+ 
+     private boolean chooseDefenderAndAddAttacker(UUID creatureId, Set<UUID> possibleDefenders, Game game) {
          Player player = game.getPlayer(attackingPlayerId);
 +        if (!game.getTeammates(attackingPlayerId).isEmpty()) {
 +            // 508.4: the creature's controller chooses whom it attacks, with shared team turns a
@@ -917,7 +927,7 @@ index fa416dab..ed68d5ea 100644
          if (player == null) {
              return false;
          }
-@@ -1943,6 +1951,50 @@ public class Combat implements Serializable, Copyable<Combat> {
+@@ -2025,6 +2034,50 @@ public class Combat implements Serializable, Copyable<Combat> {
          return attackingPlayerId;
      }
  
@@ -1075,20 +1085,6 @@ index 00000000..8660e997
 +        return events;
 +    }
 +}
-diff --git a/Mage/src/main/java/mage/game/permanent/token/TokenImpl.java b/Mage/src/main/java/mage/game/permanent/token/TokenImpl.java
-index 593d8219..a03db06a 100644
---- a/Mage/src/main/java/mage/game/permanent/token/TokenImpl.java
-+++ b/Mage/src/main/java/mage/game/permanent/token/TokenImpl.java
-@@ -448,7 +448,8 @@ public abstract class TokenImpl extends MageObjectImpl implements Token {
-                 }
- 
-                 // must attack
--                if (attacking && game.getCombat() != null && game.getActivePlayerId().equals(permanent.getControllerId())) {
-+                // 805.10a: with shared team turns, each player of the active team is an attacking player
-+                if (attacking && game.getCombat() != null && game.isActivePlayer(permanent.getControllerId())) {
-                     game.getCombat().addAttackingCreature(permanent.getId(), game, attackedPlayer);
-                 }
- 
 diff --git a/Mage/src/main/java/mage/game/turn/Phase.java b/Mage/src/main/java/mage/game/turn/Phase.java
 index 38394cac..e6bcba73 100644
 --- a/Mage/src/main/java/mage/game/turn/Phase.java
@@ -1150,7 +1146,7 @@ index 38394cac..e6bcba73 100644
                  return;
              }
 diff --git a/Mage/src/main/java/mage/game/turn/PreCombatMainStep.java b/Mage/src/main/java/mage/game/turn/PreCombatMainStep.java
-index 4567c647..97295272 100644
+index 4567c647..99a1173b 100644
 --- a/Mage/src/main/java/mage/game/turn/PreCombatMainStep.java
 +++ b/Mage/src/main/java/mage/game/turn/PreCombatMainStep.java
 @@ -9,6 +9,7 @@ import mage.filter.predicate.mageobject.AbilityPredicate;
@@ -1353,10 +1349,10 @@ index 6019143f..db3e45a9 100644
          ListIterator<TurnMod> it = this.listIterator(this.size());
          while (it.hasPrevious()) {
 diff --git a/Mage/src/main/java/mage/players/PlayerImpl.java b/Mage/src/main/java/mage/players/PlayerImpl.java
-index 91297a1b..fa980b6c 100644
+index 35aad97a..9267ce05 100644
 --- a/Mage/src/main/java/mage/players/PlayerImpl.java
 +++ b/Mage/src/main/java/mage/players/PlayerImpl.java
-@@ -2393,8 +2393,18 @@ public abstract class PlayerImpl implements Player, Serializable {
+@@ -2394,8 +2394,18 @@ public abstract class PlayerImpl implements Player, Serializable {
  
      @Override
      public void exchangeLife(Player player, Ability source, Game game) {
@@ -1375,7 +1371,7 @@ index 91297a1b..fa980b6c 100644
          if ((lifePlayer1 != lifePlayer2 && this.isLifeTotalCanChange() && player.isLifeTotalCanChange())
                  && (lifePlayer1 >= lifePlayer2 || (this.isCanGainLife() && player.isCanLoseLife()))
                  && (lifePlayer1 <= lifePlayer2 || (this.isCanLoseLife() && player.isCanGainLife()))) {
-@@ -2403,6 +2413,17 @@ public abstract class PlayerImpl implements Player, Serializable {
+@@ -2404,6 +2414,17 @@ public abstract class PlayerImpl implements Player, Serializable {
          }
      }
  
@@ -1393,7 +1389,7 @@ index 91297a1b..fa980b6c 100644
      @Override
      public int damage(int damage, Ability source, Game game) {
          return doDamage(damage, source.getSourceId(), source, game, false, true, null);
-@@ -2568,6 +2589,23 @@ public abstract class PlayerImpl implements Player, Serializable {
+@@ -2569,6 +2590,23 @@ public abstract class PlayerImpl implements Player, Serializable {
  
      @Override
      public void loseCounters(String counterName, int amount, Ability source, Game game) {
@@ -1417,7 +1413,7 @@ index 91297a1b..fa980b6c 100644
  
          GameEvent removeCountersEvent = new RemoveCountersEvent(counterName, this, source, amount, false);
          if (game.replaceEvent(removeCountersEvent)) {
-@@ -2608,6 +2646,12 @@ public abstract class PlayerImpl implements Player, Serializable {
+@@ -2609,6 +2647,12 @@ public abstract class PlayerImpl implements Player, Serializable {
  
      @Override
      public int loseAllCounters(String counterName, Ability source, Game game) {
@@ -1430,7 +1426,7 @@ index 91297a1b..fa980b6c 100644
          int amountBefore = getCountersCount(counterName);
          loseCounters(counterName, amountBefore, source, game);
          int amountAfter = getCountersCount(counterName);
-@@ -2866,7 +2910,23 @@ public abstract class PlayerImpl implements Player, Serializable {
+@@ -2867,7 +2911,23 @@ public abstract class PlayerImpl implements Player, Serializable {
      @Override
      public boolean canLose(Game game) {
          return hasLeft() // If a player concedes or has left the match they lose also if effect would say otherwise
@@ -1455,7 +1451,7 @@ index 91297a1b..fa980b6c 100644
      }
  
      @Override
-@@ -2882,7 +2942,8 @@ public abstract class PlayerImpl implements Player, Serializable {
+@@ -2883,7 +2943,8 @@ public abstract class PlayerImpl implements Player, Serializable {
          }
          if (!opponentInGame
                  || // if no more opponent is in game the wins event may no longer be replaced

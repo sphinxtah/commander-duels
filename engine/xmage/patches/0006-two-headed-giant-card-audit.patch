@@ -888,10 +888,10 @@ index 86ced19a..0d71bcd4 100644
          }
          Player controller = game.getPlayer(ability.getControllerId());
 diff --git a/Mage.Sets/src/mage/cards/n/NornsDecree.java b/Mage.Sets/src/mage/cards/n/NornsDecree.java
-index b41b1a3d..bf3a755e 100644
+index 0d22f02c..7658d038 100644
 --- a/Mage.Sets/src/mage/cards/n/NornsDecree.java
 +++ b/Mage.Sets/src/mage/cards/n/NornsDecree.java
-@@ -62,7 +62,7 @@ enum NornsDecreeCondition implements Condition {
+@@ -63,7 +63,7 @@ enum NornsDecreeCondition implements Condition {
                  .distinct()
                  .map(game::getPlayer)
                  .filter(Objects::nonNull)
@@ -1007,7 +1007,7 @@ index cc617ecf..650b25b6 100644
      }
  }
 diff --git a/Mage.Sets/src/mage/cards/q/QuestForTheNihilStone.java b/Mage.Sets/src/mage/cards/q/QuestForTheNihilStone.java
-index 8a119271..0f39b5fd 100644
+index 1da621e0..d7ce95fb 100644
 --- a/Mage.Sets/src/mage/cards/q/QuestForTheNihilStone.java
 +++ b/Mage.Sets/src/mage/cards/q/QuestForTheNihilStone.java
 @@ -55,6 +55,11 @@ class QuestForTheNihilStoneTriggeredAbility extends TriggeredAbilityImpl {
@@ -1398,7 +1398,7 @@ index 4ec44145..fc0c9d9f 100644
              }
          }
 diff --git a/Mage.Sets/src/mage/cards/v/VraskaBetrayalsSting.java b/Mage.Sets/src/mage/cards/v/VraskaBetrayalsSting.java
-index 9243008f..5944a448 100644
+index eb986d3b..053dfb98 100644
 --- a/Mage.Sets/src/mage/cards/v/VraskaBetrayalsSting.java
 +++ b/Mage.Sets/src/mage/cards/v/VraskaBetrayalsSting.java
 @@ -89,7 +89,7 @@ class VraskaBetrayalsStingEffect extends OneShotEffect {
