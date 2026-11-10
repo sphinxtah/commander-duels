@@ -1,0 +1,1723 @@
+Classic cards XMage lacked, batch 2, as printed (Commander Duels v0.9.5): Frankenstein's Monster and
+Reflecting Mirror (The Dark), Suffocation (Alliances), Equinox, Silhouette, Backdraft, Quarum Trench
+Gnomes and North Star (Legends), Arcum's Whistle, Winter's Chill and Spoils of War (Ice Age), and
+Ogre Enforcer (Visions).
+
+Reason: Commander Duels deals these cards from their sets' packs, and XMage had no implementation
+of them, so they played as stand-ins. No new core piece: each card carries its own effects and
+watchers. Where the printed wording leaves a choice to the engine:
+- Spoils of War's X is set as it is cast, from the opponent whose graveyard holds the most artifact
+  and creature cards (with one opponent, theirs).
+- North Star's "one spell" is the next spell its controller casts that turn.
+- Silhouette's "sources that target it" are spells and abilities on the stack targeting the
+  creature as they deal the damage.
+- Ogre Enforcer counts the damage marked on it per source for the turn.
+- Equinox's "would destroy a land you control": a mode that destroys a target land you control, or
+  that destroys all permanents of a kind its words name as lands.
+- Reflecting Mirror's spell is chosen as the ability is activated, so X is set to twice its mana
+  value.
+Upstream: none.
+Remove when: XMage implements these cards.
+diff --git a/Mage.Sets/src/mage/cards/a/ArcumsWhistle.java b/Mage.Sets/src/mage/cards/a/ArcumsWhistle.java
+new file mode 100644
+index 00000000..6fd364a5
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/a/ArcumsWhistle.java
+@@ -0,0 +1,142 @@
++package mage.cards.a;
++
++import mage.MageObjectReference;
++import mage.abilities.Ability;
++import mage.abilities.common.ActivateIfConditionActivatedAbility;
++import mage.abilities.common.delayed.AtTheBeginOfNextEndStepDelayedTriggeredAbility;
++import mage.abilities.condition.common.BeforeAttackersAreDeclaredCondition;
++import mage.abilities.costs.common.TapSourceCost;
++import mage.abilities.costs.mana.GenericManaCost;
++import mage.abilities.effects.OneShotEffect;
++import mage.abilities.effects.common.combat.AttacksIfAbleTargetEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.Duration;
++import mage.constants.Outcome;
++import mage.constants.SubType;
++import mage.filter.common.FilterCreaturePermanent;
++import mage.filter.predicate.Predicate;
++import mage.filter.predicate.Predicates;
++import mage.game.Game;
++import mage.game.permanent.Permanent;
++import mage.players.Player;
++import mage.target.TargetPermanent;
++import mage.target.targetpointer.FixedTarget;
++import mage.watchers.common.AttackedThisTurnWatcher;
++
++import java.util.UUID;
++
++/**
++ * Arcum's Whistle (Ice Age), as printed. Commander Duels patch 0015.
++ */
++public final class ArcumsWhistle extends CardImpl {
++
++    private static final FilterCreaturePermanent filter = new FilterCreaturePermanent(
++            "non-Wall creature the active player has controlled continuously since the beginning of the turn");
++
++    static {
++        filter.add(Predicates.not(SubType.WALL.getPredicate()));
++        filter.add((Predicate<Permanent>) (permanent, game) ->
++                permanent.isControlledBy(game.getActivePlayerId())
++                        && permanent.wasControlledFromStartOfControllerTurn());
++    }
++
++    public ArcumsWhistle(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.ARTIFACT}, "{3}");
++
++        // {3}, {T}: Choose target non-Wall creature the active player has controlled continuously since the beginning of the turn. That player may pay {X}, where X is that creature's mana value. If they don't, the creature attacks this turn if able, and at the beginning of the next end step, destroy it if it didn't attack. Activate only before attackers are declared.
++        Ability ability = new ActivateIfConditionActivatedAbility(
++                new ArcumsWhistleEffect(), new GenericManaCost(3), BeforeAttackersAreDeclaredCondition.instance);
++        ability.addCost(new TapSourceCost());
++        ability.addTarget(new TargetPermanent(filter));
++        ability.addWatcher(new AttackedThisTurnWatcher());
++        this.addAbility(ability);
++    }
++
++    private ArcumsWhistle(final ArcumsWhistle card) {
++        super(card);
++    }
++
++    @Override
++    public ArcumsWhistle copy() {
++        return new ArcumsWhistle(this);
++    }
++}
++
++class ArcumsWhistleEffect extends OneShotEffect {
++
++    ArcumsWhistleEffect() {
++        super(Outcome.Detriment);
++        staticText = "Choose target non-Wall creature the active player has controlled continuously since the beginning "
++                + "of the turn. That player may pay {X}, where X is that creature's mana value. If they don't, the "
++                + "creature attacks this turn if able, and at the beginning of the next end step, destroy it if it didn't attack";
++    }
++
++    private ArcumsWhistleEffect(final ArcumsWhistleEffect effect) {
++        super(effect);
++    }
++
++    @Override
++    public ArcumsWhistleEffect copy() {
++        return new ArcumsWhistleEffect(this);
++    }
++
++    @Override
++    public boolean apply(Game game, Ability source) {
++        Permanent creature = game.getPermanent(getTargetPointer().getFirst(game, source));
++        if (creature == null) {
++            return false;
++        }
++        Player player = game.getPlayer(creature.getControllerId());
++        if (player == null) {
++            return false;
++        }
++        GenericManaCost cost = new GenericManaCost(creature.getManaValue());
++        if (cost.canPay(source, source, player.getId(), game)
++                && player.chooseUse(Outcome.Benefit, "Pay {" + creature.getManaValue() + "} so that "
++                + creature.getLogName() + " need not attack?", source, game)
++                && cost.pay(source, game, source, player.getId(), false)) {
++            return true;
++        }
++        game.addEffect(new AttacksIfAbleTargetEffect(Duration.EndOfTurn)
++                .setTargetPointer(new FixedTarget(creature, game)), source);
++        game.addDelayedTriggeredAbility(new AtTheBeginOfNextEndStepDelayedTriggeredAbility(
++                new ArcumsWhistleDestroyEffect(new MageObjectReference(creature, game))), source);
++        return true;
++    }
++}
++
++class ArcumsWhistleDestroyEffect extends OneShotEffect {
++
++    private final MageObjectReference creature;
++
++    ArcumsWhistleDestroyEffect(MageObjectReference creature) {
++        super(Outcome.DestroyPermanent);
++        this.creature = creature;
++        staticText = "destroy it if it didn't attack";
++    }
++
++    private ArcumsWhistleDestroyEffect(final ArcumsWhistleDestroyEffect effect) {
++        super(effect);
++        this.creature = effect.creature;
++    }
++
++    @Override
++    public ArcumsWhistleDestroyEffect copy() {
++        return new ArcumsWhistleDestroyEffect(this);
++    }
++
++    @Override
++    public boolean apply(Game game, Ability source) {
++        Permanent permanent = creature.getPermanent(game);
++        if (permanent == null) {
++            return false;
++        }
++        AttackedThisTurnWatcher watcher = game.getState().getWatcher(AttackedThisTurnWatcher.class);
++        if (watcher != null && watcher.getAttackedThisTurnCreatures().contains(creature)) {
++            return false;
++        }
++        return permanent.destroy(source, game, false);
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/b/Backdraft.java b/Mage.Sets/src/mage/cards/b/Backdraft.java
+new file mode 100644
+index 00000000..8cfe1e71
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/b/Backdraft.java
+@@ -0,0 +1,163 @@
++package mage.cards.b;
++
++import mage.abilities.Ability;
++import mage.abilities.effects.OneShotEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.choices.Choice;
++import mage.choices.ChoiceImpl;
++import mage.constants.CardType;
++import mage.constants.Outcome;
++import mage.constants.WatcherScope;
++import mage.game.Game;
++import mage.game.events.GameEvent;
++import mage.game.stack.Spell;
++import mage.players.Player;
++import mage.target.TargetPlayer;
++import mage.filter.FilterPlayer;
++import mage.filter.predicate.Predicate;
++import mage.watchers.Watcher;
++
++import java.util.HashMap;
++import java.util.LinkedHashMap;
++import java.util.Map;
++import java.util.UUID;
++
++/**
++ * Backdraft (Legends), as printed. Commander Duels patch 0015.
++ * <p>
++ * The damage a sorcery spell dealt this turn is counted per spell, to players and permanents alike;
++ * the player chosen is one who cast a sorcery spell this turn that dealt damage.
++ */
++public final class Backdraft extends CardImpl {
++
++    public Backdraft(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.INSTANT}, "{1}{R}");
++
++        // Choose a player who cast one or more sorcery spells this turn. Backdraft deals damage to that player equal to half the damage dealt by one of those sorcery spells this turn, rounded down.
++        this.getSpellAbility().addEffect(new BackdraftEffect());
++        this.getSpellAbility().addWatcher(new BackdraftWatcher());
++    }
++
++    private Backdraft(final Backdraft card) {
++        super(card);
++    }
++
++    @Override
++    public Backdraft copy() {
++        return new Backdraft(this);
++    }
++}
++
++class BackdraftEffect extends OneShotEffect {
++
++    BackdraftEffect() {
++        super(Outcome.Damage);
++        staticText = "Choose a player who cast one or more sorcery spells this turn. {this} deals damage to that player "
++                + "equal to half the damage dealt by one of those sorcery spells this turn, rounded down";
++    }
++
++    private BackdraftEffect(final BackdraftEffect effect) {
++        super(effect);
++    }
++
++    @Override
++    public BackdraftEffect copy() {
++        return new BackdraftEffect(this);
++    }
++
++    @Override
++    public boolean apply(Game game, Ability source) {
++        Player controller = game.getPlayer(source.getControllerId());
++        BackdraftWatcher watcher = game.getState().getWatcher(BackdraftWatcher.class);
++        if (controller == null || watcher == null || watcher.casters().isEmpty()) {
++            return false;
++        }
++        FilterPlayer filter = new FilterPlayer("a player who cast one or more sorcery spells this turn");
++        filter.add((Predicate<Player>) (player, g) -> watcher.casters().contains(player.getId()));
++        TargetPlayer target = new TargetPlayer(1, 1, true, filter);
++        controller.choose(Outcome.Damage, target, source, game);
++        Player chosen = game.getPlayer(target.getFirstTarget());
++        if (chosen == null) {
++            return false;
++        }
++        Map<String, Integer> spells = new LinkedHashMap<>();
++        watcher.damageBy(chosen.getId()).forEach((spell, damage) -> spells.put(spell, damage));
++        int damage = 0;
++        if (spells.size() == 1) {
++            damage = spells.values().iterator().next();
++        } else if (spells.size() > 1) {
++            Choice choice = new ChoiceImpl(true);
++            choice.setMessage("Choose one of those sorcery spells");
++            choice.setChoices(spells.keySet());
++            if (controller.choose(Outcome.Damage, choice, game) && choice.getChoice() != null) {
++                damage = spells.get(choice.getChoice());
++            } else {
++                damage = spells.values().stream().max(Integer::compare).orElse(0);
++            }
++        }
++        if (damage / 2 > 0) {
++            chosen.damage(damage / 2, source.getSourceId(), source, game);
++        }
++        return true;
++    }
++}
++
++/** The sorcery spells cast this turn by each player, with the damage each dealt. */
++class BackdraftWatcher extends Watcher {
++
++    private final Map<UUID, Map<UUID, Integer>> damage = new HashMap<>();
++    private final Map<UUID, String> names = new HashMap<>();
++
++    BackdraftWatcher() {
++        super(WatcherScope.GAME);
++    }
++
++    @Override
++    public void watch(GameEvent event, Game game) {
++        if (event.getType() == GameEvent.EventType.SPELL_CAST) {
++            Spell spell = game.getSpell(event.getTargetId());
++            if (spell != null && spell.isSorcery(game)) {
++                damage.computeIfAbsent(spell.getControllerId(), k -> new LinkedHashMap<>())
++                        .putIfAbsent(spell.getId(), 0);
++                names.put(spell.getId(), spell.getName());
++            }
++            return;
++        }
++        if (event.getType() != GameEvent.EventType.DAMAGED_PLAYER
++                && event.getType() != GameEvent.EventType.DAMAGED_PERMANENT) {
++            return;
++        }
++        Spell spell = game.getSpellOrLKIStack(event.getSourceId());
++        if (spell == null || !spell.isSorcery(game)) {
++            return;
++        }
++        Map<UUID, Integer> spells = damage.get(spell.getControllerId());
++        if (spells != null && spells.containsKey(spell.getId())) {
++            spells.merge(spell.getId(), event.getAmount(), Integer::sum);
++        }
++    }
++
++    @Override
++    public void reset() {
++        super.reset();
++        damage.clear();
++        names.clear();
++    }
++
++    java.util.Set<UUID> casters() {
++        return damage.keySet();
++    }
++
++    /** Each of the player's sorcery spells this turn, by a label naming it, with the damage it dealt. */
++    Map<String, Integer> damageBy(UUID playerId) {
++        Map<String, Integer> found = new LinkedHashMap<>();
++        int index = 1;
++        for (Map.Entry<UUID, Integer> entry : damage.getOrDefault(playerId, new HashMap<>()).entrySet()) {
++            String label = index++ + ". " + names.getOrDefault(entry.getKey(), "a sorcery spell")
++                    + " (" + entry.getValue() + " damage)";
++            found.put(label, entry.getValue());
++        }
++        return found;
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/e/Equinox.java b/Mage.Sets/src/mage/cards/e/Equinox.java
+new file mode 100644
+index 00000000..f67c55ce
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/e/Equinox.java
+@@ -0,0 +1,107 @@
++package mage.cards.e;
++
++import mage.abilities.Ability;
++import mage.abilities.Mode;
++import mage.abilities.common.SimpleActivatedAbility;
++import mage.abilities.common.SimpleStaticAbility;
++import mage.abilities.costs.common.TapSourceCost;
++import mage.abilities.effects.Effect;
++import mage.abilities.effects.common.AttachEffect;
++import mage.abilities.effects.common.CounterTargetEffect;
++import mage.abilities.effects.common.DestroyAllEffect;
++import mage.abilities.effects.common.DestroyTargetEffect;
++import mage.abilities.effects.common.continuous.GainAbilityAttachedEffect;
++import mage.abilities.keyword.EnchantAbility;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.AttachmentType;
++import mage.constants.CardType;
++import mage.constants.Outcome;
++import mage.constants.SubType;
++import mage.filter.FilterSpell;
++import mage.filter.predicate.ObjectSourcePlayer;
++import mage.filter.predicate.ObjectSourcePlayerPredicate;
++import mage.game.Game;
++import mage.game.permanent.Permanent;
++import mage.game.stack.Spell;
++import mage.target.TargetPermanent;
++import mage.target.TargetSpell;
++import mage.target.common.TargetLandPermanent;
++
++import java.util.UUID;
++
++/**
++ * Equinox (Legends), as printed. Commander Duels patch 0015.
++ * <p>
++ * A spell "would destroy a land you control" when one of its modes destroys a target that is a
++ * land you control, or destroys all permanents of a kind among which is a land you control.
++ */
++public final class Equinox extends CardImpl {
++
++    private static final FilterSpell filter = new FilterSpell("spell if it would destroy a land you control");
++
++    static {
++        filter.add(EquinoxPredicate.instance);
++    }
++
++    public Equinox(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.ENCHANTMENT}, "{W}");
++        this.subtype.add(SubType.AURA);
++
++        // Enchant land
++        TargetPermanent auraTarget = new TargetLandPermanent();
++        this.getSpellAbility().addTarget(auraTarget);
++        this.getSpellAbility().addEffect(new AttachEffect(Outcome.AddAbility));
++        this.addAbility(new EnchantAbility(auraTarget));
++
++        // Enchanted land has "{T}: Counter target spell if it would destroy a land you control."
++        Ability ability = new SimpleActivatedAbility(new CounterTargetEffect(), new TapSourceCost());
++        ability.addTarget(new TargetSpell(filter));
++        Effect effect = new GainAbilityAttachedEffect(ability, AttachmentType.AURA);
++        effect.setText("Enchanted land has \"{T}: Counter target spell if it would destroy a land you control.\"");
++        this.addAbility(new SimpleStaticAbility(effect));
++    }
++
++    private Equinox(final Equinox card) {
++        super(card);
++    }
++
++    @Override
++    public Equinox copy() {
++        return new Equinox(this);
++    }
++}
++
++enum EquinoxPredicate implements ObjectSourcePlayerPredicate<Spell> {
++    instance;
++
++    @Override
++    public boolean apply(ObjectSourcePlayer<Spell> input, Game game) {
++        Spell spell = input.getObject();
++        UUID you = input.getPlayerId();
++        for (Mode mode : spell.getSpellAbility().getModes().getSelectedModes().stream()
++                .map(id -> spell.getSpellAbility().getModes().get(id)).toList()) {
++            for (Effect effect : mode.getEffects()) {
++                if (effect instanceof DestroyTargetEffect) {
++                    boolean hits = mode.getTargets().stream()
++                            .flatMap(target -> target.getTargets().stream())
++                            .map(game::getPermanent)
++                            .anyMatch(permanent -> permanent != null && permanent.isLand(game)
++                                    && permanent.isControlledBy(you));
++                    if (hits) {
++                        return true;
++                    }
++                }
++                if (effect instanceof DestroyAllEffect) {
++                    DestroyAllEffect all = (DestroyAllEffect) effect;
++                    for (Permanent land : game.getBattlefield().getAllActivePermanents(you)) {
++                        if (land.isLand(game) && all.getText(mode).toLowerCase().contains("land")) {
++                            return true;
++                        }
++                    }
++                }
++            }
++        }
++        return false;
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/f/FrankensteinsMonster.java b/Mage.Sets/src/mage/cards/f/FrankensteinsMonster.java
+new file mode 100644
+index 00000000..f0aac58a
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/f/FrankensteinsMonster.java
+@@ -0,0 +1,131 @@
++package mage.cards.f;
++
++import mage.MageInt;
++import mage.abilities.Ability;
++import mage.abilities.common.SimpleStaticAbility;
++import mage.abilities.effects.ReplacementEffectImpl;
++import mage.cards.Card;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.cards.Cards;
++import mage.cards.CardsImpl;
++import mage.choices.Choice;
++import mage.choices.ChoiceImpl;
++import mage.constants.CardType;
++import mage.constants.Duration;
++import mage.constants.Outcome;
++import mage.constants.SubType;
++import mage.constants.Zone;
++import mage.counters.BoostCounter;
++import mage.filter.StaticFilters;
++import mage.game.Game;
++import mage.game.events.GameEvent;
++import mage.game.permanent.Permanent;
++import mage.players.Player;
++import mage.target.common.TargetCardInYourGraveyard;
++import mage.util.CardUtil;
++
++import java.util.Arrays;
++import java.util.LinkedHashSet;
++import java.util.UUID;
++
++/**
++ * Frankenstein's Monster (The Dark), as printed. Commander Duels patch 0015.
++ */
++public final class FrankensteinsMonster extends CardImpl {
++
++    public FrankensteinsMonster(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.CREATURE}, "{X}{B}{B}");
++        this.subtype.add(SubType.ZOMBIE);
++        this.power = new MageInt(0);
++        this.toughness = new MageInt(1);
++
++        // As Frankenstein's Monster enters, exile X creature cards from your graveyard. If you can't, put Frankenstein's Monster into its owner's graveyard instead of onto the battlefield. For each creature card exiled this way, Frankenstein's Monster enters with a +2/+0, +1/+1, or +0/+2 counter on it.
++        this.addAbility(new SimpleStaticAbility(Zone.ALL, new FrankensteinsMonsterEffect()));
++    }
++
++    private FrankensteinsMonster(final FrankensteinsMonster card) {
++        super(card);
++    }
++
++    @Override
++    public FrankensteinsMonster copy() {
++        return new FrankensteinsMonster(this);
++    }
++}
++
++class FrankensteinsMonsterEffect extends ReplacementEffectImpl {
++
++    private static final String P2 = "+2/+0";
++    private static final String P1 = "+1/+1";
++    private static final String T2 = "+0/+2";
++
++    FrankensteinsMonsterEffect() {
++        super(Duration.WhileOnBattlefield, Outcome.BoostCreature);
++        staticText = "As {this} enters, exile X creature cards from your graveyard. If you can't, put {this} into its "
++                + "owner's graveyard instead of onto the battlefield. For each creature card exiled this way, {this} "
++                + "enters with a +2/+0, +1/+1, or +0/+2 counter on it";
++    }
++
++    private FrankensteinsMonsterEffect(final FrankensteinsMonsterEffect effect) {
++        super(effect);
++    }
++
++    @Override
++    public FrankensteinsMonsterEffect copy() {
++        return new FrankensteinsMonsterEffect(this);
++    }
++
++    @Override
++    public boolean checksEventType(GameEvent event, Game game) {
++        return event.getType() == GameEvent.EventType.ENTERS_THE_BATTLEFIELD;
++    }
++
++    @Override
++    public boolean applies(GameEvent event, Ability source, Game game) {
++        return source.getSourceId().equals(event.getTargetId());
++    }
++
++    @Override
++    public boolean replaceEvent(GameEvent event, Ability source, Game game) {
++        Player controller = game.getPlayer(source.getControllerId());
++        Permanent entering = game.getPermanentEntering(event.getTargetId());
++        if (controller == null || entering == null) {
++            return false;
++        }
++        int x = CardUtil.getSourceCostsTagX(game, source, 0);
++        if (x <= 0) {
++            return false;
++        }
++        int creatures = controller.getGraveyard().count(StaticFilters.FILTER_CARD_CREATURE, game);
++        if (creatures < x) {
++            controller.moveCards(entering, Zone.GRAVEYARD, source, game);
++            return true;
++        }
++        TargetCardInYourGraveyard target = new TargetCardInYourGraveyard(x, x, StaticFilters.FILTER_CARD_CREATURE, true);
++        controller.choose(Outcome.Exile, target, source, game);
++        Cards cards = new CardsImpl();
++        for (UUID cardId : target.getTargets()) {
++            Card card = game.getCard(cardId);
++            if (card != null) {
++                cards.add(card);
++            }
++        }
++        if (cards.size() < x) {
++            controller.moveCards(entering, Zone.GRAVEYARD, source, game);
++            return true;
++        }
++        controller.moveCards(cards, Zone.EXILED, source, game);
++        for (int i = 0; i < x; i++) {
++            Choice choice = new ChoiceImpl(true);
++            choice.setMessage("Counter for creature card " + (i + 1) + " of " + x);
++            choice.setChoices(new LinkedHashSet<>(Arrays.asList(P2, P1, T2)));
++            String chosen = controller.choose(Outcome.BoostCreature, choice, game) && choice.getChoice() != null
++                    ? choice.getChoice() : P1;
++            BoostCounter counter = P2.equals(chosen) ? new BoostCounter(2, 0)
++                    : T2.equals(chosen) ? new BoostCounter(0, 2) : new BoostCounter(1, 1);
++            entering.addCounters(counter, source.getControllerId(), source, game);
++        }
++        return false;
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/n/NorthStar.java b/Mage.Sets/src/mage/cards/n/NorthStar.java
+new file mode 100644
+index 00000000..825734cd
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/n/NorthStar.java
+@@ -0,0 +1,121 @@
++package mage.cards.n;
++
++import mage.abilities.Ability;
++import mage.abilities.common.SimpleActivatedAbility;
++import mage.abilities.costs.common.TapSourceCost;
++import mage.abilities.costs.mana.GenericManaCost;
++import mage.abilities.effects.AsThoughEffectImpl;
++import mage.abilities.effects.AsThoughManaEffect;
++import mage.abilities.effects.OneShotEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.AsThoughEffectType;
++import mage.constants.CardType;
++import mage.constants.Duration;
++import mage.constants.ManaType;
++import mage.constants.Outcome;
++import mage.game.Game;
++import mage.game.stack.Spell;
++import mage.players.ManaPoolItem;
++import mage.watchers.common.SpellsCastWatcher;
++
++import java.util.UUID;
++
++/**
++ * North Star (Legends), as printed. Commander Duels patch 0015.
++ * <p>
++ * "For one spell this turn": the next spell its controller casts this turn; once a spell of theirs
++ * is cast, the effect ends.
++ */
++public final class NorthStar extends CardImpl {
++
++    public NorthStar(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.ARTIFACT}, "{4}");
++
++        // {4}, {T}: For one spell this turn, you may spend mana as though it were mana of any color to pay that spell's mana cost.
++        Ability ability = new SimpleActivatedAbility(new NorthStarEffect(), new GenericManaCost(4));
++        ability.addCost(new TapSourceCost());
++        this.addAbility(ability);
++    }
++
++    private NorthStar(final NorthStar card) {
++        super(card);
++    }
++
++    @Override
++    public NorthStar copy() {
++        return new NorthStar(this);
++    }
++}
++
++class NorthStarEffect extends OneShotEffect {
++
++    NorthStarEffect() {
++        super(Outcome.Benefit);
++        staticText = "For one spell this turn, you may spend mana as though it were mana of any color to pay "
++                + "that spell's mana cost. <i>(Additional costs are still paid normally.)</i>";
++    }
++
++    private NorthStarEffect(final NorthStarEffect effect) {
++        super(effect);
++    }
++
++    @Override
++    public NorthStarEffect copy() {
++        return new NorthStarEffect(this);
++    }
++
++    @Override
++    public boolean apply(Game game, Ability source) {
++        SpellsCastWatcher watcher = game.getState().getWatcher(SpellsCastWatcher.class);
++        int cast = watcher == null ? 0 : watcher.getCount(source.getControllerId());
++        game.addEffect(new NorthStarManaEffect(cast), source);
++        return true;
++    }
++}
++
++class NorthStarManaEffect extends AsThoughEffectImpl implements AsThoughManaEffect {
++
++    /** The spells its controller had cast this turn when it began: it lasts until the next one. */
++    private final int castBefore;
++
++    NorthStarManaEffect(int castBefore) {
++        super(AsThoughEffectType.SPEND_OTHER_MANA, Duration.EndOfTurn, Outcome.Benefit);
++        this.castBefore = castBefore;
++    }
++
++    private NorthStarManaEffect(final NorthStarManaEffect effect) {
++        super(effect);
++        this.castBefore = effect.castBefore;
++    }
++
++    @Override
++    public boolean apply(Game game, Ability source) {
++        return true;
++    }
++
++    @Override
++    public NorthStarManaEffect copy() {
++        return new NorthStarManaEffect(this);
++    }
++
++    @Override
++    public boolean isInactive(Ability source, Game game) {
++        SpellsCastWatcher watcher = game.getState().getWatcher(SpellsCastWatcher.class);
++        return watcher != null && watcher.getCount(source.getControllerId()) > castBefore;
++    }
++
++    @Override
++    public boolean applies(UUID objectId, Ability source, UUID affectedControllerId, Game game) {
++        if (!source.isControlledBy(affectedControllerId) || isInactive(source, game)) {
++            return false;
++        }
++        Spell spell = game.getStack().getSpell(objectId);
++        return spell != null && spell.isControlledBy(affectedControllerId);
++    }
++
++    @Override
++    public ManaType getAsThoughManaType(ManaType manaType, ManaPoolItem mana, UUID affectedControllerId, Ability source, Game game) {
++        return mana.getFirstAvailable();
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/o/OgreEnforcer.java b/Mage.Sets/src/mage/cards/o/OgreEnforcer.java
+new file mode 100644
+index 00000000..8859a1a2
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/o/OgreEnforcer.java
+@@ -0,0 +1,131 @@
++package mage.cards.o;
++
++import mage.MageInt;
++import mage.MageObjectReference;
++import mage.abilities.Ability;
++import mage.abilities.common.SimpleStaticAbility;
++import mage.abilities.effects.ReplacementEffectImpl;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.Duration;
++import mage.constants.Outcome;
++import mage.constants.SubType;
++import mage.constants.WatcherScope;
++import mage.game.Game;
++import mage.game.events.GameEvent;
++import mage.game.permanent.Permanent;
++import mage.watchers.Watcher;
++
++import java.util.HashMap;
++import java.util.Map;
++import java.util.UUID;
++
++/**
++ * Ogre Enforcer (Visions), as printed. Commander Duels patch 0015.
++ * <p>
++ * The damage marked on it is counted per source for the turn (damage wears off in the cleanup
++ * step); lethal damage with deathtouch counts as lethal damage from its source.
++ */
++public final class OgreEnforcer extends CardImpl {
++
++    public OgreEnforcer(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.CREATURE}, "{3}{R}{R}");
++        this.subtype.add(SubType.OGRE);
++        this.power = new MageInt(4);
++        this.toughness = new MageInt(4);
++
++        // Ogre Enforcer can't be destroyed by lethal damage unless lethal damage dealt by a single source is marked on it.
++        Ability ability = new SimpleStaticAbility(new OgreEnforcerEffect());
++        ability.addWatcher(new OgreEnforcerWatcher());
++        this.addAbility(ability);
++    }
++
++    private OgreEnforcer(final OgreEnforcer card) {
++        super(card);
++    }
++
++    @Override
++    public OgreEnforcer copy() {
++        return new OgreEnforcer(this);
++    }
++}
++
++class OgreEnforcerEffect extends ReplacementEffectImpl {
++
++    OgreEnforcerEffect() {
++        super(Duration.WhileOnBattlefield, Outcome.Benefit);
++        staticText = "{this} can't be destroyed by lethal damage unless lethal damage dealt by a single source is marked on it";
++    }
++
++    private OgreEnforcerEffect(final OgreEnforcerEffect effect) {
++        super(effect);
++    }
++
++    @Override
++    public OgreEnforcerEffect copy() {
++        return new OgreEnforcerEffect(this);
++    }
++
++    @Override
++    public boolean checksEventType(GameEvent event, Game game) {
++        return event.getType() == GameEvent.EventType.DESTROY_PERMANENT;
++    }
++
++    @Override
++    public boolean applies(GameEvent event, Ability source, Game game) {
++        // The state-based action for lethal damage destroys with no source.
++        if (!event.getTargetId().equals(source.getSourceId()) || event.getSourceId() != null) {
++            return false;
++        }
++        Permanent ogre = game.getPermanent(source.getSourceId());
++        if (ogre == null || ogre.isDeathtouched()) {
++            return false;
++        }
++        int toughness = ogre.getToughness().getValue();
++        if (toughness <= 0 || ogre.getDamage() < toughness) {
++            return false;
++        }
++        OgreEnforcerWatcher watcher = game.getState().getWatcher(OgreEnforcerWatcher.class);
++        return watcher == null || watcher.mostFromOneSource(new MageObjectReference(ogre, game)) < toughness;
++    }
++
++    @Override
++    public boolean replaceEvent(GameEvent event, Ability source, Game game) {
++        return true;
++    }
++}
++
++/** Damage dealt to each permanent this turn, by source. */
++class OgreEnforcerWatcher extends Watcher {
++
++    private final Map<MageObjectReference, Map<UUID, Integer>> damage = new HashMap<>();
++
++    OgreEnforcerWatcher() {
++        super(WatcherScope.GAME);
++    }
++
++    @Override
++    public void watch(GameEvent event, Game game) {
++        if (event.getType() != GameEvent.EventType.DAMAGED_PERMANENT) {
++            return;
++        }
++        Permanent permanent = game.getPermanent(event.getTargetId());
++        if (permanent == null) {
++            return;
++        }
++        damage.computeIfAbsent(new MageObjectReference(permanent, game), k -> new HashMap<>())
++                .merge(event.getSourceId(), event.getAmount(), Integer::sum);
++    }
++
++    @Override
++    public void reset() {
++        super.reset();
++        damage.clear();
++    }
++
++    int mostFromOneSource(MageObjectReference permanent) {
++        return damage.getOrDefault(permanent, new HashMap<>()).values().stream()
++                .mapToInt(Integer::intValue).max().orElse(0);
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/q/QuarumTrenchGnomes.java b/Mage.Sets/src/mage/cards/q/QuarumTrenchGnomes.java
+new file mode 100644
+index 00000000..f2d54d39
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/q/QuarumTrenchGnomes.java
+@@ -0,0 +1,130 @@
++package mage.cards.q;
++
++import mage.MageInt;
++import mage.MageObjectReference;
++import mage.Mana;
++import mage.abilities.Ability;
++import mage.abilities.common.SimpleActivatedAbility;
++import mage.abilities.costs.common.TapSourceCost;
++import mage.abilities.effects.OneShotEffect;
++import mage.abilities.effects.ReplacementEffectImpl;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.Duration;
++import mage.constants.Outcome;
++import mage.constants.SubType;
++import mage.filter.FilterPermanent;
++import mage.game.Game;
++import mage.game.events.GameEvent;
++import mage.game.events.ManaEvent;
++import mage.game.events.TappedForManaEvent;
++import mage.game.permanent.Permanent;
++import mage.target.TargetPermanent;
++
++import java.util.UUID;
++
++/**
++ * Quarum Trench Gnomes (Legends), as printed. Commander Duels patch 0015.
++ */
++public final class QuarumTrenchGnomes extends CardImpl {
++
++    private static final FilterPermanent filter = new FilterPermanent(SubType.PLAINS, "Plains");
++
++    public QuarumTrenchGnomes(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.CREATURE}, "{3}{R}");
++        this.subtype.add(SubType.GNOME);
++        this.power = new MageInt(1);
++        this.toughness = new MageInt(1);
++
++        // {T}: If target Plains is tapped for mana, it produces colorless mana instead of white mana. (This effect lasts indefinitely.)
++        Ability ability = new SimpleActivatedAbility(new QuarumTrenchGnomesEffect(), new TapSourceCost());
++        ability.addTarget(new TargetPermanent(filter));
++        this.addAbility(ability);
++    }
++
++    private QuarumTrenchGnomes(final QuarumTrenchGnomes card) {
++        super(card);
++    }
++
++    @Override
++    public QuarumTrenchGnomes copy() {
++        return new QuarumTrenchGnomes(this);
++    }
++}
++
++class QuarumTrenchGnomesEffect extends OneShotEffect {
++
++    QuarumTrenchGnomesEffect() {
++        super(Outcome.Neutral);
++        staticText = "If target Plains is tapped for mana, it produces colorless mana instead of white mana. "
++                + "<i>(This effect lasts indefinitely.)</i>";
++    }
++
++    private QuarumTrenchGnomesEffect(final QuarumTrenchGnomesEffect effect) {
++        super(effect);
++    }
++
++    @Override
++    public QuarumTrenchGnomesEffect copy() {
++        return new QuarumTrenchGnomesEffect(this);
++    }
++
++    @Override
++    public boolean apply(Game game, Ability source) {
++        Permanent plains = game.getPermanent(getTargetPointer().getFirst(game, source));
++        if (plains == null) {
++            return false;
++        }
++        game.addEffect(new QuarumTrenchGnomesReplacementEffect(new MageObjectReference(plains, game)), source);
++        return true;
++    }
++}
++
++class QuarumTrenchGnomesReplacementEffect extends ReplacementEffectImpl {
++
++    private final MageObjectReference plains;
++
++    QuarumTrenchGnomesReplacementEffect(MageObjectReference plains) {
++        super(Duration.Custom, Outcome.Neutral);
++        this.plains = plains;
++    }
++
++    private QuarumTrenchGnomesReplacementEffect(final QuarumTrenchGnomesReplacementEffect effect) {
++        super(effect);
++        this.plains = effect.plains;
++    }
++
++    @Override
++    public QuarumTrenchGnomesReplacementEffect copy() {
++        return new QuarumTrenchGnomesReplacementEffect(this);
++    }
++
++    @Override
++    public boolean isInactive(Ability source, Game game) {
++        // Indefinitely, while that Plains stays the same object.
++        return plains.getPermanent(game) == null;
++    }
++
++    @Override
++    public boolean replaceEvent(GameEvent event, Ability source, Game game) {
++        Mana mana = ((ManaEvent) event).getMana();
++        int white = mana.getWhite();
++        if (white > 0) {
++            mana.setWhite(0);
++            mana.setColorless(mana.getColorless() + white);
++        }
++        return false;
++    }
++
++    @Override
++    public boolean checksEventType(GameEvent event, Game game) {
++        return event.getType() == GameEvent.EventType.TAPPED_FOR_MANA;
++    }
++
++    @Override
++    public boolean applies(GameEvent event, Ability source, Game game) {
++        Permanent permanent = ((TappedForManaEvent) event).getPermanent();
++        return permanent != null && plains.refersTo(permanent, game);
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/r/ReflectingMirror.java b/Mage.Sets/src/mage/cards/r/ReflectingMirror.java
+new file mode 100644
+index 00000000..efd5f17c
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/r/ReflectingMirror.java
+@@ -0,0 +1,157 @@
++package mage.cards.r;
++
++import mage.MageItem;
++import mage.abilities.Ability;
++import mage.abilities.common.SimpleActivatedAbility;
++import mage.abilities.costs.CostAdjuster;
++import mage.abilities.costs.EarlyTargetCost;
++import mage.abilities.costs.VariableCostType;
++import mage.abilities.costs.common.TapSourceCost;
++import mage.abilities.costs.mana.VariableManaCost;
++import mage.abilities.effects.OneShotEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.Outcome;
++import mage.filter.FilterSpell;
++import mage.filter.predicate.ObjectSourcePlayer;
++import mage.filter.predicate.ObjectSourcePlayerPredicate;
++import mage.filter.predicate.other.NumberOfTargetsPredicate;
++import mage.game.Game;
++import mage.game.stack.Spell;
++import mage.players.Player;
++import mage.target.Target;
++import mage.target.TargetSpell;
++
++import java.util.UUID;
++
++/**
++ * Reflecting Mirror (The Dark), as printed. Commander Duels patch 0015.
++ * <p>
++ * The spell is chosen as the ability is activated, before {X}, so X is set to twice its mana value.
++ */
++public final class ReflectingMirror extends CardImpl {
++
++    public ReflectingMirror(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.ARTIFACT}, "{4}");
++
++        // {X}, {T}: Change the target of target spell with a single target if that target is you. The new target must be a player. X is twice the mana value of that spell.
++        Ability ability = new SimpleActivatedAbility(new ReflectingMirrorEffect(), new ReflectingMirrorXCost());
++        ability.addCost(new TapSourceCost());
++        ability.setCostAdjuster(ReflectingMirrorAdjuster.instance);
++        this.addAbility(ability);
++    }
++
++    private ReflectingMirror(final ReflectingMirror card) {
++        super(card);
++    }
++
++    @Override
++    public ReflectingMirror copy() {
++        return new ReflectingMirror(this);
++    }
++}
++
++enum ReflectingMirrorPredicate implements ObjectSourcePlayerPredicate<Spell> {
++    instance;
++
++    @Override
++    public boolean apply(ObjectSourcePlayer<Spell> input, Game game) {
++        return input.getObject().getSpellAbility().getModes().getSelectedModes().stream()
++                .map(id -> input.getObject().getSpellAbility().getModes().get(id))
++                .flatMap(mode -> mode.getTargets().stream())
++                .flatMap(target -> target.getTargets().stream())
++                .anyMatch(input.getPlayerId()::equals);
++    }
++}
++
++class ReflectingMirrorXCost extends VariableManaCost implements EarlyTargetCost {
++
++    static final FilterSpell filter = new FilterSpell("spell with a single target if that target is you");
++
++    static {
++        filter.add(new NumberOfTargetsPredicate(1));
++        filter.add(ReflectingMirrorPredicate.instance);
++    }
++
++    ReflectingMirrorXCost() {
++        super(VariableCostType.NORMAL, 1);
++    }
++
++    private ReflectingMirrorXCost(final ReflectingMirrorXCost cost) {
++        super(cost);
++    }
++
++    @Override
++    public void chooseTarget(Game game, Ability source, Player controller) {
++        Target target = new TargetSpell(filter);
++        controller.choose(Outcome.Benefit, target, source, game);
++        addTarget(target);
++    }
++
++    /** The spell chosen as the ability was activated. */
++    static Spell chosen(Ability ability, Game game) {
++        return ability.getManaCostsToPay().getVariableCosts().stream()
++                .filter(c -> c instanceof ReflectingMirrorXCost)
++                .map(c -> ((ReflectingMirrorXCost) c).getTargets().getFirstTarget())
++                .filter(java.util.Objects::nonNull)
++                .map(game::getSpell)
++                .filter(java.util.Objects::nonNull)
++                .findFirst()
++                .orElse(null);
++    }
++
++    @Override
++    public ReflectingMirrorXCost copy() {
++        return new ReflectingMirrorXCost(this);
++    }
++}
++
++enum ReflectingMirrorAdjuster implements CostAdjuster {
++    instance;
++
++    @Override
++    public void prepareX(Ability ability, Game game) {
++        if (game.inCheckPlayableState()) {
++            return;
++        }
++        Spell spell = ReflectingMirrorXCost.chosen(ability, game);
++        ability.setVariableCostsValue(spell == null ? 0 : 2 * spell.getManaValue());
++    }
++}
++
++class ReflectingMirrorEffect extends OneShotEffect {
++
++    ReflectingMirrorEffect() {
++        super(Outcome.Benefit);
++        staticText = "Change the target of target spell with a single target if that target is you. "
++                + "The new target must be a player. X is twice the mana value of that spell";
++    }
++
++    private ReflectingMirrorEffect(final ReflectingMirrorEffect effect) {
++        super(effect);
++    }
++
++    @Override
++    public ReflectingMirrorEffect copy() {
++        return new ReflectingMirrorEffect(this);
++    }
++
++    @Override
++    public boolean apply(Game game, Ability source) {
++        Spell spell = ReflectingMirrorXCost.chosen(source, game);
++        if (spell == null) {
++            return false;
++        }
++        boolean targetsYou = spell.getSpellAbility().getModes().getSelectedModes().stream()
++                .map(id -> spell.getSpellAbility().getModes().get(id))
++                .flatMap(mode -> mode.getTargets().stream())
++                .flatMap(target -> target.getTargets().stream())
++                .anyMatch(source.getControllerId()::equals);
++        if (!targetsYou) {
++            return false;
++        }
++        return spell.chooseNewTargets(game, source.getControllerId(), true, true,
++                (MageItem item, Game g) -> g.getPlayer(item.getId()) != null);
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/s/Silhouette.java b/Mage.Sets/src/mage/cards/s/Silhouette.java
+new file mode 100644
+index 00000000..8a628b5c
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/s/Silhouette.java
+@@ -0,0 +1,75 @@
++package mage.cards.s;
++
++import mage.abilities.Ability;
++import mage.abilities.effects.PreventionEffectImpl;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.Duration;
++import mage.game.Game;
++import mage.game.events.GameEvent;
++import mage.game.stack.StackObject;
++import mage.target.common.TargetCreaturePermanent;
++
++import java.util.UUID;
++
++/**
++ * Silhouette (Legends), as printed. Commander Duels patch 0015.
++ * <p>
++ * "That target it": damage from a spell or ability on the stack that has the creature among its
++ * targets as it deals the damage.
++ */
++public final class Silhouette extends CardImpl {
++
++    public Silhouette(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.INSTANT}, "{1}{U}");
++
++        // Prevent all damage that would be dealt to target creature this turn by sources that target it.
++        this.getSpellAbility().addEffect(new SilhouetteEffect());
++        this.getSpellAbility().addTarget(new TargetCreaturePermanent());
++    }
++
++    private Silhouette(final Silhouette card) {
++        super(card);
++    }
++
++    @Override
++    public Silhouette copy() {
++        return new Silhouette(this);
++    }
++}
++
++class SilhouetteEffect extends PreventionEffectImpl {
++
++    SilhouetteEffect() {
++        super(Duration.EndOfTurn, Integer.MAX_VALUE, false);
++        staticText = "Prevent all damage that would be dealt to target creature this turn by sources that target it";
++    }
++
++    private SilhouetteEffect(final SilhouetteEffect effect) {
++        super(effect);
++    }
++
++    @Override
++    public SilhouetteEffect copy() {
++        return new SilhouetteEffect(this);
++    }
++
++    @Override
++    public boolean applies(GameEvent event, Ability source, Game game) {
++        if (!super.applies(event, source, game)
++                || event.getType() != GameEvent.EventType.DAMAGE_PERMANENT
++                || !event.getTargetId().equals(getTargetPointer().getFirst(game, source))) {
++            return false;
++        }
++        UUID creature = event.getTargetId();
++        for (StackObject object : game.getStack()) {
++            if ((object.getId().equals(event.getSourceId()) || object.getSourceId().equals(event.getSourceId()))
++                    && object.getStackAbility().getTargets().stream()
++                    .anyMatch(target -> target.getTargets().contains(creature))) {
++                return true;
++            }
++        }
++        return false;
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/s/SpoilsOfWar.java b/Mage.Sets/src/mage/cards/s/SpoilsOfWar.java
+new file mode 100644
+index 00000000..3e96d340
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/s/SpoilsOfWar.java
+@@ -0,0 +1,74 @@
++package mage.cards.s;
++
++import mage.abilities.Ability;
++import mage.abilities.costs.CostAdjuster;
++import mage.abilities.dynamicvalue.common.GetXValue;
++import mage.abilities.effects.common.InfoEffect;
++import mage.abilities.effects.common.counter.DistributeCountersEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.filter.FilterCard;
++import mage.filter.predicate.Predicates;
++import mage.game.Game;
++import mage.players.Player;
++import mage.target.common.TargetCreaturePermanentAmount;
++
++import java.util.Objects;
++import java.util.UUID;
++
++/**
++ * Spoils of War (Ice Age), as printed. Commander Duels patch 0015.
++ * <p>
++ * X is set as the spell is cast: the number of artifact and creature cards in the graveyard of the
++ * opponent who has the most (with one opponent, theirs).
++ */
++public final class SpoilsOfWar extends CardImpl {
++
++    public SpoilsOfWar(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.SORCERY}, "{X}{B}");
++
++        // X is the number of artifact and/or creature cards in an opponent's graveyard as you cast this spell.
++        this.getSpellAbility().addEffect(new InfoEffect(
++                "X is the number of artifact and/or creature cards in an opponent's graveyard as you cast this spell."));
++        this.getSpellAbility().setCostAdjuster(SpoilsOfWarAdjuster.instance);
++
++        // Distribute X +1/+1 counters among any number of target creatures.
++        this.getSpellAbility().addEffect(new DistributeCountersEffect().concatBy("<br>"));
++        this.getSpellAbility().addTarget(new TargetCreaturePermanentAmount(GetXValue.instance));
++    }
++
++    private SpoilsOfWar(final SpoilsOfWar card) {
++        super(card);
++    }
++
++    @Override
++    public SpoilsOfWar copy() {
++        return new SpoilsOfWar(this);
++    }
++}
++
++enum SpoilsOfWarAdjuster implements CostAdjuster {
++    instance;
++
++    private static final FilterCard filter = new FilterCard("artifact and/or creature cards");
++
++    static {
++        filter.add(Predicates.or(CardType.ARTIFACT.getPredicate(), CardType.CREATURE.getPredicate()));
++    }
++
++    @Override
++    public void prepareX(Ability ability, Game game) {
++        int most = game.getOpponents(ability.getControllerId(), true).stream()
++                .map(game::getPlayer)
++                .filter(Objects::nonNull)
++                .mapToInt(player -> count(player, ability, game))
++                .max()
++                .orElse(0);
++        ability.setVariableCostsValue(most);
++    }
++
++    private static int count(Player player, Ability ability, Game game) {
++        return player.getGraveyard().count(filter, ability.getControllerId(), ability, game);
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/s/Suffocation.java b/Mage.Sets/src/mage/cards/s/Suffocation.java
+new file mode 100644
+index 00000000..c1e12f61
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/s/Suffocation.java
+@@ -0,0 +1,129 @@
++package mage.cards.s;
++
++import mage.abilities.Ability;
++import mage.abilities.common.CastOnlyIfConditionIsTrueAbility;
++import mage.abilities.common.delayed.AtTheBeginOfNextUpkeepDelayedTriggeredAbility;
++import mage.abilities.condition.Condition;
++import mage.abilities.effects.OneShotEffect;
++import mage.abilities.effects.common.CreateDelayedTriggeredAbilityEffect;
++import mage.abilities.effects.common.DrawCardSourceControllerEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.Outcome;
++import mage.constants.WatcherScope;
++import mage.game.Game;
++import mage.game.events.GameEvent;
++import mage.game.stack.Spell;
++import mage.players.Player;
++import mage.watchers.Watcher;
++
++import java.util.HashMap;
++import java.util.Map;
++import java.util.UUID;
++
++/**
++ * Suffocation (Alliances), as printed. Commander Duels patch 0015.
++ */
++public final class Suffocation extends CardImpl {
++
++    public Suffocation(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.INSTANT}, "{1}{U}");
++
++        // Cast this spell only if you were dealt damage this turn by a red instant or sorcery spell.
++        this.addAbility(new CastOnlyIfConditionIsTrueAbility(SuffocationCondition.instance,
++                "Cast this spell only if you were dealt damage this turn by a red instant or sorcery spell."));
++
++        // Suffocation deals 4 damage to the controller of the last red instant or sorcery spell that dealt damage to you this turn.
++        this.getSpellAbility().addEffect(new SuffocationEffect());
++
++        // Draw a card at the beginning of the next turn's upkeep.
++        this.getSpellAbility().addEffect(new CreateDelayedTriggeredAbilityEffect(
++                new AtTheBeginOfNextUpkeepDelayedTriggeredAbility(new DrawCardSourceControllerEffect(1)), false)
++                .concatBy("<br>"));
++        this.getSpellAbility().addWatcher(new SuffocationWatcher());
++    }
++
++    private Suffocation(final Suffocation card) {
++        super(card);
++    }
++
++    @Override
++    public Suffocation copy() {
++        return new Suffocation(this);
++    }
++}
++
++enum SuffocationCondition implements Condition {
++    instance;
++
++    @Override
++    public boolean apply(Game game, Ability source) {
++        SuffocationWatcher watcher = game.getState().getWatcher(SuffocationWatcher.class);
++        return watcher != null && watcher.lastRedSpellController(source.getControllerId()) != null;
++    }
++}
++
++class SuffocationEffect extends OneShotEffect {
++
++    SuffocationEffect() {
++        super(Outcome.Damage);
++        staticText = "{this} deals 4 damage to the controller of the last red instant or sorcery spell "
++                + "that dealt damage to you this turn";
++    }
++
++    private SuffocationEffect(final SuffocationEffect effect) {
++        super(effect);
++    }
++
++    @Override
++    public SuffocationEffect copy() {
++        return new SuffocationEffect(this);
++    }
++
++    @Override
++    public boolean apply(Game game, Ability source) {
++        SuffocationWatcher watcher = game.getState().getWatcher(SuffocationWatcher.class);
++        if (watcher == null) {
++            return false;
++        }
++        UUID controllerId = watcher.lastRedSpellController(source.getControllerId());
++        Player player = controllerId == null ? null : game.getPlayer(controllerId);
++        if (player == null) {
++            return false;
++        }
++        player.damage(4, source.getSourceId(), source, game);
++        return true;
++    }
++}
++
++/** Per player, the controller of the last red instant or sorcery spell that dealt them damage this turn. */
++class SuffocationWatcher extends Watcher {
++
++    private final Map<UUID, UUID> lastRedSpell = new HashMap<>();
++
++    SuffocationWatcher() {
++        super(WatcherScope.GAME);
++    }
++
++    @Override
++    public void watch(GameEvent event, Game game) {
++        if (event.getType() != GameEvent.EventType.DAMAGED_PLAYER) {
++            return;
++        }
++        Spell spell = game.getSpellOrLKIStack(event.getSourceId());
++        if (spell != null && spell.isInstantOrSorcery(game) && spell.getColor(game).isRed()) {
++            lastRedSpell.put(event.getTargetId(), spell.getControllerId());
++        }
++    }
++
++    @Override
++    public void reset() {
++        super.reset();
++        lastRedSpell.clear();
++    }
++
++    UUID lastRedSpellController(UUID playerId) {
++        return lastRedSpell.get(playerId);
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/w/WintersChill.java b/Mage.Sets/src/mage/cards/w/WintersChill.java
+new file mode 100644
+index 00000000..a15cedfe
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/w/WintersChill.java
+@@ -0,0 +1,155 @@
++package mage.cards.w;
++
++import mage.abilities.Ability;
++import mage.abilities.common.CastOnlyDuringPhaseStepSourceAbility;
++import mage.abilities.common.delayed.AtTheEndOfCombatDelayedTriggeredAbility;
++import mage.abilities.condition.common.BeforeBlockersAreDeclaredCondition;
++import mage.abilities.costs.CostAdjuster;
++import mage.abilities.costs.mana.GenericManaCost;
++import mage.abilities.effects.OneShotEffect;
++import mage.abilities.effects.PreventionEffectImpl;
++import mage.abilities.effects.common.DestroyTargetEffect;
++import mage.abilities.effects.common.InfoEffect;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++import mage.constants.Duration;
++import mage.constants.Outcome;
++import mage.constants.SuperType;
++import mage.constants.TurnPhase;
++import mage.filter.common.FilterControlledLandPermanent;
++import mage.game.Game;
++import mage.game.events.DamageEvent;
++import mage.game.events.GameEvent;
++import mage.game.permanent.Permanent;
++import mage.players.Player;
++import mage.target.common.TargetAttackingCreature;
++import mage.target.targetadjustment.XTargetsCountAdjuster;
++import mage.target.targetpointer.FixedTarget;
++
++import java.util.UUID;
++
++/**
++ * Winter's Chill (Ice Age), as printed. Commander Duels patch 0015.
++ */
++public final class WintersChill extends CardImpl {
++
++    public WintersChill(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.INSTANT}, "{X}{U}");
++
++        // Cast this spell only during combat before blockers are declared.
++        this.addAbility(new CastOnlyDuringPhaseStepSourceAbility(TurnPhase.COMBAT,
++                BeforeBlockersAreDeclaredCondition.instance));
++
++        // X can't be greater than the number of snow lands you control.
++        this.getSpellAbility().addEffect(new InfoEffect("X can't be greater than the number of snow lands you control."));
++        this.getSpellAbility().setCostAdjuster(WintersChillAdjuster.instance);
++
++        // Choose X target attacking creatures. For each of those creatures, its controller may pay {1} or {2}. If that player doesn't, destroy that creature at end of combat. If that player pays only {1}, prevent all combat damage that would be dealt to and dealt by that creature this combat.
++        this.getSpellAbility().addEffect(new WintersChillEffect().concatBy("<br>"));
++        this.getSpellAbility().addTarget(new TargetAttackingCreature(0, Integer.MAX_VALUE));
++        this.getSpellAbility().setTargetAdjuster(new XTargetsCountAdjuster());
++    }
++
++    private WintersChill(final WintersChill card) {
++        super(card);
++    }
++
++    @Override
++    public WintersChill copy() {
++        return new WintersChill(this);
++    }
++}
++
++enum WintersChillAdjuster implements CostAdjuster {
++    instance;
++
++    private static final FilterControlledLandPermanent filter = new FilterControlledLandPermanent();
++
++    static {
++        filter.add(SuperType.SNOW.getPredicate());
++    }
++
++    @Override
++    public void prepareX(Ability ability, Game game) {
++        int snow = game.getBattlefield().count(filter, ability.getControllerId(), ability, game);
++        ability.setVariableCostsMinMax(0, snow);
++    }
++}
++
++class WintersChillEffect extends OneShotEffect {
++
++    WintersChillEffect() {
++        super(Outcome.DestroyPermanent);
++        staticText = "Choose X target attacking creatures. For each of those creatures, its controller may pay {1} or {2}. "
++                + "If that player doesn't, destroy that creature at end of combat. If that player pays only {1}, "
++                + "prevent all combat damage that would be dealt to and dealt by that creature this combat";
++    }
++
++    private WintersChillEffect(final WintersChillEffect effect) {
++        super(effect);
++    }
++
++    @Override
++    public WintersChillEffect copy() {
++        return new WintersChillEffect(this);
++    }
++
++    @Override
++    public boolean apply(Game game, Ability source) {
++        for (UUID targetId : getTargetPointer().getTargets(game, source)) {
++            Permanent creature = game.getPermanent(targetId);
++            if (creature == null) {
++                continue;
++            }
++            Player player = game.getPlayer(creature.getControllerId());
++            if (player == null) {
++                continue;
++            }
++            String name = creature.getLogName();
++            GenericManaCost two = new GenericManaCost(2);
++            if (two.canPay(source, source, player.getId(), game)
++                    && player.chooseUse(Outcome.Benefit, "Pay {2} for " + name + "? It is neither destroyed nor kept from combat damage.", source, game)
++                    && two.pay(source, game, source, player.getId(), false)) {
++                continue;
++            }
++            GenericManaCost one = new GenericManaCost(1);
++            if (one.canPay(source, source, player.getId(), game)
++                    && player.chooseUse(Outcome.Benefit, "Pay {1} for " + name + "? It is not destroyed, but deals and is dealt no combat damage this combat.", source, game)
++                    && one.pay(source, game, source, player.getId(), false)) {
++                game.addEffect(new WintersChillPreventionEffect(new FixedTarget(creature, game)), source);
++                continue;
++            }
++            AtTheEndOfCombatDelayedTriggeredAbility destroy = new AtTheEndOfCombatDelayedTriggeredAbility(
++                    new DestroyTargetEffect().setTargetPointer(new FixedTarget(creature, game)));
++            game.addDelayedTriggeredAbility(destroy, source);
++        }
++        return true;
++    }
++}
++
++class WintersChillPreventionEffect extends PreventionEffectImpl {
++
++    WintersChillPreventionEffect(FixedTarget creature) {
++        super(Duration.EndOfCombat, Integer.MAX_VALUE, true);
++        setTargetPointer(creature);
++    }
++
++    private WintersChillPreventionEffect(final WintersChillPreventionEffect effect) {
++        super(effect);
++    }
++
++    @Override
++    public WintersChillPreventionEffect copy() {
++        return new WintersChillPreventionEffect(this);
++    }
++
++    @Override
++    public boolean applies(GameEvent event, Ability source, Game game) {
++        if (!super.applies(event, source, game) || !(event instanceof DamageEvent)) {
++            return false;
++        }
++        UUID creature = getTargetPointer().getFirst(game, source);
++        return creature != null && (creature.equals(event.getTargetId()) || creature.equals(event.getSourceId()));
++    }
++}
+diff --git a/Mage.Sets/src/mage/sets/Alliances.java b/Mage.Sets/src/mage/sets/Alliances.java
+index 8800beec..c3ce2df8 100644
+--- a/Mage.Sets/src/mage/sets/Alliances.java
++++ b/Mage.Sets/src/mage/sets/Alliances.java
+@@ -188,6 +188,7 @@ public final class Alliances extends ExpansionSet {
+         cards.add(new SetCardInfo("Storm Shaman", "81a", Rarity.COMMON, mage.cards.s.StormShaman.class, RETRO_ART_USE_VARIOUS));
+         cards.add(new SetCardInfo("Storm Shaman", "81b", Rarity.COMMON, mage.cards.s.StormShaman.class, RETRO_ART_USE_VARIOUS));
+         cards.add(new SetCardInfo("Stromgald Spy", 62, Rarity.UNCOMMON, mage.cards.s.StromgaldSpy.class, RETRO_ART));
++        cards.add(new SetCardInfo("Suffocation", 38, Rarity.UNCOMMON, mage.cards.s.Suffocation.class, RETRO_ART));
+         cards.add(new SetCardInfo("Surge of Strength", 109, Rarity.UNCOMMON, mage.cards.s.SurgeOfStrength.class, RETRO_ART));
+         cards.add(new SetCardInfo("Sustaining Spirit", 18, Rarity.RARE, mage.cards.s.SustainingSpirit.class, RETRO_ART));
+         cards.add(new SetCardInfo("Swamp Mosquito", "63a", Rarity.COMMON, mage.cards.s.SwampMosquito.class, RETRO_ART_USE_VARIOUS));
+diff --git a/Mage.Sets/src/mage/sets/IceAge.java b/Mage.Sets/src/mage/sets/IceAge.java
+index ff684111..57987de9 100644
+--- a/Mage.Sets/src/mage/sets/IceAge.java
++++ b/Mage.Sets/src/mage/sets/IceAge.java
+@@ -36,6 +36,7 @@ public final class IceAge extends ExpansionSet {
+         cards.add(new SetCardInfo("Arctic Foxes", 2, Rarity.COMMON, mage.cards.a.ArcticFoxes.class, RETRO_ART));
+         cards.add(new SetCardInfo("Arcum's Sleigh", 309, Rarity.UNCOMMON, mage.cards.a.ArcumsSleigh.class, RETRO_ART));
+         cards.add(new SetCardInfo("Arcum's Weathervane", 310, Rarity.UNCOMMON, mage.cards.a.ArcumsWeathervane.class));
++        cards.add(new SetCardInfo("Arcum's Whistle", 311, Rarity.UNCOMMON, mage.cards.a.ArcumsWhistle.class, RETRO_ART));
+         cards.add(new SetCardInfo("Arenson's Aura", 3, Rarity.COMMON, mage.cards.a.ArensonsAura.class, RETRO_ART));
+         cards.add(new SetCardInfo("Armor of Faith", 4, Rarity.COMMON, mage.cards.a.ArmorOfFaith.class, RETRO_ART));
+         cards.add(new SetCardInfo("Arnjlot's Ascent", 57, Rarity.COMMON, mage.cards.a.ArnjlotsAscent.class, RETRO_ART));
+@@ -341,6 +342,7 @@ public final class IceAge extends ExpansionSet {
+         cards.add(new SetCardInfo("Soul Kiss", 162, Rarity.COMMON, mage.cards.s.SoulKiss.class, RETRO_ART));
+         cards.add(new SetCardInfo("Spectral Shield", 302, Rarity.UNCOMMON, mage.cards.s.SpectralShield.class, RETRO_ART));
+         cards.add(new SetCardInfo("Spoils of Evil", 163, Rarity.RARE, mage.cards.s.SpoilsOfEvil.class, RETRO_ART));
++        cards.add(new SetCardInfo("Spoils of War", 164, Rarity.RARE, mage.cards.s.SpoilsOfWar.class, RETRO_ART));
+         cards.add(new SetCardInfo("Staff of the Ages", 340, Rarity.RARE, mage.cards.s.StaffOfTheAges.class, RETRO_ART));
+         cards.add(new SetCardInfo("Stampede", 265, Rarity.RARE, mage.cards.s.Stampede.class, RETRO_ART));
+         cards.add(new SetCardInfo("Stench of Evil", 165, Rarity.UNCOMMON, mage.cards.s.StenchOfEvil.class, RETRO_ART));
+@@ -390,6 +392,7 @@ public final class IceAge extends ExpansionSet {
+         cards.add(new SetCardInfo("Wild Growth", 277, Rarity.COMMON, mage.cards.w.WildGrowth.class, RETRO_ART));
+         cards.add(new SetCardInfo("Wind Spirit", 106, Rarity.UNCOMMON, mage.cards.w.WindSpirit.class, RETRO_ART));
+         cards.add(new SetCardInfo("Wings of Aesthir", 305, Rarity.UNCOMMON, mage.cards.w.WingsOfAesthir.class, RETRO_ART));
++        cards.add(new SetCardInfo("Winter's Chill", 107, Rarity.RARE, mage.cards.w.WintersChill.class, RETRO_ART));
+         cards.add(new SetCardInfo("Withering Wisps", 168, Rarity.UNCOMMON, mage.cards.w.WitheringWisps.class, RETRO_ART));
+         cards.add(new SetCardInfo("Woolly Mammoths", 278, Rarity.COMMON, mage.cards.w.WoollyMammoths.class, RETRO_ART));
+         cards.add(new SetCardInfo("Woolly Spider", 279, Rarity.COMMON, mage.cards.w.WoollySpider.class, RETRO_ART));
+diff --git a/Mage.Sets/src/mage/sets/Legends.java b/Mage.Sets/src/mage/sets/Legends.java
+index eb1b9214..40a8f424 100644
+--- a/Mage.Sets/src/mage/sets/Legends.java
++++ b/Mage.Sets/src/mage/sets/Legends.java
+@@ -49,6 +49,7 @@ public final class Legends extends ExpansionSet {
+         cards.add(new SetCardInfo("Axelrod Gunnarson", 219, Rarity.RARE, mage.cards.a.AxelrodGunnarson.class, RETRO_ART));
+         cards.add(new SetCardInfo("Ayesha Tanaka", 220, Rarity.RARE, mage.cards.a.AyeshaTanaka.class, RETRO_ART));
+         cards.add(new SetCardInfo("Azure Drake", 46, Rarity.UNCOMMON, mage.cards.a.AzureDrake.class, RETRO_ART));
++        cards.add(new SetCardInfo("Backdraft", 132, Rarity.UNCOMMON, mage.cards.b.Backdraft.class, RETRO_ART));
+         cards.add(new SetCardInfo("Backfire", 47, Rarity.UNCOMMON, mage.cards.b.Backfire.class, RETRO_ART));
+         cards.add(new SetCardInfo("Barbary Apes", 176, Rarity.COMMON, mage.cards.b.BarbaryApes.class, RETRO_ART));
+         cards.add(new SetCardInfo("Barktooth Warbeard", 221, Rarity.UNCOMMON, mage.cards.b.BarktoothWarbeard.class, RETRO_ART));
+@@ -101,6 +102,7 @@ public final class Legends extends ExpansionSet {
+         cards.add(new SetCardInfo("Enchanted Being", 12, Rarity.COMMON, mage.cards.e.EnchantedBeing.class, RETRO_ART));
+         cards.add(new SetCardInfo("Enchantment Alteration", 53, Rarity.COMMON, mage.cards.e.EnchantmentAlteration.class, RETRO_ART));
+         cards.add(new SetCardInfo("Energy Tap", 54, Rarity.COMMON, mage.cards.e.EnergyTap.class, RETRO_ART));
++        cards.add(new SetCardInfo("Equinox", 13, Rarity.COMMON, mage.cards.e.Equinox.class, RETRO_ART));
+         cards.add(new SetCardInfo("Eternal Warrior", 144, Rarity.UNCOMMON, mage.cards.e.EternalWarrior.class, RETRO_ART));
+         cards.add(new SetCardInfo("Eureka", 185, Rarity.RARE, mage.cards.e.Eureka.class, RETRO_ART));
+         cards.add(new SetCardInfo("Evil Eye of Orms-by-Gore", 96, Rarity.UNCOMMON, mage.cards.e.EvilEyeOfOrmsByGore.class, RETRO_ART));
+@@ -206,6 +208,7 @@ public final class Legends extends ExpansionSet {
+         cards.add(new SetCardInfo("Nebuchadnezzar", 245, Rarity.RARE, mage.cards.n.Nebuchadnezzar.class, RETRO_ART));
+         cards.add(new SetCardInfo("Nether Void", 113, Rarity.RARE, mage.cards.n.NetherVoid.class, RETRO_ART));
+         cards.add(new SetCardInfo("Nicol Bolas", 246, Rarity.RARE, mage.cards.n.NicolBolas.class, RETRO_ART));
++        cards.add(new SetCardInfo("North Star", 288, Rarity.RARE, mage.cards.n.NorthStar.class, RETRO_ART));
+         cards.add(new SetCardInfo("Nova Pentacle", 289, Rarity.RARE, mage.cards.n.NovaPentacle.class, RETRO_ART));
+         cards.add(new SetCardInfo("Osai Vultures", 29, Rarity.COMMON, mage.cards.o.OsaiVultures.class, RETRO_ART));
+         cards.add(new SetCardInfo("Palladia-Mors", 247, Rarity.RARE, mage.cards.p.PalladiaMors.class, RETRO_ART));
+@@ -225,6 +228,7 @@ public final class Legends extends ExpansionSet {
+         cards.add(new SetCardInfo("Puppet Master", 69, Rarity.UNCOMMON, mage.cards.p.PuppetMaster.class, RETRO_ART));
+         cards.add(new SetCardInfo("Pyrotechnics", 161, Rarity.COMMON, mage.cards.p.Pyrotechnics.class, RETRO_ART));
+         cards.add(new SetCardInfo("Quagmire", 115, Rarity.UNCOMMON, mage.cards.q.Quagmire.class, RETRO_ART));
++        cards.add(new SetCardInfo("Quarum Trench Gnomes", 145, Rarity.RARE, mage.cards.q.QuarumTrenchGnomes.class, RETRO_ART));
+         cards.add(new SetCardInfo("Rabid Wombat", 198, Rarity.UNCOMMON, mage.cards.r.RabidWombat.class, RETRO_ART));
+         cards.add(new SetCardInfo("Radjan Spirit", 199, Rarity.UNCOMMON, mage.cards.r.RadjanSpirit.class, RETRO_ART));
+         cards.add(new SetCardInfo("Raging Bull", 163, Rarity.COMMON, mage.cards.r.RagingBull.class, RETRO_ART));
+@@ -258,6 +262,7 @@ public final class Legends extends ExpansionSet {
+         cards.add(new SetCardInfo("Shelkin Brownie", 204, Rarity.COMMON, mage.cards.s.ShelkinBrownie.class, RETRO_ART));
+         cards.add(new SetCardInfo("Shield Wall", 36, Rarity.UNCOMMON, mage.cards.s.ShieldWall.class, RETRO_ART));
+         cards.add(new SetCardInfo("Shimian Night Stalker", 116, Rarity.UNCOMMON, mage.cards.s.ShimianNightStalker.class, RETRO_ART));
++        cards.add(new SetCardInfo("Silhouette", 77, Rarity.UNCOMMON, mage.cards.s.Silhouette.class, RETRO_ART));
+         cards.add(new SetCardInfo("Sir Shandlar of Eberyn", 257, Rarity.UNCOMMON, mage.cards.s.SirShandlarOfEberyn.class, RETRO_ART));
+         cards.add(new SetCardInfo("Sivitri Scarzam", 258, Rarity.UNCOMMON, mage.cards.s.SivitriScarzam.class, RETRO_ART));
+         cards.add(new SetCardInfo("Sol'kanar the Swamp King", 259, Rarity.RARE, mage.cards.s.SolkanarTheSwampKing.class, RETRO_ART));
+diff --git a/Mage.Sets/src/mage/sets/TheDark.java b/Mage.Sets/src/mage/sets/TheDark.java
+index e7ed7900..4880c089 100644
+--- a/Mage.Sets/src/mage/sets/TheDark.java
++++ b/Mage.Sets/src/mage/sets/TheDark.java
+@@ -68,6 +68,7 @@ public final class TheDark extends ExpansionSet {
+         cards.add(new SetCardInfo("Flood", 27, Rarity.UNCOMMON, mage.cards.f.Flood.class, RETRO_ART));
+         cards.add(new SetCardInfo("Fountain of Youth", 103, Rarity.UNCOMMON, mage.cards.f.FountainOfYouth.class, RETRO_ART_USE_VARIOUS));
+         cards.add(new SetCardInfo("Fountain of Youth", "103+", Rarity.UNCOMMON, mage.cards.f.FountainOfYouth.class, RETRO_ART_USE_VARIOUS));
++        cards.add(new SetCardInfo("Frankenstein's Monster", 45, Rarity.RARE, mage.cards.f.FrankensteinsMonster.class, RETRO_ART));
+         cards.add(new SetCardInfo("Gaea's Touch", 77, Rarity.COMMON, mage.cards.g.GaeasTouch.class, RETRO_ART_USE_VARIOUS));
+         cards.add(new SetCardInfo("Gaea's Touch", "77+", Rarity.COMMON, mage.cards.g.GaeasTouch.class, RETRO_ART_USE_VARIOUS));
+         cards.add(new SetCardInfo("Ghost Ship", 28, Rarity.COMMON, mage.cards.g.GhostShip.class, RETRO_ART));
+@@ -110,6 +111,7 @@ public final class TheDark extends ExpansionSet {
+         cards.add(new SetCardInfo("Preacher", 16, Rarity.RARE, mage.cards.p.Preacher.class, RETRO_ART));
+         cards.add(new SetCardInfo("Psychic Allergy", 34, Rarity.RARE, mage.cards.p.PsychicAllergy.class, RETRO_ART));
+         cards.add(new SetCardInfo("Rag Man", 51, Rarity.RARE, mage.cards.r.RagMan.class, RETRO_ART));
++        cards.add(new SetCardInfo("Reflecting Mirror", 106, Rarity.UNCOMMON, mage.cards.r.ReflectingMirror.class, RETRO_ART));
+         cards.add(new SetCardInfo("Riptide", 35, Rarity.COMMON, mage.cards.r.Riptide.class, RETRO_ART));
+         cards.add(new SetCardInfo("Runesword", 107, Rarity.UNCOMMON, mage.cards.r.Runesword.class, RETRO_ART_USE_VARIOUS));
+         cards.add(new SetCardInfo("Runesword", "107+", Rarity.UNCOMMON, mage.cards.r.Runesword.class, RETRO_ART_USE_VARIOUS));
+diff --git a/Mage.Sets/src/mage/sets/Visions.java b/Mage.Sets/src/mage/sets/Visions.java
+index ed15f3fd..d0a42138 100644
+--- a/Mage.Sets/src/mage/sets/Visions.java
++++ b/Mage.Sets/src/mage/sets/Visions.java
+@@ -126,6 +126,7 @@ public final class Visions extends ExpansionSet {
+         cards.add(new SetCardInfo("Necromancy", 64, Rarity.UNCOMMON, mage.cards.n.Necromancy.class, RETRO_ART));
+         cards.add(new SetCardInfo("Necrosavant", 65, Rarity.RARE, mage.cards.n.Necrosavant.class, RETRO_ART));
+         cards.add(new SetCardInfo("Nekrataal", 66, Rarity.UNCOMMON, mage.cards.n.Nekrataal.class, RETRO_ART));
++        cards.add(new SetCardInfo("Ogre Enforcer", 89, Rarity.RARE, mage.cards.o.OgreEnforcer.class, RETRO_ART));
+         cards.add(new SetCardInfo("Ovinomancer", 39, Rarity.UNCOMMON, mage.cards.o.Ovinomancer.class, RETRO_ART));
+         cards.add(new SetCardInfo("Panther Warriors", 115, Rarity.COMMON, mage.cards.p.PantherWarriors.class, RETRO_ART));
+         cards.add(new SetCardInfo("Parapet", 14, Rarity.COMMON, mage.cards.p.Parapet.class, RETRO_ART));
