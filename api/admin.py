@@ -64,6 +64,8 @@ from api.schemas import (
 router = APIRouter(prefix="/api/v1/admin", responses=ERRORS)
 CanReadUsers = Annotated[Principal, Depends(require_permission("admin.users.read"))]
 CanManageUsers = Annotated[Principal, Depends(require_permission("admin.users.manage"))]
+# Approving or denying a new account (v0.9.4): moderators as well as administrators.
+CanApproveUsers = Annotated[Principal, Depends(require_permission("admin.users.approve"))]
 CanManageRoles = Annotated[Principal, Depends(require_permission("admin.roles.manage"))]
 CanReadAudit = Annotated[Principal, Depends(require_permission("admin.audit.read"))]
 CanResetUsers = Annotated[Principal, Depends(require_permission("admin.users.reset"))]
@@ -92,11 +94,13 @@ def granted_roles(db: Session, user: User) -> list[str]:
 
 def admin_user(db: Session, user: User, viewer: Principal) -> AdminUser:
     wins, tier = admin_progress(db, user)
-    # Email identifies the accounts administrators approve; moderators approve none. Whether
-    # Google verified it goes with it, so an unverified address is not taken as proof.
-    email, verified = (
-        verified_email_of(db, user) if viewer.can("admin.users.manage") else (None, False)
+    # Email identifies the accounts an approver approves: administrators see every account's,
+    # and since v0.9.4 moderators, who approve too, see a pending account's. Whether Google
+    # verified it goes with it, so an unverified address is not taken as proof.
+    sees_email = viewer.can("admin.users.manage") or (
+        viewer.can("admin.users.approve") and user.status == "pending"
     )
+    email, verified = verified_email_of(db, user) if sees_email else (None, False)
     return AdminUser(
         id=user.id,
         handle=user.handle,
@@ -190,11 +194,20 @@ def managed_user(db: Session, principal: Principal, user_id: UUID) -> User:
 
 @router.post("/users/{user_id}/status", response_model=AdminUser)
 def change_status(
-    user_id: UUID, body: StatusChange, request: Request, principal: CanManageUsers, db: Db
+    user_id: UUID, body: StatusChange, request: Request, principal: CanApproveUsers, db: Db
 ) -> AdminUser:
     require_recent_sign_in(request, principal)
     user = managed_user(db, principal, user_id)
     before = user.status
+    # Approving and denying a pending account is every approver's (v0.9.4); anything else, such
+    # as disabling or restoring, stays the administrators'.
+    approval = before == "pending" and body.status in ("active", "denied")
+    if not approval and not principal.can("admin.users.manage"):
+        raise ApiError(
+            403,
+            "forbidden",
+            "Moderators approve and deny new accounts; only administrators do more.",
+        )
     if before != body.status:
         if body.status == "denied" and before != "pending":
             raise ApiError(409, "invalid_transition", "Only a pending account can be denied.")

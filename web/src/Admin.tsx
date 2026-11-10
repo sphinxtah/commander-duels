@@ -101,6 +101,8 @@ function Users({
   // The message a failed load left, so a load that works can take it back.
   const loadFailure = useRef("");
   const manage = me.permissions.includes("admin.users.manage");
+  // Approving and denying new accounts: moderators too since v0.9.4 (the owner, 2026-11-10).
+  const approve = me.permissions.includes("admin.users.approve");
   const roles = me.permissions.includes("admin.roles.manage");
   const administrators = me.permissions.includes("admin.roles.administrator");
   const progress = me.permissions.includes("progress.manage");
@@ -304,7 +306,7 @@ function Users({
                       </small>
                     ) : (
                       <small>
-                        {manage ? (
+                        {manage || (approve && user.status === "pending") ? (
                           <>
                             {user.email ?? "No email"}
                             {/* Google did not verify the address: it proves nothing. */}
@@ -389,102 +391,113 @@ function Users({
                     ))}
                   </fieldset>
                 )}
-                {!deleted && ((manage && !locked) || sysopChanges) && (
-                  <div className={styles.actions}>
-                    {/* SysOp sets any account's wins, and so its tier (v0.3.1). */}
-                    {progress && settingWins !== user.id && (
-                      <button
-                        className={styles.secondary}
-                        onClick={() => setSettingWins(user.id)}
-                      >
-                        {own ? "Set your wins" : `Set wins for ${name}`}
-                      </button>
-                    )}
-                    {economy && givingTokens !== user.id && (
-                      <button
-                        className={styles.secondary}
-                        onClick={() => setGivingTokens(user.id)}
-                      >
-                        {own
-                          ? "Give yourself tokens"
-                          : `Give tokens to ${name}`}
-                      </button>
-                    )}
-                    {/* Packs, wins by format, cards and campaign progress (v0.8.8). */}
-                    {progress && economy && testing !== user.id && (
-                      <button
-                        className={styles.secondary}
-                        onClick={() => setTesting(user.id)}
-                      >
-                        {own
-                          ? "Testing grants for yourself…"
-                          : `Testing grants for ${name}…`}
-                      </button>
-                    )}
-                    {manage && !locked && !own && user.status === "pending" && (
-                      <>
-                        <button
-                          className={shell.primary}
-                          onClick={() => void changeStatus(user, "active")}
-                        >
-                          Approve {name}
-                        </button>
+                {!deleted &&
+                  (((manage || (approve && user.status === "pending")) &&
+                    !locked) ||
+                    sysopChanges) && (
+                    <div className={styles.actions}>
+                      {/* SysOp sets any account's wins, and so its tier (v0.3.1). */}
+                      {progress && settingWins !== user.id && (
                         <button
                           className={styles.secondary}
-                          onClick={() => void changeStatus(user, "denied")}
+                          onClick={() => setSettingWins(user.id)}
                         >
-                          Deny {name}
-                        </button>
-                      </>
-                    )}
-                    {manage && !locked && !own && user.status === "active" && (
-                      <>
-                        <button
-                          className={styles.secondary}
-                          onClick={() => void signOut(user)}
-                        >
-                          Sign {name} out everywhere
-                        </button>
-                        <button
-                          className={styles.danger}
-                          onClick={() => void changeStatus(user, "disabled")}
-                        >
-                          Disable {name}
-                        </button>
-                      </>
-                    )}
-                    {manage &&
-                      !locked &&
-                      !own &&
-                      (user.status === "disabled" ||
-                        user.status === "denied") && (
-                        <button
-                          className={styles.secondary}
-                          onClick={() => void changeStatus(user, "active")}
-                        >
-                          Restore {name}
+                          {own ? "Set your wins" : `Set wins for ${name}`}
                         </button>
                       )}
-                    {/* A fresh start, so the setup wizard runs again (v0.4.5). */}
-                    {resets && user.id !== me.id && (
-                      <button
-                        className={styles.danger}
-                        onClick={() => setResetting(user)}
-                      >
-                        Reset {name}'s account…
-                      </button>
-                    )}
-                    {/* For good, when its owner asks (v0.4.1); never your own account. */}
-                    {manage && !locked && user.id !== me.id && (
-                      <button
-                        className={styles.danger}
-                        onClick={() => setDeleting(user)}
-                      >
-                        Delete {name}'s account…
-                      </button>
-                    )}
-                  </div>
-                )}
+                      {economy && givingTokens !== user.id && (
+                        <button
+                          className={styles.secondary}
+                          onClick={() => setGivingTokens(user.id)}
+                        >
+                          {own
+                            ? "Give yourself tokens"
+                            : `Give tokens to ${name}`}
+                        </button>
+                      )}
+                      {/* Packs, wins by format, cards and campaign progress (v0.8.8). */}
+                      {progress && economy && testing !== user.id && (
+                        <button
+                          className={styles.secondary}
+                          onClick={() => setTesting(user.id)}
+                        >
+                          {own
+                            ? "Testing grants for yourself…"
+                            : `Testing grants for ${name}…`}
+                        </button>
+                      )}
+                      {approve &&
+                        !locked &&
+                        !own &&
+                        user.status === "pending" && (
+                          <>
+                            <button
+                              className={shell.primary}
+                              onClick={() => void changeStatus(user, "active")}
+                            >
+                              Approve {name}
+                            </button>
+                            <button
+                              className={styles.secondary}
+                              onClick={() => void changeStatus(user, "denied")}
+                            >
+                              Deny {name}
+                            </button>
+                          </>
+                        )}
+                      {manage &&
+                        !locked &&
+                        !own &&
+                        user.status === "active" && (
+                          <>
+                            <button
+                              className={styles.secondary}
+                              onClick={() => void signOut(user)}
+                            >
+                              Sign {name} out everywhere
+                            </button>
+                            <button
+                              className={styles.danger}
+                              onClick={() =>
+                                void changeStatus(user, "disabled")
+                              }
+                            >
+                              Disable {name}
+                            </button>
+                          </>
+                        )}
+                      {manage &&
+                        !locked &&
+                        !own &&
+                        (user.status === "disabled" ||
+                          user.status === "denied") && (
+                          <button
+                            className={styles.secondary}
+                            onClick={() => void changeStatus(user, "active")}
+                          >
+                            Restore {name}
+                          </button>
+                        )}
+                      {/* A fresh start, so the setup wizard runs again (v0.4.5). */}
+                      {resets && user.id !== me.id && (
+                        <button
+                          className={styles.danger}
+                          onClick={() => setResetting(user)}
+                        >
+                          Reset {name}'s account…
+                        </button>
+                      )}
+                      {/* For good, when its owner asks (v0.4.1); never your own account. */}
+                      {manage && !locked && user.id !== me.id && (
+                        <button
+                          className={styles.danger}
+                          onClick={() => setDeleting(user)}
+                        >
+                          Delete {name}'s account…
+                        </button>
+                      )}
+                    </div>
+                  )}
                 {progress && settingWins === user.id && (
                   <SetWins
                     userId={user.id}

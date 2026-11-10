@@ -1424,6 +1424,7 @@ describe("what waits for Administration (v0.4.1)", () => {
     permissions: [
       ...alice.permissions,
       "admin.users.read",
+      "admin.users.approve",
       "admin.users.manage",
       "reports.manage",
     ],

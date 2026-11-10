@@ -192,7 +192,7 @@
                 "type": "null"
               }
             ],
-            "description": "Accounts waiting for approval; null without admin.users.manage.",
+            "description": "Accounts waiting for approval; null without admin.users.approve.",
             "title": "Pending Accounts"
           },
           "unread_reports": {
@@ -7504,6 +7504,7 @@
                 "moderation.read",
                 "content.edit",
                 "admin.users.read",
+                "admin.users.approve",
                 "admin.users.manage",
                 "admin.roles.manage",
                 "admin.roles.administrator",

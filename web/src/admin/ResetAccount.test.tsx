@@ -184,6 +184,7 @@ describe("resetting from the accounts list", () => {
     csrf_token: "token",
     permissions: [
       "admin.users.read",
+      "admin.users.approve",
       "admin.users.manage",
       "admin.roles.manage",
       "admin.roles.administrator",

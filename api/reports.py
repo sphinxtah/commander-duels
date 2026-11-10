@@ -230,7 +230,7 @@ class ReportStatusChange(Contract):
 
 class AdminCounts(Contract):
     pending_accounts: int | None = Field(
-        description="Accounts waiting for approval; null without admin.users.manage."
+        description="Accounts waiting for approval; null without admin.users.approve."
     )
     unread_reports: int | None = Field(
         description="Reports nobody has opened (status new); null without reports.manage."
@@ -571,7 +571,7 @@ def admin_counts(principal: Active, db: Db) -> AdminCounts:
             .select_from(User)
             .where(User.kind == "player", User.status == "pending")
         )
-        if principal.can("admin.users.manage")
+        if principal.can("admin.users.approve")
         else None
     )
     unread = (

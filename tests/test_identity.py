@@ -478,6 +478,68 @@ def test_approval_mode_keeps_new_accounts_pending(database: str, certs: Certs) -
         assert again.json()["code"] == "invalid_transition"
 
 
+@pytest.mark.real_roles
+def test_moderators_and_administrators_approve_new_accounts(database: str, certs: Certs) -> None:
+    """v0.9.4 (the owner, 2026-11-10): any administrator, and any moderator too, approves or
+    denies a new account, seeing its email to do so. A moderator does nothing more to an account:
+    no disabling or restoring, and no email of an account that is not waiting."""
+    app = build(database, certs, signup_policy="approval")
+    set_sysop_password(database, PASSWORD)
+    with TestClient(app, base_url="https://testserver"):
+        start(app)
+        root = sysop(app)
+        staff: dict[str, TestClient] = {}
+        for sub, role in (("5005", "moderator"), ("6006", "administrator")):
+            client = browser(app)
+            account = sign_in(client, sub=sub, email=f"{role}@example.com").json()
+            root.post(f"/api/v1/admin/users/{account['id']}/status", json={"status": "active"})
+            assert root.put(f"/api/v1/admin/users/{account['id']}/roles/{role}").status_code == 200
+            assert "admin.users.approve" in client.get("/api/v1/me").json()["permissions"]
+            staff[role] = client
+        moderator, administrator = staff["moderator"], staff["administrator"]
+
+        waiting = [
+            sign_in(browser(app), sub=sub, email=f"new{sub}@example.com").json()
+            for sub in ("7001", "7002", "7003")
+        ]
+        assert moderator.get("/api/v1/admin/counts").json()["pending_accounts"] == 3
+        listed = moderator.get("/api/v1/admin/users", params={"status": "pending"}).json()["items"]
+        assert {user["id"]: user["email"] for user in listed} == {
+            account["id"]: f"new{sub}@example.com"
+            for account, sub in zip(waiting, ("7001", "7002", "7003"), strict=True)
+        }
+        first = moderator.post(
+            f"/api/v1/admin/users/{waiting[0]['id']}/status", json={"status": "active"}
+        )
+        assert first.status_code == 200 and first.json()["status"] == "active"
+        # Approved, the account is no longer the moderator's to see the email of.
+        assert first.json()["email"] is None
+        denied = moderator.post(
+            f"/api/v1/admin/users/{waiting[1]['id']}/status", json={"status": "denied"}
+        )
+        assert denied.json()["status"] == "denied"
+        second = administrator.post(
+            f"/api/v1/admin/users/{waiting[2]['id']}/status", json={"status": "active"}
+        )
+        assert second.status_code == 200 and second.json()["status"] == "active"
+
+        # Anything but approving or denying stays the administrators'.
+        refused = moderator.post(
+            f"/api/v1/admin/users/{waiting[0]['id']}/status", json={"status": "disabled"}
+        )
+        assert refused.status_code == 403 and refused.json()["code"] == "forbidden"
+        disabled = administrator.post(
+            f"/api/v1/admin/users/{waiting[0]['id']}/status", json={"status": "disabled"}
+        )
+        assert disabled.json()["status"] == "disabled"
+        restore = moderator.post(
+            f"/api/v1/admin/users/{waiting[0]['id']}/status", json={"status": "active"}
+        )
+        assert restore.status_code == 403
+        everyone = moderator.get("/api/v1/admin/users").json()["items"]
+        assert all(user["email"] is None for user in everyone if user["status"] != "pending")
+
+
 def test_sysop_entrance_exists_only_on_its_network(app: FastAPI, database: str) -> None:
     missing = browser(app).get("/api/v1/no-such-path").json()
     for address, forwarded in [
@@ -682,8 +744,8 @@ def test_roles_follow_least_privilege_and_players_cannot_administer(
     found = ada.get("/api/v1/admin/users", params={"q": "BEA@"}).json()["items"]
     assert [(user["id"], user["email"]) for user in found] == [(bea_id, "bea@example.com")]
 
-    # A moderator reads the account list, but approves nothing: no private email addresses, and
-    # no searching by them.
+    # A moderator reads the account list, but sees no private email addresses but a pending
+    # account's (v0.9.4: moderators approve), and searches by none.
     listed = bea.get("/api/v1/admin/users").json()["items"]
     assert len(listed) == 2 and all(user["email"] is None for user in listed)
     assert bea.get("/api/v1/admin/users", params={"q": "ada@"}).json()["items"] == []

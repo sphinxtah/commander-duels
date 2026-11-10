@@ -56,12 +56,14 @@ BACKGROUND_HEADER = "x-background"
 ALL_PERMISSIONS: frozenset[str] = frozenset(get_args(Permission))
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     "player": frozenset({"profile.edit", "games.play", "decks.edit"}),
-    "moderator": frozenset({"moderation.read", "admin.users.read"}),
+    # Since v0.9.4 moderators approve and deny new accounts too (the owner, 2026-11-10).
+    "moderator": frozenset({"moderation.read", "admin.users.read", "admin.users.approve"}),
     "administrator": frozenset(
         {
             "moderation.read",
             "content.edit",
             "admin.users.read",
+            "admin.users.approve",
             "admin.users.manage",
             "admin.roles.manage",
             "admin.audit.read",

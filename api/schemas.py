@@ -127,6 +127,7 @@ Permission = Literal[
     "moderation.read",
     "content.edit",
     "admin.users.read",
+    "admin.users.approve",
     "admin.users.manage",
     "admin.roles.manage",
     "admin.roles.administrator",

@@ -13,7 +13,7 @@ import {
 const sysop = {
   id: "00000000-0000-4000-8000-000000000001",
   status: "active",
-  permissions: ["admin.users.manage", "reports.manage"],
+  permissions: ["admin.users.approve", "admin.users.manage", "reports.manage"],
 } as Me;
 const moderator = {
   ...sysop,

@@ -91,7 +91,7 @@ This pair, the cookie and the nonce inside the signed token, is this flow's CSRF
 - The profile also holds the display name, locale, onboarding state and the accessibility preferences, which follow the account across devices.
 - Email and the Google subject are private:
   - The subject is never returned.
-  - Email goes to its owner, and to administrators (`admin.users.manage`), who need it to identify accounts they approve. Since v0.8.5 the account list also says whether Google verified that address (`email_verified`), and marks an unverified one "unverified" beside it: an address Google has not verified proves nothing about who signed in. Moderators see the account list without email and cannot search by it.
+  - Email goes to its owner, and to administrators (`admin.users.manage`), who need it to identify accounts they approve. Since v0.8.5 the account list also says whether Google verified that address (`email_verified`), and marks an unverified one "unverified" beside it: an address Google has not verified proves nothing about who signed in. Moderators see the account list without email and cannot search by it; since v0.9.4 they see a pending account's email, since they approve it.
 
 **Failures.**
 - **Without a challenge.** A post without one of our challenges (no `cd_google` cookie, or a cookie for a challenge the server never issued) is refused 401 `invalid_sign_in` without an audit entry, so a bot cannot fill the trail.
@@ -159,6 +159,7 @@ Every active account is a player. Grants add the other roles. Permissions are ch
 | `moderation.read` |  | ✓ | ✓ | ✓ |
 | `content.edit` |  |  | ✓ | ✓ |
 | `admin.users.read` |  | ✓ | ✓ | ✓ |
+| `admin.users.approve` (v0.9.4: approve or deny a pending account) |  | ✓ | ✓ | ✓ |
 | `admin.users.manage`, `admin.roles.manage`, `admin.audit.read` |  |  | ✓ | ✓ |
 | `admin.roles.administrator` |  |  |  | ✓ |
 | `games.view_concealed` (since v0.8.9 administrators' too, but not in a game they play with another person: [administrators](#administrators-see-the-app-as-sysop-does-v089)) |  |  | ✓ | ✓ |
@@ -174,6 +175,8 @@ Every active account is a player. Grants add the other roles. Permissions are ch
 | `economy.grant` (v0.8.9: give and take back tokens, give packs, [tokens](tokens.md)) |  |  | ✓ | ✓ |
 | `economy.manage` (v0.4.0: the economy's limits; cancelling auctions) |  |  |  | ✓ |
 | `games.passive_bots` (v0.8.7: [passive bots](game-screen.md#passive-bots-v086-administrators-v087) in their own game against bots; SysOp's since v0.8.6) |  |  | ✓ | ✓ |
+
+**Moderators** (since v0.9.4, the owner's decision of 2026-11-10) approve or deny pending accounts, as administrators do, and Admin counts the accounts waiting for them. That is all they change: disabling, restoring and the rest stay the administrators' (403 `forbidden`).
 
 **Administrators.**
 - They approve or deny pending accounts, disable and restore accounts (disabling ends every session), sign accounts out everywhere, grant or remove the moderator role (until v0.8.8 also the content editor role), and since v0.4.1 delete accounts ([deleting an account](#deleting-an-account-v041)).

@@ -67,6 +67,7 @@ const administrator: Me = {
   csrf_token: "token",
   permissions: [
     "admin.users.read",
+    "admin.users.approve",
     "admin.users.manage",
     "admin.roles.manage",
     "admin.audit.read",
@@ -269,6 +270,29 @@ describe("email addresses", () => {
     expect(ann).toHaveTextContent(/Joined/);
     expect(ann).not.toHaveTextContent(/email/i);
     expect(screen.getByLabelText("Search handle or name")).toBeInTheDocument();
+  });
+
+  it("of a waiting account go to a moderator, who approves or denies it and no more (v0.9.4)", async () => {
+    const moderator: Me = {
+      ...administrator,
+      kind: "player",
+      permissions: ["admin.users.read", "admin.users.approve"],
+      roles: ["player", "moderator"],
+    };
+    on(USERS, () =>
+      page([user("pat", "pending"), { ...user("ann", "active"), email: null }]),
+    );
+    render(<Admin me={moderator} heading={createRef()} />);
+    const pat = await screen.findByRole("listitem", { name: "pat" });
+    expect(pat).toHaveTextContent("pat@example.com");
+    expect(
+      within(pat).getByRole("button", { name: "Approve pat" }),
+    ).toBeInTheDocument();
+    expect(
+      within(pat).getByRole("button", { name: "Deny pat" }),
+    ).toBeInTheDocument();
+    const ann = screen.getByRole("listitem", { name: "ann" });
+    expect(within(ann).queryAllByRole("button")).toHaveLength(0);
   });
 
   it("are shown to an administrator, and their absence named", async () => {

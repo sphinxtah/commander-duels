@@ -3536,7 +3536,7 @@ export interface components {
         AdminCounts: {
             /**
              * Pending Accounts
-             * @description Accounts waiting for approval; null without admin.users.manage.
+             * @description Accounts waiting for approval; null without admin.users.approve.
              */
             pending_accounts: number | null;
             /**
@@ -6395,7 +6395,7 @@ export interface components {
              */
             onboarding: "handle" | "starters" | "complete";
             /** Permissions */
-            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage" | "economy.grant" | "shop.manage" | "reports.manage" | "players.presence" | "chat.read_all" | "admin.users.reset" | "players.history" | "auctions.manage" | "games.passive_bots")[];
+            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.approve" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage" | "economy.grant" | "shop.manage" | "reports.manage" | "players.presence" | "chat.read_all" | "admin.users.reset" | "players.history" | "auctions.manage" | "games.passive_bots")[];
             preferences: components["schemas"]["Preferences"];
             /** Roles */
             roles: ("player" | "moderator" | "administrator" | "sysop")[];

@@ -513,8 +513,12 @@ def test_counts_per_role(client):
     first = report(ada).json()["id"]
     report(ada)
     nothing = {"pending_accounts": None, "unread_reports": None}
-    for viewer in (ada, moderator):
-        assert viewer.get("/api/v1/admin/counts").json() == nothing
+    assert ada.get("/api/v1/admin/counts").json() == nothing
+    # Since v0.9.4 a moderator approves accounts, so counts those waiting, but reads no reports.
+    assert moderator.get("/api/v1/admin/counts").json() == {
+        "pending_accounts": 2,
+        "unread_reports": None,
+    }
     for viewer in (admin, root):
         assert viewer.get("/api/v1/admin/counts").json() == {
             "pending_accounts": 2,

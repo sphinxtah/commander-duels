@@ -9,12 +9,13 @@ import { answerTimeout, client, type AdminCounts, type Me } from "../api";
 
 export const COUNTS_MS = 60_000;
 
-/** Whether the account sees either count: it approves accounts or reads reports. */
+/** Whether the account sees either count: it approves accounts (moderators too, since v0.9.4)
+ * or reads reports. */
 export function watchesCounts(me: Me | null | undefined): boolean {
   return Boolean(
     me &&
     me.status === "active" &&
-    (me.permissions.includes("admin.users.manage") ||
+    (me.permissions.includes("admin.users.approve") ||
       me.permissions.includes("reports.manage")),
   );
 }
