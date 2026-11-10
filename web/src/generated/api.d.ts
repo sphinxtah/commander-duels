@@ -2483,33 +2483,12 @@ export interface paths {
         };
         /**
          * My Quests
-         * @description Today's three quests, drawn now if this is the day's first look, with their progress. Wins
-         *     earlier today that complete one pay here.
+         * @description Today's daily board and this week's weekly board, each drawn at its period's first look,
+         *     with their progress and streaks. What already completed one pays here.
          */
         get: operations["my_quests_api_v1_me_quests_get"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/me/quests/{slot}/swap": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Swap Quest
-         * @description Today's swap: the slot's quest, not yet completed, gives way to another from a group the
-         *     other two do not hold. Once a day.
-         */
-        post: operations["swap_quest_api_v1_me_quests__slot__swap_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4000,6 +3979,34 @@ export interface components {
             blocked_at: string;
             player: components["schemas"]["PlayerRef"];
         };
+        /** BoardView */
+        BoardView: {
+            /**
+             * Board
+             * @enum {string}
+             */
+            board: "daily" | "weekly";
+            /**
+             * Completed At
+             * @description When every quest was complete.
+             */
+            completed_at: string | null;
+            /**
+             * Period
+             * Format: date
+             * @description The day, or the Sunday the week starts on, in Arizona.
+             */
+            period: string;
+            /** Quests */
+            quests: components["schemas"]["QuestView"][];
+            /**
+             * Resets At
+             * Format: date-time
+             * @description When the next board comes, midnight in Arizona.
+             */
+            resets_at: string;
+            streak: components["schemas"]["Streak"];
+        };
         /** BoosterRun */
         BoosterRun: {
             /** Error Code */
@@ -4998,33 +5005,6 @@ export interface components {
             toughness?: string | null;
             /** Type Line */
             type_line: string;
-        };
-        /** DailyQuests */
-        DailyQuests: {
-            /**
-             * Can Swap
-             * @description Whether today's swap is still unused.
-             */
-            can_swap: boolean;
-            /**
-             * Day
-             * Format: date
-             * @description The day, in Arizona.
-             */
-            day: string;
-            /**
-             * Paid
-             * @description Tokens this look itself paid, for quests that wins before it completed.
-             */
-            paid: number;
-            /** Quests */
-            quests: components["schemas"]["QuestView"][];
-            /**
-             * Resets At
-             * Format: date-time
-             * @description Midnight in Arizona, when the next day's quests come.
-             */
-            resets_at: string;
         };
         /** DeckCounts */
         DeckCounts: {
@@ -7304,31 +7284,51 @@ export interface components {
              */
             purged: number;
         };
+        /** QuestBoards */
+        QuestBoards: {
+            daily: components["schemas"]["BoardView"];
+            /**
+             * Paid
+             * @description Tokens this look itself paid, for quests and boards it found complete.
+             */
+            paid: number;
+            weekly: components["schemas"]["BoardView"];
+        };
         /** QuestView */
         QuestView: {
             /** Completed At */
             completed_at: string | null;
             /** Id */
             id: string;
+            /**
+             * In Game
+             * @description Counted from games played, not from outside them.
+             */
+            in_game: boolean;
             /** Name */
             name: string;
             /**
              * Progress
-             * @description The wins counted so far, at most the target.
+             * @description Counted so far, at most the target.
              */
             progress: number;
             /** Slot */
             slot: number;
             /**
-             * Swapped
-             * @description Swapped in today: only games after the swap count.
+             * Step
+             * @description A daily quest's step, 1 (easiest) to 5 (hardest).
              */
-            swapped: boolean;
+            step?: number | null;
             /**
              * Target
-             * @description The wins it needs.
+             * @description What it needs: wins, games, packs, cards, tokens…
              */
             target: number;
+            /**
+             * Tier
+             * @description A weekly goal's tier.
+             */
+            tier?: ("easy" | "medium" | "hard") | null;
             /** Tokens */
             tokens: number;
         };
@@ -8665,6 +8665,29 @@ export interface components {
              * @enum {string}
              */
             status: "active" | "denied" | "disabled";
+        };
+        /** Streak */
+        Streak: {
+            /**
+             * Best
+             * @description The most boards finished in a row since the last reset.
+             */
+            best: number;
+            /**
+             * Bonus
+             * @description What finishing this period's board pays (or paid, once finished).
+             */
+            bonus: number;
+            /**
+             * Current
+             * @description Boards finished in a row, up to the last one finished (this period's when it is finished, else the previous one's); 0 when the previous period's was not.
+             */
+            current: number;
+            /**
+             * Next Bonus
+             * @description What the next period's board pays if the streak holds.
+             */
+            next_bonus: number;
         };
         /** Suggestion */
         Suggestion: {
@@ -22608,101 +22631,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DailyQuests"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    swap_quest_api_v1_me_quests__slot__swap_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                slot: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DailyQuests"];
+                    "application/json": components["schemas"]["QuestBoards"];
                 };
             };
             /** @description Bad Request */

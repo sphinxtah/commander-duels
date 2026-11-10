@@ -1347,6 +1347,8 @@ class Pack(Base):
     source: Mapped[str] = mapped_column(String(16))
     # Tokens paid; 0 for a pack given.
     tokens: Mapped[int] = mapped_column(BigInteger)
+    # Bought at the weekly sale's price (v0.9.5, for the quest boards).
+    sale: Mapped[bool] = mapped_column(default=False, server_default=false())
     request_key: Mapped[str | None] = mapped_column(String(64))
     # One grant of several packs shares its ID.
     grant_id: Mapped[UUID | None]
@@ -1548,7 +1550,7 @@ class Notification(Base):
             "kind IN ('friend_request', 'friend_accepted', 'friend_online', 'message', "
             "'quest_completed', 'achievement_earned', 'rematch', 'team_invite', "
             "'auction_outbid', 'auction_won', 'auction_sold', 'auction_unsold', "
-            "'auction_cancelled', 'table_invite')",
+            "'auction_cancelled', 'table_invite', 'warden_deck')",
             name="ck_notifications_kind",
         ),
         # The bell's list, newest first, and its unread count.
@@ -1688,23 +1690,31 @@ class PlayerResult(Base):
 
 
 class DailyQuest(Base):
-    """One of an account's three quests of a day (v0.5.0, api/quests.py), drawn the first time
-    the account asks for its quests that day, Arizona time. A swap replaces a slot's quest once a
-    day; a quest completed is paid through the economy ledger (key quest:<account>:<day>:<quest>).
-    """
+    """One quest on an account's board (api/quests.py), drawn the first time the account asks for
+    its quests in the board's period, Arizona time. Until v0.9.4 three a day (quests-v1, with one
+    swap a day); since v0.9.5 a board: the daily board's five a day (board daily, quests-v2) and the
+    weekly board's twenty a week (board weekly, its day the Sunday the week starts on). A quest
+    completed is paid through the economy ledger, once: quest:<account>:<day>:<quest> (v1),
+    daily:<account>:<day>:<quest> and weekly:<account>:<week>:<goal> (v2)."""
 
     __tablename__ = "daily_quests"
     __table_args__ = (
-        CheckConstraint("slot BETWEEN 0 AND 2", name="ck_daily_quests_slot"),
+        CheckConstraint(
+            "(board = 'daily' AND slot BETWEEN 0 AND 4) "
+            "OR (board = 'weekly' AND slot BETWEEN 0 AND 19)",
+            name="ck_daily_quests_slot",
+        ),
+        CheckConstraint("board IN ('daily', 'weekly')", name="ck_daily_quests_board"),
         Index("ix_daily_quests_user_id_day", "user_id", "day"),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
-    # The calendar day in Arizona.
+    # The calendar day in Arizona; for the weekly board, the Sunday its week starts on.
     day: Mapped[date] = mapped_column(Date)
+    board: Mapped[str] = mapped_column(String(8), default="daily", server_default="daily")
     slot: Mapped[int] = mapped_column(SmallInteger)
-    # Unique per slot and day: quest-slot:<account>:<day>:<slot>, with the time of a reset after
-    # one, so a reset draws the day's quests again.
+    # Unique per slot and period: quest-slot:<account>:<day>:<slot> (v1), daily-slot: and
+    # weekly-slot: (v2), with the time of a reset after one, so a reset draws the board again.
     key: Mapped[str] = mapped_column(String(128), unique=True)
     quest: Mapped[str] = mapped_column(String(48))
     # What it pays and how many wins it needs, as they were when it was drawn.
@@ -1716,6 +1726,31 @@ class DailyQuest(Base):
     completed_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     policy: Mapped[str] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class QuestBoard(Base):
+    """A quest board an account finished (v0.9.5, api/quests.py): every quest of a day's daily
+    board or a week's weekly board completed in its period. Its bonus grows with the streak, the
+    boards finished in a row (the previous period's row counts it), and is paid through the
+    economy ledger under the same key, once: board:<account>:<board>:<period>, with a reset's time
+    after one. Never updated."""
+
+    __tablename__ = "quest_boards"
+    __table_args__ = (
+        CheckConstraint("board IN ('daily', 'weekly')", name="ck_quest_boards_board"),
+        CheckConstraint("streak >= 1", name="ck_quest_boards_streak"),
+        Index("ix_quest_boards_user_id_board_period", "user_id", "board", "period"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    board: Mapped[str] = mapped_column(String(8))
+    # The day, or the Sunday the week starts on.
+    period: Mapped[date] = mapped_column(Date)
+    key: Mapped[str] = mapped_column(String(128), unique=True)
+    streak: Mapped[int]
+    bonus: Mapped[int]
+    policy: Mapped[str] = mapped_column(String(32))
+    completed_at: Mapped[datetime] = mapped_column(UtcDateTime())
 
 
 class PlayerAchievement(Base):
@@ -1936,6 +1971,31 @@ class CustomCardGrant(Base):
     # campaign:<campaign>:<encounter>:<progress>, as the deck's library grant.
     grant_key: Mapped[str] = mapped_column(String(96))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class WardenOpening(Base):
+    """A warden's deck won in the campaign (v0.9.5), to open as a pack: the spoils' cards as the
+    win granted them, in the order they reveal (by rarity, the commander last). Written with the
+    spoils in the win's transaction, under the spoils' key; opening it only shows what was given.
+    Until opened it waits on the campaign map, and the bell says so."""
+
+    __tablename__ = "warden_openings"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    campaign_id: Mapped[str] = mapped_column(String(48))
+    encounter: Mapped[int] = mapped_column(SmallInteger)
+    key: Mapped[str] = mapped_column(String(160), unique=True)
+    deck_id: Mapped[UUID | None] = mapped_column(ForeignKey("decks.id"))
+    game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"))
+    # The warden's roster ID (their portrait), name, and the deck's title.
+    opponent: Mapped[str] = mapped_column(String(64))
+    opponent_name: Mapped[str] = mapped_column(String(64))
+    deck_title: Mapped[str] = mapped_column(String(80))
+    # [{card_id, printing_id, commander, custom}], in reveal order; a custom card has no
+    # printing and is named by its card ID.
+    cards: Mapped[list[dict[str, object]]] = mapped_column(JsonType, default=list)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    opened_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
 
 
 class CampaignReward(Base):

@@ -26,8 +26,9 @@ export const pages = [
 ] as const;
 // How to play (v0.8.6) opens from the account's menu, and signed out too: not one of the main
 // pages.
+// The Quests page (v0.9.5) opens from the main menu's quest panel: not one of the main pages.
 export type Page =
-  (typeof pages)[number] | "SysOp" | "Notifications" | "HowToPlay";
+  (typeof pages)[number] | "SysOp" | "Notifications" | "HowToPlay" | "Quests";
 
 /** The name the title band shows for each page. */
 export const pageNames: Record<Page, string> = {
@@ -46,6 +47,7 @@ export const pageNames: Record<Page, string> = {
   SysOp: "SysOp",
   Notifications: "Notifications",
   HowToPlay: "How to play",
+  Quests: "Quests",
 };
 
 export type IconName =

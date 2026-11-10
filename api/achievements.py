@@ -37,7 +37,7 @@ from api.auth import INPUT_ERRORS
 from api.economy import lock_account, reward
 from api.identity import Active, ApiError, Db, utcnow
 from api.library import reset_key, since_reset
-from api.models import DailyQuest, Friendship, PackOpening, PlayerAchievement, User
+from api.models import DailyQuest, Friendship, PackOpening, PlayerAchievement, QuestBoard, User
 from api.schemas import Contract, Error
 from api.social import notify_award, visible_player
 from api.stats import COLORS, Rule, counted
@@ -45,11 +45,26 @@ from api.stats import COLORS, Rule, counted
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 
 # The rule achievements are earned and paid under, recorded on each payment (PROG05).
-POLICY = "achievements-v1"
+# achievements-v2 (v0.9.5): every reward four times v1's, the owner's word; migration 0041 paid
+# the difference for what was earned before.
+POLICY = "achievements-v2"
 PINS = 3
 # What an achievement counts: wins its rule matches, the colours won with, daily quests
 # completed, packs opened, friends made.
-Metric = Literal["wins", "colours", "quests", "packs", "friends"]
+# Since v0.9.5 also the quest boards: daily and weekly boards finished, the longest streak of each,
+# and weekly goals completed.
+Metric = Literal[
+    "wins",
+    "colours",
+    "quests",
+    "packs",
+    "friends",
+    "daily_boards",
+    "daily_streak",
+    "weekly_boards",
+    "weekly_streak",
+    "weekly_goals",
+]
 Group = Literal[
     "victories", "commander", "legacy", "colours", "bots", "players", "quests", "shop", "friends"
 ]
@@ -77,24 +92,24 @@ def colour(color: str, word: str) -> Achievement:
         f"Paragon of {word.title()}",
         f"Win with a {word} deck.",
         "colours",
-        100,
+        400,
         rule=Rule(color=color),
     )
 
 
 ACHIEVEMENTS: tuple[Achievement, ...] = (
-    Achievement("first-win", "First Victory", "Win a game.", "victories", 100),
-    Achievement("wins-10", "Seasoned Planeswalker", "Win 10 games.", "victories", 200, 10),
-    Achievement("wins-100", "Veteran Planeswalker", "Win 100 games.", "victories", 400, 100),
+    Achievement("first-win", "First Victory", "Win a game.", "victories", 400),
+    Achievement("wins-10", "Seasoned Planeswalker", "Win 10 games.", "victories", 800, 10),
+    Achievement("wins-100", "Veteran Planeswalker", "Win 100 games.", "victories", 1_600, 100),
     Achievement(
-        "wins-1000", "Legendary Planeswalker", "Win 1,000 games.", "victories", 1_000, 1_000
+        "wins-1000", "Legendary Planeswalker", "Win 1,000 games.", "victories", 4_000, 1_000
     ),
     Achievement(
         "commander-win",
         "Commander Victor",
         "Win a Commander game.",
         "commander",
-        100,
+        400,
         rule=Rule(format="commander"),
         addition=True,
     ),
@@ -103,7 +118,7 @@ ACHIEVEMENTS: tuple[Achievement, ...] = (
         "Commander Captain",
         "Win 25 Commander games.",
         "commander",
-        300,
+        1200,
         25,
         rule=Rule(format="commander"),
         addition=True,
@@ -113,7 +128,7 @@ ACHIEVEMENTS: tuple[Achievement, ...] = (
         "Last One Standing",
         "Win a four-player Commander game.",
         "commander",
-        150,
+        600,
         rule=Rule(format="commander", seats=4),
         addition=True,
     ),
@@ -122,7 +137,7 @@ ACHIEVEMENTS: tuple[Achievement, ...] = (
         "King of the Table",
         "Win 10 four-player Commander games.",
         "commander",
-        300,
+        1200,
         10,
         rule=Rule(format="commander", seats=4),
         addition=True,
@@ -132,7 +147,7 @@ ACHIEVEMENTS: tuple[Achievement, ...] = (
         "Legacy Victor",
         "Win a Legacy game.",
         "legacy",
-        100,
+        400,
         rule=Rule(format="legacy"),
         addition=True,
     ),
@@ -141,7 +156,7 @@ ACHIEVEMENTS: tuple[Achievement, ...] = (
         "Legacy Master",
         "Win 25 Legacy games.",
         "legacy",
-        300,
+        1200,
         25,
         rule=Rule(format="legacy"),
         addition=True,
@@ -156,7 +171,7 @@ ACHIEVEMENTS: tuple[Achievement, ...] = (
         "Master of the Five",
         "Win with a deck of each colour.",
         "colours",
-        250,
+        1000,
         5,
         metric="colours",
     ),
@@ -165,7 +180,7 @@ ACHIEVEMENTS: tuple[Achievement, ...] = (
         "Five-Colour Triumph",
         "Win with a five-colour deck.",
         "colours",
-        200,
+        800,
         rule=Rule(colors_at_least=5),
     ),
     Achievement(
@@ -173,7 +188,7 @@ ACHIEVEMENTS: tuple[Achievement, ...] = (
         "Rising Challenger",
         "Beat a bot of skill 4 or higher.",
         "bots",
-        100,
+        400,
         rule=Rule(skill_at_least=4),
     ),
     Achievement(
@@ -181,7 +196,7 @@ ACHIEVEMENTS: tuple[Achievement, ...] = (
         "Machine Breaker",
         "Beat a skill-6 bot.",
         "bots",
-        200,
+        800,
         rule=Rule(skill_at_least=6),
     ),
     Achievement(
@@ -189,7 +204,7 @@ ACHIEVEMENTS: tuple[Achievement, ...] = (
         "Master of Machines",
         "Beat skill-6 bots in 10 games.",
         "bots",
-        300,
+        1200,
         10,
         rule=Rule(skill_at_least=6),
     ),
@@ -198,7 +213,7 @@ ACHIEVEMENTS: tuple[Achievement, ...] = (
         "Worthy Opponent",
         "Win at a human table.",
         "players",
-        150,
+        600,
         rule=Rule(against_players=True),
     ),
     Achievement(
@@ -206,25 +221,78 @@ ACHIEVEMENTS: tuple[Achievement, ...] = (
         "Table Champion",
         "Win 10 games against other players.",
         "players",
-        400,
+        1600,
         10,
         rule=Rule(against_players=True),
     ),
     Achievement(
-        "quest-1", "First Quest", "Complete a daily quest.", "quests", 100, metric="quests"
+        "quest-1", "First Quest", "Complete a daily quest.", "quests", 400, metric="quests"
     ),
     Achievement(
-        "quests-10", "Quest Seeker", "Complete 10 daily quests.", "quests", 200, 10, "quests"
+        "quests-10", "Quest Seeker", "Complete 10 daily quests.", "quests", 800, 10, "quests"
     ),
     Achievement(
-        "quests-50", "Questing Knight", "Complete 50 daily quests.", "quests", 400, 50, "quests"
+        "quests-50", "Questing Knight", "Complete 50 daily quests.", "quests", 1_600, 50, "quests"
     ),
     Achievement(
-        "pack-1", "Fresh Pack", "Open a pack from Leng's card shop.", "shop", 100, metric="packs"
+        "pack-1", "Fresh Pack", "Open a pack from Leng's card shop.", "shop", 400, metric="packs"
     ),
-    Achievement("packs-25", "Collector", "Open 25 packs.", "shop", 300, 25, "packs"),
-    Achievement("friend-1", "Ally", "Make a friend.", "friends", 100, metric="friends"),
-    Achievement("friends-10", "Fellowship", "Make 10 friends.", "friends", 200, 10, "friends"),
+    Achievement("packs-25", "Collector", "Open 25 packs.", "shop", 1_200, 25, "packs"),
+    Achievement("friend-1", "Ally", "Make a friend.", "friends", 400, metric="friends"),
+    Achievement("friends-10", "Fellowship", "Make 10 friends.", "friends", 800, 10, "friends"),
+    # The quest boards (v0.9.5), on the same curve as the rest.
+    Achievement(
+        "daily-board-1",
+        "Full Board",
+        "Finish every quest on a daily board.",
+        "quests",
+        400,
+        metric="daily_boards",
+    ),
+    Achievement(
+        "daily-streak-7",
+        "Seven Days Strong",
+        "Finish the daily board seven days in a row.",
+        "quests",
+        1_200,
+        7,
+        "daily_streak",
+    ),
+    Achievement(
+        "daily-boards-50",
+        "Board Regular",
+        "Finish 50 daily boards.",
+        "quests",
+        1_600,
+        50,
+        "daily_boards",
+    ),
+    Achievement(
+        "weekly-goals-50",
+        "Goal Getter",
+        "Complete 50 weekly goals.",
+        "quests",
+        800,
+        50,
+        "weekly_goals",
+    ),
+    Achievement(
+        "weekly-board-1",
+        "A Week's Work",
+        "Finish every goal on a weekly board.",
+        "quests",
+        800,
+        metric="weekly_boards",
+    ),
+    Achievement(
+        "weekly-streak-4",
+        "Month of Mastery",
+        "Finish the weekly board four weeks in a row.",
+        "quests",
+        1_600,
+        4,
+        "weekly_streak",
+    ),
 )
 BY_ID = {achievement.id: achievement for achievement in ACHIEVEMENTS}
 
@@ -311,18 +379,22 @@ def measure(db: Session, user: User) -> dict[str, int]:
     ]
     counts = {found.id: value for found, value in zip(ruled, values, strict=False)}
     colours = sum(1 for value in values[len(ruled) :] if value)
-    quests = (
-        db.scalar(
-            select(func.count())
-            .select_from(DailyQuest)
-            .where(
-                DailyQuest.user_id == user.id,
-                DailyQuest.completed_at.is_not(None),
-                since_reset(user, DailyQuest.created_at),
-            )
+    quest_rows = db.execute(
+        select(DailyQuest.board, func.count())
+        .where(
+            DailyQuest.user_id == user.id,
+            DailyQuest.completed_at.is_not(None),
+            since_reset(user, DailyQuest.created_at),
         )
-        or 0
-    )
+        .group_by(DailyQuest.board)
+    ).all()
+    completed = {board: int(count) for board, count in quest_rows}
+    boards = db.execute(
+        select(QuestBoard.board, func.count(), func.max(QuestBoard.streak))
+        .where(QuestBoard.user_id == user.id, since_reset(user, QuestBoard.completed_at))
+        .group_by(QuestBoard.board)
+    ).all()
+    finished = {board: (int(count), int(streak or 0)) for board, count, streak in boards}
     packs = (
         db.scalar(
             select(func.count())
@@ -343,7 +415,17 @@ def measure(db: Session, user: User) -> dict[str, int]:
         )
         or 0
     )
-    others = {"colours": colours, "quests": quests, "packs": packs, "friends": friends}
+    others = {
+        "colours": colours,
+        "quests": completed.get("daily", 0),
+        "packs": packs,
+        "friends": friends,
+        "daily_boards": finished.get("daily", (0, 0))[0],
+        "daily_streak": finished.get("daily", (0, 0))[1],
+        "weekly_boards": finished.get("weekly", (0, 0))[0],
+        "weekly_streak": finished.get("weekly", (0, 0))[1],
+        "weekly_goals": completed.get("weekly", 0),
+    }
     return {
         found.id: counts.get(found.id, 0) if found.metric == "wins" else others[found.metric]
         for found in ACHIEVEMENTS

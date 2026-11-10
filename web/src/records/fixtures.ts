@@ -1,4 +1,4 @@
-import type { DailyQuests, QuestView } from "../quests/quests";
+import type { BoardView, QuestBoards, QuestView } from "../quests/quests";
 import type {
   AchievementView,
   Achievements,
@@ -64,39 +64,61 @@ export function badges(fields: Partial<PlayerBadges> = {}): PlayerBadges {
 export function quest(fields: Partial<QuestView> = {}): QuestView {
   return {
     slot: 0,
-    id: "win",
+    id: "d1-win",
     name: "Win a game",
-    tokens: 100,
+    tokens: 150,
     target: 1,
     progress: 0,
     completed_at: null,
-    swapped: false,
+    step: 1,
+    tier: null,
+    in_game: true,
     ...fields,
   };
 }
 
-export function dailyQuests(fields: Partial<DailyQuests> = {}): DailyQuests {
+export function board(fields: Partial<BoardView> = {}): BoardView {
   return {
-    day: "2026-10-22",
-    resets_at: "2026-10-23T07:00:00Z",
-    can_swap: true,
+    board: "daily",
+    period: "2026-11-10",
+    resets_at: "2026-11-11T07:00:00Z",
+    completed_at: null,
+    streak: { current: 0, bonus: 400, next_bonus: 500, best: 0 },
+    quests: [1, 2, 3, 4, 5].map((step) =>
+      quest({
+        slot: step - 1,
+        id: `d${step}-win`,
+        name: `Win ${step} games`,
+        step,
+        target: step,
+        tokens: [150, 250, 350, 500, 750][step - 1]!,
+      }),
+    ),
+    ...fields,
+  };
+}
+
+export function questBoards(fields: Partial<QuestBoards> = {}): QuestBoards {
+  return {
+    daily: board(),
+    weekly: board({
+      board: "weekly",
+      period: "2026-11-08",
+      resets_at: "2026-11-15T07:00:00Z",
+      streak: { current: 2, bonus: 2_400, next_bonus: 2_600, best: 2 },
+      quests: Array.from({ length: 20 }, (_, slot) =>
+        quest({
+          slot,
+          id: `w-goal-${slot}`,
+          name: `Goal ${slot + 1}`,
+          step: null,
+          tier: slot < 6 ? "easy" : slot < 15 ? "medium" : "hard",
+          tokens: slot < 6 ? 250 : slot < 15 ? 400 : 650,
+          in_game: slot % 3 === 0,
+        }),
+      ),
+    }),
     paid: 0,
-    quests: [
-      quest(),
-      quest({
-        slot: 1,
-        id: "win-red",
-        name: "Win with a red deck",
-        tokens: 150,
-      }),
-      quest({
-        slot: 2,
-        id: "win-3",
-        name: "Win three games",
-        tokens: 200,
-        target: 3,
-      }),
-    ],
     ...fields,
   };
 }

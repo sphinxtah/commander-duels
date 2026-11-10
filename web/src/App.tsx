@@ -44,6 +44,7 @@ import { DecksPage } from "./decks/DecksPage";
 import { SharedDeck } from "./decks/SharedDeck";
 import { ShopPage } from "./shop/ShopPage";
 import { AuctionsPage } from "./auctions/AuctionsPage";
+import { QuestsPage } from "./quests/QuestsPage";
 import { GameScreen } from "./game/GameScreen";
 import { HowToPlay, HOW_TO_PLAY_ROUTE } from "./howToPlay/HowToPlay";
 import { PublicHowToPlay } from "./howToPlay/PublicHowToPlay";
@@ -137,6 +138,7 @@ function currentPage(): Page {
   const path = window.location.hash.slice(1).toLowerCase().split("?")[0] ?? "";
   if (path === "sysop") return "SysOp";
   if (path === "notifications") return "Notifications";
+  if (path === "quests") return "Quests";
   if (path === "how-to-play" || path.startsWith("how-to-play/"))
     return "HowToPlay";
   if (path.startsWith("player/")) return "Friends";
@@ -715,6 +717,8 @@ export function App() {
               />
             ) : page === "Auctions" ? (
               <AuctionsPage me={me} heading={heading} />
+            ) : page === "Quests" ? (
+              <QuestsPage heading={heading} />
             ) : page === "Friends" && playerRoute ? (
               <PlayerPage
                 key={playerRoute}

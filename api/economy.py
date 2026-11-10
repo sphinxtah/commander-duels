@@ -191,10 +191,12 @@ def pay_game(db: Session, game: Game) -> None:
         db.scalars(select(GameSeat).where(GameSeat.game_id == game.id).order_by(GameSeat.seat))
     )
     owners = {seat.seat: seat.user_id for seat in seats if seat.seat in winners and seat.user_id}
-    # Two of a winner's games ending at once count today's paid wins one after the other. The
-    # winners' rows are locked in one order, so two games paying the same players never wait on
-    # each other.
-    for owner in sorted(set(owners.values()), key=str):
+    # Two of a winner's games ending at once count today's paid wins one after the other. Every
+    # player's row is locked, in one order, so two games paying the same players never wait on
+    # each other; since v0.9.5 the losers' too, as their quest boards may count the game
+    # (api/awards.py).
+    players = {seat.user_id for seat in seats if seat.user_id}
+    for owner in sorted(players, key=str):
         lock_account(db, owner)
     for winner, owner in owners.items():
         pay_winner(db, game, seats, set(winners), winner, owner)

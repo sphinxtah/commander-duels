@@ -738,6 +738,7 @@ def buy(body: PurchaseRequest, request: Request, principal: Active, db: Db) -> P
         source="purchase",
         tokens=price,
         request_key=body.key,
+        sale=discounted is not None,
         created_at=utcnow(),
     )
     db.add(pack)

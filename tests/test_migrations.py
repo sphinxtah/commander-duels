@@ -61,6 +61,8 @@ def test_migration_upgrade_and_downgrade(tmp_path, monkeypatch):
         "game_tables",
         "table_seats",
         "table_invites",
+        "quest_boards",
+        "warden_openings",
         "matches",
         "match_players",
         "queue_entries",

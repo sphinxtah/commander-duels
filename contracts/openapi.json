@@ -1446,6 +1446,64 @@
         "title": "BlockedPlayer",
         "type": "object"
       },
+      "BoardView": {
+        "additionalProperties": false,
+        "properties": {
+          "board": {
+            "enum": [
+              "daily",
+              "weekly"
+            ],
+            "title": "Board",
+            "type": "string"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When every quest was complete.",
+            "title": "Completed At"
+          },
+          "period": {
+            "description": "The day, or the Sunday the week starts on, in Arizona.",
+            "format": "date",
+            "title": "Period",
+            "type": "string"
+          },
+          "quests": {
+            "items": {
+              "$ref": "#/components/schemas/QuestView"
+            },
+            "title": "Quests",
+            "type": "array"
+          },
+          "resets_at": {
+            "description": "When the next board comes, midnight in Arizona.",
+            "format": "date-time",
+            "title": "Resets At",
+            "type": "string"
+          },
+          "streak": {
+            "$ref": "#/components/schemas/Streak"
+          }
+        },
+        "required": [
+          "board",
+          "period",
+          "resets_at",
+          "completed_at",
+          "streak",
+          "quests"
+        ],
+        "title": "BoardView",
+        "type": "object"
+      },
       "BoosterRun": {
         "additionalProperties": false,
         "properties": {
@@ -4124,49 +4182,6 @@
           "image_type"
         ],
         "title": "CustomCardUpload",
-        "type": "object"
-      },
-      "DailyQuests": {
-        "additionalProperties": false,
-        "properties": {
-          "can_swap": {
-            "description": "Whether today's swap is still unused.",
-            "title": "Can Swap",
-            "type": "boolean"
-          },
-          "day": {
-            "description": "The day, in Arizona.",
-            "format": "date",
-            "title": "Day",
-            "type": "string"
-          },
-          "paid": {
-            "description": "Tokens this look itself paid, for quests that wins before it completed.",
-            "title": "Paid",
-            "type": "integer"
-          },
-          "quests": {
-            "items": {
-              "$ref": "#/components/schemas/QuestView"
-            },
-            "title": "Quests",
-            "type": "array"
-          },
-          "resets_at": {
-            "description": "Midnight in Arizona, when the next day's quests come.",
-            "format": "date-time",
-            "title": "Resets At",
-            "type": "string"
-          }
-        },
-        "required": [
-          "day",
-          "resets_at",
-          "can_swap",
-          "paid",
-          "quests"
-        ],
-        "title": "DailyQuests",
         "type": "object"
       },
       "DeckCounts": {
@@ -9789,6 +9804,29 @@
         "title": "Purged",
         "type": "object"
       },
+      "QuestBoards": {
+        "additionalProperties": false,
+        "properties": {
+          "daily": {
+            "$ref": "#/components/schemas/BoardView"
+          },
+          "paid": {
+            "description": "Tokens this look itself paid, for quests and boards it found complete.",
+            "title": "Paid",
+            "type": "integer"
+          },
+          "weekly": {
+            "$ref": "#/components/schemas/BoardView"
+          }
+        },
+        "required": [
+          "daily",
+          "weekly",
+          "paid"
+        ],
+        "title": "QuestBoards",
+        "type": "object"
+      },
       "QuestView": {
         "additionalProperties": false,
         "properties": {
@@ -9808,12 +9846,17 @@
             "title": "Id",
             "type": "string"
           },
+          "in_game": {
+            "description": "Counted from games played, not from outside them.",
+            "title": "In Game",
+            "type": "boolean"
+          },
           "name": {
             "title": "Name",
             "type": "string"
           },
           "progress": {
-            "description": "The wins counted so far, at most the target.",
+            "description": "Counted so far, at most the target.",
             "title": "Progress",
             "type": "integer"
           },
@@ -9821,15 +9864,39 @@
             "title": "Slot",
             "type": "integer"
           },
-          "swapped": {
-            "description": "Swapped in today: only games after the swap count.",
-            "title": "Swapped",
-            "type": "boolean"
+          "step": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A daily quest's step, 1 (easiest) to 5 (hardest).",
+            "title": "Step"
           },
           "target": {
-            "description": "The wins it needs.",
+            "description": "What it needs: wins, games, packs, cards, tokens\u2026",
             "title": "Target",
             "type": "integer"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "enum": [
+                  "easy",
+                  "medium",
+                  "hard"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A weekly goal's tier.",
+            "title": "Tier"
           },
           "tokens": {
             "title": "Tokens",
@@ -9844,7 +9911,7 @@
           "target",
           "progress",
           "completed_at",
-          "swapped"
+          "in_game"
         ],
         "title": "QuestView",
         "type": "object"
@@ -13023,6 +13090,39 @@
           "status"
         ],
         "title": "StatusChange",
+        "type": "object"
+      },
+      "Streak": {
+        "additionalProperties": false,
+        "properties": {
+          "best": {
+            "description": "The most boards finished in a row since the last reset.",
+            "title": "Best",
+            "type": "integer"
+          },
+          "bonus": {
+            "description": "What finishing this period's board pays (or paid, once finished).",
+            "title": "Bonus",
+            "type": "integer"
+          },
+          "current": {
+            "description": "Boards finished in a row, up to the last one finished (this period's when it is finished, else the previous one's); 0 when the previous period's was not.",
+            "title": "Current",
+            "type": "integer"
+          },
+          "next_bonus": {
+            "description": "What the next period's board pays if the streak holds.",
+            "title": "Next Bonus",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "current",
+          "bonus",
+          "next_bonus",
+          "best"
+        ],
+        "title": "Streak",
         "type": "object"
       },
       "Suggestion": {
@@ -30911,14 +31011,14 @@
     },
     "/api/v1/me/quests": {
       "get": {
-        "description": "Today's three quests, drawn now if this is the day's first look, with their progress. Wins\nearlier today that complete one pay here.",
+        "description": "Today's daily board and this week's weekly board, each drawn at its period's first look,\nwith their progress and streaks. What already completed one pays here.",
         "operationId": "my_quests_api_v1_me_quests_get",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DailyQuests"
+                  "$ref": "#/components/schemas/QuestBoards"
                 }
               }
             },
@@ -31006,118 +31106,6 @@
           }
         },
         "summary": "My Quests"
-      }
-    },
-    "/api/v1/me/quests/{slot}/swap": {
-      "post": {
-        "description": "Today's swap: the slot's quest, not yet completed, gives way to another from a group the\nother two do not hold. Once a day.",
-        "operationId": "swap_quest_api_v1_me_quests__slot__swap_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "slot",
-            "required": true,
-            "schema": {
-              "maximum": 2,
-              "minimum": 0,
-              "title": "Slot",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DailyQuests"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "description": "Bad Request"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "description": "Forbidden"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "description": "Conflict"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          },
-          "429": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "description": "Too Many Requests"
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "description": "Service Unavailable"
-          }
-        },
-        "summary": "Swap Quest"
       }
     },
     "/api/v1/me/sessions": {

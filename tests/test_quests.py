@@ -24,12 +24,14 @@ from test_decks_api import ACCOUNT_TABLES
 from test_games import SERVICE_TOKEN, SYSOP_ADDRESS
 from test_progression import Account, card_id, completed
 
-from api import achievements, awards, games, quests
+from api import achievements, awards, games, quest_pool, quests
 from api.accounts import delete_account
 from api.config import Settings
 from api.identity import utcnow
 from api.main import create_app
 from api.models import (
+    Auction,
+    CardPrinting,
     DailyQuest,
     Deck,
     DeckEntryRow,
@@ -38,18 +40,23 @@ from api.models import (
     Game,
     GameSeat,
     Notification,
+    Pack,
     PackOpening,
     PlayerAchievement,
     PlayerResult,
+    QuestBoard,
+    ShopProduct,
     TokenEntry,
     User,
 )
-from api.quests import Quest
 
 url = test_progression.url
 content = test_progression.content
 engine = test_progression.engine
 TABLES = (
+    "auctions",
+    "packs",
+    "quest_boards",
     "player_achievements",
     "daily_quests",
     "player_results",
@@ -206,18 +213,6 @@ def entries(client: TestClient, user_id: UUID, kind: str) -> list[tuple[int, str
         ]
 
 
-def prefer(*ids: str) -> Callable[[list[Quest], int], list[Quest]]:
-    """A draw that takes the named quests first, in order, as far as the candidates allow."""
-
-    def choose(candidates: list[Quest], count: int) -> list[Quest]:
-        ranked = sorted(
-            candidates, key=lambda quest: ids.index(quest.id) if quest.id in ids else len(ids)
-        )
-        return ranked[:count]
-
-    return choose
-
-
 def earned(client: TestClient, user_id: UUID) -> set[str]:
     with database(client) as db:
         return set(
@@ -353,55 +348,146 @@ def test_totals_are_public_and_the_history_is_its_players_and_sysops(client):
     assert [item["game_id"] for item in older["items"]] == [str(first)] and older["next"] is None
 
 
-# Daily quests.
+# The quest boards (v0.9.5).
 
 
-def test_the_days_quests_are_drawn_once_and_stay(client):
+def daily(*ids: str) -> Callable[[User], list[quest_pool.DailyQuest]]:
+    """A daily draw of the named quests, one a step, in order."""
+    return lambda _user: [quest_pool.DAILY_BY_ID[found] for found in ids]
+
+
+def weekly(*ids: str) -> Callable[[Any], list[quest_pool.WeeklyGoal]]:
+    """A weekly draw of the named goals first, then other families' to make twenty."""
+    named = [quest_pool.WEEKLY_BY_ID[found] for found in ids]
+
+    def choose(available: Any) -> list[quest_pool.WeeklyGoal]:
+        families = {goal.family for goal in named}
+        rest = [
+            goal
+            for goal in quest_pool.WEEKLY
+            if goal.family not in families
+            and goal.tier == "hard"
+            and goal.metric not in ("wins", "games", "table_games")
+            and available(goal)
+            and not families.add(goal.family)  # type: ignore[func-returns-value]
+        ]
+        return (named + rest)[: quest_pool.WEEKLY_GOALS]
+
+    return choose
+
+
+EASY_DAY = ("d1-win", "d2-mono", "d3-skill-4", "d4-skill-5", "d5-skill-6")
+RED_DAY = ("d1-win", "d2-colour-red", "d3-skill-4", "d4-skill-5", "d5-skill-6")
+
+
+def board_rows(client: TestClient, user_id: UUID, board: str) -> list[DailyQuest]:
+    with database(client) as db:
+        return list(
+            db.scalars(
+                select(DailyQuest)
+                .where(DailyQuest.user_id == user_id, DailyQuest.board == board)
+                .order_by(DailyQuest.day, DailyQuest.slot)
+            )
+        )
+
+
+def test_the_boards_are_drawn_once_and_stay(client):
     ada = Account(client, "ada")
     first = ada.get("/api/v1/me/quests").json()
-    assert len(first["quests"]) == 3 and first["can_swap"] is True and first["paid"] == 0
-    assert [quest["slot"] for quest in first["quests"]] == [0, 1, 2]
-    groups = {quests.BY_ID[quest["id"]].group for quest in first["quests"]}
-    assert len(groups) == 3
-    assert all(100 <= quest["tokens"] <= 250 for quest in first["quests"])
+    day, week = first["daily"], first["weekly"]
+    assert first["paid"] == 0
+    assert [quest["step"] for quest in day["quests"]] == [1, 2, 3, 4, 5]
+    assert [quest["tokens"] for quest in day["quests"]] == [150, 250, 350, 500, 750]
+    families = {quest_pool.DAILY_BY_ID[quest["id"]].family for quest in day["quests"]}
+    assert len(families) == 5 and all(quest["in_game"] for quest in day["quests"])
+    assert len(week["quests"]) == 20 and [q["slot"] for q in week["quests"]] == list(range(20))
+    goals = [quest_pool.WEEKLY_BY_ID[quest["id"]] for quest in week["quests"]]
+    assert len({goal.family for goal in goals}) == 20
+    assert sum(1 for goal in goals if goal.in_game) == 6
+    tiers = [quest["tier"] for quest in week["quests"]]
+    assert (tiers.count("easy"), tiers.count("medium"), tiers.count("hard")) == (6, 9, 5)
+    assert {quest["tokens"] for quest in week["quests"]} == {250, 400, 650}
+    assert day["streak"] == {"current": 0, "bonus": 400, "next_bonus": 500, "best": 0}
+    assert week["streak"] == {"current": 0, "bonus": 2_000, "next_bonus": 2_200, "best": 0}
     assert ada.get("/api/v1/me/quests").json() == first
-    resets = datetime.fromisoformat(first["resets_at"])
+    resets = datetime.fromisoformat(day["resets_at"])
     assert resets.astimezone(quests.ARIZONA).time().isoformat() == "00:00:00"
-    assert date.fromisoformat(first["day"]) == quests.day_of(resets - timedelta(seconds=1))
-    # Every quest in the pool pays 100 to 250 tokens, and the groups give three a day.
-    assert all(100 <= quest.tokens <= 250 for quest in quests.QUESTS)
-    assert len({quest.group for quest in quests.QUESTS}) >= 5
+    weekly_resets = datetime.fromisoformat(week["resets_at"]).astimezone(quests.ARIZONA)
+    # Sunday's midnight, as the weekly sale's.
+    assert weekly_resets.weekday() == 6 and weekly_resets.time().isoformat() == "00:00:00"
+    assert date.fromisoformat(week["period"]).weekday() == 6
+    # No swap any more.
+    assert ada.send("POST", "/api/v1/me/quests/0/swap").status_code in (404, 405)
 
 
-def test_the_day_is_arizonas(client):
+def test_the_pools_are_large_and_every_goal_is_for_one_player():
+    assert len(quest_pool.DAILY) >= 50
+    assert all(sum(1 for q in quest_pool.DAILY if q.step == step) >= 10 for step in range(1, 6))
+    assert len(quest_pool.WEEKLY) >= 200
+    # Nothing asks for another player at the table, a friend or a buyer.
+    for quest in (*quest_pool.DAILY, *quest_pool.WEEKLY):
+        assert not quest.rule.against_players and len(quest.id) <= 48
+    assert {goal.metric for goal in quest_pool.WEEKLY} >= {
+        "packs_bought",
+        "listings",
+        "auctions_won",
+        "decks_built",
+        "pulls",
+        "campaign_wins",
+        "sleeves",
+    }
+    in_game = {goal.family for goal in quest_pool.WEEKLY if goal.in_game}
+    outside = {goal.family for goal in quest_pool.WEEKLY if not goal.in_game}
+    assert len(in_game) >= 6 and len(outside) >= 14
+
+
+def test_the_day_and_the_week_are_arizonas():
     # 06:59 UTC is still the day before in Arizona, which keeps one offset all year.
     assert quests.day_of(datetime(2026, 7, 2, 6, 59, tzinfo=UTC)) == date(2026, 7, 1)
     assert quests.day_of(datetime(2026, 7, 2, 7, 0, tzinfo=UTC)) == date(2026, 7, 2)
+    # Sunday 2026-11-15 begins at 07:00 UTC.
+    assert quests.period_of("weekly", datetime(2026, 11, 15, 6, 59, tzinfo=UTC))[0] == date(
+        2026, 11, 8
+    )
+    assert quests.period_of("weekly", datetime(2026, 11, 15, 7, 0, tzinfo=UTC))[0] == date(
+        2026, 11, 15
+    )
+
+
+def test_the_bonuses_grow_with_the_streak_to_their_caps():
+    assert [quests.bonus_for("daily", n) for n in (1, 2, 7, 8, 30)] == [
+        400,
+        500,
+        1_000,
+        1_000,
+        1_000,
+    ]
+    assert [quests.bonus_for("weekly", n) for n in (1, 2, 16, 17)] == [2_000, 2_200, 5_000, 5_000]
 
 
 def test_a_win_completes_quests_and_pays_once(client, monkeypatch):
-    monkeypatch.setattr(quests, "choose", prefer("win-3", "win-red", "beat-skill-6"))
+    monkeypatch.setattr(quests, "choose_daily", daily(*EASY_DAY))
+    monkeypatch.setattr(quests, "choose_weekly", weekly("w-wins-3", "w-colour-red-2"))
     ada = Account(client, "ada")
-    assert [quest["id"] for quest in ada.get("/api/v1/me/quests").json()["quests"]] == [
-        "win-3",
-        "win-red",
-        "beat-skill-6",
-    ]
-    game = won(client, ada, skill=6)
+    shown = ada.get("/api/v1/me/quests").json()
+    assert [quest["id"] for quest in shown["daily"]["quests"]] == list(EASY_DAY)
+    game = won(client, ada, skill=4)
     shown = ada.get("/api/v1/me/quests").json()
     assert shown["paid"] == 0
-    assert [
-        (quest["progress"], quest["completed_at"] is not None) for quest in shown["quests"]
-    ] == [
-        (1, False),
-        (1, True),
-        (1, True),
+    assert [q["completed_at"] is not None for q in shown["daily"]["quests"]] == [
+        True,
+        True,
+        True,
+        False,
+        False,
     ]
-    day = shown["day"]
-    assert entries(client, ada.id, "quest") == [
-        (250, f"quest:{ada.id}:{day}:beat-skill-6", "Beat a skill-6 bot"),
-        (150, f"quest:{ada.id}:{day}:win-red", "Win with a red deck"),
-    ]
+    day = shown["daily"]["period"]
+    paid = entries(client, ada.id, "quest")
+    assert (150, f"daily:{ada.id}:{day}:d1-win", "Win a game") in paid
+    assert sum(amount for amount, _, _ in paid) == 150 + 250 + 350
+    weekly_view = {q["id"]: q for q in shown["weekly"]["quests"]}
+    assert weekly_view["w-wins-3"]["progress"] == 1
+    assert weekly_view["w-colour-red-2"]["progress"] == 1
     # A replayed end, a second look or a second settling pays nothing more.
     database_ = client.app.state.database  # type: ignore[attr-defined]
     games.record_end(database_, game, "finished", completed(0))
@@ -409,63 +495,332 @@ def test_a_win_completes_quests_and_pays_once(client, monkeypatch):
         awards.settle(db, db.get_one(Game, game))
         db.commit()
     ada.get("/api/v1/me/quests")
-    assert len(entries(client, ada.id, "quest")) == 2
-    # Wins over several games count: the third completes the last quest.
-    won(client, ada)
-    played(client, [ada.id, None], completed(1))
-    won(client, ada)
-    assert ada.get("/api/v1/me/quests").json()["quests"][0]["completed_at"] is not None
     assert len(entries(client, ada.id, "quest")) == 3
     # The bell says so, with what each paid.
     bell = ada.get("/api/v1/notifications", limit=50).json()["items"]
     told = [item["award"] for item in bell if item["kind"] == "quest_completed"]
-    assert {"id": "win-red", "name": "Win with a red deck", "tokens": 150} in told
-    assert len(told) == 3 and all(item["actor"] is None for item in bell)
-    tokens = ada.get("/api/v1/me/tokens").json()
-    lines = [line for line in tokens["entries"] if line["kind"] == "quest"]
-    assert {line["reason"] for line in lines} == {
-        "Win three games",
-        "Win with a red deck",
-        "Beat a skill-6 bot",
-    }
+    assert {"id": "d1-win", "name": "Win a game", "tokens": 150} in told
+    assert len(told) == 3
 
 
-def test_wins_before_the_days_first_look_count(client, monkeypatch):
-    monkeypatch.setattr(quests, "choose", prefer("win", "win-commander", "beat-skill-4"))
+def test_a_full_board_pays_its_bonus_and_its_streak(client, monkeypatch):
+    monkeypatch.setattr(quests, "choose_daily", daily(*EASY_DAY))
     ada = Account(client, "ada")
-    won(client, ada, skill=2)
-    # The win came before the quests were drawn: nothing was paid then.
-    assert entries(client, ada.id, "quest") == []
-    shown = ada.get("/api/v1/me/quests").json()
-    assert shown["paid"] == 225
-    assert [quest["completed_at"] is not None for quest in shown["quests"]] == [True, True, False]
-    assert ada.get("/api/v1/me/quests").json()["paid"] == 0
+    now = utcnow()
+    today = quests.day_of(now)
+    # Yesterday's board finished with a streak of six: today's is the seventh, 1,000 tokens.
+    with database(client) as db:
+        db.add(
+            QuestBoard(
+                user_id=ada.id,
+                board="daily",
+                period=today - timedelta(days=1),
+                key=f"board:{ada.id}:daily:old",
+                streak=6,
+                bonus=900,
+                policy="quests-v2",
+                completed_at=now - timedelta(days=1),
+            )
+        )
+        db.commit()
+    shown = ada.get("/api/v1/me/quests").json()["daily"]
+    assert shown["streak"] == {"current": 6, "bonus": 1_000, "next_bonus": 1_000, "best": 6}
+    won(client, ada, skill=6)
+    shown = ada.get("/api/v1/me/quests").json()["daily"]
+    assert shown["completed_at"] is not None
+    assert shown["streak"]["current"] == 7 and shown["streak"]["bonus"] == 1_000
+    bonus = [entry for entry in entries(client, ada.id, "quest") if entry[1].startswith("board:")]
+    assert bonus == [
+        (1_000, f"board:{ada.id}:daily:{today.isoformat()}", "Daily board complete (streak 7)")
+    ]
+    bell = ada.get("/api/v1/notifications", limit=50).json()["items"]
+    assert {"id": "board-daily:1000", "name": "Daily board complete", "tokens": 1_000} in [
+        item["award"] for item in bell if item["kind"] == "quest_completed"
+    ]
+    # Settling again pays nothing more; the board row is unique to its period.
+    with database(client) as db:
+        user = db.get_one(User, ada.id)
+        rows = quests.assigned(db, user, "daily", today)
+        assert quests.settle(db, user, "daily", rows, utcnow()) == 0
+        db.commit()
 
 
-def test_one_swap_a_day(client, monkeypatch):
+def test_a_broken_streak_starts_over(client, monkeypatch):
+    monkeypatch.setattr(quests, "choose_daily", daily(*EASY_DAY))
+    ada = Account(client, "ada")
+    now = utcnow()
+    today = quests.day_of(now)
+    with database(client) as db:
+        # Two days ago, not yesterday.
+        db.add(
+            QuestBoard(
+                user_id=ada.id,
+                board="daily",
+                period=today - timedelta(days=2),
+                key=f"board:{ada.id}:daily:older",
+                streak=5,
+                bonus=800,
+                policy="quests-v2",
+                completed_at=now - timedelta(days=2),
+            )
+        )
+        db.commit()
+    won(client, ada, skill=6)
+    shown = ada.get("/api/v1/me/quests").json()["daily"]
+    assert shown["streak"] == {"current": 1, "bonus": 400, "next_bonus": 500, "best": 5}
+
+
+def test_a_loss_counts_for_games_played(client, monkeypatch):
     monkeypatch.setattr(
-        quests, "choose", prefer("win", "win-legacy", "beat-skill-6", "win-commander")
+        quests, "choose_daily", daily("d1-play-2", "d2-win-2", "d3-win-3", "d4-win-4", "d5-win-5")
     )
     ada = Account(client, "ada")
     ada.get("/api/v1/me/quests")
-    won(client, ada)
-    done = ada.send("POST", "/api/v1/me/quests/0/swap")
-    assert (done.status_code, done.json()["code"]) == (409, "quest_completed")
-    swapped = ada.send("POST", "/api/v1/me/quests/1/swap")
-    assert swapped.status_code == 200, swapped.text
-    body = swapped.json()
-    assert body["can_swap"] is False
-    new = body["quests"][1]
-    # From a group the other two do not hold; the win before the swap does not count for it.
-    assert (new["id"], new["swapped"], new["progress"]) == ("win-commander", True, 0)
-    won(client, ada)
-    assert ada.get("/api/v1/me/quests").json()["quests"][1]["completed_at"] is not None
-    again = ada.send("POST", "/api/v1/me/quests/2/swap")
-    assert (again.status_code, again.json()["code"]) == (409, "swap_used")
-    assert ada.send("POST", "/api/v1/me/quests/3/swap").status_code == 422
+    played(client, [ada.id, None], completed(1))
+    played(client, [ada.id, None], completed(1))
+    shown = ada.get("/api/v1/me/quests").json()["daily"]["quests"]
+    assert shown[0]["completed_at"] is not None and shown[1]["progress"] == 0
+
+
+def test_the_old_quests_stay_and_the_board_replaces_them(client):
+    ada = Account(client, "ada")
+    now = utcnow()
+    today = quests.day_of(now)
     with database(client) as db:
-        rows = list(db.scalars(select(DailyQuest).where(DailyQuest.user_id == ada.id)))
-    assert len(rows) == 3 and sum(1 for row in rows if row.swapped_at) == 1
+        db.add(
+            DailyQuest(
+                user_id=ada.id,
+                day=today,
+                board="daily",
+                slot=0,
+                key=f"quest-slot:{ada.id}:{today.isoformat()}:0",
+                quest="win",
+                tokens=100,
+                target=1,
+                counts_from=now,
+                policy="quests-v1",
+                created_at=now,
+                completed_at=now,
+            )
+        )
+        db.commit()
+    shown = ada.get("/api/v1/me/quests").json()["daily"]
+    assert len(shown["quests"]) == 5
+    assert len(board_rows(client, ada.id, "daily")) == 6
+
+
+def pack_product(client: TestClient, released: date = date(2025, 1, 1)) -> UUID:
+    with database(client) as db:
+        product = ShopProduct(
+            set_code=f"Q{uuid4().hex[:6]}",
+            booster="play",
+            set_name="Quest Set",
+            name="Quest Set Play Booster",
+            released=released,
+            origin="price_list",
+            data_status="ready",
+            collation_id=uuid4(),
+            created_at=utcnow(),
+            updated_at=utcnow(),
+        )
+        db.add(product)
+        db.commit()
+        return product.id
+
+
+def test_weekly_goals_count_what_the_server_records(client, monkeypatch):
+    monkeypatch.setattr(
+        quests,
+        "choose_weekly",
+        weekly(
+            "w-buy-packs-3",
+            "w-sale-packs-1",
+            "w-list-3",
+            "w-win-auctions-1",
+            "w-decks-1",
+            "w-spend-500",
+        ),
+    )
+    ada, bob = Account(client, "ada"), Account(client, "bob")
+    ada.get("/api/v1/me/quests")
+    product = pack_product(client)
+    printing, concept = card_printing(client)
+    now = utcnow()
+    with database(client) as db:
+        for index in range(3):
+            db.add(
+                Pack(
+                    user_id=ada.id,
+                    product_id=product,
+                    source="purchase",
+                    tokens=200,
+                    request_key=f"k{index}",
+                    sale=index == 0,
+                    created_at=now,
+                )
+            )
+            db.add(
+                TokenEntry(
+                    user_id=ada.id,
+                    kind="pack",
+                    amount=-200,
+                    key=f"pack:test:{index}",
+                    policy="test",
+                    created_at=now,
+                )
+            )
+        # A pack given counts for nothing.
+        db.add(
+            Pack(
+                user_id=ada.id,
+                product_id=product,
+                source="grant",
+                tokens=0,
+                actor_id=bob.id,
+                created_at=now,
+            )
+        )
+
+        def listing(seller: UUID, **kw: Any) -> Auction:
+            values: dict[str, Any] = {
+                "seller_id": seller,
+                "concept_id": concept,
+                "printing_id": printing,
+                "finish": "nonfoil",
+                "starting_bid": 100,
+                "duration": "24h",
+                "request_key": uuid4().hex,
+                "created_at": now - timedelta(hours=2),
+                "ends_at": now + timedelta(hours=22),
+            } | kw
+            auction = Auction(**values)
+            db.add(auction)
+            return auction
+
+        # Up two hours: counts. Withdrawn after ten minutes: not. Sold at once: counts.
+        listing(ada.id)
+        listing(
+            ada.id,
+            status="withdrawn",
+            created_at=now - timedelta(minutes=30),
+            ended_at=now - timedelta(minutes=20),
+        )
+        listing(
+            ada.id,
+            status="sold",
+            buyer_id=bob.id,
+            sold_price=100,
+            created_at=now - timedelta(minutes=5),
+            ended_at=now - timedelta(minutes=4),
+        )
+        # Won from Bob above the minimum.
+        listing(
+            bob.id,
+            status="sold",
+            buyer_id=ada.id,
+            sold_price=60,
+            created_at=now - timedelta(hours=3),
+            ended_at=now - timedelta(minutes=1),
+        )
+        # A deck legal and complete, made two days ago: it lasted a day, this week.
+        made = now - timedelta(days=1, minutes=5)
+        week_start = quests.period_of("weekly", now)[1]
+        db.add(
+            Deck(
+                owner_id=ada.id,
+                title="Made",
+                format="legacy",
+                draft={},
+                draft_hash="",
+                card_count=60,
+                legal=True,
+                created_at=max(made, week_start - timedelta(days=1)),
+                updated_at=now,
+            )
+        )
+        db.commit()
+    shown = {q["id"]: q for q in ada.get("/api/v1/me/quests").json()["weekly"]["quests"]}
+    assert shown["w-buy-packs-3"]["completed_at"] is not None
+    assert shown["w-sale-packs-1"]["completed_at"] is not None
+    assert shown["w-spend-500"]["completed_at"] is not None
+    assert shown["w-list-3"]["progress"] == 2
+    assert shown["w-win-auctions-1"]["completed_at"] is not None
+    assert shown["w-decks-1"]["completed_at"] is not None
+    keys = [key for _, key, _ in entries(client, ada.id, "quest")]
+    week = quests.period_of("weekly", now)[0].isoformat()
+    assert f"weekly:{ada.id}:{week}:w-buy-packs-3" in keys
+
+
+def card_printing(client: TestClient) -> tuple[UUID, UUID]:
+    with database(client) as db:
+        found = db.execute(select(CardPrinting.id, CardPrinting.concept_id).limit(1)).first()
+    if found is None:
+        pytest.skip("No catalog loaded")
+    return found[0], found[1]
+
+
+def test_the_back_pay_raises_earned_achievements_once(tmp_path, monkeypatch):
+    """Migration 0041 pays the difference for achievements earned before v0.9.5, once."""
+    database_url = f"sqlite:///{tmp_path}/raise.db"
+    monkeypatch.setenv("CD_DATABASE_URL", database_url)
+    config = Config("alembic.ini")
+    command.upgrade(config, "0040_decks_purged")
+    database_ = create_engine(database_url)
+    ada, cleo = uuid4(), uuid4()
+    with database_.begin() as connection:
+        for user, handle, reset in ((ada, "ada", None), (cleo, "cleo", "2026-10-05 00:00:00")):
+            connection.execute(
+                text(
+                    "INSERT INTO users (id, normalized_handle, handle, display_name, kind, "
+                    "status, onboarding, avatar, locale, preferences, privilege_version, "
+                    "created_at, presence_visibility, appear_offline, email_searchable, reset_at) "
+                    "VALUES (:id, :h, :h, :h, 'player', 'active', 'complete', 'sigil', 'en', "
+                    "'{}', 0, :now, 'friends', 0, 1, :reset)"
+                ),
+                {"id": user.hex, "h": handle, "now": "2026-10-01 00:00:00", "reset": reset},
+            )
+        for user, achievement, tokens in (
+            (ada, "first-win", 100),
+            (ada, "wins-10", 200),
+            (cleo, "first-win", 100),
+        ):
+            connection.execute(
+                text(
+                    "INSERT INTO player_achievements (id, user_id, achievement, version, key, "
+                    "tokens, earned_at) VALUES (:id, :user, :a, 1, :key, :tokens, :at)"
+                ),
+                {
+                    "id": uuid4().hex,
+                    "user": user.hex,
+                    "a": achievement,
+                    "key": f"achievement:{user}:{achievement}",
+                    "tokens": tokens,
+                    "at": "2026-10-02 00:00:00",
+                },
+            )
+    command.upgrade(config, "head")
+    with database_.connect() as connection:
+        rows = connection.execute(
+            text("SELECT user_id, amount, key, reason FROM token_ledger ORDER BY amount")
+        ).all()
+    # Cleo's was earned before her reset: it no longer counts, so it is not raised.
+    assert [(row[1], row[2], row[3]) for row in rows] == [
+        (
+            300,
+            f"achievement-raise:achievement:{ada}:first-win",
+            "First Victory: reward raised to 400 tokens",
+        ),
+        (
+            600,
+            f"achievement-raise:achievement:{ada}:wins-10",
+            "Seasoned Planeswalker: reward raised to 800 tokens",
+        ),
+    ]
+    command.downgrade(config, "0040_decks_purged")
+    command.upgrade(config, "head")
+    with database_.connect() as connection:
+        assert connection.execute(text("SELECT count(*) FROM token_ledger")).scalar() == 2
+    database_.dispose()
 
 
 # Achievements.
@@ -487,7 +842,7 @@ def test_achievements_are_earned_once_and_paid_once(client):
     assert sum(amount for amount, _, _ in paid) == sum(
         achievements.BY_ID[found].tokens for found in expected
     )
-    assert (100, f"achievement:{ada.id}:first-win", "First Victory") in paid
+    assert (400, f"achievement:{ada.id}:first-win", "First Victory") in paid
     database_ = client.app.state.database  # type: ignore[attr-defined]
     games.record_end(database_, game, "finished", completed(0))
     with database(client) as db:
@@ -512,10 +867,13 @@ def test_achievements_are_earned_once_and_paid_once(client):
 
 
 def test_every_achievement_is_reachable_and_modest():
-    assert 20 <= len(achievements.ACHIEVEMENTS) <= 30
+    assert 30 <= len(achievements.ACHIEVEMENTS) <= 40
     assert len(achievements.BY_ID) == len(achievements.ACHIEVEMENTS)
+    # Four times v0.5.0's rewards since v0.9.5 (the owner's word): First Victory 400.
+    assert achievements.BY_ID["first-win"].tokens == 400
+    assert achievements.BY_ID["wins-10"].tokens == 800
     for found in achievements.ACHIEVEMENTS:
-        assert 100 <= found.tokens <= 1_000 and found.target >= 1 and found.version >= 1
+        assert 400 <= found.tokens <= 4_000 and found.target >= 1 and found.version >= 1
         assert len(found.id) <= 48
     additions = {found.group for found in achievements.ACHIEVEMENTS if found.addition}
     assert additions == {"commander", "legacy"}
@@ -552,7 +910,7 @@ def test_badges_are_pinned_and_shown_on_the_profile(client):
 
 
 def test_packs_quests_and_friends_count_at_the_next_look(client, monkeypatch):
-    monkeypatch.setattr(quests, "choose", prefer("win", "win-commander", "beat-skill-4"))
+    monkeypatch.setattr(quests, "choose_daily", daily(*EASY_DAY))
     ada, bob = Account(client, "ada"), Account(client, "bob")
     now = utcnow()
     with database(client) as db:
@@ -583,7 +941,7 @@ def test_packs_quests_and_friends_count_at_the_next_look(client, monkeypatch):
     assert {"friend-1", "pack-1", "quest-1", "first-win"} <= earned(client, ada.id)
     # Bob made a friend too: he earns it when he looks.
     assert earned(client, bob.id) == set()
-    assert bob.get("/api/v1/me/achievements").json()["paid"] == 100
+    assert bob.get("/api/v1/me/achievements").json()["paid"] == 400
     assert earned(client, bob.id) == {"friend-1"}
 
 
@@ -675,7 +1033,7 @@ def test_a_history_from_before_achievements_earns_them_at_the_first_look(tmp_pat
 
 
 def test_a_reset_starts_quests_achievements_and_statistics_again(client, monkeypatch):
-    monkeypatch.setattr(quests, "choose", prefer("win", "win-red", "beat-skill-6"))
+    monkeypatch.setattr(quests, "choose_daily", daily(*RED_DAY))
     ada = Account(client, "ada")
     root = Account(client, "sysop", kind="sysop")
     ada.get("/api/v1/me/quests")
@@ -691,17 +1049,23 @@ def test_a_reset_starts_quests_achievements_and_statistics_again(client, monkeyp
     profile = root.get(f"/api/v1/players/{ada.id}/achievements").json()
     assert (profile["pinned"], profile["earned"]) == ([], [])
     fresh = ada.get("/api/v1/me/quests").json()
-    assert all(quest["completed_at"] is None for quest in fresh["quests"])
+    assert all(quest["completed_at"] is None for quest in fresh["daily"]["quests"])
     assert ada.get("/api/v1/me/achievements").json()["earned"] == 0
     # The same day's quests and the first win pay again, under keys of their own.
     won(client, ada)
     assert (
-        sum(1 for quest in ada.get("/api/v1/me/quests").json()["quests"] if quest["completed_at"])
+        sum(
+            1
+            for quest in ada.get("/api/v1/me/quests").json()["daily"]["quests"]
+            if quest["completed_at"]
+        )
         == 2
     )
     keys = [key for _, key, _ in entries(client, ada.id, "achievement") if "first-win" in key]
     assert len(keys) == 2 and keys[0] != keys[1]
-    assert len([key for _, key, _ in entries(client, ada.id, "quest") if "win-red" in key]) == 2
+    assert (
+        len([key for _, key, _ in entries(client, ada.id, "quest") if "d2-colour-red" in key]) == 2
+    )
     assert ada.get("/api/v1/me/stats").json()["totals"]["wins"] == 1
 
 
@@ -742,10 +1106,10 @@ def test_results_are_append_only_on_postgresql(monkeypatch, content):
         )
         with TestClient(app, base_url="https://testserver", client=SYSOP_ADDRESS) as http:
             ada, bob = Account(http, "ada"), Account(http, "bob")
-            monkeypatch.setattr(quests, "choose", prefer("win", "win-red", "beat-skill-6"))
+            monkeypatch.setattr(quests, "choose_daily", daily(*RED_DAY))
             assert ada.get("/api/v1/me/quests").status_code == 200
             played(http, [(ada.id, RED), bob.id], completed(0), kind="table")
-            assert ada.get("/api/v1/me/quests").json()["quests"][0]["completed_at"]
+            assert ada.get("/api/v1/me/quests").json()["daily"]["quests"][0]["completed_at"]
             assert ada.get("/api/v1/me/achievements").json()["earned"] >= 3
             assert ada.get("/api/v1/me/history").json()["items"][0]["outcome"] == "win"
             for statement in (
