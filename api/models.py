@@ -1985,7 +1985,9 @@ class WardenOpening(Base):
     campaign_id: Mapped[str] = mapped_column(String(48))
     encounter: Mapped[int] = mapped_column(SmallInteger)
     key: Mapped[str] = mapped_column(String(160), unique=True)
-    deck_id: Mapped[UUID | None] = mapped_column(ForeignKey("decks.id"))
+    # The deck the spoils made. No foreign key: its owner may delete it for good (v0.9.3), and the
+    # opening still shows what was given.
+    deck_id: Mapped[UUID | None]
     game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"))
     # The warden's roster ID (their portrait), name, and the deck's title.
     opponent: Mapped[str] = mapped_column(String(64))

@@ -7760,7 +7760,8 @@
               "auction_sold",
               "auction_unsold",
               "auction_cancelled",
-              "table_invite"
+              "table_invite",
+              "warden_deck"
             ],
             "title": "Kind",
             "type": "string"
@@ -14718,6 +14719,295 @@
           "requested_at"
         ],
         "title": "WaitingRequest",
+        "type": "object"
+      },
+      "WardenCard": {
+        "additionalProperties": false,
+        "properties": {
+          "card_id": {
+            "format": "uuid",
+            "title": "Card Id",
+            "type": "string"
+          },
+          "collector_number": {
+            "title": "Collector Number",
+            "type": "string"
+          },
+          "commander": {
+            "default": false,
+            "description": "The deck's commander: revealed last.",
+            "title": "Commander",
+            "type": "boolean"
+          },
+          "custom": {
+            "default": false,
+            "description": "One of the Godlike tier's custom cards (the High Priest): its image is the custom card's, and printing_id is its card ID.",
+            "title": "Custom",
+            "type": "boolean"
+          },
+          "extra": {
+            "default": false,
+            "description": "Given in a pack opened before v0.6.2 in place of the card listed before it, which the game could not play then; since v0.6.2 the account holds both.",
+            "title": "Extra",
+            "type": "boolean"
+          },
+          "faces": {
+            "description": "Faces with images of their own; 0 for one image.",
+            "title": "Faces",
+            "type": "integer"
+          },
+          "finish": {
+            "enum": [
+              "nonfoil",
+              "foil",
+              "etched"
+            ],
+            "title": "Finish",
+            "type": "string"
+          },
+          "mana_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mana Cost"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "new": {
+            "description": "No copy of its edition was in the library for good before (by edition since v0.5.0).",
+            "title": "New",
+            "type": "boolean"
+          },
+          "position": {
+            "description": "Its place in the pack as revealed; since v0.6.2 in the order shown, a past pack's card drawn and the one given in its place each with its own.",
+            "title": "Position",
+            "type": "integer"
+          },
+          "printing_id": {
+            "format": "uuid",
+            "title": "Printing Id",
+            "type": "string"
+          },
+          "rarity": {
+            "title": "Rarity",
+            "type": "string"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When its edition was released (v0.9.0).",
+            "title": "Released At"
+          },
+          "set_code": {
+            "title": "Set Code",
+            "type": "string"
+          },
+          "set_name": {
+            "default": "",
+            "description": "Its edition's name (v0.9.0).",
+            "title": "Set Name",
+            "type": "string"
+          },
+          "sheet": {
+            "title": "Sheet",
+            "type": "string"
+          },
+          "stand_in": {
+            "default": false,
+            "description": "The game has no rules for this card yet (v0.6.2): casual games play it as a stand-in.",
+            "title": "Stand In",
+            "type": "boolean"
+          },
+          "type_line": {
+            "title": "Type Line",
+            "type": "string"
+          }
+        },
+        "required": [
+          "position",
+          "card_id",
+          "printing_id",
+          "name",
+          "mana_cost",
+          "type_line",
+          "rarity",
+          "set_code",
+          "collector_number",
+          "finish",
+          "sheet",
+          "new",
+          "faces"
+        ],
+        "title": "WardenCard",
+        "type": "object"
+      },
+      "WardenOpeningSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "cards": {
+            "title": "Cards",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "deck_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deck Id"
+          },
+          "deck_title": {
+            "title": "Deck Title",
+            "type": "string"
+          },
+          "encounter": {
+            "title": "Encounter",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "opened_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opened At"
+          },
+          "opponent": {
+            "description": "The warden's roster ID, for their portrait.",
+            "title": "Opponent",
+            "type": "string"
+          },
+          "opponent_name": {
+            "title": "Opponent Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "encounter",
+          "opponent",
+          "opponent_name",
+          "deck_title",
+          "deck_id",
+          "cards",
+          "created_at",
+          "opened_at"
+        ],
+        "title": "WardenOpeningSummary",
+        "type": "object"
+      },
+      "WardenOpeningView": {
+        "additionalProperties": false,
+        "properties": {
+          "cards": {
+            "title": "Cards",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "deck_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deck Id"
+          },
+          "deck_title": {
+            "title": "Deck Title",
+            "type": "string"
+          },
+          "encounter": {
+            "title": "Encounter",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "opened_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opened At"
+          },
+          "opponent": {
+            "description": "The warden's roster ID, for their portrait.",
+            "title": "Opponent",
+            "type": "string"
+          },
+          "opponent_name": {
+            "title": "Opponent Name",
+            "type": "string"
+          },
+          "pulled": {
+            "description": "The cards, in the order they reveal.",
+            "items": {
+              "$ref": "#/components/schemas/WardenCard"
+            },
+            "title": "Pulled",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "encounter",
+          "opponent",
+          "opponent_name",
+          "deck_title",
+          "deck_id",
+          "cards",
+          "created_at",
+          "opened_at",
+          "pulled"
+        ],
+        "title": "WardenOpeningView",
         "type": "object"
       },
       "WinsChange": {
@@ -22581,6 +22871,331 @@
           }
         },
         "summary": "Start Encounter"
+      }
+    },
+    "/api/v1/campaign/openings": {
+      "get": {
+        "description": "The warden decks the account won, by ward: those not yet opened wait to be.",
+        "operationId": "my_openings_api_v1_campaign_openings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WardenOpeningSummary"
+                  },
+                  "title": "Response My Openings Api V1 Campaign Openings Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "My Openings"
+      }
+    },
+    "/api/v1/campaign/openings/{opening_id}": {
+      "get": {
+        "description": "A warden deck's cards in the order they reveal, opened or not.",
+        "operationId": "an_opening_api_v1_campaign_openings__opening_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "opening_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Opening Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WardenOpeningView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "An Opening"
+      }
+    },
+    "/api/v1/campaign/openings/{opening_id}/open": {
+      "post": {
+        "description": "Marks the deck opened, the first time; again, nothing changes. It gives nothing: the\ncards were the win's.",
+        "operationId": "open_deck_api_v1_campaign_openings__opening_id__open_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "opening_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Opening Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WardenOpeningView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Open Deck"
       }
     },
     "/api/v1/campaign/scenes": {

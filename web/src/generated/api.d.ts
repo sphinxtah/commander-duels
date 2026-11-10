@@ -1161,6 +1161,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/campaign/openings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Openings
+         * @description The warden decks the account won, by ward: those not yet opened wait to be.
+         */
+        get: operations["my_openings_api_v1_campaign_openings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/campaign/openings/{opening_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * An Opening
+         * @description A warden deck's cards in the order they reveal, opened or not.
+         */
+        get: operations["an_opening_api_v1_campaign_openings__opening_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/campaign/openings/{opening_id}/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open Deck
+         * @description Marks the deck opened, the first time; again, nothing changes. It gives nothing: the
+         *     cards were the win's.
+         */
+        post: operations["open_deck_api_v1_campaign_openings__opening_id__open_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/campaign/scenes": {
         parameters: {
             query?: never;
@@ -6452,7 +6513,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "friend_request" | "friend_accepted" | "friend_online" | "message" | "quest_completed" | "achievement_earned" | "rematch" | "team_invite" | "auction_outbid" | "auction_won" | "auction_sold" | "auction_unsold" | "auction_cancelled" | "table_invite";
+            kind: "friend_request" | "friend_accepted" | "friend_online" | "message" | "quest_completed" | "achievement_earned" | "rematch" | "team_invite" | "auction_outbid" | "auction_won" | "auction_sold" | "auction_unsold" | "auction_cancelled" | "table_invite" | "warden_deck";
             /**
              * Messages
              * @description For new messages (v0.4.4): how many from this friend are still unread.
@@ -9392,6 +9453,153 @@ export interface components {
              * Format: date-time
              */
             requested_at: string;
+        };
+        /** WardenCard */
+        WardenCard: {
+            /**
+             * Card Id
+             * Format: uuid
+             */
+            card_id: string;
+            /** Collector Number */
+            collector_number: string;
+            /**
+             * Commander
+             * @description The deck's commander: revealed last.
+             * @default false
+             */
+            commander: boolean;
+            /**
+             * Custom
+             * @description One of the Godlike tier's custom cards (the High Priest): its image is the custom card's, and printing_id is its card ID.
+             * @default false
+             */
+            custom: boolean;
+            /**
+             * Extra
+             * @description Given in a pack opened before v0.6.2 in place of the card listed before it, which the game could not play then; since v0.6.2 the account holds both.
+             * @default false
+             */
+            extra: boolean;
+            /**
+             * Faces
+             * @description Faces with images of their own; 0 for one image.
+             */
+            faces: number;
+            /**
+             * Finish
+             * @enum {string}
+             */
+            finish: "nonfoil" | "foil" | "etched";
+            /** Mana Cost */
+            mana_cost: string | null;
+            /** Name */
+            name: string;
+            /**
+             * New
+             * @description No copy of its edition was in the library for good before (by edition since v0.5.0).
+             */
+            new: boolean;
+            /**
+             * Position
+             * @description Its place in the pack as revealed; since v0.6.2 in the order shown, a past pack's card drawn and the one given in its place each with its own.
+             */
+            position: number;
+            /**
+             * Printing Id
+             * Format: uuid
+             */
+            printing_id: string;
+            /** Rarity */
+            rarity: string;
+            /**
+             * Released At
+             * @description When its edition was released (v0.9.0).
+             */
+            released_at?: string | null;
+            /** Set Code */
+            set_code: string;
+            /**
+             * Set Name
+             * @description Its edition's name (v0.9.0).
+             * @default
+             */
+            set_name: string;
+            /** Sheet */
+            sheet: string;
+            /**
+             * Stand In
+             * @description The game has no rules for this card yet (v0.6.2): casual games play it as a stand-in.
+             * @default false
+             */
+            stand_in: boolean;
+            /** Type Line */
+            type_line: string;
+        };
+        /** WardenOpeningSummary */
+        WardenOpeningSummary: {
+            /** Cards */
+            cards: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Deck Id */
+            deck_id: string | null;
+            /** Deck Title */
+            deck_title: string;
+            /** Encounter */
+            encounter: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Opened At */
+            opened_at: string | null;
+            /**
+             * Opponent
+             * @description The warden's roster ID, for their portrait.
+             */
+            opponent: string;
+            /** Opponent Name */
+            opponent_name: string;
+        };
+        /** WardenOpeningView */
+        WardenOpeningView: {
+            /** Cards */
+            cards: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Deck Id */
+            deck_id: string | null;
+            /** Deck Title */
+            deck_title: string;
+            /** Encounter */
+            encounter: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Opened At */
+            opened_at: string | null;
+            /**
+             * Opponent
+             * @description The warden's roster ID, for their portrait.
+             */
+            opponent: string;
+            /** Opponent Name */
+            opponent_name: string;
+            /**
+             * Pulled
+             * @description The cards, in the order they reveal.
+             */
+            pulled: components["schemas"]["WardenCard"][];
         };
         /** WinsChange */
         WinsChange: {
@@ -15630,6 +15838,286 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GameSummary"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    my_openings_api_v1_campaign_openings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WardenOpeningSummary"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    an_opening_api_v1_campaign_openings__opening_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                opening_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WardenOpeningView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    open_deck_api_v1_campaign_openings__opening_id__open_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                opening_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WardenOpeningView"];
                 };
             };
             /** @description Bad Request */

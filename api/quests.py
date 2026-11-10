@@ -70,7 +70,6 @@ from api.quest_pool import (
     WEEKLY,
     WEEKLY_BONUS,
     WEEKLY_BY_ID,
-    WEEKLY_GOALS,
     WEEKLY_IN_GAME,
     WEEKLY_TIERS,
     WeeklyGoal,

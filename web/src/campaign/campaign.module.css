@@ -861,3 +861,26 @@ button.choice:focus-visible {
   line-height: 1.45;
   color: #d4d9d3;
 }
+
+/* The warden decks won (v0.9.5): those waiting to be opened, and those to open again. */
+.openings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 12px 0;
+}
+.openingsTitle {
+  color: var(--cd-gold-hi);
+  font: 700 0.7rem/1.3 var(--cd-display);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.openings ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

@@ -191,7 +191,7 @@ def upgrade() -> None:
         sa.Column("campaign_id", sa.String(48), nullable=False),
         sa.Column("encounter", sa.SmallInteger(), nullable=False),
         sa.Column("key", sa.String(160), nullable=False, unique=True),
-        sa.Column("deck_id", sa.Uuid(), sa.ForeignKey("decks.id")),
+        sa.Column("deck_id", sa.Uuid()),
         sa.Column("game_id", sa.Uuid(), sa.ForeignKey("games.id")),
         sa.Column("opponent", sa.String(64), nullable=False),
         sa.Column("opponent_name", sa.String(64), nullable=False),

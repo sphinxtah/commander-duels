@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type ReactNode,
 } from "react";
 import { useMotionLevel } from "../app/motion";
 import { readTableSettings } from "../app/tableSettings";
@@ -62,11 +63,15 @@ export function CardFace({
   /** The foil glow (v0.6.0) on the face itself, where nothing around it turns. */
   glow?: boolean;
 }) {
-  const src = printingImage(
-    card.printing_id,
-    "normal",
-    card.faces > 0 ? 0 : undefined,
-  );
+  // A warden deck's custom commander (v0.9.5) shows the custom card's own image.
+  const src =
+    "custom" in card && card.custom
+      ? `/api/v1/custom-cards/${card.card_id}/image`
+      : printingImage(
+          card.printing_id,
+          "normal",
+          card.faces > 0 ? 0 : undefined,
+        );
   // A pack's new cards all load at once: one the server cannot send yet is tried again (v0.4.4).
   const image = useImageRetry(src);
   return (
@@ -106,8 +111,17 @@ export function PackOpening({
   onAnother,
   remaining = 0,
   startOpen = false,
+  art,
+  tutorial = true,
+  summaryLine,
 }: {
   opening: Opening;
+  /** What tears open in place of the product's pack: a warden's deck box (v0.9.5). */
+  art?: ReactNode;
+  /** Whether the tutorial's tour hears of it (a pack from the shop does). */
+  tutorial?: boolean;
+  /** The summary's line in place of the count of new cards. */
+  summaryLine?: string;
   onDone: () => void;
   /** Opens the next pack of the same product, when there is one. */
   onAnother?: () => void;
@@ -185,8 +199,9 @@ export function PackOpening({
   }, [stage]);
   // A pack opened here, not one from the history, tells the tutorial's tour (v0.8.4).
   useEffect(() => {
-    if (stage === "summary" && !startOpen) signalTutorial("pack_opened", cards);
-  }, [stage, startOpen, cards]);
+    if (stage === "summary" && !startOpen && tutorial)
+      signalTutorial("pack_opened", cards);
+  }, [stage, startOpen, cards, tutorial]);
   // Once every card is up, the summary follows after a moment to look at them.
   useEffect(() => {
     if (stage !== "revealing" || shown.size < cards.length) return;
@@ -262,7 +277,8 @@ export function PackOpening({
           {title}
         </h2>
         <p className={styles.note}>
-          {cards.length} cards · {newCards} new to your library
+          {summaryLine ??
+            `${cards.length} cards · ${newCards} new to your library`}
           {foils ? ` · ${foils} foil${foils === 1 ? "" : "s"}` : ""}. Every card
           is now in your library for good.
         </p>
@@ -404,10 +420,14 @@ export function PackOpening({
           >
             {/* The same picture twice: the strip that tears off, and the rest of the pack. */}
             <span className={styles.packTop} aria-hidden="true">
-              <PackArt product={opening.product} size="large" height={20} />
+              {art ?? (
+                <PackArt product={opening.product} size="large" height={20} />
+              )}
             </span>
             <span className={styles.packBody} aria-hidden="true">
-              <PackArt product={opening.product} size="large" height={20} />
+              {art ?? (
+                <PackArt product={opening.product} size="large" height={20} />
+              )}
             </span>
           </button>
           <p className={styles.note}>

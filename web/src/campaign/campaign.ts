@@ -43,9 +43,7 @@ export async function changeTutorial(
 }
 
 export type StartChoice =
-  | { kind: "learn" }
-  | { kind: "loaner" }
-  | { kind: "own"; deckId: string };
+  { kind: "learn" } | { kind: "loaner" } | { kind: "own"; deckId: string };
 
 export async function startEncounter(
   number: number,

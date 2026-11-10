@@ -114,6 +114,7 @@ NotificationKind = Literal[
     "auction_unsold",
     "auction_cancelled",
     "table_invite",
+    "warden_deck",
 ]
 AuctionKind = Literal[
     "auction_outbid", "auction_won", "auction_sold", "auction_unsold", "auction_cancelled"
@@ -121,7 +122,7 @@ AuctionKind = Literal[
 AUCTION_KINDS = frozenset(
     {"auction_outbid", "auction_won", "auction_sold", "auction_unsold", "auction_cancelled"}
 )
-AwardKind = Literal["quest_completed", "achievement_earned"]
+AwardKind = Literal["quest_completed", "achievement_earned", "warden_deck"]
 SearchText = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1, max_length=320),

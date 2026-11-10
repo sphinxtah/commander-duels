@@ -42,6 +42,7 @@ from api import (
     tables,
     testing,
     tutorial,
+    warden_openings,
 )
 from api.config import Settings
 from api.database import build_engine, migration_head
@@ -392,6 +393,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Statistics, daily quests and achievements (v0.5.0).
     app.include_router(stats.router)
     app.include_router(quests.router)
+    app.include_router(warden_openings.router)
     app.include_router(achievements.router)
     app.include_router(testing.router)
     app.include_router(cosmetics.router)

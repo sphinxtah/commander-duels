@@ -46,6 +46,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
+from api import warden_openings
 from api.auth import INPUT_ERRORS
 from api.custom_play import custom_in_seats
 from api.decks import refresh_decks, store_draft
@@ -621,6 +622,7 @@ def game_ended(
             content_dir,
             prize_card,
             served,
+            game.id,
         )
     done = set(progress.completed)
     for chapter in campaign.chapters:
@@ -741,6 +743,7 @@ def give_spoils(
     content_dir: str | None,
     prize_card: UUID | None = None,
     served: dict[str, Any] | None = None,
+    game_id: UUID | None = None,
 ) -> None:
     """A warden's spoils, in the transaction recording the win: their deck's cards granted to the
     library for good, the deck itself among the player's own (past the deck limit if need be:
@@ -791,6 +794,20 @@ def give_spoils(
     db.flush()
     if library is not None:
         refresh_decks(db, user.id, library)
+    # The deck waits to be opened as a pack (v0.9.5), under the spoils' own key.
+    warden_openings.record(
+        db,
+        user,
+        key,
+        campaign.id,
+        encounter.number,
+        encounter.opponent,
+        encounter.name,
+        encounter.deck_title,
+        deck.id,
+        game_id,
+        entries,
+    )
     if encounter.tokens > 0:
         pay_reward(
             db,

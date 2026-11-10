@@ -267,6 +267,30 @@ def test_a_wardens_first_defeat_gives_their_deck_and_tokens(
         "Lightning Bolt": 1,
         "Mountain": 97,
     }
+    # The deck waits to be opened as a pack (v0.9.5): its 100 cards, commons first, the
+    # commander last; the bell says so. Opening it gives nothing more and may be watched again.
+    (waiting,) = ada.get("/api/v1/campaign/openings").json()
+    assert (waiting["deck_title"], waiting["cards"], waiting["opened_at"]) == (
+        "Tibalt's Deck",
+        100,
+        None,
+    )
+    bell = ada.get("/api/v1/notifications", limit="50").json()["items"]
+    assert [item["kind"] for item in bell].count("warden_deck") == 1
+    shown = ada.get(f"/api/v1/campaign/openings/{waiting['id']}").json()
+    names = [card["name"] for card in shown["pulled"]]
+    assert len(names) == 100 and names[-1] == "Karlach, Fury of Avernus"
+    assert shown["pulled"][-1]["commander"] is True
+    rarities = [card["rarity"] for card in shown["pulled"][:-1]]
+    order = ["common", "uncommon", "rare", "mythic", "special", "bonus"]
+    assert rarities == sorted(rarities, key=order.index)
+    opened = ada.post(f"/api/v1/campaign/openings/{waiting['id']}/open", {})
+    assert opened.status_code == 200 and opened.json()["opened_at"] is not None
+    again = ada.post(f"/api/v1/campaign/openings/{waiting['id']}/open", {}).json()
+    assert again["opened_at"] == opened.json()["opened_at"]
+    bob = Account(client, "bob")
+    assert bob.get(f"/api/v1/campaign/openings/{waiting['id']}").status_code == 404
+
     # The deck is the player's, in their deck list, and their balance shows the tokens.
     decks = ada.get("/api/v1/decks").json()
     assert [summary["title"] for summary in decks] == ["Tibalt's Deck"]
@@ -572,6 +596,15 @@ def test_the_finales_spoils_wait_for_its_commander_and_give_the_deck_served(
                 ).all()
             )
         assert granted == {"Sol Ring": 1, "Lightning Bolt": 1, "Mountain": 97}
+        # The opening ends on the High Priest, the custom card, after the 99.
+        (waiting,) = ada.get("/api/v1/campaign/openings").json()
+        pulled = ada.get(f"/api/v1/campaign/openings/{waiting['id']}").json()["pulled"]
+        assert len(pulled) == 100
+        assert (pulled[-1]["name"], pulled[-1]["custom"], pulled[-1]["commander"]) == (
+            "Test Priest Commander",
+            True,
+            True,
+        )
 
 
 def test_scenes_and_the_tutorial_are_remembered(client: TestClient) -> None:

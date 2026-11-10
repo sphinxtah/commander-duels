@@ -27,6 +27,11 @@ import { CosmeticsPicker } from "./CosmeticsPicker";
 import { Cutscene } from "./Cutscene";
 import { DuelSetup } from "./DuelSetup";
 import { Journal } from "./Journal";
+import {
+  loadOpenings,
+  WardenOpening,
+  type WardenOpeningSummary,
+} from "./WardenOpening";
 import { MAP_LINE, STORY, type Scene } from "./script";
 import { useCampaignSettings } from "./settings";
 import type { Step } from "./stage";
@@ -70,6 +75,12 @@ export function CampaignPage({
   const [challenging, setChallenging] = useState(false);
   const [journal, setJournal] = useState(false);
   const [aftermath, setAftermath] = useState<Aftermath | null>(null);
+  // A warden's deck to open (v0.9.5), and what follows it; the decks won, opened or waiting.
+  const [opening, setOpening] = useState<{
+    id: string;
+    then?: () => void;
+  } | null>(null);
+  const [openings, setOpenings] = useState<WardenOpeningSummary[]>([]);
   const [notice, setNotice] = useState("");
   const [lost, setLost] = useState<Set<number>>(new Set());
   const [settings, updateSettings] = useCampaignSettings();
@@ -93,10 +104,46 @@ export function CampaignPage({
     void loadCampaign().then((data) => {
       if (active) setState(data);
     });
+    void loadOpenings().then((found) => {
+      if (active) setOpenings(found);
+    });
     return () => {
       active = false;
     };
   }, []);
+
+  /** Opens a warden's deck, then runs what follows (the spoils card after a duel). */
+  function unseal(id: string, then?: () => void) {
+    setOpening({ id, then });
+  }
+
+  /** The win's steps, split: the seal with the scene, the rest after the deck is opened when
+   * one waits (v0.9.5: the duel's end, the cut scene, the opening, then the spoils card). */
+  function afterWin(
+    scene: Scene,
+    steps: Step[],
+    waiting: WardenOpeningSummary | undefined,
+  ) {
+    if (!waiting) return play({ scenes: [scene], extra: steps });
+    const seal = steps.filter((step) => step.kind === "seal");
+    const rest = steps.filter((step) => step.kind !== "seal");
+    // The rest plays over the scene's own scenery, without its lines.
+    const after: Scene = {
+      ...scene,
+      caption: undefined,
+      intro: undefined,
+      outro: undefined,
+      lines: [],
+    };
+    play({
+      scenes: [scene],
+      extra: seal,
+      then: () =>
+        unseal(waiting.id, () => {
+          if (rest.length > 0) play({ scenes: [after], extra: rest });
+        }),
+    });
+  }
 
   // What the visit opens on, once: the story of the duel it comes back from, else the opening
   // cinematic on a first visit, else the replay's framing once the campaign is complete.
@@ -150,12 +197,17 @@ export function CampaignPage({
     const encounter = fresh?.encounters.find((e) => e.number === number);
     if (!story || !encounter || !fresh) return;
     if (ref.outcome === "won") {
+      const found = await loadOpenings();
+      setOpenings(found);
+      const waiting = found.find(
+        (item) => item.encounter === number && !item.opened_at,
+      );
       if (number === 14) {
         const early = arrived(gameId) === false;
         const ending = early ? STORY.endings.early : STORY.endings.win;
-        play({
-          scenes: [ending],
-          extra: [
+        afterWin(
+          ending,
+          [
             ...stepsAfterWin(fresh, encounter),
             {
               kind: "card",
@@ -164,16 +216,14 @@ export function CampaignPage({
               text: "Every seal answered to you, and you gave them back. Replay any duel from the map; the Archive kept their shape.",
             },
           ],
-        });
+          waiting,
+        );
         return;
       }
       const post = story.post;
       if (!post) return;
       const first = !fresh.progress.scenes_seen.includes(post.id);
-      play({
-        scenes: [post],
-        extra: first ? stepsAfterWin(fresh, encounter) : [],
-      });
+      afterWin(post, first ? stepsAfterWin(fresh, encounter) : [], waiting);
       return;
     }
     if (ref.outcome === "lost" || ref.outcome === "draw") {
@@ -340,6 +390,41 @@ export function CampaignPage({
           )}
         </div>
       </header>
+
+      {openings.length > 0 && (
+        <section className={styles.openings} aria-label="Warden decks">
+          <span className={styles.openingsTitle}>Warden decks</span>
+          <ul>
+            {openings.map((item) => (
+              <li key={item.id} data-waiting={!item.opened_at || undefined}>
+                <button
+                  type="button"
+                  className={item.opened_at ? styles.secondary : styles.gold}
+                  onClick={() =>
+                    unseal(item.id, () =>
+                      setOpenings((current) =>
+                        current.map((found) =>
+                          found.id === item.id
+                            ? {
+                                ...found,
+                                opened_at:
+                                  found.opened_at ?? new Date().toISOString(),
+                              }
+                            : found,
+                        ),
+                      ),
+                    )
+                  }
+                >
+                  {item.opened_at
+                    ? `Open ${item.deck_title} again`
+                    : `Open ${item.deck_title}`}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {aftermath && (
         <Retreat
@@ -577,6 +662,27 @@ export function CampaignPage({
         />
       )}
       {journal && <Journal state={state} onClose={() => setJournal(false)} />}
+      {opening && (
+        <WardenOpening
+          key={opening.id}
+          id={opening.id}
+          onDone={() => {
+            const then = opening.then;
+            setOpening(null);
+            setOpenings((current) =>
+              current.map((found) =>
+                found.id === opening.id
+                  ? {
+                      ...found,
+                      opened_at: found.opened_at ?? new Date().toISOString(),
+                    }
+                  : found,
+              ),
+            );
+            then?.();
+          }}
+        />
+      )}
       {playing && current && (
         <Cutscene
           key={`${playing.key}-${current.id}`}

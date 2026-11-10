@@ -68,13 +68,17 @@ export function presenceRank(presence: Presence | null | undefined): number {
 
 /** Where a notification leads: a message to its conversation, a rematch (v0.5.0) to its
  * game's result screen, an invitation to the Two-Headed Giant queue (v0.5.1) to Find a game on
- * the Play page, an invitation to a table (v0.9.2) to the table, anything else to the player's
- * profile. Null without a player. */
+ * the Play page, an invitation to a table (v0.9.2) to the table, a quest (v0.9.5) to the Quests
+ * page, a warden's deck to the campaign, anything else to the player's profile. Null without a
+ * player. */
 export function notificationLink(item: NotificationItem): string | null {
   if (item.kind === "rematch" && item.game_id) return `#game/${item.game_id}`;
   if (item.kind === "team_invite") return "#find";
   if (item.kind === "table_invite")
     return item.table ? `#tables/${item.table.code}` : "#tables";
+  // A warden's deck to open (v0.9.5) waits on the campaign's map; a quest, on the Quests page.
+  if (item.kind === "warden_deck") return "#campaign";
+  if (item.kind === "quest_completed") return "#quests";
   if (!item.actor) return null;
   return playerLink(item.actor.id);
 }
@@ -105,9 +109,13 @@ export function notificationWords(item: NotificationItem): string {
           ? `${who} sent you a message.`
           : `${who} sent you messages.`;
     case "quest_completed":
+      if (item.award?.id.startsWith("board-"))
+        return `${item.award.name}! Bonus: +${item.award.tokens.toLocaleString("en-US")} tokens.`;
       return item.award
         ? `Quest complete: ${item.award.name}. +${item.award.tokens.toLocaleString("en-US")} tokens.`
-        : "You completed a daily quest.";
+        : "You completed a quest.";
+    case "warden_deck":
+      return "A warden's deck is yours. Open it on the campaign's map.";
     case "achievement_earned":
       return item.award
         ? `Achievement earned: ${item.award.name}. +${item.award.tokens.toLocaleString("en-US")} tokens.`
