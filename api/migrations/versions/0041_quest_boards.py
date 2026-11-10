@@ -5,7 +5,7 @@
   the old three a day (quests-v1), kept as they are.
 - quest_boards: a board an account finished, its streak and its bonus, keyed once per period.
 - packs.sale: bought at the weekly sale's price, filled in for packs bought before from their
-  ledger entry's reason.
+  ledger entry's reason (packs is append-only on PostgreSQL: its trigger is set aside meanwhile).
 - warden_openings: a warden's deck won in the campaign, to open as a pack (api/campaign.py): the
   cards the win granted, in the order they reveal, and when the player opened it.
 - notifications.kind gains 'warden_deck': the bell's notice of a warden's deck waiting.
@@ -180,10 +180,16 @@ def upgrade() -> None:
         ).all()
         if key == f"pack:{UUID(str(pack_id))}"
     ]
+    # packs is append-only on PostgreSQL (0010): its trigger is set aside for the backfill.
+    postgres = bind.dialect.name == "postgresql"
+    if postgres and sold:
+        op.execute("ALTER TABLE packs DISABLE TRIGGER packs_append_only")
     for pack_id in sold:
         bind.execute(
             sa.text("UPDATE packs SET sale = :sale WHERE id = :id"), {"sale": True, "id": pack_id}
         )
+    if postgres and sold:
+        op.execute("ALTER TABLE packs ENABLE TRIGGER packs_append_only")
     op.create_table(
         "warden_openings",
         sa.Column("id", sa.Uuid(), primary_key=True),
