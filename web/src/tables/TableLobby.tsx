@@ -674,6 +674,10 @@ function KingsSeat({
   const openSeats = table.players
     .filter((other) => other.player === "human" && !other.taken)
     .map((other) => other.seat);
+  // The campaign's court (v0.9.8): its host is King A and team B's named bots are the court's,
+  // so neither moves; only the Generals' seats change hands. The server refuses the rest.
+  const court = Boolean(table.campaign);
+  const courtBot = court && bot && Boolean(player.handle);
   return (
     <li
       className={styles.kingsSeat}
@@ -743,7 +747,7 @@ function KingsSeat({
         {player.role === "king" ? "King" : "General"} ·{" "}
         {player.starting_life ?? "?"} starting life
       </small>
-      {open && empty && (seated || canJoin) && (
+      {open && empty && (seated || canJoin) && !(court && host) && (
         <button
           type="button"
           className={seated ? game.secondaryButton : game.primaryButton}
@@ -765,7 +769,7 @@ function KingsSeat({
           Give to a bot
         </button>
       )}
-      {open && host && bot && (
+      {open && host && bot && !courtBot && (
         <button
           type="button"
           className={game.secondaryButton}
@@ -778,24 +782,29 @@ function KingsSeat({
           Open for a player
         </button>
       )}
-      {open && host && !bot && player.taken && openSeats.length > 0 && (
-        <select
-          aria-label={`Move ${player.you ? "yourself" : (player.handle ?? "this player")} to another seat`}
-          value=""
-          disabled={busy}
-          onChange={(event) => {
-            const to = Number(event.target.value);
-            if (event.target.value !== "") onChange({ move: { seat, to } });
-          }}
-        >
-          <option value="">Move to…</option>
-          {openSeats.map((to) => (
-            <option key={to} value={to}>
-              {seatTitle(to)}
-            </option>
-          ))}
-        </select>
-      )}
+      {open &&
+        host &&
+        !bot &&
+        player.taken &&
+        openSeats.length > 0 &&
+        !court && (
+          <select
+            aria-label={`Move ${player.you ? "yourself" : (player.handle ?? "this player")} to another seat`}
+            value=""
+            disabled={busy}
+            onChange={(event) => {
+              const to = Number(event.target.value);
+              if (event.target.value !== "") onChange({ move: { seat, to } });
+            }}
+          >
+            <option value="">Move to…</option>
+            {openSeats.map((to) => (
+              <option key={to} value={to}>
+                {seatTitle(to)}
+              </option>
+            ))}
+          </select>
+        )}
     </li>
   );
 }

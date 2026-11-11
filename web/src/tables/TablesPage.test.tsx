@@ -1057,6 +1057,56 @@ describe("King's Table at a table (v0.8.7)", () => {
     ]);
   });
 
+  it("keeps the court's host in King A's seat and the court in its own (v0.9.8)", async () => {
+    const api = mockApi();
+    // The campaign's court with one friend invited: the host is King A, a General's seat waits
+    // for the friend, the other General is a bot, and team B is the court's named bots.
+    const court = kingsTable({
+      host: "ada",
+      your_seat: 1,
+      campaign: "The Unbound Court",
+      bots: 4,
+      players: [
+        kseat({ seat: 0 }),
+        kseat({
+          seat: 1,
+          taken: true,
+          handle: "ada",
+          host: true,
+          you: true,
+          deck: "Soldiers",
+          deck_id: "deck-c",
+        }),
+        kseat({ seat: 2, player: "bot", taken: true }),
+        kseat({ seat: 3, player: "bot", taken: true, handle: "Nicol Bolas" }),
+        kseat({ seat: 4, player: "bot", taken: true, handle: "The Sphinx" }),
+        kseat({ seat: 5, player: "bot", taken: true, handle: "Liliana" }),
+      ],
+    });
+    api.on("GET /api/v1/tables/{code}", () => reply(200, court));
+    api.on("GET /api/v1/decks", () => reply(200, [commanderDeck]));
+    render(<TablesPage me={ada} heading={createRef()} code={CODE} />);
+    await settle();
+    // The host does not move to the open General's seat, nor anyone else by the host's hand.
+    expect(
+      screen.queryByRole("button", { name: /^Move to this seat/ }),
+    ).toBeNull();
+    expect(screen.queryByRole("combobox", { name: /^Move / })).toBeNull();
+    // The Generals' seats still change hands: the open one to a bot, the bot's to a player.
+    expect(
+      screen.getByRole("button", {
+        name: "Give Team A's Left General's seat to a bot",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Open Team A's Right General's seat for a player",
+      }),
+    ).toBeInTheDocument();
+    // The court's own seats open for nobody.
+    expect(screen.queryByRole("button", { name: /^Open Team B's/ })).toBeNull();
+  });
+
   it("says why a deck of the other format cannot get ready", async () => {
     const api = mockApi();
     const seated = kingsTable({

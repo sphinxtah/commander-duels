@@ -1237,6 +1237,15 @@ def change_seat(
             free = [seat for seat in player_seats_of(table) if seat not in taken]
             target = free_in_team(table, free, body.team)[0]
         if target != row.seat:
+            # At the campaign's court the host is King A (v0.9.8): until then the host could take
+            # a General's seat and give the King's to a bot. Harmless, as the campaign reads the
+            # team's result, but not the court.
+            if table.campaign and row.user_id == table.host_id:
+                raise ApiError(
+                    409,
+                    "campaign_table",
+                    "At the court you are its King: your seat is the campaign's.",
+                )
             move_player(db, table, row, target)
     elif body.team is not None and team_of(table, row.seat) != body.team:
         stays_on(table, row.user_id, body.team)

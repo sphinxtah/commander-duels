@@ -76,6 +76,7 @@ from api.quest_pool import (
     DAILY_BONUS,
     DAILY_BY_ID,
     DAILY_QUESTS,
+    HINTS,
     POLICY,
     WEEKLY,
     WEEKLY_BONUS,
@@ -150,6 +151,11 @@ class QuestView(Contract):
         default=None, description="A weekly goal's tier."
     )
     in_game: bool = Field(description="Counted from games played, not from outside them.")
+    hint: str | None = Field(
+        default=None,
+        description="A way to do it that its name leaves unsaid (v0.9.8): a game at a table can "
+        "be played alone, at a King's Table table of bots.",
+    )
 
 
 class Streak(Contract):
@@ -832,6 +838,7 @@ def board_view(
                 step=daily.step if daily else None,
                 tier=weekly.tier if weekly else None,
                 in_game=daily is not None or (weekly is not None and weekly.in_game),
+                hint=HINTS.get(weekly.family) if weekly else None,
             )
         )
     return BoardView(

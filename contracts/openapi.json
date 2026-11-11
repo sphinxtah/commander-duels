@@ -10334,6 +10334,18 @@
             ],
             "title": "Completed At"
           },
+          "hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A way to do it that its name leaves unsaid (v0.9.8): a game at a table can be played alone, at a King's Table table of bots.",
+            "title": "Hint"
+          },
           "id": {
             "title": "Id",
             "type": "string"

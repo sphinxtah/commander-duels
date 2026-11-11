@@ -486,6 +486,12 @@ def test_friends_help_at_the_court_and_are_paid_once(
     assert (changed.status_code, changed.json()["code"]) == (409, "campaign_table")
     freed = ada.send("PATCH", f"/api/v1/tables/{code}", {"bot_seats": [2]})
     assert (freed.status_code, freed.json()["code"]) == (409, "campaign_table")
+    # The host is the court's King A (v0.9.8): they take no General's seat, so the King's seat
+    # is never left for a bot.
+    moved = ada.send("PATCH", f"/api/v1/tables/{code}/seat", {"seat": 0})
+    assert (moved.status_code, moved.json()["code"]) == (409, "campaign_table")
+    kept = {p["seat"]: p for p in ada.get(f"/api/v1/tables/{code}").json()["players"]}
+    assert kept[1]["you"] and kept[1]["host"] and not kept[0]["taken"]
     # Bob was invited: the bell, and the table among his.
     joined = bob.send("POST", f"/api/v1/tables/{code}/join", {"deck_id": his, "seat": 0})
     assert joined.status_code == 200, joined.text

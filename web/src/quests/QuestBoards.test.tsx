@@ -84,6 +84,37 @@ describe("the quest boards", () => {
     expect(screen.getByText(/Do them in any order/)).toBeTruthy();
   });
 
+  it("say how a table goal is played alone, until it is done (v0.9.8)", async () => {
+    const hint =
+      "Alone? Open a King's Table table and give every other seat to a bot.";
+    const week = questBoards().weekly;
+    const shown = questBoards({
+      weekly: {
+        ...week,
+        quests: [
+          { ...week.quests[0]!, name: "Finish a game at a table", hint },
+          {
+            ...week.quests[1]!,
+            name: "Finish three games at a table",
+            hint,
+            completed_at: "2026-11-10T18:00:00Z",
+          },
+          ...week.quests.slice(2),
+        ],
+      },
+    });
+    vi.spyOn(client, "GET").mockResolvedValue(ok(shown));
+    render(<QuestsPage heading={createRef()} />);
+    await settle();
+    const goals = within(
+      screen.getByRole("region", { name: "This week's goals" }),
+    ).getAllByRole("listitem");
+    expect(within(goals[0]!).getByText(hint)).toBeTruthy();
+    // A goal already done needs no way to it; a goal without one shows none.
+    expect(within(goals[1]!).queryByText(hint)).toBeNull();
+    expect(screen.getAllByText(hint)).toHaveLength(1);
+  });
+
   it("show a harder quest complete while the easier ones are open", async () => {
     const five = board().quests;
     const shown = questBoards({

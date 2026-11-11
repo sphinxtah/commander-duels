@@ -7699,6 +7699,11 @@ export interface components {
         QuestView: {
             /** Completed At */
             completed_at: string | null;
+            /**
+             * Hint
+             * @description A way to do it that its name leaves unsaid (v0.9.8): a game at a table can be played alone, at a King's Table table of bots.
+             */
+            hint?: string | null;
             /** Id */
             id: string;
             /**

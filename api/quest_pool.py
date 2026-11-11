@@ -122,17 +122,38 @@ class WeeklyGoal:
         return self.metric in IN_GAME
 
 
-def plural(count: int, one: str, many: str | None = None) -> str:
-    if count == 1:
-        return f"{'an' if one[0] in 'aeiouAEIOU' else 'a'} {one}"
-    return f"{count} {many or one + 's'}"
+# A count as every quest and goal writes it (v0.9.8): in words below ten, in digits from ten, as
+# the daily quests always did ("Win two games"). Until v0.9.8 the weekly goals from the games
+# wrote digits ("Win 3 Commander games") and the others words up to six ("Buy two packs").
+WORDS = {
+    2: "two",
+    3: "three",
+    4: "four",
+    5: "five",
+    6: "six",
+    7: "seven",
+    8: "eight",
+    9: "nine",
+}
+
+
+# What a goal's name leaves unsaid (v0.9.8), by family: a way to it that nothing else shows. Every
+# weekly goal can be finished alone; a table is the one that does not say how, since every table
+# but a King's Table one needs two players' seats.
+HINTS = {
+    "tables": "Alone? Open a King's Table table and give every other seat to a bot.",
+}
+
+
+def in_words(count: int) -> str:
+    return WORDS.get(count, f"{count:,}")
 
 
 def number(count: int, one: str, many: str | None = None) -> str:
-    words = {1: "a", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six"}
+    """A count of things: "a pack", "an auction", "three packs", "12 games"."""
     if count == 1:
-        return f"{'an' if one[0] in 'aeiou' else 'a'} {one}"
-    return f"{words.get(count, str(count))} {many or one + 's'}"
+        return f"{'an' if one[0] in 'aeiouAEIOU' else 'a'} {one}"
+    return f"{in_words(count)} {many or one + 's'}"
 
 
 # The daily pool.
@@ -285,97 +306,97 @@ def weekly_pool() -> tuple[WeeklyGoal, ...]:
             )
 
     # In the games.
-    tiered("wins", "wins", (3, 7, 12), lambda n: f"Win {plural(n, 'game')}")
-    tiered("play", "games", (5, 10, 20), lambda n: f"Play {plural(n, 'game')} to the end")
+    tiered("wins", "wins", (3, 7, 12), lambda n: f"Win {number(n, 'game')}")
+    tiered("play", "games", (5, 10, 20), lambda n: f"Play {number(n, 'game')} to the end")
     tiered(
         "commander",
         "wins",
         (2, 4, 8),
-        lambda n: f"Win {plural(n, 'Commander game')}",
+        lambda n: f"Win {number(n, 'Commander game')}",
         Rule(format="commander"),
     )
     tiered(
         "legacy",
         "wins",
         (1, 3, 6),
-        lambda n: f"Win {plural(n, 'Legacy game')}",
+        lambda n: f"Win {number(n, 'Legacy game')}",
         Rule(format="legacy"),
     )
     tiered(
         "four-players",
         "wins",
         (1, 3, 5),
-        lambda n: f"Win {plural(n, 'four-player Commander game')}",
+        lambda n: f"Win {number(n, 'four-player Commander game')}",
         Rule(format="commander", seats=4),
     )
     tiered(
         "two-headed",
         "wins",
         (1, 2, 4),
-        lambda n: f"Win {plural(n, 'Two-Headed Giant game')}",
+        lambda n: f"Win {number(n, 'Two-Headed Giant game')}",
         Rule(format="two_headed_giant"),
     )
     tiered(
         "kings-table",
         "wins",
         (1, 2, 3),
-        lambda n: f"Win {plural(n, "King's Table game")}",
+        lambda n: f"Win {number(n, "King's Table game")}",
         Rule(format="kings_table"),
     )
     tiered(
         "skill-5",
         "wins",
         (1, 3, 6),
-        lambda n: f"Beat bots of skill 5 or higher in {plural(n, 'game')}",
+        lambda n: f"Beat bots of skill 5 or higher in {number(n, 'game')}",
         Rule(skill_at_least=5),
     )
     tiered(
         "skill-6",
         "wins",
         (1, 2, 4),
-        lambda n: f"Beat skill-6 bots in {plural(n, 'game')}",
+        lambda n: f"Beat skill-6 bots in {number(n, 'game')}",
         Rule(skill_at_least=6),
     )
     tiered(
         "mono",
         "wins",
         (1, 3, 5),
-        lambda n: f"Win {plural(n, 'game')} with a mono-coloured deck",
+        lambda n: f"Win {number(n, 'game')} with a mono-coloured deck",
         Rule(mono=True),
     )
     tiered(
         "multicolour",
         "wins",
         (1, 3, 5),
-        lambda n: f"Win {plural(n, 'game')} with a deck of three or more colours",
+        lambda n: f"Win {number(n, 'game')} with a deck of three or more colours",
         Rule(colors_at_least=3),
     )
-    tiered("tables", "table_games", (1, 3, 5), lambda n: f"Finish {plural(n, 'game')} at a table")
+    tiered("tables", "table_games", (1, 3, 5), lambda n: f"Finish {number(n, 'game')} at a table")
     for color, word in COLOURS:
         tiered(
             f"colour-{word}",
             "wins",
             (2, 4, 7),
-            lambda n, word=word: f"Win {plural(n, 'game')} with a {word} deck",
+            lambda n, word=word: f"Win {number(n, 'game')} with a {word} deck",
             Rule(color=color),
         )
         tiered(
             f"legacy-{word}",
             "wins",
             (1, 2, 4),
-            lambda n, word=word: f"Win {plural(n, 'Legacy game')} with a {word} deck",
+            lambda n, word=word: f"Win {number(n, 'Legacy game')} with a {word} deck",
             Rule(format="legacy", color=color),
         )
         tiered(
             f"commander-{word}",
             "wins",
             (1, 3, 5),
-            lambda n, word=word: f"Win {plural(n, 'Commander game')} with a {word} deck",
+            lambda n, word=word: f"Win {number(n, 'Commander game')} with a {word} deck",
             Rule(format="commander", color=color),
         )
 
     # Leng's card shop.
-    tiered("buy-packs", "packs_bought", (1, 3, 6), lambda n: f"Buy {plural(n, 'pack')} at Leng's")
+    tiered("buy-packs", "packs_bought", (1, 3, 6), lambda n: f"Buy {number(n, 'pack')} at Leng's")
     tiered(
         "sale-packs",
         "packs_bought",
@@ -411,7 +432,7 @@ def weekly_pool() -> tuple[WeeklyGoal, ...]:
         (500, 2_000, 5_000),
         lambda n: f"Spend {n:,} tokens at Leng's card shop",
     )
-    tiered("open", "packs_opened", (2, 5, 10), lambda n: f"Open {plural(n, 'pack')}")
+    tiered("open", "packs_opened", (2, 5, 10), lambda n: f"Open {number(n, 'pack')}")
     tiered(
         "foils",
         "pulls",
@@ -437,7 +458,7 @@ def weekly_pool() -> tuple[WeeklyGoal, ...]:
         "new-cards",
         "pulls",
         (10, 30, 75),
-        lambda n: f"Add {n} cards new to your library from packs",
+        lambda n: f"Add {in_words(n)} cards new to your library from packs",
         params=Params(new=True),
     )
     for color, word in COLOURS:
@@ -445,7 +466,7 @@ def weekly_pool() -> tuple[WeeklyGoal, ...]:
             f"pull-{word}",
             "pulls",
             (5, 15, 30),
-            lambda n, word=word: f"Pull {n} {word} cards from packs",
+            lambda n, word=word: f"Pull {in_words(n)} {word} cards from packs",
             params=Params(color=color),
         )
     for card_type in CARD_TYPES:

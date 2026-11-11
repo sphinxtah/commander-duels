@@ -5,6 +5,7 @@ history's privacy, account deletion, and the migration on PostgreSQL when CD_TES
 set. The progression tests' database, content and fake engine are shared here."""
 
 import os
+import re
 from collections.abc import Callable, Iterator
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -443,6 +444,44 @@ def test_the_pools_are_large_and_every_goal_is_for_one_player():
     in_game = {goal.family for goal in quest_pool.WEEKLY if goal.in_game}
     outside = {goal.family for goal in quest_pool.WEEKLY if not goal.in_game}
     assert len(in_game) >= 6 and len(outside) >= 14
+
+
+def test_every_goal_writes_its_count_in_one_style():
+    """v0.9.8: a count below ten is written in words and one from ten in digits, on every board.
+    Until then the weekly goals from the games wrote digits ("Win 3 Commander games") and the
+    others words up to six ("Buy two packs", but "Pull 8 rares or mythic rares")."""
+    names = {goal.id: goal.name for goal in quest_pool.WEEKLY}
+    assert names["w-wins-3"] == "Win three games"
+    assert names["w-wins-7"] == "Win seven games"
+    assert names["w-wins-12"] == "Win 12 games"
+    assert names["w-commander-8"] == "Win eight Commander games"
+    assert names["w-play-10"] == "Play 10 games to the end"
+    assert names["w-buy-packs-3"] == "Buy three packs at Leng's"
+    assert names["w-rares-8"] == "Pull eight rares or mythic rares from packs"
+    assert names["w-pull-white-5"] == "Pull five white cards from packs"
+    assert names["w-pull-white-15"] == "Pull 15 white cards from packs"
+    assert names["w-spend-2000"] == "Spend 2,000 tokens at Leng's card shop"
+    assert names["w-tables-1"] == "Finish a game at a table"
+    assert names["w-win-auctions-1"] == "Win an auction from another player"
+    # No count of one to nine is left in digits; a bot's skill is a level, not a count.
+    lone = re.compile(r"(?<![\w,-])[1-9](?![\d,])")
+    every = [quest.name for quest in (*quest_pool.DAILY, *quest_pool.WEEKLY)]
+    assert [name for name in every if lone.search(name.replace("skill ", "skill-"))] == []
+
+
+def test_a_table_goal_says_it_can_be_played_alone(client, monkeypatch):
+    """v0.9.8: every weekly goal can be finished alone, and a game at a table is the one whose
+    name does not say how: only a King's Table table seats bots in every other seat."""
+    monkeypatch.setattr(quests, "choose_weekly", weekly("w-tables-1", "w-wins-3"))
+    ada = Account(client, "ada")
+    week = {q["id"]: q for q in ada.get("/api/v1/me/quests").json()["weekly"]["quests"]}
+    assert week["w-tables-1"]["hint"] == (
+        "Alone? Open a King's Table table and give every other seat to a bot."
+    )
+    assert week["w-wins-3"]["hint"] is None
+    assert all(
+        quest["hint"] is None for quest in ada.get("/api/v1/me/quests").json()["daily"]["quests"]
+    )
 
 
 def test_the_day_and_the_week_are_arizonas():

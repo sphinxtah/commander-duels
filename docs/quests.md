@@ -66,6 +66,10 @@ Until v0.9.4 every player had three daily quests, all wins in games, with one sw
 - *Decks:* new legal decks, Commander decks, Legacy decks, decks of three or more colours, and of each colour.
 - *Sleeves and the campaign:* a card sleeve uploaded; campaign duels won (any ward, replays and Apex Unbound included).
 
+**How a quest is worded** (v0.9.8).
+- *One way to write a count:* below ten in words, from ten in digits, on both boards ("Win three games", "Win 12 games", "Pull 15 white cards from packs"). Until v0.9.8 the weekly goals from the games wrote digits ("Win 3 Commander games") and the others words up to six ("Buy two packs"). A bot's skill stays a figure: it is a level, not a count.
+- *A table goal says how it is done alone.* Every weekly goal can be finished by one player, and "Finish a game at a table" is the one whose name does not say how: every table but a King's Table one needs two players' seats. Its three targets carry a hint (`hint` in the board's answer, null for every other quest), which the goal's card shows until it is done: "Alone? Open a King's Table table and give every other seat to a bot."
+
 **The old daily quests.** Their rows stay (`daily_quests`, policy `quests-v1`), and what they paid stays in the ledger. The day v0.9.5 reached the live server, the first look drew the new board in their place; quests already paid that day kept their pay.
 
 ## Achievements

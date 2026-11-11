@@ -26,6 +26,8 @@ export function QuestCard({ quest }: { quest: QuestView }) {
         <span className={styles.reward}>{tokens(quest.tokens)}</span>
       </span>
       <span className={styles.questName}>{quest.name}</span>
+      {/* A way to it that its name leaves unsaid (v0.9.8): a table game can be played alone. */}
+      {quest.hint && !done && <span className={styles.hint}>{quest.hint}</span>}
       <span
         className={styles.bar}
         role="progressbar"
