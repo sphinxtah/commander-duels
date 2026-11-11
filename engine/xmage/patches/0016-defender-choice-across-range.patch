@@ -1,0 +1,107 @@
+The choice of a defender offers every defender the combat names, whatever the range (Commander
+Duels v0.9.8). King's Table.
+
+Reason: the owner's report from the campaign's court. Liliana's Contract made both of the other
+King's Generals lose at the player's upkeep (801.16: a win by an effect makes the opponents in
+range lose), and in that turn's combat neither the other King nor his planeswalker could be chosen
+to attack. The combat had named both as defenders: patch 0011's attack rules (Game.attackablePlayers)
+let a King attack the other King once one of that King's Generals is out, across range. But when an
+attacker has more than one possible defender, HumanPlayer asks with a TargetDefender, and that
+target took its candidates from TargetPermanentOrPlayer: the players in the attacking player's
+range of influence and the permanents of players in that range. Range is set as a turn begins
+(801.2c), so it still ended at the Generals, and the choice came up empty; the attack could not be
+declared. With one defender HumanPlayer asks nothing, so only a King with a planeswalker or a
+battle, or one named beside other defenders, could not be chosen: the faraway King under the house
+rule without its guard, too, since v0.8.7. TargetDefender now keeps the defenders it was made
+with and offers each one still there (a player in the game, a permanent on the battlefield and
+phased in) that its filter matches. In every other game the defenders are already those in the
+attacking player's range, so the choice is the same there. Applies after 0012, which narrows the
+defenders to those the attacker can attack before the choice is asked.
+Upstream: none.
+Remove when: XMage's TargetDefender offers the combat's defenders without asking for range again.
+
+diff --git a/Mage/src/main/java/mage/target/common/TargetDefender.java b/Mage/src/main/java/mage/target/common/TargetDefender.java
+index 86c71f77..4789b868 100644
+--- a/Mage/src/main/java/mage/target/common/TargetDefender.java
++++ b/Mage/src/main/java/mage/target/common/TargetDefender.java
+@@ -1,7 +1,12 @@
+ package mage.target.common;
+ 
++import mage.abilities.Ability;
+ import mage.filter.common.FilterDefender;
++import mage.game.Game;
++import mage.game.permanent.Permanent;
++import mage.players.Player;
+ 
++import java.util.LinkedHashSet;
+ import java.util.Set;
+ import java.util.UUID;
+ 
+@@ -10,12 +15,67 @@ import java.util.UUID;
+  */
+ public class TargetDefender extends TargetPermanentOrPlayer {
+ 
++    // Commander Duels: the defenders the combat names, which this choice is among
++    private final Set<UUID> defenders;
++
+     public TargetDefender(Set<UUID> defenders) {
+         super(1, 1, new FilterDefender(defenders), true);
++        this.defenders = new LinkedHashSet<>(defenders);
+     }
+ 
+     private TargetDefender(final TargetDefender target) {
+         super(target);
++        this.defenders = new LinkedHashSet<>(target.defenders);
++    }
++
++    /**
++     * Commander Duels: the choice is among the combat's defenders, which the game's attack rules
++     * have already named (Combat.setDefenders, Game.attackablePlayers). In most games those are in
++     * the attacking player's range of influence, so nothing changes there. A game with its own
++     * attack rules may name a player outside that range (the Emperor variant with a house rule), and
++     * that player, their planeswalkers and the battles they protect must still be offered: so this
++     * does not ask for range a second time, as TargetPermanentOrPlayer does, and offers every named
++     * defender that is still there.
++     */
++    @Override
++    public Set<UUID> possibleTargets(UUID sourceControllerId, Ability source, Game game) {
++        Set<UUID> possibleTargets = new LinkedHashSet<>();
++        for (UUID defenderId : defenders) {
++            if (isThere(defenderId, sourceControllerId, source, game)) {
++                possibleTargets.add(defenderId);
++            }
++        }
++        return keepValidPossibleTargets(possibleTargets, sourceControllerId, source, game);
++    }
++
++    @Override
++    public boolean canChoose(UUID sourceControllerId, Ability source, Game game) {
++        return countThere(sourceControllerId, source, game) >= this.minNumberOfTargets;
++    }
++
++    @Override
++    public boolean canChoose(UUID sourceControllerId, Game game) {
++        return countThere(sourceControllerId, null, game) >= this.minNumberOfTargets;
++    }
++
++    private int countThere(UUID sourceControllerId, Ability source, Game game) {
++        int count = 0;
++        for (UUID defenderId : defenders) {
++            if (isThere(defenderId, sourceControllerId, source, game)) {
++                count++;
++            }
++        }
++        return count;
++    }
++
++    private boolean isThere(UUID defenderId, UUID sourceControllerId, Ability source, Game game) {
++        Player player = game.getPlayer(defenderId);
++        if (player != null) {
++            return player.isInGame() && filter.match(player, sourceControllerId, source, game);
++        }
++        Permanent permanent = game.getPermanent(defenderId);
++        return permanent != null && permanent.isPhasedIn()
++                && filter.match(permanent, sourceControllerId, source, game);
+     }
+ 
+     @Override

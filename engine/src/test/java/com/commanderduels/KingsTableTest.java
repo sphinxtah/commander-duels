@@ -274,6 +274,72 @@ class KingsTableTest {
         assertEquals(Set.of(1), table.attackable(4));
     }
 
+    /**
+     * The owner's report (v0.9.8), from the campaign's court: Liliana's Contract made both of the
+     * other King's Generals lose at the player's upkeep, and in that turn's combat neither The Sphinx
+     * nor his planeswalker could be chosen to attack. The combat named both as defenders; the choice
+     * among several defenders (XMage's TargetDefender, which the human player asks) kept to the
+     * attacking player's range of influence, and range is set as a turn begins (801.2c), so it still
+     * ended at the Generals. With one defender XMage asks nothing, so only a King with a planeswalker
+     * or a battle, or one named beside other defenders, could not be chosen.
+     */
+    @Test
+    void theChoiceOfADefenderOffersEveryDefenderTheCombatNames() throws Exception {
+        Seated table = seated(new KingsTableRules(true, KingsTableRules.ALL_40, true, true), 16L);
+        Game game = table.game();
+        UUID kingA = table.ids().get(1);
+        UUID kingB = table.ids().get(4);
+        Permanent walker = planeswalker(table, 4);
+        // Both of King B's Generals are defeated during King A's turn: the range is still the turn's.
+        table.player(3).lostForced(game);
+        table.player(5).lostForced(game);
+        assertFalse(game.getPlayer(kingA).hasPlayerInRange(kingB), "range is set as the turn begins");
+        game.getCombat().setAttacker(kingA);
+        game.getCombat().setDefenders(game);
+        assertEquals(Set.of(kingB, walker.getId()), game.getCombat().getDefenders(), "the King and his planeswalker");
+        var choice = new mage.target.common.TargetDefender(game.getCombat().getDefenders());
+        assertEquals(Set.of(kingB, walker.getId()), choice.possibleTargets(kingA, null, game),
+            "the choice offers both, out of range as they are");
+        assertTrue(choice.canChoose(kingA, null, game));
+        assertTrue(choice.canChoose(kingA, game));
+        assertTrue(choice.canTarget(kingA, kingB, null, game));
+        assertTrue(choice.canTarget(kingA, walker.getId(), null, game));
+        // What the combat does not name is never offered: the King's own General, in range.
+        assertFalse(choice.possibleTargets(kingA, null, game).contains(table.ids().get(0)));
+        game.getCombat().clear();
+
+        // The house rule without its guard, all four Generals standing: the faraway King is offered
+        // beside the Generals in range.
+        Seated open = seated(new KingsTableRules(true, KingsTableRules.ALL_40, true), 17L);
+        UUID king = open.ids().get(1);
+        open.game().getCombat().setAttacker(king);
+        open.game().getCombat().setDefenders(open.game());
+        assertEquals(Set.of(open.ids().get(3), open.ids().get(4), open.ids().get(5)),
+            new mage.target.common.TargetDefender(open.game().getCombat().getDefenders())
+                .possibleTargets(king, null, open.game()));
+        // A General's choice is the combat's too: the one opponent beside them.
+        UUID general = open.ids().get(2);
+        open.game().getCombat().clear();
+        open.game().getCombat().setAttacker(general);
+        open.game().getCombat().setDefenders(open.game());
+        assertEquals(Set.of(open.ids().get(3)),
+            new mage.target.common.TargetDefender(open.game().getCombat().getDefenders())
+                .possibleTargets(general, null, open.game()));
+    }
+
+    /** Puts a planeswalker under the seat's control, with loyalty, as a second thing to attack there. */
+    private static Permanent planeswalker(Seated table, int seat) {
+        Player player = table.player(seat);
+        mage.cards.Card card = mage.cards.repository.CardRepository.instance.findCard("Chandra Nalaar").createCard();
+        card.setOwnerId(player.getId());
+        table.game().loadCards(Set.of(card), player.getId());
+        var permanent = new mage.game.permanent.PermanentCard(card, player.getId(), table.game());
+        table.game().getBattlefield().addPermanent(permanent);
+        table.game().getState().setZone(card.getId(), mage.constants.Zone.BATTLEFIELD);
+        permanent.addCounters(mage.counters.CounterType.LOYALTY.createInstance(6), player.getId(), null, table.game());
+        return permanent;
+    }
+
     /** Puts the first creature card of the seat's library onto the battlefield, ready to attack or block. */
     private static Permanent creature(Seated table, int seat) {
         Player player = table.player(seat);
