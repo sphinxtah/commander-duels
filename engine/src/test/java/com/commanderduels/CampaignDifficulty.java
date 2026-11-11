@@ -81,6 +81,9 @@ class CampaignDifficulty {
         int games = Integer.parseInt(System.getProperty("campaign.measure"));
         int referenceSkill = Integer.parseInt(System.getProperty("campaign.reference.skill", "3"));
         long budget = Long.parseLong(System.getProperty("campaign.budget", "300"));
+        if (System.getProperty("campaign.probe") != null) {
+            HeapProbe.start(Double.parseDouble(System.getProperty("campaign.probe")));
+        }
         JsonObject campaign = JsonParser.parseString(Files.readString(CONTENT.resolve("campaign.json"))).getAsJsonObject();
         // The games' turn limits are the game's own (v0.9.7): 40 turns for each player, so 80 in a
         // duel and 240 at the court. Until v0.9.7 the content named one for all, 60.

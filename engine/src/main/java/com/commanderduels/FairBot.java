@@ -4,13 +4,16 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryPoolMXBean;
 import java.lang.management.MemoryType;
 import java.lang.management.MemoryUsage;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -21,12 +24,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BooleanSupplier;
 import java.util.Map;
 import mage.MageObject;
 import mage.abilities.Ability;
 import mage.abilities.ActivatedAbility;
 import mage.abilities.PlayLandAbility;
 import mage.abilities.SpellAbility;
+import mage.abilities.effects.SearchEffect;
 import mage.cards.Card;
 import mage.choices.Choice;
 import mage.constants.CardType;
@@ -35,8 +40,11 @@ import mage.constants.PhaseStep;
 import mage.constants.RangeOfInfluence;
 import mage.constants.Zone;
 import mage.game.Game;
+import mage.game.combat.Combat;
 import mage.game.combat.CombatGroup;
 import mage.game.permanent.Permanent;
+import mage.game.stack.StackAbility;
+import mage.game.stack.StackObject;
 import mage.player.ai.ComputerPlayerControllableProxy;
 import mage.player.ai.SimulationNode2;
 import mage.player.ai.score.GameStateEvaluator2;
@@ -85,6 +93,12 @@ import org.apache.log4j.Logger;
  *       and blocks with nothing and says no to every optional choice. What the rules still make it
  *       do (its draw, the discard to hand size, a mandatory trigger's targets) is XMage's AI as
  *       before.</li>
+ *   <li>Since v0.9.8 a search keeps few copies of the game alive. XMage tried every card a search
+ *       effect could find by copying the game for each one at once and keeping each one's line of
+ *       play until the last was scored: hundreds of copies at the campaign's court, and the engine's
+ *       heap. The cards are tried one at a time, one for each name ({@link #resolve}), a line that
+ *       is not the best is let go as soon as it is scored ({@link #minimaxAB}), and a search ends,
+ *       as when its budget runs out, when the heap fills while it runs ({@link #heapFull}).</li>
  * </ul>
  *
  * See docs/engine/fair-bots.md for the audit of XMage's AI code behind these changes. Not final
@@ -105,6 +119,19 @@ class FairBot extends ComputerPlayerControllableProxy {
     static final long HEAVY_COPY_MILLIS = 200;
     static final double HEAP_PRESSURE = 0.70;
     static final int LIGHT_DEPTH = 2;
+    /**
+     * A search ends, as when its budget runs out, when the heap's old generation is this full while
+     * it runs (v0.9.8): after its last collection, or (the higher share) at this moment, when no
+     * collection has yet counted what the search holds. The v0.9.3 guard above acts only as a search
+     * starts; at the campaign's court a search that started on a quiet heap filled it by itself, and
+     * the engine exits when its heap runs out, which interrupts every game it runs.
+     */
+    static final double HEAP_FULL = 0.80;
+    static final double HEAP_FULL_NOW = 0.90;
+    /** How often a running search's wait looks at the heap. */
+    static final long HEAP_CHECK_MILLIS = 100;
+    /** XMage's own count of a search's nodes past which it reports an error (private there). */
+    private static final int MAX_NODES_ERROR = 5100;
     /** How long a decision waits for a free search thread before the bot passes instead. */
     static final long QUEUE_WAIT_MILLIS = 60_000;
     /** XMage's own pool for its AI has five threads; a busy engine needs one per processor. */
@@ -187,6 +214,10 @@ class FairBot extends ComputerPlayerControllableProxy {
         private final AtomicLong light = new AtomicLong();
         // Pacts not cast because their upkeep cost could not be paid (v0.9.3).
         private final AtomicLong pacts = new AtomicLong();
+        // Searches ended because the heap filled, and search effects' cards tried one at a time (v0.9.8).
+        private final AtomicLong heapStops = new AtomicLong();
+        private final AtomicLong finds = new AtomicLong();
+        private final AtomicLong found = new AtomicLong();
 
         /** Determinized copies made: one per search. */
         long samples() {
@@ -277,6 +308,21 @@ class FairBot extends ComputerPlayerControllableProxy {
             return pacts.get();
         }
 
+        /** Searches ended because the heap filled while they ran (v0.9.8): the bot played its best so far. */
+        long heapStops() {
+            return heapStops.get();
+        }
+
+        /** Search effects whose cards a search tried one at a time (v0.9.8). */
+        long finds() {
+            return finds.get();
+        }
+
+        /** The cards those search effects tried: one for each name the search could find. */
+        long found() {
+            return found.get();
+        }
+
         @Override
         public String toString() {
             return searches() + " searches, " + completed() + " completed, " + timedOut() + " cut off by the budget, "
@@ -284,7 +330,8 @@ class FairBot extends ComputerPlayerControllableProxy {
                 + longestMillis() + " ms, longest wait " + longestWaitMillis() + " ms; habits: " + slips()
                 + " slips, " + naivePlays() + " naive plays, " + heldBack() + " held back, " + recklessAttacks()
                 + " reckless attacks, " + unblocked() + " unblocked; " + passive() + " passive decisions; "
-                + pressed() + " pressed attacks; " + light() + " light searches, " + pacts() + " unpayable Pacts held";
+                + pressed() + " pressed attacks; " + light() + " light searches, " + pacts() + " unpayable Pacts held; "
+                + heapStops() + " stopped by a full heap, " + finds() + " search effects trying " + found() + " cards";
         }
 
         /** Decisions that continued a planned chain of actions instead of searching again. */
@@ -304,6 +351,15 @@ class FairBot extends ComputerPlayerControllableProxy {
      * each of them at its next decision. A bot no game has given one keeps its own, always off.
      */
     private transient AtomicBoolean passive = new AtomicBoolean();
+    /**
+     * The cards a search effect may still find (v0.9.8), between {@link #resolve}, which makes the
+     * first, and the {@link #minimaxAB} that follows it for the same node and makes the others one
+     * at a time. Only the thread running this bot's search touches it.
+     */
+    private transient Finds finds;
+
+    /** A search effect on a node's stack, and the cards it may find that the search has not tried. */
+    private record Finds(SimulationNode2 node, StackAbility search, int depth, Deque<UUID> cards) {}
 
     FairBot(String name, RangeOfInfluence range, int skill, long seed) {
         this(name, range, skill, seed, Budget.forSkill(skill));
@@ -769,13 +825,22 @@ class FairBot extends ComputerPlayerControllableProxy {
      * pool's) collection usage against its maximum, 0 when the JVM reports none.
      */
     static double heapPressure() {
+        return heapShare(true);
+    }
+
+    /**
+     * How full the heap's old generation is (or every heap pool with a maximum): after its last
+     * collection, or at this moment, which counts what no collection has yet looked at, garbage
+     * included. 0 when the JVM reports none.
+     */
+    private static double heapShare(boolean afterCollection) {
         long used = 0;
         long max = 0;
         for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans()) {
             if (pool.getType() != MemoryType.HEAP || !pool.isCollectionUsageThresholdSupported()) {
                 continue;
             }
-            MemoryUsage usage = pool.getCollectionUsage();
+            MemoryUsage usage = afterCollection ? pool.getCollectionUsage() : pool.getUsage();
             if (usage == null || usage.getMax() <= 0) {
                 continue;
             }
@@ -783,6 +848,175 @@ class FairBot extends ComputerPlayerControllableProxy {
             max += usage.getMax();
         }
         return max <= 0 ? 0 : (double) used / max;
+    }
+
+    /**
+     * Whether the heap is filling up (v0.9.8), asked while a search runs: more than
+     * {@link #HEAP_FULL} of the old generation was in use after its last collection, or more than
+     * {@link #HEAP_FULL_NOW} is in use now. The second is the cruder reading, since it counts
+     * garbage, so it asks for more; it is there for a search that fills the heap between two
+     * collections. A search ended on a false alarm plays its best action so far, which costs a
+     * move's quality; a heap that runs out costs the engine every game it is running.
+     */
+    static boolean heapFull() {
+        return heapShare(true) > HEAP_FULL || heapShare(false) > HEAP_FULL_NOW;
+    }
+
+    /** The reading a running search asks for: {@link #heapFull}, unless a test puts its own here. */
+    static volatile BooleanSupplier heapCheck = FairBot::heapFull;
+
+    /**
+     * A search effect of this bot's on the stack (a fetch land's ability, a creature that searches
+     * as it enters the battlefield): XMage tries every card the search could find. It copies the
+     * game for each of those cards at once, then scores them one after another and keeps each one's
+     * whole line of play until the last is scored. At the campaign's court that was 365 copies of
+     * the game alive at once early in a game and near 900 later: 3 GB of a 3 GB heap (v0.9.8; v0.9.7
+     * had measured the heap running out without finding what filled it). Here only the first card's
+     * copy is made, of the cards the search can really find ({@link #findable}); the
+     * {@link #minimaxAB} that XMage calls next makes the others one at a time.
+     */
+    @Override
+    protected void resolve(SimulationNode2 node, int depth, Game game) {
+        StackObject top = game.getStack().getFirstOrNull();
+        if (top instanceof StackAbility search && search.getControllerId().equals(playerId)) {
+            SearchEffect effect = getSearchEffect(search);
+            if (effect != null && !effect.getTarget().isChoiceCompleted(getId(), search, game, null)) {
+                Deque<UUID> cards = findable(effect.getTarget().possibleTargets(search.getControllerId(),
+                    search.getStackAbility(), game), search.getControllerId(), game);
+                if (!cards.isEmpty()) {
+                    stats.finds.incrementAndGet();
+                    node.getChildren().add(found(node, depth, game, search, cards.poll()));
+                    finds = new Finds(node, search, depth, cards);
+                }
+                return;
+            }
+        }
+        super.resolve(node, depth, game);
+    }
+
+    /**
+     * The cards a search effect's step tries, of those XMage names for it. XMage's target for a
+     * card in a library names every card in the library of every player in range, though a search
+     * is of one library, the searching player's own in nearly every card, and the others in a
+     * search's copy are re-dealt guesses besides ({@link Determinizer}): at the court, up to five
+     * libraries' worth of copies for one fetch land. So the step tries the named cards that are in
+     * the searching player's own library, one for each name, in the names' order. Only when none
+     * of them is there (a search of another player's library) does it try every card XMage named.
+     */
+    static Deque<UUID> findable(Set<UUID> named, UUID searcherId, Game game) {
+        Player searcher = game.getPlayer(searcherId);
+        Set<UUID> own = new HashSet<>();
+        if (searcher != null) {
+            for (UUID id : named) {
+                if (searcher.getLibrary().getCard(id, game) != null) {
+                    own.add(id);
+                }
+            }
+        }
+        if (!own.isEmpty()) {
+            return oneOfEachName(own, game);
+        }
+        List<UUID> all = new ArrayList<>(named);
+        all.sort(Comparator.comparing((UUID id) -> nameOf(id, game)).thenComparing(Comparator.naturalOrder()));
+        return new ArrayDeque<>(all);
+    }
+
+    /** One card of each name, in the names' order: what a search of one library can tell apart. */
+    static Deque<UUID> oneOfEachName(Set<UUID> cardIds, Game game) {
+        Map<String, UUID> byName = new TreeMap<>();
+        for (UUID id : cardIds) {
+            String name = nameOf(id, game);
+            UUID kept = byName.get(name);
+            // The same card of a name whatever order the set came in: a seed repeats its game.
+            if (kept == null || id.compareTo(kept) < 0) {
+                byName.put(name, id);
+            }
+        }
+        return new ArrayDeque<>(byName.values());
+    }
+
+    private static String nameOf(UUID cardId, Game game) {
+        Card card = game.getCard(cardId);
+        return card == null ? cardId.toString() : card.getName();
+    }
+
+    /** The game as it is once the search on the stack has found the card: XMage's own child node. */
+    private SimulationNode2 found(SimulationNode2 node, int depth, Game game, StackAbility search, UUID cardId) {
+        Game sim = game.createSimulationForAI();
+        StackAbility ability = search.copy();
+        getSearchEffect(ability).getTarget().addTarget(cardId, ability, sim);
+        sim.getStack().push(sim, ability);
+        SimulationNode2 child = new SimulationNode2(node, sim, depth, search.getControllerId());
+        child.getTargets().add(cardId);
+        stats.found.incrementAndGet();
+        return child;
+    }
+
+    /**
+     * XMage's minimax over a node's children, with its own cut-offs, letting go of every child that
+     * is not the best so far as soon as it is scored (v0.9.8). XMage holds them all, each with the
+     * game copies of its own best line, until the last is scored, and only then keeps the best.
+     * After a search effect ({@link #resolve}) the children are the cards it may find, and those not
+     * yet tried are made here, one at a time, so that a search holds two lines of play at most where
+     * it held one for every card in the library.
+     */
+    @Override
+    protected int minimaxAB(SimulationNode2 node, int depth, int alpha, int beta) {
+        Finds more = finds != null && finds.node() == node ? finds : null;
+        finds = null;
+        UUID currentPlayerId = node.getGame().getPlayerList().get();
+        boolean mine = currentPlayerId.equals(playerId);
+        List<SimulationNode2> children = node.getChildren();
+        SimulationNode2 bestChild = null;
+        int best = -1;
+        try {
+            for (int index = 0; alpha < beta; index++) {
+                if (index == children.size()) {
+                    if (more == null || more.cards().isEmpty() || Thread.currentThread().isInterrupted()) {
+                        break;
+                    }
+                    children.add(found(node, more.depth(), node.getGame(), more.search(), more.cards().poll()));
+                }
+                SimulationNode2 child = children.get(index);
+                Combat childCombat = child.getCombat();
+                if (SimulationNode2.getCount() > MAX_NODES_ERROR) {
+                    throw new IllegalStateException("AI ERROR: too much nodes (possible actions)");
+                }
+                if (SimulationNode2.getCount() > maxNodes) {
+                    break;
+                }
+                int val = addActions(child, depth - 1, alpha, beta);
+                if (mine ? val > alpha : val < beta) {
+                    if (mine) {
+                        alpha = val;
+                    } else {
+                        beta = val;
+                    }
+                    if (best >= 0) {
+                        children.set(best, null); // the line this one beats
+                    }
+                    bestChild = child;
+                    best = index;
+                    if (node.getCombat() == null) {
+                        node.setCombat(childCombat);
+                        bestChild.setCombat(childCombat);
+                    }
+                } else {
+                    children.set(index, null);
+                }
+                // No need to look at other actions: the game is won, or lost.
+                if (val == (mine ? GameStateEvaluator2.WIN_GAME_SCORE : GameStateEvaluator2.LOSE_GAME_SCORE)) {
+                    break;
+                }
+            }
+        } finally {
+            // XMage's end state, whatever ended the loop: the best child alone.
+            children.clear();
+            if (bestChild != null) {
+                children.add(bestChild);
+            }
+        }
+        return mine ? alpha : beta;
     }
 
     /** XMage's state fingerprint with hands as counts, plus this bot's own hand. */
@@ -798,6 +1032,7 @@ class FairBot extends ComputerPlayerControllableProxy {
     @Override
     protected Integer addActionsTimed() {
         SimulationNode2 searched = root;
+        finds = null;
         int depth = maxDepth;
         if (lastCopyMillis > HEAVY_COPY_MILLIS || heapPressure() > HEAP_PRESSURE) {
             depth = Math.min(depth, LIGHT_DEPTH);
@@ -825,16 +1060,23 @@ class FairBot extends ComputerPlayerControllableProxy {
         SEARCHES.execute(search);
         Integer score = null;
         boolean interrupted = false;
+        AtomicBoolean heapFilled = new AtomicBoolean();
         try {
             // The budget is thinking time: it starts when a search thread takes the search.
             if (began.await(QUEUE_WAIT_MILLIS, TimeUnit.MILLISECONDS)) {
-                score = search.get(budget.thinkMillis(), TimeUnit.MILLISECONDS);
+                score = awaitSearch(search, heapFilled);
                 stats.completed.incrementAndGet();
             } else {
                 stats.unstarted.incrementAndGet();
             }
         } catch (TimeoutException e) {
-            stats.timedOut.incrementAndGet();
+            if (heapFilled.get()) {
+                stats.heapStops.incrementAndGet();
+                LOG.warn("AI search for " + getName() + " ended: the heap is filling up; the bot plays its best "
+                    + "action so far");
+            } else {
+                stats.timedOut.incrementAndGet();
+            }
         } catch (InterruptedException e) {
             interrupted = true; // the game is being stopped
         } catch (ExecutionException e) {
@@ -865,6 +1107,32 @@ class FairBot extends ComputerPlayerControllableProxy {
             stats.longestMillis.accumulateAndGet(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started), Math::max);
         }
         return score == null ? 0 : score;
+    }
+
+    /**
+     * Waits for the search to finish, up to the budget, in slices of {@link #HEAP_CHECK_MILLIS}
+     * with a look at the heap between them (v0.9.8). A heap that is filling up ends the wait as the
+     * budget does, and the caller then stops the search the same way and plays its best action so
+     * far.
+     */
+    private Integer awaitSearch(FutureTask<Integer> search, AtomicBoolean heapFilled)
+            throws InterruptedException, ExecutionException, TimeoutException {
+        long slice = TimeUnit.MILLISECONDS.toNanos(HEAP_CHECK_MILLIS);
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(budget.thinkMillis());
+        while (true) {
+            long left = Math.max(0, deadline - System.nanoTime());
+            try {
+                return search.get(Math.min(left, slice), TimeUnit.NANOSECONDS);
+            } catch (TimeoutException e) {
+                if (left <= slice) {
+                    throw e; // the budget ran out
+                }
+                if (heapCheck.getAsBoolean()) {
+                    heapFilled.set(true);
+                    throw e;
+                }
+            }
+        }
     }
 
     private static boolean awaitStop(CountDownLatch stopped) {
