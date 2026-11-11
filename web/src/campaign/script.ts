@@ -85,6 +85,8 @@ export interface Bark extends Line {
 export interface EncounterStory {
   number: number;
   title: string;
+  /** The boss's seat when it is not the first opponent: The Sphinx as King B at the court. */
+  bossSeat?: number;
   pre: Scene;
   /** The victory scene (none for the finale, whose endings are below). */
   post?: Scene;
@@ -117,6 +119,17 @@ export interface Story {
     arrivalTip: string;
   };
   endings: { win: Scene; early: Scene };
+  /** Ward 14's end since v0.9.6: The Sphinx recalls Liliana and Nicol Bolas and flees. */
+  flight: Scene;
+  /** Ward 15, the court (v0.9.6): its incarnation, there from the start, and the victory's
+   * scene before the ending. */
+  court: {
+    arrival: Line[];
+    removed: Line[];
+    returned: Line[];
+    post: Scene;
+    arrivalTip: string;
+  };
   tutorial: { id: string; when: string; text: string }[];
 }
 
@@ -1787,6 +1800,130 @@ export const STORY: Story = {
       counterplay: "",
       design: "",
     },
+    "15": {
+      number: 15,
+      title: "The Unbound Court",
+      bossSeat: 4,
+      pre: {
+        id: "FC.E15.PRE",
+        scenery: "throne",
+        phase: "fractured",
+        caption: {
+          kicker: "The court",
+          title: "The Unbound Court",
+          sub: "Godlike | The Archive's last court | Sovereignty",
+        },
+        intro:
+          "Behind the throne the Archive keeps one room it never showed you: a round court of six seats under a cracked dome. The Sphinx takes the King's seat, his incarnation already standing beside it. Nicol Bolas sits at his right hand and Liliana at his left, each holding a deck still warm from his gift. Across the floor a King's seat waits for you, and two seats beside it for whoever answers your call.",
+        lines: [
+          {
+            id: "FC.E15.PRE.01",
+            speaker: "SPHINX",
+            text: "A throne can be revoked. A court cannot. Here every seat answers to its King.",
+            fx: "reveal",
+          },
+          {
+            id: "FC.E15.PRE.02",
+            speaker: "BOLAS",
+            text: "He paid in advance, Wayfarer. I always honour a contract that pays in advance.",
+          },
+          {
+            id: "FC.E15.PRE.03",
+            speaker: "LILIANA",
+            text: "My name is still on his page. Until it burns, I fight where he points.",
+            fx: "chains",
+          },
+          {
+            id: "FC.E15.PRE.04",
+            speaker: "KAYA",
+            text: "Three of them, and two seats at your side. Fill them with friends, or let the Archive lend you hands.",
+          },
+          {
+            id: "FC.E15.PRE.05",
+            speaker: "PLAYER",
+            text: "Then I sit as King, and the court ends with him.",
+          },
+          {
+            id: "FC.E15.PRE.06",
+            speaker: "SPHINX",
+            text: "Kings do not strike one another here. You will have to cut through my Generals first. Begin.",
+            fx: "shake",
+          },
+        ],
+      },
+      loss: {
+        id: "FC.E15.LOSS",
+        scenery: "throne",
+        phase: "intact",
+        lines: [
+          {
+            id: "FC.E15.LOSS.01",
+            speaker: "SPHINX",
+            text: "A court is not won by one victory. Go back to the throne, and earn the door again.",
+          },
+          {
+            id: "FC.E15.LOSS.02",
+            speaker: "KAYA",
+            text: "The tether pulled you clear, back to the throne room. He has taken his seat there again.",
+          },
+          {
+            id: "FC.E15.LOSS.03",
+            speaker: "NARRATOR",
+            text: "The court closes behind you. The throne's ward seals itself, and The Sphinx waits on it once more.",
+          },
+        ],
+      },
+      barks: [
+        {
+          id: "FC.E15.BARK.01",
+          speaker: "BOLAS",
+          text: "Your Generals are brave. I collect brave things.",
+          trigger: "FIRST_PLAYER_CREATURE",
+        },
+        {
+          id: "FC.E15.BARK.02",
+          speaker: "SPHINX",
+          text: "That possibility is closed.",
+          trigger: "BOSS_COUNTERS_A_SPELL",
+        },
+        {
+          id: "FC.E15.BARK.03",
+          speaker: "LILIANA",
+          text: "He kept a deck that would not stay buried. So did I.",
+          trigger: "FIRST_BOSS_REANIMATION",
+        },
+        {
+          id: "FC.E15.BARK.04",
+          speaker: "BOLAS",
+          text: "An army, and he still sends me to do the work.",
+          trigger: "BOSS_ARMY",
+        },
+        {
+          id: "FC.E15.BARK.05",
+          speaker: "LILIANA",
+          text: "Your King is bleeding, Sphinx. Do you still want me facing the wrong way?",
+          trigger: "BOSS_LIFE_AT_OR_BELOW_10",
+        },
+        {
+          id: "FC.E15.BARK.06",
+          speaker: "SPHINX",
+          text: "I offered them an end to fear. I offer it to you, one last time.",
+          trigger: "BOSS_LIFE_AT_OR_BELOW_5",
+        },
+        {
+          id: "FC.E15.BARK.07",
+          speaker: "KAYA",
+          text: "He has enough loyalty to end this. Watch the next activation.",
+          trigger: "INCARNATION_LOYALTY_AT_LEAST_10",
+        },
+      ],
+      story:
+        "The Sphinx kept a court behind his throne, and bound Liliana and Nicol Bolas to it by the names they signed. Beating it breaks the last claim: the court's seats empty, and the gifted decks are yours with his.",
+      counterplay:
+        "Kings cannot attack here, so the court falls General by General: break Nicol Bolas or Liliana first and the path to The Sphinx opens. His incarnation returns at each of his upkeeps, so spend removal on it only when it threatens to end the game, and keep your Generals alive: a General out leaves your King open.",
+      design:
+        "A King's Table game (v0.9.6): the player is King A, with friends or bots as Generals; team B is The Sphinx as King and the two Generals he recalled, every one at the highest skill.",
+    },
   },
   finale: {
     phase1: [
@@ -2080,6 +2217,134 @@ export const STORY: Story = {
       outro:
         "The throne remains empty. Its light is gone. One blank page survives in the Archive, and you write no name on it. In the refuge, freed incarnations argue, laugh, and choose different doors.",
     },
+  },
+  flight: {
+    id: "FC.E14.FLIGHT",
+    scenery: "throne",
+    phase: "fractured",
+    lines: [
+      {
+        id: "FC.E14.FLIGHT.01",
+        speaker: "SPHINX",
+        text: "No. Not to a Wayfarer. Not in my own chamber.",
+        fx: "shake",
+      },
+      {
+        id: "FC.E14.FLIGHT.02",
+        speaker: "HIGH_PRIEST",
+        text: "My lord, the seals have spoken. The claim is broken.",
+      },
+      {
+        id: "FC.E14.FLIGHT.03",
+        speaker: "SPHINX",
+        text: "The seals bind wardens. I was never a warden.",
+        fx: "fracture",
+      },
+      {
+        id: "FC.E14.FLIGHT.04",
+        speaker: "SPHINX",
+        text: "Liliana. Nicol Bolas. By the names you signed, attend me.",
+        fx: "chains",
+      },
+      {
+        id: "FC.E14.FLIGHT.05",
+        speaker: "LILIANA",
+        text: "He invokes the contract. I cannot refuse a summons written in my own name.",
+      },
+      {
+        id: "FC.E14.FLIGHT.06",
+        speaker: "BOLAS",
+        text: "Spare me the pageant. If he pays, I play.",
+      },
+      {
+        id: "FC.E14.FLIGHT.07",
+        speaker: "KAYA",
+        text: "He's running, and he's taking them with him!",
+      },
+      {
+        id: "FC.E14.FLIGHT.08",
+        speaker: "SPHINX",
+        text: "Follow, if you dare. My court is older than this throne.",
+        fx: "flash",
+      },
+      {
+        id: "FC.E14.FLIGHT.09",
+        speaker: "NARRATOR",
+        text: "The throne stands empty. A gold seam tears the chamber open behind it, and the tether pulls you through after him.",
+        fx: "gold-thread",
+      },
+    ],
+    outro:
+      "Ward 14's seal stays unclaimed: the throne was fled, not surrendered. Its spoils wait with the court's.",
+  },
+  court: {
+    arrival: [
+      {
+        id: "FC.E15.ARRIVAL.01",
+        speaker: "SPHINX",
+        text: "I did not come here to cross. I came here already standing.",
+        fx: "fracture",
+      },
+      {
+        id: "FC.E15.ARRIVAL.02",
+        speaker: "KAYA",
+        text: "His incarnation is on the battlefield from the start. It will keep coming back.",
+      },
+    ],
+    removed: [
+      {
+        id: "FC.E15.REMOVED.01",
+        speaker: "SPHINX",
+        text: "You have broken a vessel. The court keeps another.",
+      },
+      {
+        id: "FC.E15.REMOVED.02",
+        speaker: "KAYA",
+        text: "It returns at his next upkeep. Use the time.",
+      },
+    ],
+    returned: [
+      {
+        id: "FC.E15.RETURNED.01",
+        speaker: "SPHINX",
+        text: "I did not yield the floor.",
+      },
+    ],
+    post: {
+      id: "FC.E15.POST",
+      scenery: "throne",
+      phase: "fractured",
+      caption: {
+        kicker: "The court",
+        title: "The Last Seat Empties",
+      },
+      lines: [
+        {
+          id: "FC.E15.POST.01",
+          speaker: "BOLAS",
+          text: "Keep the deck. I have no use for a gift that lost.",
+        },
+        {
+          id: "FC.E15.POST.02",
+          speaker: "LILIANA",
+          text: "The page burns. My name is my own again.",
+          fx: "burn",
+        },
+        {
+          id: "FC.E15.POST.03",
+          speaker: "SPHINX",
+          text: "Then I have no court, and no one left to rule.",
+          fx: "fracture",
+        },
+        {
+          id: "FC.E15.POST.04",
+          speaker: "KAYA",
+          text: "Both seals are yours, the throne's and the court's. Finish it.",
+        },
+      ],
+    },
+    arrivalTip:
+      "The Sphinx's incarnation starts on the battlefield. Destroyed, it returns at the beginning of his next upkeep, every time. Kings cannot attack: beat his Generals to reach him.",
   },
   tutorial: [
     {

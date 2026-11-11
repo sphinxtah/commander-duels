@@ -65,12 +65,14 @@ export function CampaignLayer({
   const seenLog = useRef(0);
   const counter = useRef(0);
   const finale = campaign.encounter === 14;
+  // Ward 15, the court (v0.9.6): The Sphinx is King B, his incarnation there from the start.
+  const court = campaign.encounter === 15;
   const story = STORY.encounters[campaign.encounter];
 
   // Each new view: what it fires.
   useEffect(() => {
     if (!view || over) return;
-    const now = observe(view, log, seenLog.current);
+    const now = observe(view, log, seenLog.current, story?.bossSeat);
     seenLog.current = (log[log.length - 1]?.index ?? -1) + 1;
     const was = before.current;
     const mind = memory.current;
@@ -114,18 +116,31 @@ export function CampaignLayer({
           say(help[3]);
       }
     }
-    if (finale && campaign.finale === "private") {
-      const step = incarnation(was, now, mind);
+    if ((finale || court) && campaign.finale === "private") {
+      const voices = court
+        ? {
+            arrival: STORY.court.arrival,
+            removed: STORY.court.removed,
+            recast: STORY.court.returned,
+            tip: STORY.court.arrivalTip,
+          }
+        : {
+            arrival: STORY.finale.arrival,
+            removed: STORY.finale.removed,
+            recast: STORY.finale.recast,
+            tip: STORY.finale.arrivalTip,
+          };
+      const step = incarnation(was, now, mind, court);
       if (step === "arrived") {
         memory.current = { ...memory.current, arrived: true };
         rememberArrival(gameId);
         setArrival((value) => value + 1);
-        setTip(STORY.finale.arrivalTip);
-        for (const line of STORY.finale.arrival) say(line);
+        setTip(voices.tip);
+        for (const line of voices.arrival) say(line);
       } else if (step === "removed") {
         const first = !memory.current.removed;
         memory.current = { ...memory.current, removed: true };
-        if (first) for (const line of STORY.finale.removed) say(line);
+        if (first) for (const line of voices.removed) say(line);
       } else if (step === "returned") {
         const returns = memory.current.returns + 1;
         const quiet = now.turn - memory.current.lastReturnTurn < 2;
@@ -134,8 +149,8 @@ export function CampaignLayer({
           returns,
           lastReturnTurn: now.turn,
         };
-        if (returns === 1) for (const line of STORY.finale.recast) say(line);
-        else if (!quiet) say(STORY.finale.recast[0], false);
+        if (returns === 1) for (const line of voices.recast) say(line);
+        else if (!quiet) say(voices.recast[0], false);
         setArrival((value) => value + 1);
       }
     }
@@ -200,10 +215,17 @@ export function CampaignLayer({
       {arrival > 0 && (
         <div key={arrival} className={styles.crossing} aria-hidden="true" />
       )}
-      {spoken && <Bubble key={spoken.key} line={spoken.line} finale={finale} />}
+      {spoken && (
+        <Bubble
+          key={spoken.key}
+          line={spoken.line}
+          finale={finale || court}
+          lilianaAlly={finale}
+        />
+      )}
       {tip && (
         <div className={styles.tip} role="status">
-          <strong>The Sphinx crosses</strong>
+          <strong>{court ? "The Sphinx's court" : "The Sphinx crosses"}</strong>
           <span>{tip}</span>
           <button type="button" onClick={() => setTip(null)}>
             Got it
@@ -241,12 +263,22 @@ export function CampaignLayer({
   );
 }
 
-function Bubble({ line, finale }: { line: Line; finale: boolean }) {
+function Bubble({
+  line,
+  finale,
+  lilianaAlly,
+}: {
+  line: Line;
+  /** The Sphinx is seen at last: the finale's duel and since v0.9.6 the court. */
+  finale: boolean;
+  /** Liliana speaks for the player (the finale's duel), not for his court. */
+  lilianaAlly: boolean;
+}) {
   const speaker = line.speaker as Speaker;
   const ally =
     speaker === "KAYA" ||
     speaker === "PLAYER" ||
-    (finale && speaker === "LILIANA");
+    (lilianaAlly && speaker === "LILIANA");
   const portrait = speakerPortrait(speaker);
   return (
     <div

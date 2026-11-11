@@ -7,12 +7,16 @@ import mage.MageObject;
 import mage.abilities.Ability;
 import mage.abilities.StateTriggeredAbility;
 import mage.abilities.common.SimpleStaticAbility;
+import mage.abilities.condition.Condition;
+import mage.abilities.effects.ContinuousRuleModifyingEffectImpl;
 import mage.abilities.effects.OneShotEffect;
 import mage.abilities.effects.ReplacementEffectImpl;
+import mage.abilities.triggers.BeginningOfUpkeepTriggeredAbility;
 import mage.cards.Card;
 import mage.cards.repository.CardInfo;
 import mage.constants.Duration;
 import mage.constants.Outcome;
+import mage.constants.TargetController;
 import mage.constants.Zone;
 import mage.game.Game;
 import mage.game.command.Commander;
@@ -45,10 +49,20 @@ import mage.util.CardUtil;
  * cast from there by the same rules, but it is not a commander: no tax, no commander damage, and
  * none of the commander's own replacements. Only one copy ever exists. Its loyalty, its abilities
  * and its ultimate are the card's own, and every result the game reaches stands.
+ *
+ * <p><b>The court (v0.9.6).</b> Ward 15, The Unbound Court, is a King's Table game, and there the
+ * owner's rule is another ({@link #applyCourt}): the incarnation starts the game on the battlefield,
+ * as if it were a free card, and whenever it is not on the battlefield at the beginning of its
+ * controller's upkeep it is put onto the battlefield again, for free, as often as that happens. It is
+ * never cast, so it cannot be countered, and it cannot be cast from the reserve either: it only
+ * returns. It enters at its printed loyalty each time. As in the duel, leaving the battlefield for
+ * anywhere else sends it to the reserve instead.
  */
 final class CampaignReserve {
     /** The emblem's name, as the command zone shows it. */
     static final String NAME = "Incarnation in reserve";
+    /** The court's emblem's name (v0.9.6). */
+    static final String COURT_NAME = "Incarnation of the court";
     private static final String CARD = "commander-duels:reserve-card:";
     private static final String UNLOCKED = "commander-duels:reserve-unlocked:";
 
@@ -57,6 +71,11 @@ final class CampaignReserve {
     /** Game thread, before the game starts: the reserve's rules for the seat's player. */
     static void apply(Game game, UUID playerId, String cardName, int threshold) {
         game.addEmblem(new ReserveEmblem(cardName, threshold), null, playerId);
+    }
+
+    /** Game thread, before the game starts: the court's rules for the seat's player (v0.9.6). */
+    static void applyCourt(Game game, UUID playerId, String cardName) {
+        game.addEmblem(new CourtEmblem(cardName), null, playerId);
     }
 
     /** The reserve card in the game, once it has been brought in. */
@@ -267,6 +286,168 @@ final class CampaignReserve {
                 game.informPlayers(reserve.getLogName() + " returns to its reserve.");
             }
             return false;
+        }
+    }
+
+    static final class CourtEmblem extends Emblem {
+        private static final long serialVersionUID = 1L;
+
+        CourtEmblem(String cardName) {
+            super(COURT_NAME);
+            this.getAbilities().add(new CourtArrival(cardName));
+            this.getAbilities().add(new BeginningOfUpkeepTriggeredAbility(Zone.COMMAND, TargetController.YOU,
+                new Arrive(cardName), false).withInterveningIf(new InReserve()));
+            this.getAbilities().add(new SimpleStaticAbility(Zone.COMMAND, new BackToReserve()));
+            this.getAbilities().add(new SimpleStaticAbility(Zone.COMMAND, new NeverCast()));
+        }
+
+        private CourtEmblem(final CourtEmblem emblem) {
+            super(emblem);
+        }
+
+        @Override
+        public CourtEmblem copy() {
+            return new CourtEmblem(this);
+        }
+
+        @Override
+        public void setSourceObjectAndInitImage(MageObject sourceObject) {
+            this.sourceObject = sourceObject;
+            this.setUsesVariousArt(false);
+            this.setCardNumber("");
+            this.setImageFileName("");
+            this.setImageNumber(0);
+        }
+    }
+
+    /** The court's start: the first moment the game checks its state, once, the card enters. */
+    static final class CourtArrival extends StateTriggeredAbility {
+        private static final long serialVersionUID = 1L;
+
+        CourtArrival(String cardName) {
+            super(Zone.COMMAND, new Arrive(cardName));
+        }
+
+        private CourtArrival(final CourtArrival ability) {
+            super(ability);
+        }
+
+        @Override
+        public CourtArrival copy() {
+            return new CourtArrival(this);
+        }
+
+        @Override
+        public boolean checkTrigger(GameEvent event, Game game) {
+            if (unlocked(game, getSourceId())) {
+                return false;
+            }
+            Player player = game.getPlayer(getControllerId());
+            return player != null && player.isInGame() && !player.hasLost();
+        }
+
+        @Override
+        public void trigger(Game game, UUID controllerId, GameEvent triggeringEvent) {
+            game.getState().setValue(UNLOCKED + getSourceId(), Boolean.TRUE);
+            super.trigger(game, controllerId, triggeringEvent);
+        }
+
+        @Override
+        public String getRule() {
+            return "Your incarnation starts the game on the battlefield. At the beginning of your upkeep, if it is in "
+                + "your reserve, put it onto the battlefield. If it would leave the battlefield for anywhere else, it "
+                + "returns to your reserve instead. It can't be cast.";
+        }
+    }
+
+    /** Puts the card onto the battlefield from the reserve, for free, bringing it in the first time. */
+    static final class Arrive extends OneShotEffect {
+        private static final long serialVersionUID = 1L;
+
+        private final String cardName;
+
+        Arrive(String cardName) {
+            super(Outcome.PutCardInPlay);
+            this.cardName = cardName;
+            this.staticText = "put your incarnation onto the battlefield from your reserve";
+        }
+
+        private Arrive(final Arrive effect) {
+            super(effect);
+            this.cardName = effect.cardName;
+        }
+
+        @Override
+        public Arrive copy() {
+            return new Arrive(this);
+        }
+
+        @Override
+        public boolean apply(Game game, Ability source) {
+            Player controller = game.getPlayer(source.getControllerId());
+            if (controller == null) {
+                return false;
+            }
+            Card card = bringIn(game, source.getSourceId(), controller, cardName);
+            if (card == null || game.getState().getZone(card.getId()) != Zone.COMMAND) {
+                return card != null;
+            }
+            boolean moved = controller.moveCards(card, Zone.BATTLEFIELD, source, game);
+            if (moved && !game.isSimulation()) {
+                game.informPlayers(card.getLogName() + " takes the court.");
+            }
+            return moved;
+        }
+    }
+
+    /** The upkeep's intervening "if": the card waits in the reserve. */
+    static final class InReserve implements Condition {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public boolean apply(Game game, Ability source) {
+            Card card = card(game, source.getSourceId());
+            return card != null && game.getState().getZone(card.getId()) == Zone.COMMAND;
+        }
+
+        @Override
+        public String toString() {
+            return "your incarnation is in your reserve";
+        }
+    }
+
+    /** The court's incarnation only returns: it is never cast from the reserve. */
+    static final class NeverCast extends ContinuousRuleModifyingEffectImpl {
+        private static final long serialVersionUID = 1L;
+
+        NeverCast() {
+            super(Duration.EndOfGame, Outcome.Detriment);
+            this.staticText = "Your incarnation can't be cast";
+        }
+
+        private NeverCast(final NeverCast effect) {
+            super(effect);
+        }
+
+        @Override
+        public NeverCast copy() {
+            return new NeverCast(this);
+        }
+
+        @Override
+        public boolean checksEventType(GameEvent event, Game game) {
+            return event.getType() == GameEvent.EventType.CAST_SPELL_LATE
+                || event.getType() == GameEvent.EventType.CAST_SPELL;
+        }
+
+        @Override
+        public boolean applies(GameEvent event, Ability source, Game game) {
+            Card reserve = card(game, source.getSourceId());
+            if (reserve == null) {
+                return false;
+            }
+            Card card = game.getCard(event.getSourceId());
+            return card != null && reserve.getId().equals(card.getMainCard().getId());
         }
     }
 }

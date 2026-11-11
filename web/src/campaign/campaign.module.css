@@ -884,3 +884,129 @@ button.choice:focus-visible {
   padding: 0;
   list-style: none;
 }
+
+/* Ward 15, The Unbound Court (v0.9.6): its seal beside the throne's, its medallion's crown, and
+   ward 14's fled throne: The Sphinx shaking furiously, then fleeing, leaving the Fled marker. */
+.sealCourt {
+  width: 34px;
+  height: 34px;
+  margin-left: 0.3rem;
+  background: #ffffff26;
+  clip-path: polygon(
+    0 100%,
+    0 35%,
+    22% 55%,
+    34% 10%,
+    50% 45%,
+    66% 10%,
+    78% 55%,
+    100% 35%,
+    100% 100%
+  );
+}
+.sealCourt.sealWon {
+  background: linear-gradient(180deg, #ffe2a8, #f08a3c 55%, #8f2e12);
+  filter: drop-shadow(0 0 6px #f08a3c);
+}
+.node[data-court] .medallion {
+  width: 92px;
+  height: 92px;
+  --metal: #f08a3c;
+}
+.courtCrown {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  width: 34px;
+  height: 18px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, #ffe2a8, #f08a3c 60%, #8f2e12);
+  clip-path: polygon(
+    0 100%,
+    0 30%,
+    22% 60%,
+    34% 0,
+    50% 50%,
+    66% 0,
+    78% 60%,
+    100% 30%,
+    100% 100%
+  );
+  filter: drop-shadow(0 0 4px #000);
+}
+.node[data-status="locked"] .courtCrown {
+  background: #ffffff40;
+}
+.fleeing {
+  z-index: 1;
+  animation:
+    sphinxFury 1.4s ease-in-out both,
+    sphinxFlees 1.1s cubic-bezier(0.55, 0, 0.85, 0.35) 1.4s forwards;
+}
+@keyframes sphinxFury {
+  0%,
+  100% {
+    transform: scale(1.35) translateY(12%) rotate(0);
+    filter: drop-shadow(0 0 4px #f4dca6);
+  }
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: scale(1.4) translate(-5%, 11%) rotate(-5deg);
+    filter: drop-shadow(0 0 10px #ff5a2a) saturate(1.6);
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: scale(1.4) translate(5%, 13%) rotate(5deg);
+    filter: drop-shadow(0 0 14px #ff5a2a) saturate(1.8);
+  }
+}
+@keyframes sphinxFlees {
+  0% {
+    opacity: 1;
+    transform: scale(1.35) translateY(12%);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.4) translate(120%, -160%) rotate(25deg);
+  }
+}
+.fledMarker {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--cd-display);
+  font-size: 0.85rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #f4dca6;
+  background:
+    linear-gradient(115deg, transparent 47%, #f4dca6aa 48%, transparent 50%),
+    radial-gradient(circle at 50% 40%, #3a2f1c, #0a0806 72%);
+}
+.fledMarker[data-after] {
+  animation: fledAppears 0.6s ease-out 2.3s both;
+}
+@keyframes fledAppears {
+  from {
+    opacity: 0;
+    transform: scale(1.3);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fleeing {
+    display: none;
+  }
+  .fledMarker[data-after] {
+    animation: none;
+  }
+}

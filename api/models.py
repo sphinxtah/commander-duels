@@ -357,6 +357,9 @@ class GameTable(Base):
     # King's Table (v0.8.7, api/kings_table.py): the host's settings, which the game takes when it
     # starts ({deck_format, life, king_attacks_anyone}). Null in other formats.
     kings_table: Mapped[dict[str, object] | None] = mapped_column(JsonType)
+    # Ward 15 (v0.9.6): a table the campaign opened for its player's court with friends as their
+    # Generals ({campaign_id, encounter, user_id, challenge}). Null for every other table.
+    campaign: Mapped[dict[str, object] | None] = mapped_column(JsonType)
 
 
 class TableSeat(Base):
@@ -1909,6 +1912,11 @@ class CampaignProgress(Base):
     lessons: Mapped[list[str]] = mapped_column(JsonType, default=list)
     started_at: Mapped[datetime] = mapped_column(UtcDateTime())
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    # Ward 15 (v0.9.6): when The Sphinx fled ward 14 in this run, opening the court. Wards 14 and 15
+    # are one run: a lost court clears it (back to ward 14), a won one pays both. Apex Unbound's
+    # run keeps its own (challenge_fled_at).
+    fled_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    challenge_fled_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
 
 
 class CampaignGame(Base):
@@ -1946,6 +1954,10 @@ class CampaignGame(Base):
     # The Apex Unbound challenge (v0.9.3): the finale played again once the campaign is complete,
     # without hints, for its badge alone.
     challenge: Mapped[bool] = mapped_column(default=False, server_default=false())
+    # The player's seat (v0.9.6): 0 in a duel, King A's (1) at ward 15's court.
+    seat: Mapped[int] = mapped_column(SmallInteger, default=0, server_default=text("0"))
+    # The court's named bot seats (v0.9.6), {seat: [name, roster ID]}; null in a duel.
+    opponents: Mapped[dict[str, list[str]] | None] = mapped_column(JsonType)
     outcome: Mapped[str | None] = mapped_column(String(16))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
     finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime())

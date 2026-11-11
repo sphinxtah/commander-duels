@@ -37,7 +37,9 @@ import mage.game.GameException;
  * held back plays as a stand-in too. A list without {@code stand_ins} reads as before.
  *
  * <p>Since v0.8.0 a Commander list may name a {@code reserve}: one card and its threshold, the campaign
- * finale's incarnation, kept out of the deck and brought into the game by {@link CampaignReserve}.
+ * finale's incarnation, kept out of the deck and brought into the game by {@link CampaignReserve}. Since
+ * v0.9.6 its {@code mode} may be {@code court} (ward 15, a King's Table game with Commander decks): the card
+ * starts the game on the battlefield and comes back at its controller's upkeep, and takes no threshold.
  */
 final class DeckLists {
     static final int MAX_ENTRIES = 250;
@@ -52,7 +54,7 @@ final class DeckLists {
         "opening");
     /** At most an opening hand's worth of cards on top of a stacked library (v0.9.1). */
     static final int MAX_OPENING = 7;
-    private static final Set<String> RESERVE_FIELDS = Set.of("name", "threshold");
+    private static final Set<String> RESERVE_FIELDS = Set.of("name", "threshold", "mode");
     /** A reserve card's threshold: the life at or below which it first crosses (v0.8.0). */
     static final int MAX_THRESHOLD = 999;
     private static final Set<String> ENTRY_FIELDS = Set.of("name", "count");
@@ -65,8 +67,15 @@ final class DeckLists {
 
     record Entry(String name, int count) {}
 
-    /** A campaign finale's incarnation (v0.8.0): its card, and the life at which it first crosses. */
-    record Reserve(String name, int threshold) {}
+    /**
+     * A campaign finale's incarnation (v0.8.0): its card, and the life at which it first crosses; or since
+     * v0.9.6 the court's ({@code court}): on the battlefield from the start, back at each upkeep it is not.
+     */
+    record Reserve(String name, int threshold, boolean court) {
+        Reserve(String name, int threshold) {
+            this(name, threshold, false);
+        }
+    }
 
     /**
      * A deck as named in a request, before resolution; the sideboard is Legacy's only. Since v0.6.2
@@ -171,7 +180,7 @@ final class DeckLists {
             : Map.of();
         List<Reserve> reserve = List.of();
         if (json.has("reserve")) {
-            if (format != GameFormat.COMMANDER) {
+            if (!format.commanderDecks()) {
                 throw new JsonRequest.Invalid("only Commander deck lists have a reserve");
             }
             reserve = reserve(json.get("reserve"));
@@ -223,13 +232,21 @@ final class DeckLists {
             JsonObject card = item.getAsJsonObject();
             JsonRequest.onlyFields(card, RESERVE_FIELDS, "seats[].deck_list.reserve[].");
             String name = JsonRequest.string(card, "name", MAX_NAME).strip();
+            String mode = card.has("mode") ? JsonRequest.string(card, "mode", 16) : "threshold";
+            if (!mode.equals("threshold") && !mode.equals("court")) {
+                throw new JsonRequest.Invalid("a reserve card's mode is threshold or court");
+            }
+            boolean court = mode.equals("court");
+            if (court && card.has("threshold")) {
+                throw new JsonRequest.Invalid("the court's reserve card takes no threshold");
+            }
             BigDecimal threshold = card.has("threshold") ? JsonRequest.integer(card, "threshold")
                 : BigDecimal.valueOf(15);
             if (name.isEmpty() || threshold.signum() <= 0
                 || threshold.compareTo(BigDecimal.valueOf(MAX_THRESHOLD)) > 0) {
                 throw new JsonRequest.Invalid("a reserve card needs a name and a threshold from 1 to " + MAX_THRESHOLD);
             }
-            found.add(new Reserve(name, threshold.intValueExact()));
+            found.add(new Reserve(name, threshold.intValueExact(), court));
         }
         return found;
     }

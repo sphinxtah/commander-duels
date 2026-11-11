@@ -44,6 +44,12 @@
 - **Finding a table** (v0.9.2). The lobby's cards come a page at a time (20, 50 or 100), newest
   first with your own table leading, filtered by format, rules (casual or tournament), open seats,
   no bots, best of three, and friends' tables: those a friend sits at or you were invited to.
+- **The campaign's court** (v0.9.6). Ward 15 with friends as the player's Generals is a private
+  King's Table table the campaign opens (api/campaign.py open_court): the player is its host,
+  seated as King A, the court's three seats are bots, and the player's Generals' seats wait for
+  the friends invited. Its settings and the court's seats are fixed; the host may still give an
+  open General's seat to a bot. Its start serves team B the court's decks, and its game is the
+  campaign's: its end is read as the court's, and counts nothing else for anyone.
 - **Invitations** (v0.9.2). The host invites friends when opening a table, and any of its players
   invites more from its page: each friend gets a notice in the bell that leads to the table, and
   sees it in the lobby even when it is private. No seat is held; inviting a friend again sends
@@ -52,6 +58,7 @@
 
 import random
 import secrets
+from collections.abc import Callable
 from contextlib import AsyncExitStack
 from datetime import datetime, timedelta
 from typing import Annotated, Literal, cast
@@ -339,6 +346,11 @@ class TableView(Contract):
         default=None,
         description="Since v0.9.2, in the lobby's pages: who invited you to the table, if anyone.",
     )
+    campaign: str | None = Field(
+        default=None,
+        description="Since v0.9.6: the campaign encounter's title when the campaign opened the "
+        "table (ward 15's court); null for every other table.",
+    )
 
 
 RulesFilter = Literal["casual", "tournament"]
@@ -542,19 +554,22 @@ def view_of(db: Session, table: GameTable, principal: Principal) -> TableView:
     deck = db.get(Deck, mine.deck_id) if mine is not None else None
     bots = bot_seats_of(table)
     kings = kings_of(table)
+    # The campaign's court (v0.9.6): team B's bots by name and portrait.
+    named = campaign_names(table)
     players: list[TablePlayer] = []
     for index in range(table.seats):
         row = by_seat.get(index)
         role = kings_table.role_of(index) if kings else None
         life = kings_table.starting_life(kings, index) if kings else None
         if index in bots:
+            name, portrait = named.get(index, (None, None))
             players.append(
                 TablePlayer(
                     seat=index,
                     player="bot",
                     taken=True,
-                    handle=None,
-                    portrait=None,
+                    handle=name,
+                    portrait=portrait,
                     host=False,
                     ready=True,
                     you=False,
@@ -607,7 +622,82 @@ def view_of(db: Session, table: GameTable, principal: Principal) -> TableView:
         game_id=table.game_id if mine is not None or full_access(principal) else None,
         created_at=table.created_at,
         open_seats=sum(1 for player in players if player.player == "human" and not player.taken),
+        campaign=str(table.campaign.get("title")) if table.campaign else None,
     )
+
+
+def campaign_names(table: GameTable) -> dict[int, tuple[str, str]]:
+    """The court's named bot seats (v0.9.6), as the campaign recorded them on its table."""
+    found = (table.campaign or {}).get("opponents")
+    if not isinstance(found, dict):
+        return {}
+    return {
+        int(seat): (str(pair[0]), str(pair[1]))
+        for seat, pair in found.items()
+        if isinstance(pair, list) and len(pair) == 2
+    }
+
+
+def open_campaign_table(
+    db: Session,
+    request: Request,
+    principal: Principal,
+    deck_id: UUID,
+    friends: list[UUID],
+    campaign: dict[str, object],
+    host_seat: int,
+    bot_seats: list[int],
+    settings: dict[str, object],
+    skill: int,
+    turn_cap: int,
+) -> TableView:
+    """The table the campaign opens for ward 15 with friends (v0.9.6, api/campaign.py): private,
+    King's Table under the court's settings, its host seated as King A with one of their decks,
+    the bots in the seats given, and the friends invited to the rest. Casual rules."""
+    invitees = friends_to_invite(db, principal.user, friends)
+    kings = kings_table.config_of(settings)
+    rules = casual()
+    revision = check_deck(
+        db, request, principal.user, principal.permissions, deck_id, KINGS, rules, kings
+    )
+    may_sit(db, request, principal)
+    now = utcnow()
+    seats = kings_bot_seats(bot_seats, {host_seat})
+    table = GameTable(
+        code=secrets.token_urlsafe(12),
+        host_id=principal.user.id,
+        format=KINGS,
+        visibility="private",
+        seats=kings_table.SEATS,
+        bots=len(seats),
+        bot_seats=seats,
+        kings_table=kings_table.engine_settings(kings),
+        bot_skill=skill,
+        turn_cap=turn_cap,
+        allow_banned=rules.banned,
+        allow_not_legal=rules.not_legal,
+        allow_stand_in=rules.stand_in,
+        best_of=1,
+        status="open",
+        created_at=now,
+        campaign={**campaign, "player_seat": host_seat},
+    )
+    db.add(table)
+    db.flush()
+    db.add(
+        TableSeat(
+            table_id=table.id,
+            seat=host_seat,
+            user_id=principal.user.id,
+            deck_id=deck_id,
+            deck_revision_id=revision,
+            ready=True,
+            joined_at=now,
+        )
+    )
+    invite(db, table, principal.user, invitees, now)
+    db.commit()
+    return view_of(db, table, principal)
 
 
 def check_deck(
@@ -1213,6 +1303,17 @@ def change_table(code: Code, body: TableChange, principal: Player, db: Db) -> Ta
         raise ApiError(409, "table_closed", "This table is no longer open.")
     if table.format != KINGS:
         raise ApiError(422, "invalid_table", "Only King's Table tables have settings to change.")
+    court = set(campaign_names(table))
+    if table.campaign and (
+        body.kings_table is not None
+        or body.move is not None
+        or (body.bot_seats is not None and not court <= set(body.bot_seats))
+    ):
+        raise ApiError(
+            409,
+            "campaign_table",
+            "The court's settings and seats are the campaign's; only your Generals' seats change.",
+        )
     rows = seats_of(db, table)
     changed = False
     if body.kings_table is not None:
@@ -1490,9 +1591,11 @@ def record_table_game(
     created: dict[str, object],
     plans: list[SeatPlan],
     users: list[UUID | None],
+    link: Callable[[Session, Game], None] | None = None,
 ) -> Game:
     """The table's game and its seats, and the table as started, in one transaction. The seats
-    must be as they were when the game was planned."""
+    must be as they were when the game was planned. Since v0.9.6 the campaign's court links its
+    game to the campaign in that transaction (link)."""
     table = db.scalar(select(GameTable).where(GameTable.id == table_id).with_for_update())
     assert table is not None
     seated = {row.seat: row.user_id for row in seats_of(db, table)}
@@ -1501,6 +1604,8 @@ def record_table_game(
     }:
         raise ApiError(409, "table_changed", "A player left as the game started. Try again.")
     game = add_table_game(db, table, created, plans, users)
+    if link is not None:
+        link(db, game)
     db.commit()
     return game
 
@@ -1582,14 +1687,23 @@ async def start_table(code: Code, request: Request, principal: Player, db: Db) -
                 await stack.enter_async_context(hub.locks[user_id])
             await run_in_threadpool(under_limits, db, request, players)
             await require_loaded(request, plans)
+            link: Callable[[Session, Game], None] | None = None
+            if table.campaign:
+                # The campaign's court (v0.9.6): team B's decks, and the game the campaign's.
+                # Imported here: api.campaign imports this module.
+                from api import campaign
+
+                plans, body, link = await campaign.court_table(
+                    request, engine, db, table, plans, users
+                )
+            else:
+                body = engine_body(table, [plan.engine for plan in plans])
             hub.reserve()
             try:
-                created = await engine_game(
-                    engine, engine_body(table, [plan.engine for plan in plans]), request
-                )
+                created = await engine_game(engine, body, request)
                 async with followed_or_closed(hub, created, db):
                     game = await run_in_threadpool(
-                        record_table_game, db, table.id, created, plans, users
+                        record_table_game, db, table.id, created, plans, users, link
                     )
                     tokens = seat_tokens(created)
                     hub.register(

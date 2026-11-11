@@ -42,13 +42,16 @@ const WARDENS: Partial<Record<Speaker, { name: string; portrait: string }>> = {
 export function finaleScene(sceneId: string): boolean {
   return (
     sceneId.startsWith("FC.E14") ||
+    sceneId.startsWith("FC.E15") ||
     sceneId.startsWith("FC.END") ||
     sceneId === "FC.ALLIANCE.SPHINX"
   );
 }
 
-/** Liliana stands with the player once her seal is won: from her victory scene on. */
+/** Liliana stands with the player once her seal is won: from her victory scene on, except while
+ * The Sphinx holds her to his court (v0.9.6: his flight from ward 14 and ward 15 itself). */
 function lilianaAllied(sceneId: string): boolean {
+  if (sceneId === "FC.E14.FLIGHT" || sceneId.startsWith("FC.E15")) return false;
   return (
     sceneId === "FC.E13.POST" || finaleScene(sceneId) || sceneId === "FC.REPLAY"
   );

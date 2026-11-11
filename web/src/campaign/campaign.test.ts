@@ -14,7 +14,7 @@ import {
   observe,
   remember,
 } from "./barks";
-import { stepsAfterWin } from "./campaign";
+import { stepsAfterWin, type CampaignEncounter } from "./campaign";
 import { castOf, finaleScene } from "./cast";
 import { STORY, type Scene } from "./script";
 import {
@@ -53,9 +53,18 @@ function allScenes(): Scene[] {
 }
 
 describe("the script", () => {
-  it("holds fourteen encounters, each with its scenes, and unique line keys", () => {
+  it("holds fifteen encounters, each with its scenes, and unique line keys", () => {
     const numbers = Object.keys(STORY.encounters).map(Number);
-    expect(numbers).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
+    expect(numbers).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+    ]);
+    // The court (v0.9.6): its King's seat, its loss back to the throne, three speakers' barks.
+    const court = STORY.encounters[15];
+    expect(court?.bossSeat).toBe(4);
+    expect(court?.loss?.lines.length).toBeGreaterThan(0);
+    expect(new Set(court?.barks?.map((bark) => bark.speaker))).toEqual(
+      new Set(["SPHINX", "BOLAS", "LILIANA", "KAYA"]),
+    );
     for (const story of Object.values(STORY.encounters)) {
       expect(story.pre.lines.length).toBeGreaterThan(0);
       if (story.number < 14) {
@@ -73,6 +82,11 @@ describe("the script", () => {
       ...STORY.finale.recast,
       STORY.finale.countered,
       ...STORY.finale.escalation,
+      ...STORY.flight.lines,
+      ...STORY.court.arrival,
+      ...STORY.court.removed,
+      ...STORY.court.returned,
+      ...STORY.court.post.lines,
       ...STORY.tutorialHelp,
       ...Object.values(STORY.encounters).flatMap((story) => story.barks ?? []),
     ];
@@ -264,9 +278,16 @@ describe("after a win", () => {
         tokens: 1000,
         deck: "Tibalt's Deck",
         commander: "Judith, the Scourge Diva",
+        decks: [
+          {
+            title: "Tibalt's Deck",
+            commander: "Judith, the Scourge Diva",
+            opponent: "tibalt",
+          },
+        ],
         earned: true,
       },
-    } as const;
+    } as unknown as CampaignEncounter;
     const state = { chapters: [], encounters: [encounter] } as never;
     const steps = stepsAfterWin(state, encounter);
     expect(steps.map((step) => step.kind)).toEqual(["seal", "spoils"]);
@@ -378,6 +399,29 @@ describe("barks", () => {
     // A planeswalker before the threshold is no incarnation.
     const early = observe(view([walker], player(0, 40), player(1, 30)), log, 0);
     expect(incarnation(before, early, FRESH_MEMORY)).toBe(null);
+  });
+
+  it("read the court's King by his seat, his incarnation there from the start (v0.9.6)", () => {
+    const walker = permanent("walker", 4, "Legendary Planeswalker — Sphinx", {
+      counters: { loyalty: 7 },
+    });
+    const court = (battlefield: PermanentView[], life: number) =>
+      view(battlefield, player(1, 40), player(3, 40), {
+        seat: 1,
+        opponents: [player(3, 40), player(4, life), player(5, 40)],
+      });
+    const first = observe(court([walker], 40), log, 0, 4);
+    expect(first.bossSeat).toBe(4);
+    // At 40 life, from the first view: the court's arrival, not the duel's crossing.
+    expect(incarnation(null, first, FRESH_MEMORY, true)).toBe("arrived");
+    expect(incarnation(null, first, FRESH_MEMORY)).toBe(null);
+    const arrived = { ...FRESH_MEMORY, arrived: true };
+    const gone = observe(court([], 38), log, 0, 4);
+    expect(incarnation(first, gone, arrived, true)).toBe("removed");
+    const back = observe(court([walker], 38), log, 0, 4);
+    expect(incarnation(gone, back, { ...arrived, removed: true }, true)).toBe(
+      "returned",
+    );
   });
 });
 

@@ -1626,7 +1626,7 @@
             "type": "integer"
           },
           "version": {
-            "default": "0.9.5",
+            "default": "0.9.6",
             "title": "Version",
             "type": "string"
           }
@@ -1686,6 +1686,11 @@
         "additionalProperties": false,
         "description": "The Apex Unbound challenge (v0.9.3).",
         "properties": {
+          "at": {
+            "description": "The encounter the challenge stands at: since v0.9.6 wards 14 and 15 as one run, so 15 once The Sphinx fled 14 in it.",
+            "title": "At",
+            "type": "integer"
+          },
           "earned": {
             "description": "Its badge is yours.",
             "title": "Earned",
@@ -1704,7 +1709,8 @@
         "required": [
           "name",
           "open",
-          "earned"
+          "earned",
+          "at"
         ],
         "title": "CampaignChallenge",
         "type": "object"
@@ -1772,6 +1778,17 @@
             "description": "The opponent's commander; null for the finale's, which is the owner's own.",
             "title": "Commander"
           },
+          "court": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CourtView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Ward 15 (v0.9.6): the court's seats; null for a duel."
+          },
           "location": {
             "title": "Location",
             "type": "string"
@@ -1803,10 +1820,12 @@
             "description": "What the first win gives: the warden's deck and tokens."
           },
           "status": {
+            "description": "Since v0.9.6 ward 14 is fled once The Sphinx fled it in this run, until the court is won (then won) or lost (then open again).",
             "enum": [
               "locked",
               "open",
-              "won"
+              "won",
+              "fled"
             ],
             "title": "Status",
             "type": "string"
@@ -2021,6 +2040,12 @@
             ],
             "description": "How the duel ended for you, once its end is recorded.",
             "title": "Outcome"
+          },
+          "seat": {
+            "default": 0,
+            "description": "Your seat (v0.9.6): 0 in a duel, King A's (1) at ward 15's court. Only the campaign's own player sees the reference; friends at the court see a table's game.",
+            "title": "Seat",
+            "type": "integer"
           },
           "title": {
             "description": "The encounter's title.",
@@ -3776,6 +3801,128 @@
         "title": "CosmeticsChange",
         "type": "object"
       },
+      "CourtSeat": {
+        "additionalProperties": false,
+        "properties": {
+          "commander": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for The Sphinx's, the owner's own.",
+            "title": "Commander"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "opponent": {
+            "description": "The roster ID naming their portrait.",
+            "title": "Opponent",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "king",
+              "general"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "seat": {
+            "title": "Seat",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seat",
+          "opponent",
+          "name",
+          "role",
+          "commander"
+        ],
+        "title": "CourtSeat",
+        "type": "object"
+      },
+      "CourtStart": {
+        "additionalProperties": false,
+        "description": "Ward 15 with friends as your Generals (v0.9.6): a private King's Table table the campaign\nopens, you as King A with one of your Commander decks.",
+        "properties": {
+          "challenge": {
+            "default": false,
+            "description": "Apex Unbound's court (v0.9.6).",
+            "title": "Challenge",
+            "type": "boolean"
+          },
+          "deck_id": {
+            "description": "One of your Commander decks.",
+            "format": "uuid",
+            "title": "Deck Id",
+            "type": "string"
+          },
+          "friends": {
+            "description": "One or two friends, invited as your Generals.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Friends",
+            "type": "array"
+          }
+        },
+        "required": [
+          "deck_id",
+          "friends"
+        ],
+        "title": "CourtStart",
+        "type": "object"
+      },
+      "CourtView": {
+        "additionalProperties": false,
+        "description": "Ward 15, The Unbound Court (v0.9.6): a King's Table game against The Sphinx's court.",
+        "properties": {
+          "ally_seats": {
+            "description": "Your Generals' seats: friends or bots.",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Ally Seats",
+            "type": "array"
+          },
+          "helper_tokens": {
+            "description": "What a friend who helps win it is paid, once.",
+            "title": "Helper Tokens",
+            "type": "integer"
+          },
+          "opponents": {
+            "description": "Team B: The Sphinx as King, two Generals.",
+            "items": {
+              "$ref": "#/components/schemas/CourtSeat"
+            },
+            "title": "Opponents",
+            "type": "array"
+          },
+          "player_seat": {
+            "description": "Your seat: King A's.",
+            "title": "Player Seat",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "player_seat",
+          "ally_seats",
+          "opponents",
+          "helper_tokens"
+        ],
+        "title": "CourtView",
+        "type": "object"
+      },
       "Coverage": {
         "additionalProperties": false,
         "description": "How many cards of each format the engine can play, and why the rest cannot (CAT07).",
@@ -5194,9 +5341,17 @@
             "type": "string"
           },
           "deck": {
-            "description": "The title of the deck the first win gives.",
+            "description": "The title of the deck the first win gives (the first of them).",
             "title": "Deck",
             "type": "string"
+          },
+          "decks": {
+            "description": "Every deck the first win gives: one for a warden, two at the court (v0.9.6).",
+            "items": {
+              "$ref": "#/components/schemas/SpoilsDeck"
+            },
+            "title": "Decks",
+            "type": "array"
           },
           "earned": {
             "title": "Earned",
@@ -5212,6 +5367,7 @@
           "tokens",
           "deck",
           "commander",
+          "decks",
           "earned"
         ],
         "title": "EncounterSpoils",
@@ -6309,7 +6465,7 @@
             "type": "string"
           },
           "version": {
-            "default": "0.9.5",
+            "default": "0.9.6",
             "title": "Version",
             "type": "string"
           }
@@ -12831,6 +12987,31 @@
         "title": "Sleeves",
         "type": "object"
       },
+      "SpoilsDeck": {
+        "additionalProperties": false,
+        "properties": {
+          "commander": {
+            "title": "Commander",
+            "type": "string"
+          },
+          "opponent": {
+            "description": "Whose deck it is: their roster ID, naming their portrait.",
+            "title": "Opponent",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "commander",
+          "opponent"
+        ],
+        "title": "SpoilsDeck",
+        "type": "object"
+      },
       "StartEncounter": {
         "additionalProperties": false,
         "properties": {
@@ -13794,6 +13975,18 @@
           "bots": {
             "title": "Bots",
             "type": "integer"
+          },
+          "campaign": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Since v0.9.6: the campaign encounter's title when the campaign opened the table (ward 15's court); null for every other table.",
+            "title": "Campaign"
           },
           "can_start": {
             "description": "You host it, every player's seat is taken and ready.",
@@ -15066,7 +15259,7 @@
   },
   "info": {
     "title": "Commander Duels",
-    "version": "0.9.5"
+    "version": "0.9.6"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -22753,9 +22946,129 @@
         "summary": "Get Campaign"
       }
     },
+    "/api/v1/campaign/encounters/{number}/court": {
+      "post": {
+        "description": "Ward 15 with friends as your Generals (v0.9.6): opens a private King's Table table for the\ncourt, you seated as King A with one of your Commander decks, and invites the friends named.\nTeam B's three seats are the court's bots; your Generals' seats wait for the friends, and\nthose not taken when you start are played by bots. The table starts as any other, from its\npage; its game is the campaign's, and its end is read as the court's.",
+        "operationId": "open_court_api_v1_campaign_encounters__number__court_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "title": "Number",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CourtStart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Open Court"
+      }
+    },
     "/api/v1/campaign/encounters/{number}/start": {
       "post": {
-        "description": "Starts an encounter's duel: you in seat 0, with your deck or the loaner, against the\nencounter's opponent. An encounter opens once the one before it is won; one won may be played\nagain, for no new reward.",
+        "description": "Starts an encounter's duel: you in seat 0, with your deck or the loaner, against the\nencounter's opponent. An encounter opens once the one before it is won; one won may be played\nagain, for no new reward. Since v0.9.6 ward 15, the court, starts here with bots as your two\nGenerals: a King's Table game, you as King A (with friends instead: the court route).",
         "operationId": "start_encounter_api_v1_campaign_encounters__number__start_post",
         "parameters": [
           {

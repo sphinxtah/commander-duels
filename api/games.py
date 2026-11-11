@@ -1404,9 +1404,22 @@ def summary_of(
         db, [(row.seat, row.user_id, row.deck_revision_id) for row in rows], campaign
     )
     your_seat = next((row.seat for row in rows if row.user_id == principal.user.id), None)
-    # A campaign duel (v0.8.0): the bot is the encounter's opponent, by name and portrait.
+    # A campaign duel (v0.8.0): the bot is the encounter's opponent, by name and portrait; at the
+    # court (v0.9.6) each of team B's bots is named, and the player's bot Generals are not.
     link = db.get(CampaignGame, game.id)
-    opponent = (link.opponent_name, link.opponent) if link is not None else None
+    named: dict[int, tuple[str, str]] = {}
+    if link is not None and link.opponents:
+        named = {
+            int(seat): (str(pair[0]), str(pair[1]))
+            for seat, pair in link.opponents.items()
+            if isinstance(pair, list) and len(pair) == 2
+        }
+    elif link is not None:
+        named = {
+            row.seat: (link.opponent_name, link.opponent) for row in rows if row.player == "bot"
+        }
+    # The campaign's own reference is its player's: friends at the court see a table's game.
+    yours = link is not None and link.user_id == principal.user.id
     # King's Table (v0.8.7): the settings it started with, and each seat's team, role and life.
     kings = kings_table.config_of(game.kings_table) if game.format == kings_table.FORMAT else None
     return GameSummary(
@@ -1421,15 +1434,15 @@ def summary_of(
                 handle=(
                     handles.get(row.user_id)
                     if row.user_id
-                    else opponent[0]
-                    if opponent and row.player == "bot"
+                    else named[row.seat][0]
+                    if row.seat in named
                     else None
                 ),
                 portrait=(
                     alliances.get(row.user_id)
                     if row.user_id
-                    else opponent[1]
-                    if opponent and row.player == "bot"
+                    else named[row.seat][1]
+                    if row.seat in named
                     else None
                 ),
                 deck=row.deck if everything or row.user_id == principal.user.id else None,
@@ -1473,8 +1486,9 @@ def summary_of(
                 finale=link.finale,  # type: ignore[arg-type]
                 outcome=link.outcome,  # type: ignore[arg-type]
                 challenge=link.challenge,
+                seat=link.seat,
             )
-            if link is not None
+            if link is not None and yours
             else None
         ),
     )

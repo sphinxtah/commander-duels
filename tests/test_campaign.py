@@ -110,6 +110,19 @@ def put(account: Account, path: str, body: object) -> httpx.Response:
     return account.http.put(path, json=body, headers=headers)
 
 
+def without_court(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The campaign as it was before v0.9.6, its duel the last: for the finale's own rules, which
+    the court (tests/test_campaign_court.py) leaves as they were."""
+    real = campaign.campaign_in("content")
+    assert real is not None
+    duel = dataclasses.replace(
+        real,
+        encounters=tuple(e for e in real.encounters if e.court is None),
+        chapters=tuple(c for c in real.chapters if 15 not in c.encounters),
+    )
+    monkeypatch.setattr(campaign, "campaign_in", lambda folder: duel)
+
+
 def unlock(app: FastAPI, account: Account, number: int) -> None:
     with Session(app.state.database) as db:
         db.execute(
@@ -124,15 +137,32 @@ def test_the_campaign_opens_at_its_first_encounter(client: TestClient) -> None:
     ada = Account(client, "ada")
     opened = state(ada)
     assert opened["id"] == "final_concordance_v1"
-    assert [e["number"] for e in opened["encounters"]] == list(range(1, 15))
+    assert [e["number"] for e in opened["encounters"]] == list(range(1, 16))
     assert [e["status"] for e in opened["encounters"]][:3] == ["open", "locked", "locked"]
     assert opened["encounters"][0]["opponent"] == "tibalt"
     assert opened["encounters"][13]["opponent"] == "the-sphinx"
     # The finale's commander is the owner's own and is never named here.
     assert opened["encounters"][13]["commander"] is None
     tiers = [chapter["tier"] for chapter in opened["chapters"]]
-    assert tiers == ["bronze", "silver", "gold", "platinum", "mythic", "godlike"]
-    assert [len(chapter["encounters"]) for chapter in opened["chapters"]] == [4, 4, 2, 2, 1, 1]
+    assert tiers == ["bronze", "silver", "gold", "platinum", "mythic", "godlike", "godlike"]
+    assert [len(chapter["encounters"]) for chapter in opened["chapters"]] == [4, 4, 2, 2, 1, 1, 1]
+    # Ward 15 (v0.9.6): the court, a King's Table game against The Sphinx and his two Generals.
+    court = opened["encounters"][14]
+    assert (court["title"], court["opponent"], court["status"]) == (
+        "The Unbound Court",
+        "the-sphinx",
+        "locked",
+    )
+    assert court["court"]["player_seat"] == 1 and court["court"]["ally_seats"] == [0, 2]
+    assert [(seat["seat"], seat["name"], seat["role"]) for seat in court["court"]["opponents"]] == [
+        (3, "Nicol Bolas", "general"),
+        (4, "The Sphinx", "king"),
+        (5, "Liliana", "general"),
+    ]
+    assert [deck["title"] for deck in court["spoils"]["decks"]] == [
+        "Nicol Bolas's Gift",
+        "Liliana's Gift",
+    ]
     assert opened["progress"]["highest_unlocked"] == 1
     assert opened["progress"]["tutorial"] == {
         "complete": False,
@@ -161,6 +191,7 @@ def test_a_won_duel_opens_the_next_encounter_once(
         "finale": None,
         "outcome": None,
         "challenge": False,
+        "seat": 0,
     }
     # The bot is the encounter's opponent, by name and portrait, playing its own deck.
     bot = summary["seats"][1]
@@ -223,12 +254,19 @@ def test_a_wardens_first_defeat_gives_their_deck_and_tokens(
         "tokens": 1000,
         "deck": "Tibalt's Deck",
         "commander": "Karlach, Fury of Avernus",
+        "decks": [
+            {
+                "title": "Tibalt's Deck",
+                "commander": "Karlach, Fury of Avernus",
+                "opponent": "tibalt",
+            }
+        ],
         "earned": False,
     }
     # 1,000 tokens for the first warden, doubling with each: 8,192,000 for The Sphinx, whose deck
-    # comes with the commander he plays.
+    # comes with the commander he plays, and since v0.9.6 16,384,000 for his court.
     amounts = [encounter["spoils"]["tokens"] for encounter in state(ada)["encounters"]]
-    assert amounts == [1000 * 2**index for index in range(14)]
+    assert amounts == [1000 * 2**index for index in range(15)]
     # Before the engine is asked, the finale's commander by the story's word.
     assert state(ada)["encounters"][13]["spoils"]["commander"] == "The High Priest"
 
@@ -445,9 +483,12 @@ class FinaleEngine(FakeEngine):
         return await super().__call__(request)
 
 
-def test_the_finale_takes_the_owners_content_from_the_engine(database: str) -> None:
+def test_the_finale_takes_the_owners_content_from_the_engine(
+    database: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from api.identity import utcnow
 
+    without_court(monkeypatch)
     engine = FinaleEngine()
     with connect(build(database, engine)) as client:
         app: FastAPI = client.app  # type: ignore[assignment]
@@ -493,6 +534,13 @@ def test_the_finale_takes_the_owners_content_from_the_engine(database: str) -> N
             "tokens": 8192000,
             "deck": "The Sphinx's Deck",
             "commander": "The High Priest",
+            "decks": [
+                {
+                    "title": "The Sphinx's Deck",
+                    "commander": "The High Priest",
+                    "opponent": "the-sphinx",
+                }
+            ],
             "earned": True,
         }
         with Session(app.state.database) as db:
@@ -543,10 +591,11 @@ class FinaleListEngine(FakeEngine):
 
 
 def test_the_finales_spoils_wait_for_its_commander_and_give_the_deck_served(
-    database: str, tmp_path: Path
+    database: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from api.identity import utcnow
 
+    without_court(monkeypatch)
     import_bulk(create_engine(database), tmp_path / "files", bulk(), engine_list())
     engine = FinaleListEngine()
     with connect(build(database, engine)) as client:
@@ -634,27 +683,35 @@ def test_scenes_and_the_tutorial_are_remembered(client: TestClient) -> None:
     assert put(ada, "/api/v1/campaign/tutorial", {"lessons": ["T13"]}).status_code == 422
 
 
-def test_the_content_holds_fourteen_complete_decks() -> None:
+def test_the_content_holds_fifteen_wards_of_complete_decks() -> None:
     text = CONTENT.read_text(encoding="utf-8")
     content = json.loads(text)
     # The finale names no commander of its own here: the owner's engine serves it, else the
     # public stand-in plays.
-    finale = content["encounters"][-1]
+    finale = content["encounters"][13]
     assert finale["commander"] is None and finale["private"] == "campaign-finale"
     assert finale["fallback_commander"] == "Morophon, the Boundless"
     loaded = campaign.campaign_in("content")
-    assert loaded is not None and len(loaded.encounters) == 14
-    for encounter in content["encounters"]:
-        cards = encounter["cards"]
-        assert sum(card["count"] for card in cards) == 99, encounter["name"]
+    assert loaded is not None and len(loaded.encounters) == 15
+    # The court (v0.9.6): The Sphinx keeps his deck, and gifts two more, one per General.
+    court = loaded.encounter(15)
+    assert court.court is not None and court.cards == loaded.encounter(14).cards
+    assert (court.private, court.commander, court.tokens) == ("campaign-finale", None, 16384000)
+    assert (loaded.court, loaded.flight, loaded.last) == (15, 14, 15)
+    decks = [(e["name"], e["commander"], e["cards"]) for e in content["encounters"][:14]] + [
+        (g["name"], g["commander"], g["cards"])
+        for g in content["encounters"][14]["court"]["generals"]
+    ]
+    for name, commander, cards in decks:
+        assert sum(card["count"] for card in cards) == 99, name
         names = [card["name"] for card in cards]
-        assert len(names) == len(set(names)), encounter["name"]
+        assert len(names) == len(set(names)), name
         assert all(card["count"] == 1 for card in cards if card["name"] not in BASICS)
-        assert (encounter["commander"] is None) == (encounter["number"] == 14)
-        assert encounter["commander"] not in names
+        assert commander not in names
+    assert [e["commander"] is None for e in content["encounters"]].count(True) == 2
     assert sum(card["count"] for card in content["loaner"]["cards"]) == 99
     numbers = [n for chapter in content["chapters"] for n in chapter["encounters"]]
-    assert numbers == list(range(1, 15))
+    assert numbers == list(range(1, 16))
 
 
 def test_a_reset_starts_the_campaign_again(
@@ -705,14 +762,21 @@ def test_a_duel_won_with_passive_bots_moves_on_without_spoils(
 
 
 def test_apex_unbound_is_the_finale_again_for_its_badge_alone(
-    client: TestClient, app: FastAPI, engine: FakeEngine
+    client: TestClient, app: FastAPI, engine: FakeEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The handoff's post-campaign challenge (v0.9.3): once the finale is won, it may be played
     again as Apex Unbound, without hints, for a badge of its own, once; its win gives no seal,
-    spoils, tokens or chapter rewards a second time, and the badge shows on the profile."""
+    spoils, tokens or chapter rewards a second time, and the badge shows on the profile. (Since
+    v0.9.6 it is wards 14 and 15 as one run: tests/test_campaign_court.py.)"""
+    without_court(monkeypatch)
     ada = Account(client, "ada")
     eve = Account(client, "eve")
-    assert state(ada)["challenge"] == {"name": "Apex Unbound", "open": False, "earned": False}
+    assert state(ada)["challenge"] == {
+        "name": "Apex Unbound",
+        "open": False,
+        "earned": False,
+        "at": 14,
+    }
     unlock(app, ada, 14)
     locked = start(ada, 14, loaner=True, challenge=True)
     assert (locked.status_code, locked.json()["code"]) == (409, "challenge_locked")
@@ -720,7 +784,7 @@ def test_apex_unbound_is_the_finale_again_for_its_badge_alone(
     assert (elsewhere.status_code, elsewhere.json()["code"]) == (422, "invalid_seat")
     play(ada, engine, 14, won())
     opened = state(ada)
-    assert opened["challenge"] == {"name": "Apex Unbound", "open": True, "earned": False}
+    assert opened["challenge"] == {"name": "Apex Unbound", "open": True, "earned": False, "at": 14}
     with Session(app.state.database) as db:
         before = sorted(
             db.scalars(select(CampaignReward.reward).where(CampaignReward.user_id == ada.id))

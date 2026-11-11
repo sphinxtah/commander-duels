@@ -2,8 +2,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { client } from "../api";
 import { portraitUrl } from "../game/table/portrait";
 import { selectSound } from "../shell/menuSound";
+import { FriendPicker, useFriendList } from "../tables/InviteFriends";
 import {
   changeTutorial,
+  COURT,
+  openCourt,
   startEncounter,
   TIER_NAMES,
   type CampaignEncounter,
@@ -17,7 +20,8 @@ import styles from "./campaign.module.css";
 // training seed and the hints), the campaign's loaner deck, one of the player's own Commander
 // decks, or for the first encounter "I know how to play" (the teaching skipped, the duel kept);
 // Review my alliance leads to the profile. Kaya's advice for a duel lost before is the encounter's
-// counterplay.
+// counterplay. Since v0.9.6 ward 15, the court, is a King's Table game: the player is King A, and
+// their two Generals are bots, or one or two friends invited to a table the campaign opens.
 
 type OwnDeck = { id: string; title: string; commanders: string[] };
 
@@ -47,6 +51,9 @@ export function DuelSetup({
   const first = encounter.number === 1 && !challenge;
   const tutorial = state.progress.tutorial;
   const story = STORY.encounters[encounter.number];
+  const court = encounter.number === COURT ? encounter.court : null;
+  const [friends, setFriends] = useState<string[]>([]);
+  const friendList = useFriendList(Boolean(court) && canUseOwnDecks);
 
   useLayoutEffect(() => {
     const element = dialog.current;
@@ -97,6 +104,25 @@ export function DuelSetup({
     setError(started.error ?? "The duel could not start.");
   }
 
+  async function bringFriends() {
+    if (!chosen || friends.length === 0) return;
+    setBusy(true);
+    setError("");
+    selectSound();
+    const opened = await openCourt(
+      encounter.number,
+      chosen,
+      friends,
+      challenge,
+    );
+    if (opened.code) {
+      window.location.hash = `#tables/${opened.code}`;
+      return;
+    }
+    setBusy(false);
+    setError(opened.error ?? "The court could not open.");
+  }
+
   async function skipTeaching() {
     const next = await changeTutorial({ skip: true });
     if (next) onState(next);
@@ -104,6 +130,9 @@ export function DuelSetup({
 
   const opponentPortrait =
     encounter.number === 14 ? null : portraitUrl(encounter.opponent, 256);
+  const courtSpoils = encounter.spoils.decks
+    .map((deck) => deck.title)
+    .join(" and ");
 
   return (
     <dialog
@@ -131,9 +160,11 @@ export function DuelSetup({
           <span className={styles.kicker}>
             {challenge
               ? "The post-campaign challenge"
-              : encounter.number === 14
-                ? "The final duel"
-                : `Encounter ${String(encounter.number).padStart(2, "0")} · ${TIER_NAMES[encounter.tier]}`}
+              : court
+                ? "The court · King's Table"
+                : encounter.number === 14
+                  ? "The final duel"
+                  : `Encounter ${String(encounter.number).padStart(2, "0")} · ${TIER_NAMES[encounter.tier]}`}
           </span>
           <h2 id="duel-setup-title" className={styles.setupTitle}>
             {challenge ? state.challenge.name : encounter.title}
@@ -144,7 +175,18 @@ export function DuelSetup({
               ? `, commanding ${encounter.commander}`
               : ""}. {encounter.location}.
           </p>
-          {challenge ? (
+          {court && !challenge ? (
+            <p className={styles.spoilsLine}>
+              {encounter.spoils.earned ? "Won: " : "Win it for "}
+              <strong>{courtSpoils}</strong> and{" "}
+              <strong>
+                {encounter.spoils.tokens.toLocaleString("en-US")} tokens
+              </strong>
+              {encounter.spoils.earned
+                ? "."
+                : ", once, with the throne's own spoils if they still wait."}
+            </p>
+          ) : challenge ? (
             <p className={styles.spoilsLine}>
               {state.challenge.earned
                 ? "Its badge is yours already; play it again for the challenge alone."
@@ -191,7 +233,10 @@ export function DuelSetup({
           disabled={busy}
           onClick={() => void start({ kind: "loaner" })}
         >
-          <strong>Use the loaner: {state.loaner}</strong>
+          <strong>
+            Use the loaner: {state.loaner}
+            {court ? ", with bots as your Generals" : ""}
+          </strong>
           <span>
             A mono-white deck led by {state.loaner_commander}. It stays the
             campaign&rsquo;s and never touches your collection.
@@ -231,13 +276,41 @@ export function DuelSetup({
                   disabled={busy || !chosen}
                   onClick={() => void start({ kind: "own", deckId: chosen })}
                 >
-                  Duel with it
+                  {court ? "Play with bots as Generals" : "Duel with it"}
                 </button>
               </span>
             )}
           </div>
         )}
       </div>
+
+      {court && canUseOwnDecks && (
+        <div className={styles.choice}>
+          <strong>Bring friends as your Generals</strong>
+          <span>
+            One or two friends join you at a private table with their own
+            Commander decks; a General&rsquo;s seat nobody takes is a
+            bot&rsquo;s. Each friend who helps you win is paid{" "}
+            {court.helper_tokens.toLocaleString("en-US")} tokens, once. Uses the
+            deck chosen above.
+          </span>
+          <FriendPicker
+            friends={friendList.friends}
+            error={friendList.error}
+            selected={friends}
+            onChange={(next) => setFriends(next.slice(-2))}
+          />
+          <button
+            type="button"
+            className={styles.gold}
+            disabled={busy || !chosen || friends.length === 0}
+            onClick={() => void bringFriends()}
+          >
+            Open the court for {friends.length || "your"}{" "}
+            {friends.length === 1 ? "friend" : "friends"}
+          </button>
+        </div>
+      )}
 
       {first && !tutorial.skipped && (
         <p className={styles.quiet}>
@@ -256,6 +329,14 @@ export function DuelSetup({
           The Sphinx plays without restraint: acceleration, tutors and
           combinations can end the duel from the first turns. At 15 life or less
           he crosses into the duel himself.
+        </p>
+      )}
+      {court && (
+        <p className={styles.warning}>
+          The Sphinx is King B, with Nicol Bolas and Liliana as his Generals,
+          all at full strength. His incarnation starts on the battlefield and
+          returns at each of his upkeeps. Kings cannot attack; everyone starts
+          at 40 life. Lose the court and you return to the throne&rsquo;s ward.
         </p>
       )}
 

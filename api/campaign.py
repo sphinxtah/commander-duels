@@ -33,6 +33,7 @@ the owner's handoff is in the gitignored campaign/ folder beside compose.yaml.
 import json
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -46,12 +47,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from api import warden_openings
+from api import kings_table, tables, warden_openings
 from api.auth import INPUT_ERRORS
 from api.custom_play import custom_in_seats
 from api.decks import refresh_decks, store_draft
 from api.economy import reward as pay_reward
 from api.games import (
+    TABLE_IDLE_SECONDS,
     EngineClient,
     EngineUnavailable,
     LiveGame,
@@ -81,12 +83,14 @@ from api.models import (
     Deck,
     Game,
     GameSeat,
+    GameTable,
     User,
 )
 from api.progression import winning_seats
 from api.roster import load as load_roster
 from api.roster import roster_of
 from api.schemas import Contract, Error, GameSummary, PracticeGameRequest, casual
+from api.tables import TableView
 from api.validation import DeckEntry
 from catalog.text import normalize
 
@@ -113,6 +117,44 @@ Outcome = Literal["won", "lost", "draw", "unfinished"]
 
 
 @dataclass(frozen=True)
+class CourtGeneral:
+    """One of the court's two Generals B (v0.9.6): a warden recalled by The Sphinx, playing the deck
+    he gifted them. Its win gives that deck, as a warden's first defeat gives theirs."""
+
+    seat: int
+    opponent: str
+    name: str
+    deck_title: str
+    commander: str
+    cards: tuple[tuple[str, int], ...]
+
+    def deck_list(self) -> dict[str, object]:
+        return {
+            "cards": [{"name": name, "count": count} for name, count in self.cards],
+            "commanders": [self.commander],
+        }
+
+
+@dataclass(frozen=True)
+class Court:
+    """Ward 15, The Unbound Court (v0.9.6): a King's Table game. The player is King A, their two
+    Generals friends or bots; team B is The Sphinx as King with his two recalled Generals, every
+    one a bot at the encounter's skill."""
+
+    kings_table: dict[str, object]
+    player_seat: int
+    king_seat: int
+    generals: tuple[CourtGeneral, ...]
+    # Tokens a friend who helps win the court is paid, once per player and friend, ever.
+    helper_tokens: int
+
+    @property
+    def ally_seats(self) -> tuple[int, ...]:
+        """King A's Generals' seats: the player's friends or bots."""
+        return tuple(seat for seat in (0, 1, 2) if seat != self.player_seat)
+
+
+@dataclass(frozen=True)
 class Encounter:
     number: int
     opponent: str
@@ -132,6 +174,8 @@ class Encounter:
     tokens: int = 0
     # What the spoils call the private finale's commander, whose name this repository never holds.
     private_commander_title: str | None = None
+    # Ward 15 (v0.9.6): the court, a King's Table game, instead of a duel.
+    court: Court | None = None
 
     @property
     def prize_commander(self) -> str:
@@ -183,6 +227,18 @@ class Campaign:
     def last(self) -> int:
         return max(encounter.number for encounter in self.encounters)
 
+    @property
+    def court(self) -> int | None:
+        """The court's encounter (v0.9.6), ward 15, or None in content without one."""
+        return next((e.number for e in self.encounters if e.court is not None), None)
+
+    @property
+    def flight(self) -> int | None:
+        """The duel The Sphinx flees (v0.9.6), ward 14: the one before the court, played with it
+        as one run. None without a court."""
+        court = self.court
+        return court - 1 if court is not None else None
+
     def loaner_list(self, learn: bool = False) -> dict[str, object]:
         """The loaner as a deck list; with learn, its opening hand stacked: the training seven."""
         listed: dict[str, object] = {
@@ -196,6 +252,36 @@ class Campaign:
 
 def cards_of(entries: list[dict[str, Any]]) -> tuple[tuple[str, int], ...]:
     return tuple((str(entry["name"]), int(entry["count"])) for entry in entries)
+
+
+def court_of(raw: dict[str, Any] | None) -> Court | None:
+    if raw is None:
+        return None
+    return Court(
+        kings_table=dict(raw["kings_table"]),
+        player_seat=int(raw["player_seat"]),
+        king_seat=int(raw["king_seat"]),
+        generals=tuple(
+            CourtGeneral(
+                seat=int(general["seat"]),
+                opponent=general["opponent"],
+                name=general["name"],
+                deck_title=general["deck_title"],
+                commander=general["commander"],
+                cards=cards_of(general["cards"]),
+            )
+            for general in raw["generals"]
+        ),
+        helper_tokens=int(raw.get("helper_tokens", 0)),
+    )
+
+
+def encounter_cards(data: dict[str, Any], encounter: dict[str, Any]) -> tuple[tuple[str, int], ...]:
+    """An encounter's 99, or since v0.9.6 another's (cards_from): The Sphinx keeps his deck."""
+    source = encounter.get("cards_from")
+    if source is not None:
+        encounter = next(found for found in data["encounters"] if found["number"] == source)
+    return cards_of(encounter["cards"])
 
 
 @lru_cache(maxsize=4)
@@ -234,11 +320,12 @@ def campaign_in(folder: str) -> Campaign | None:
                 seal=encounter["seal"],
                 skill=int(encounter["skill"]),
                 commander=encounter.get("commander"),
-                cards=cards_of(encounter["cards"]),
+                cards=encounter_cards(data, encounter),
                 fallback_commander=encounter.get("fallback_commander"),
                 private=encounter.get("private"),
                 tokens=int(encounter.get("tokens", 0)),
                 private_commander_title=encounter.get("private_commander_title"),
+                court=court_of(encounter.get("court")),
             )
             for encounter in data["encounters"]
         ),
@@ -255,13 +342,39 @@ def campaign_of(request: Request) -> Campaign:
 # Contracts.
 
 
+class SpoilsDeck(Contract):
+    title: str
+    commander: str
+    opponent: str = Field(description="Whose deck it is: their roster ID, naming their portrait.")
+
+
 class EncounterSpoils(Contract):
     tokens: int = Field(description="Tokens the first win pays.")
-    deck: str = Field(description="The title of the deck the first win gives.")
+    deck: str = Field(description="The title of the deck the first win gives (the first of them).")
     commander: str = Field(
         description="That deck's commander; for the private finale's, what the story calls it."
     )
+    decks: list[SpoilsDeck] = Field(
+        description="Every deck the first win gives: one for a warden, two at the court (v0.9.6)."
+    )
     earned: bool
+
+
+class CourtSeat(Contract):
+    seat: int
+    opponent: str = Field(description="The roster ID naming their portrait.")
+    name: str
+    role: Literal["king", "general"]
+    commander: str | None = Field(description="Null for The Sphinx's, the owner's own.")
+
+
+class CourtView(Contract):
+    """Ward 15, The Unbound Court (v0.9.6): a King's Table game against The Sphinx's court."""
+
+    player_seat: int = Field(description="Your seat: King A's.")
+    ally_seats: list[int] = Field(description="Your Generals' seats: friends or bots.")
+    opponents: list[CourtSeat] = Field(description="Team B: The Sphinx as King, two Generals.")
+    helper_tokens: int = Field(description="What a friend who helps win it is paid, once.")
 
 
 class CampaignEncounter(Contract):
@@ -276,9 +389,15 @@ class CampaignEncounter(Contract):
         description="The opponent's commander; null for the finale's, which is the owner's own."
     )
     skill: int = Field(description="The bot's skill, 1 to 6.")
-    status: Literal["locked", "open", "won"]
+    status: Literal["locked", "open", "won", "fled"] = Field(
+        description="Since v0.9.6 ward 14 is fled once The Sphinx fled it in this run, until the "
+        "court is won (then won) or lost (then open again)."
+    )
     spoils: EncounterSpoils = Field(
         description="What the first win gives: the warden's deck and tokens."
+    )
+    court: CourtView | None = Field(
+        default=None, description="Ward 15 (v0.9.6): the court's seats; null for a duel."
     )
 
 
@@ -317,6 +436,10 @@ class CampaignChallenge(Contract):
     name: str
     open: bool = Field(description="The finale is won: the challenge may be taken.")
     earned: bool = Field(description="Its badge is yours.")
+    at: int = Field(
+        description="The encounter the challenge stands at: since v0.9.6 wards 14 and 15 as one "
+        "run, so 15 once The Sphinx fled 14 in it."
+    )
 
 
 class CampaignState(Contract):
@@ -344,6 +467,17 @@ class StartEncounter(Contract):
         description="The Apex Unbound challenge (v0.9.3): the finale again, once it is won, for "
         "its badge alone.",
     )
+
+
+class CourtStart(Contract):
+    """Ward 15 with friends as your Generals (v0.9.6): a private King's Table table the campaign
+    opens, you as King A with one of your Commander decks."""
+
+    deck_id: UUID = Field(description="One of your Commander decks.")
+    friends: list[UUID] = Field(
+        min_length=1, max_length=2, description="One or two friends, invited as your Generals."
+    )
+    challenge: bool = Field(default=False, description="Apex Unbound's court (v0.9.6).")
 
 
 class SceneSeen(Contract):
@@ -402,9 +536,29 @@ def progress_of(
         progress.hints = True
         progress.tutorial_skipped = False
         progress.lessons = []
+        progress.fled_at = None
+        progress.challenge_fled_at = None
         progress.started_at = now
         progress.updated_at = now
     return progress
+
+
+def unlocked(progress: CampaignProgress, campaign: Campaign) -> int:
+    """The furthest encounter open: since v0.9.6 the court too for an account that won ward 14
+    before it existed (it opens directly, the one exception to the run), or whose Sphinx fled."""
+    highest = progress.highest_unlocked
+    court, flight = campaign.court, campaign.flight
+    if court is not None and (flight in progress.completed or progress.fled_at is not None):
+        highest = max(highest, court)
+    return min(highest, campaign.last)
+
+
+def challenge_at(progress: CampaignProgress, campaign: Campaign) -> int:
+    """Where Apex Unbound stands: the court once The Sphinx fled ward 14 in the challenge's run,
+    else the duel (ward 14; the last encounter in content without a court)."""
+    if campaign.court is not None and campaign.flight is not None:
+        return campaign.court if progress.challenge_fled_at is not None else campaign.flight
+    return campaign.last
 
 
 def epoch(progress: CampaignProgress) -> str:
@@ -472,6 +626,63 @@ def spoils_commander(encounter: Encounter, finale: "FinaleCache | None") -> str:
     return encounter.prize_commander
 
 
+def spoils_decks(encounter: Encounter, finale: "FinaleCache | None") -> list[SpoilsDeck]:
+    """The decks a first win gives: the warden's, or at the court (v0.9.6) the two gifted ones."""
+    if encounter.court is not None:
+        return [
+            SpoilsDeck(
+                title=general.deck_title, commander=general.commander, opponent=general.opponent
+            )
+            for general in encounter.court.generals
+        ]
+    return [
+        SpoilsDeck(
+            title=encounter.deck_title,
+            commander=spoils_commander(encounter, finale),
+            opponent=encounter.opponent,
+        )
+    ]
+
+
+def court_view(encounter: Encounter) -> CourtView | None:
+    court = encounter.court
+    if court is None:
+        return None
+    seats = [
+        CourtSeat(
+            seat=court.king_seat,
+            opponent=encounter.opponent,
+            name=encounter.name,
+            role="king",
+            commander=encounter.commander,
+        ),
+        *(
+            CourtSeat(
+                seat=general.seat,
+                opponent=general.opponent,
+                name=general.name,
+                role="general",
+                commander=general.commander,
+            )
+            for general in court.generals
+        ),
+    ]
+    return CourtView(
+        player_seat=court.player_seat,
+        ally_seats=list(court.ally_seats),
+        opponents=sorted(seats, key=lambda seat: seat.seat),
+        helper_tokens=court.helper_tokens,
+    )
+
+
+def status_of(encounter: Encounter, progress: CampaignProgress, campaign: Campaign) -> str:
+    if encounter.number in progress.completed:
+        return "won"
+    if encounter.number == campaign.flight and progress.fled_at is not None:
+        return "fled"
+    return "open" if encounter.number <= unlocked(progress, campaign) else "locked"
+
+
 def state_of(
     db: Session, user: User, campaign: Campaign, finale: "FinaleCache | None" = None
 ) -> CampaignState:
@@ -479,13 +690,10 @@ def state_of(
     db.commit()
     done = set(progress.completed)
     rewards = earned(db, user.id, campaign, progress)
-    return CampaignState(
-        id=campaign.id,
-        title=campaign.title,
-        content_version=campaign.content_version,
-        loaner=campaign.loaner_title,
-        loaner_commander=campaign.loaner_commander,
-        encounters=[
+    encounters: list[CampaignEncounter] = []
+    for encounter in campaign.encounters:
+        decks = spoils_decks(encounter, finale)
+        encounters.append(
             CampaignEncounter(
                 number=encounter.number,
                 opponent=encounter.opponent,
@@ -496,22 +704,24 @@ def state_of(
                 seal=encounter.seal,
                 commander=encounter.commander,
                 skill=encounter.skill,
-                status=(
-                    "won"
-                    if encounter.number in done
-                    else "open"
-                    if encounter.number <= progress.highest_unlocked
-                    else "locked"
-                ),
+                status=status_of(encounter, progress, campaign),  # type: ignore[arg-type]
                 spoils=EncounterSpoils(
                     tokens=encounter.tokens,
-                    deck=encounter.deck_title,
-                    commander=spoils_commander(encounter, finale),
+                    deck=decks[0].title,
+                    commander=decks[0].commander,
+                    decks=decks,
                     earned=f"spoils:{encounter.number:02d}" in rewards,
                 ),
+                court=court_view(encounter),
             )
-            for encounter in campaign.encounters
-        ],
+        )
+    return CampaignState(
+        id=campaign.id,
+        title=campaign.title,
+        content_version=campaign.content_version,
+        loaner=campaign.loaner_title,
+        loaner_commander=campaign.loaner_commander,
+        encounters=encounters,
         chapters=[
             CampaignChapter(
                 tier=cast(Tier, chapter.tier),
@@ -526,7 +736,7 @@ def state_of(
             for chapter in campaign.chapters
         ],
         progress=CampaignProgressView(
-            highest_unlocked=progress.highest_unlocked,
+            highest_unlocked=unlocked(progress, campaign),
             completed=sorted(done),
             ending=progress.ending,  # type: ignore[arg-type]
             scenes_seen=list(progress.scenes_seen),
@@ -542,6 +752,7 @@ def state_of(
             name=CHALLENGE_NAME,
             open=campaign.last in done,
             earned=CHALLENGE_REWARD in rewards,
+            at=challenge_at(progress, campaign),
         ),
     )
 
@@ -549,16 +760,16 @@ def state_of(
 # A duel's end.
 
 
-def outcome_of(game: Game) -> Outcome:
-    """The campaign's word for how the game ended, for the player in seat 0. Only a completed game
-    that seat 0's side won is a win; a turn limit, a closed or idle game and an engine error are
-    unfinished."""
+def outcome_of(game: Game, seat: int = 0) -> Outcome:
+    """The campaign's word for how the game ended, for the player's seat (seat 0 in a duel, King
+    A's at the court, v0.9.6). Only a completed game the player's side won is a win; a turn limit,
+    a closed or idle game and an engine error are unfinished."""
     result = game.result or {}
     if game.status != "finished" or result.get("kind") != "completed":
         return "unfinished"
     if result.get("draw"):
         return "draw"
-    return "won" if 0 in winning_seats(result) else "lost"
+    return "won" if seat in winning_seats(result) else "lost"
 
 
 def game_ended(
@@ -574,35 +785,107 @@ def game_ended(
     seal and spoils, the next encounter and a chapter's rewards, once. Called by
     games.record_end. Without payouts (SysOp's duel with passive bots, v0.8.6) a win still opens
     the next encounter and records its seal, but gives no spoils and no chapter rewards: a later
-    win without passive bots gives them as a first win would."""
-    outcome = outcome_of(game)
+    win without passive bots gives them as a first win would.
+
+    Since v0.9.6 wards 14 and 15 are one run. The Sphinx flees ward 14 at the moment he would lose
+    it: the win records the flight (fled_at) and opens the court, and pays nothing yet. Winning the
+    court then wins both: ward 14's seal, spoils and chapter, and ward 15's, with the friends who
+    helped paid once each. Losing the court (or a draw) ends the run: the player is back at ward
+    14. An account that won ward 14 before the court existed plays the court alone: nothing sends
+    it back. Apex Unbound runs the same way, for its badge alone."""
+    outcome = outcome_of(game, link.seat)
     link.outcome = outcome
     link.finished_at = utcnow()
-    if outcome != "won" or campaign is None or link.campaign_id != campaign.id:
+    if outcome == "unfinished" or campaign is None or link.campaign_id != campaign.id:
         return
     user = db.get_one(User, link.user_id)
     progress = progress_of(db, user, campaign, lock=True)
     if progress.started_at > link.created_at:
         # The account was reset after the duel began: it belongs to the old progress.
         return
+    number = link.encounter
+    court, flight = campaign.court, campaign.flight
+    if outcome != "won":
+        if court is not None and number == court:
+            # The court lost: the run ends, and the player is back at ward 14.
+            if link.challenge:
+                progress.challenge_fled_at = None
+            elif flight is not None and flight not in progress.completed:
+                progress.fled_at = None
+                progress.highest_unlocked = min(progress.highest_unlocked, flight)
+            progress.updated_at = utcnow()
+        return
     if link.challenge:
+        if court is not None and number == flight:
+            # Apex Unbound's Sphinx flees too: the challenge goes on at the court.
+            progress.challenge_fled_at = utcnow()
+            progress.updated_at = utcnow()
+            return
         # Apex Unbound (v0.9.3): its badge, once, and nothing else; never with passive bots.
         if payouts:
             reward(db, user.id, campaign, progress, CHALLENGE_REWARD, game.id)
+        progress.challenge_fled_at = None
+        progress.updated_at = utcnow()
         return
-    number = link.encounter
-    if number not in progress.completed:
-        progress.completed = sorted({*progress.completed, number})
+    if court is not None and flight is not None and number == flight:
+        if flight not in progress.completed:
+            # The Sphinx flees (v0.9.6): the court opens, and the run pays when it is won.
+            progress.fled_at = utcnow()
+            progress.highest_unlocked = max(progress.highest_unlocked, court)
+            progress.content_version = campaign.content_version
+            progress.updated_at = utcnow()
+        return
+    won = [number]
+    if court is not None and flight is not None and number == court:
+        # The court won: ward 14 too, when the run began there.
+        if flight not in progress.completed:
+            won = [flight, number]
+        progress.fled_at = None
+    for each in won:
+        if each not in progress.completed:
+            progress.completed = sorted({*progress.completed, each})
+        reward(db, user.id, campaign, progress, f"seal:{each:02d}", game.id)
     progress.highest_unlocked = max(progress.highest_unlocked, min(number + 1, campaign.last))
     progress.content_version = campaign.content_version
     progress.updated_at = utcnow()
-    reward(db, user.id, campaign, progress, f"seal:{number:02d}", game.id)
     if not payouts:
         return
-    served = served_list(db, game)
+    for each in won:
+        encounter = campaign.encounter(each)
+        if encounter.court is not None:
+            if reward(db, user.id, campaign, progress, f"spoils:{each:02d}", game.id):
+                give_court_spoils(db, user, campaign, progress, encounter, content_dir, game)
+            pay_helpers(db, game, link, encounter, campaign)
+        else:
+            win_spoils(db, game, link, user, campaign, progress, encounter, content_dir)
+    done = set(progress.completed)
+    for chapter in campaign.chapters:
+        if any(each in chapter.encounters for each in won) and all(
+            n in done for n in chapter.encounters
+        ):
+            for id_, _ in chapter.rewards:
+                reward(db, user.id, campaign, progress, id_, game.id)
+
+
+def win_spoils(
+    db: Session,
+    game: Game,
+    link: CampaignGame,
+    user: User,
+    campaign: Campaign,
+    progress: CampaignProgress,
+    encounter: Encounter,
+    content_dir: str | None,
+) -> None:
+    """A warden's spoils for a first win, once. The Sphinx's (ward 14) from the court's game since
+    v0.9.6: his deck as the court served it, his commander as the finale's."""
+    number = encounter.number
+    court = campaign.encounter(campaign.court).court if campaign.court is not None else None
+    seat = court.king_seat if court is not None and link.encounter == campaign.court else None
+    served = served_list(db, game, seat)
     prize_card = link.prize_card
     ready = True
-    if link.finale == "private":
+    if link.finale == "private" and encounter.private:
         # The private finale's spoils come with its commander, a custom card. Without one under
         # the commander's name, the spoils wait: a later win gives them once SysOp uploads it.
         prize_card = finale_prize(db, link, served)
@@ -618,24 +901,94 @@ def game_ended(
             user,
             campaign,
             progress,
-            campaign.encounter(number),
+            encounter,
             content_dir,
             prize_card,
             served,
             game.id,
         )
-    done = set(progress.completed)
-    for chapter in campaign.chapters:
-        if number in chapter.encounters and all(n in done for n in chapter.encounters):
-            for id_, _ in chapter.rewards:
-                reward(db, user.id, campaign, progress, id_, game.id)
 
 
-def served_list(db: Session, game: Game) -> dict[str, Any] | None:
-    """The opponent's deck list as the duel served it to the engine (the bot seat's)."""
-    found = db.scalar(
-        select(GameSeat.deck_list).where(GameSeat.game_id == game.id, GameSeat.player == "bot")
-    )
+def give_court_spoils(
+    db: Session,
+    user: User,
+    campaign: Campaign,
+    progress: CampaignProgress,
+    encounter: Encounter,
+    content_dir: str | None,
+    game: Game,
+) -> None:
+    """The court's spoils (v0.9.6): the two gifted decks, each as the court served it, each with
+    its own opening, and the ward's tokens."""
+    court = encounter.court
+    assert court is not None
+    library: Any = None
+    number = f"{encounter.number:02d}"
+    for general in court.generals:
+        served = served_list(db, game, general.seat)
+        commander = served_commander(served) or general.commander
+        entries = deck_entries(
+            db, encounter.number, None, commander, served_cards(served) or general.cards
+        )
+        library = give_deck(
+            db,
+            user,
+            campaign,
+            f"campaign:{campaign.id}:{number}:{epoch(progress)}:{general.opponent}",
+            encounter,
+            general.opponent,
+            general.name,
+            general.deck_title,
+            f"Gifted to {general.name} by The Sphinx; won in the campaign: {encounter.title}.",
+            entries,
+            content_dir,
+            game.id,
+        )
+    if library is not None:
+        refresh_decks(db, user.id, library)
+    pay_tokens(db, user, campaign, progress, encounter)
+
+
+def pay_helpers(
+    db: Session, game: Game, link: CampaignGame, encounter: Encounter, campaign: Campaign
+) -> None:
+    """The friends who helped win the court (v0.9.6): each player seated with the winner who played
+    to the end and is their friend is paid once, ever, per player and friend, whatever later wins
+    or resets: the key names only the two accounts."""
+    court = encounter.court
+    if court is None or court.helper_tokens <= 0:
+        return
+    # Imported here: api.tables imports api.games, which imports this module late.
+    from api.tables import friends_of
+
+    friends = friends_of(db, link.user_id)
+    host = db.get(User, link.user_id)
+    for row in db.scalars(
+        select(GameSeat).where(GameSeat.game_id == game.id, GameSeat.user_id.is_not(None))
+    ):
+        helper = row.user_id
+        if helper is None or helper == link.user_id or row.left_reason is not None:
+            continue
+        if helper not in friends:
+            continue
+        pay_reward(
+            db,
+            helper,
+            "campaign",
+            court.helper_tokens,
+            f"campaign-helper:{campaign.id}:{link.user_id}:{helper}",
+            f"Helped {host.handle if host and host.handle else 'a friend'} win {encounter.title}",
+            SPOILS_POLICY,
+        )
+
+
+def served_list(db: Session, game: Game, seat: int | None = None) -> dict[str, Any] | None:
+    """The opponent's deck list as the duel served it to the engine (the bot seat's); at the court
+    (v0.9.6) the given seat's."""
+    query = select(GameSeat.deck_list).where(GameSeat.game_id == game.id, GameSeat.player == "bot")
+    if seat is not None:
+        query = query.where(GameSeat.seat == seat)
+    found = db.scalar(query.order_by(GameSeat.seat).limit(1))
     return found if isinstance(found, dict) else None
 
 
@@ -685,6 +1038,23 @@ def prize_entries(
     finale's own, a custom card, when given), then each card the catalog has, in its default
     edition. The deck is the one the duel served (served), when the seat recorded it: the
     private finale's own list when the owner's content gives one; else the content's."""
+    commander = encounter.prize_commander
+    if not encounter.private:
+        commander = served_commander(served) or commander
+    return deck_entries(
+        db, encounter.number, custom_commander, commander, served_cards(served) or encounter.cards
+    )
+
+
+def deck_entries(
+    db: Session,
+    number: int,
+    custom_commander: UUID | None,
+    commander: str,
+    cards: tuple[tuple[str, int], ...],
+) -> list[DeckEntry]:
+    """A won deck as entries: its commander first (a custom card when given), then each card the
+    catalog has, in its default edition; a card it lacks is named in the log."""
     entries: list[DeckEntry] = []
     wanted: list[tuple[str, int, str]] = []
     if custom_commander is not None:
@@ -692,11 +1062,7 @@ def prize_entries(
             DeckEntry(card_id=custom_commander, printing_id=None, quantity=1, location="commander")
         )
     else:
-        commander = encounter.prize_commander
-        if not encounter.private:
-            commander = served_commander(served) or commander
         wanted.append((commander, 1, "commander"))
-    cards = served_cards(served) or encounter.cards
     wanted += [(name, count, "main") for name, count in cards]
     concepts = {
         concept.normalized_name: concept
@@ -727,11 +1093,19 @@ def prize_entries(
         # resolves is the one thing that can shorten it, so it is named, never dropped quietly.
         log.warning(
             "Campaign spoils for encounter %d: %d card(s) not in the catalog: %s",
-            encounter.number,
+            number,
             len(missing),
             ", ".join(sorted(missing)),
         )
     return entries
+
+
+def library_for(db: Session, user: User, content_dir: str | None) -> Any:
+    return (
+        library_of(db, user, permissions_for(user, roles_of(db, user)), load_roster(content_dir))
+        if content_dir
+        else None
+    )
 
 
 def give_spoils(
@@ -756,6 +1130,44 @@ def give_spoils(
     if prize_card is not None and db.get(CustomCard, prize_card) is not None:
         custom = prize_card
     entries = prize_entries(db, encounter, custom, served)
+    library = give_deck(
+        db,
+        user,
+        campaign,
+        key,
+        encounter,
+        encounter.opponent,
+        encounter.name,
+        encounter.deck_title,
+        f"Won from {encounter.name} in the campaign: {encounter.title}.",
+        entries,
+        content_dir,
+        game_id,
+        custom,
+    )
+    if library is not None:
+        refresh_decks(db, user.id, library)
+    pay_tokens(db, user, campaign, progress, encounter)
+
+
+def give_deck(
+    db: Session,
+    user: User,
+    campaign: Campaign,
+    key: str,
+    encounter: Encounter,
+    opponent: str,
+    name: str,
+    title: str,
+    notes: str,
+    entries: list[DeckEntry],
+    content_dir: str | None,
+    game_id: UUID | None,
+    custom: UUID | None = None,
+) -> Any:
+    """One won deck: its cards granted for good under the key, a custom commander with them, the
+    deck among the player's own, and its opening waiting (v0.9.5). Returns the player's library
+    as it stands with them, to refresh their decks by."""
     catalog = [entry for entry in entries if entry.card_id != custom]
     grant_deck(db, user, key, catalog, "campaign")
     if custom is not None:
@@ -770,18 +1182,14 @@ def give_spoils(
             )
         )
     db.flush()
-    library = (
-        library_of(db, user, permissions_for(user, roles_of(db, user)), load_roster(content_dir))
-        if content_dir
-        else None
-    )
+    library = library_for(db, user, content_dir)
     stamp = utcnow()
     deck = Deck(
         owner_id=user.id,
-        title=encounter.deck_title,
+        title=title,
         format="commander",
         visibility="private",
-        notes=f"Won from {encounter.name} in the campaign: {encounter.title}.",
+        notes=notes,
         draft={},
         draft_version=1,
         draft_hash="",
@@ -792,8 +1200,6 @@ def give_spoils(
     db.add(deck)
     store_draft(db, deck, entries, library)
     db.flush()
-    if library is not None:
-        refresh_decks(db, user.id, library)
     # The deck waits to be opened as a pack (v0.9.5), under the spoils' own key.
     warden_openings.record(
         db,
@@ -801,14 +1207,25 @@ def give_spoils(
         key,
         campaign.id,
         encounter.number,
-        encounter.opponent,
-        encounter.name,
-        encounter.deck_title,
+        opponent,
+        name,
+        title,
         deck.id,
         game_id,
         entries,
     )
+    return library
+
+
+def pay_tokens(
+    db: Session,
+    user: User,
+    campaign: Campaign,
+    progress: CampaignProgress,
+    encounter: Encounter,
+) -> None:
     if encounter.tokens > 0:
+        number = f"{encounter.number:02d}"
         pay_reward(
             db,
             user.id,
@@ -857,7 +1274,8 @@ def finale_seat(
     encounter: Encounter, content: dict[str, Any] | None
 ) -> tuple[dict[str, object], str]:
     """The finale's bot seat: with the owner's content, its commander, its reserve (the
-    incarnation, cast at its threshold) and its deck if it names one; without, the public deck
+    incarnation, cast at its threshold; at the court since v0.9.6 on the battlefield from the
+    start and back at each of his upkeeps) and its deck if it names one; without, the public deck
     and its stand-in commander."""
     if content is None:
         fallback = encounter.fallback_commander or "Morophon, the Boundless"
@@ -872,10 +1290,108 @@ def finale_seat(
         ]
     reserve = content.get("reserve")
     if isinstance(reserve, dict) and isinstance(reserve.get("card"), str):
-        deck_list["reserve"] = [
-            {"name": reserve["card"], "threshold": int(reserve.get("threshold", 15))}
-        ]
+        deck_list["reserve"] = (
+            [{"name": reserve["card"], "mode": "court"}]
+            if encounter.court is not None
+            else [{"name": reserve["card"], "threshold": int(reserve.get("threshold", 15))}]
+        )
     return deck_list, "private"
+
+
+def court_seats(
+    encounter: Encounter,
+    sphinx: dict[str, object],
+    players: dict[int, SeatPlan],
+    allies: dict[int, SeatPlan],
+) -> list[SeatPlan]:
+    """The court's six seats in King's Table order (v0.9.6): the players' (the King's and any
+    friends'), the player's bot Generals, and team B, each of its three a named bot with its own
+    deck: The Sphinx's (finale_seat) as King, and the two he gifted."""
+    court = encounter.court
+    assert court is not None
+    generals = {general.seat: general for general in court.generals}
+    plans: list[SeatPlan] = []
+    for seat in range(kings_table.SEATS):
+        if seat in players:
+            plans.append(players[seat])
+        elif seat == court.king_seat:
+            plans.append(
+                SeatPlan(
+                    {"player": "bot", "deck_list": sphinx},
+                    title=f"{encounter.name}'s deck",
+                    starter=True,
+                )
+            )
+        elif seat in generals:
+            general = generals[seat]
+            plans.append(
+                SeatPlan(
+                    {"player": "bot", "deck_list": general.deck_list()},
+                    title=general.deck_title,
+                    starter=True,
+                )
+            )
+        else:
+            plans.append(allies.get(seat) or SeatPlan({"player": "bot"}))
+    return plans
+
+
+def court_opponents(encounter: Encounter) -> dict[str, list[str]]:
+    """The court's named bot seats, for the game's summary: {seat: [name, roster ID]}."""
+    court = encounter.court
+    assert court is not None
+    named = {str(court.king_seat): [encounter.name, encounter.opponent]}
+    for general in court.generals:
+        named[str(general.seat)] = [general.name, general.opponent]
+    return named
+
+
+def court_body(
+    campaign: Campaign, encounter: Encounter, plans: list[SeatPlan], idle: int | None = None
+) -> dict[str, object]:
+    court = encounter.court
+    assert court is not None
+    body: dict[str, object] = {
+        "format": kings_table.FORMAT,
+        "seats": [plan.engine for plan in plans],
+        "skill": encounter.skill,
+        "turn_cap": campaign.turn_cap,
+        "kings_table": kings_table.engine_settings(kings_table.config_of(court.kings_table)),
+    }
+    if idle is not None:
+        body["idle_timeout_seconds"] = idle
+    return body
+
+
+async def court_finale(
+    request: Request, engine: EngineClient, encounter: Encounter, db: Session
+) -> tuple[dict[str, object], str, UUID | None]:
+    """The Sphinx's seat at the court, whether the owner's finale ran, and its prize card."""
+    deck_list, finale = finale_seat(encounter, await finale_content(request, engine))
+    prize_card: UUID | None = None
+    if finale == "private":
+        commanders = cast(list[str], deck_list["commanders"])
+        prize_card = await run_in_threadpool(prize_card_named, db, commanders[0])
+    return deck_list, finale, prize_card
+
+
+def check_start(
+    progress: CampaignProgress, campaign: Campaign, number: int, challenge: bool
+) -> None:
+    """Whether the encounter may start: open, and for Apex Unbound where its run stands."""
+    if number > unlocked(progress, campaign):
+        raise ApiError(409, "encounter_locked", "Win the encounter before this one to open it.")
+    if challenge:
+        if campaign.last not in progress.completed:
+            raise ApiError(
+                409, "challenge_locked", f"Win the finale before you take on {CHALLENGE_NAME}."
+            )
+        if number != challenge_at(progress, campaign):
+            raise ApiError(
+                409,
+                "challenge_locked",
+                f"{CHALLENGE_NAME} stands at encounter {challenge_at(progress, campaign)}.",
+            )
 
 
 # Routes.
@@ -902,7 +1418,8 @@ async def start_encounter(
 ) -> GameSummary:
     """Starts an encounter's duel: you in seat 0, with your deck or the loaner, against the
     encounter's opponent. An encounter opens once the one before it is won; one won may be played
-    again, for no new reward."""
+    again, for no new reward. Since v0.9.6 ward 15, the court, starts here with bots as your two
+    Generals: a King's Table game, you as King A (with friends instead: the court route)."""
     campaign = campaign_of(request)
     encounter = campaign.encounter(number)
     hub = hub_of(request)
@@ -916,19 +1433,17 @@ async def start_encounter(
         # Learn Commander's seed is disclosed and fixes the shuffles (v0.8.3): on any other ward it
         # would let a player learn both decks' order and replay the same game for its spoils.
         raise ApiError(422, "invalid_seat", "Learn Commander is for the first ward only.")
-    if body.challenge and number != campaign.last:
-        raise ApiError(422, "invalid_seat", f"{CHALLENGE_NAME} is the final encounter's challenge.")
+    finals = {campaign.last, campaign.flight} - {None}
+    if body.challenge and number not in finals:
+        raise ApiError(422, "invalid_seat", f"{CHALLENGE_NAME} is the final encounters' challenge.")
 
     def plan() -> tuple[SeatPlan, CampaignProgress]:
         progress = progress_of(db, user, campaign)
-        if number > progress.highest_unlocked:
+        try:
+            check_start(progress, campaign, number, body.challenge)
+        except ApiError:
             db.commit()
-            raise ApiError(409, "encounter_locked", "Win the encounter before this one to open it.")
-        if body.challenge and number not in progress.completed:
-            db.commit()
-            raise ApiError(
-                409, "challenge_locked", f"Win the finale before you take on {CHALLENGE_NAME}."
-            )
+            raise
         if body.deck_id is not None:
             if not principal.can("decks.edit"):
                 raise ApiError(403, "forbidden", "Your account cannot play its own decks.")
@@ -952,36 +1467,48 @@ async def start_encounter(
     await require_loaded(request, [human])
     finale: str | None = None
     prize_card: UUID | None = None
-    if encounter.private:
-        deck_list, finale = finale_seat(encounter, await finale_content(request, engine))
-        if finale == "private":
-            # The private commander as a custom card, for the deck the win gives.
-            commanders = cast(list[str], deck_list["commanders"])
-            prize_card = await run_in_threadpool(prize_card_named, db, commanders[0])
+    court = encounter.court
+    mine = court.player_seat if court is not None else 0
+    opponents: dict[str, list[str]] | None = None
+    if court is not None:
+        sphinx, finale, prize_card = await court_finale(request, engine, encounter, db)
+        plans = court_seats(encounter, sphinx, {mine: human}, {})
+        opponents = court_opponents(encounter)
+        engine_body = court_body(campaign, encounter, plans)
     else:
-        deck_list = encounter.deck_list(encounter.commander or "")
-    bot = SeatPlan(
-        {"player": "bot", "deck_list": deck_list},
-        title=f"{encounter.name}'s deck",
-        starter=True,
-    )
+        if encounter.private:
+            deck_list, finale = finale_seat(encounter, await finale_content(request, engine))
+            if finale == "private":
+                # The private commander as a custom card, for the deck the win gives.
+                commanders = cast(list[str], deck_list["commanders"])
+                prize_card = await run_in_threadpool(prize_card_named, db, commanders[0])
+        else:
+            deck_list = encounter.deck_list(encounter.commander or "")
+        bot = SeatPlan(
+            {"player": "bot", "deck_list": deck_list},
+            title=f"{encounter.name}'s deck",
+            starter=True,
+        )
+        plans = [human, bot]
+        engine_body = {
+            "format": "commander",
+            "seats": [human.engine, bot.engine],
+            "skill": encounter.skill,
+            "turn_cap": campaign.turn_cap,
+        }
     hints = (
         (body.learn or (number == 1 and progress.hints))
         and not progress.tutorial_skipped
         and not body.challenge
     )
     request_body = PracticeGameRequest(
-        format="commander",
+        format="kings_table" if court is not None else "commander",
         deck_id=body.deck_id,
         bot_skill=encounter.skill,
         turn_cap=campaign.turn_cap,
+        seat=mine if court is not None else None,
+        kings_table=(kings_table.config_of(court.kings_table) if court is not None else None),
     )
-    engine_body: dict[str, object] = {
-        "format": "commander",
-        "seats": [human.engine, bot.engine],
-        "skill": encounter.skill,
-        "turn_cap": campaign.turn_cap,
-    }
     if body.learn:
         # Learn Commander's disclosed training seed: the same shuffles every time.
         engine_body["seed"] = campaign.training_seed
@@ -998,7 +1525,7 @@ async def start_encounter(
             created = await engine_game(engine, engine_body, request)
 
             def record() -> Game:
-                game = record_game(db, request, principal, created, request_body, [human, bot])
+                game = record_game(db, request, principal, created, request_body, plans)
                 # A campaign duel is played again from the campaign, not by a rematch.
                 game.settings = None
                 db.add(
@@ -1015,6 +1542,8 @@ async def start_encounter(
                         finale=finale,
                         prize_card=prize_card,
                         challenge=body.challenge,
+                        seat=mine,
+                        opponents=opponents,
                         created_at=utcnow(),
                     )
                 )
@@ -1023,11 +1552,137 @@ async def start_encounter(
 
             async with followed_or_closed(hub, created, db):
                 game = await run_in_threadpool(record)
-                token = seat_tokens(created)[0]
-                hub.register(LiveGame(id=game.id, seats={0: LiveSeat(0, user_id, token)}))
+                token = seat_tokens(created)[mine]
+                hub.register(
+                    LiveGame(
+                        id=game.id,
+                        seats={mine: LiveSeat(mine, user_id, token)},
+                        kings=court is not None,
+                    )
+                )
         finally:
             hub.starting -= 1
         return await run_in_threadpool(summary_of, db, game, principal, campaign)
+
+
+@router.post(
+    "/campaign/encounters/{number}/court",
+    response_model=TableView,
+    status_code=201,
+    responses={409: {"model": Error}},
+)
+def open_court(
+    number: int, body: CourtStart, request: Request, principal: Player, db: Db
+) -> TableView:
+    """Ward 15 with friends as your Generals (v0.9.6): opens a private King's Table table for the
+    court, you seated as King A with one of your Commander decks, and invites the friends named.
+    Team B's three seats are the court's bots; your Generals' seats wait for the friends, and
+    those not taken when you start are played by bots. The table starts as any other, from its
+    page; its game is the campaign's, and its end is read as the court's."""
+    campaign = campaign_of(request)
+    encounter = campaign.encounter(number)
+    court = encounter.court
+    if court is None:
+        raise ApiError(422, "invalid_seat", "Only the court is played with friends.")
+    if not principal.can("decks.edit"):
+        raise ApiError(403, "forbidden", "Your account cannot play its own decks.")
+    if len(set(body.friends)) != len(body.friends):
+        raise ApiError(422, "invalid_seat", "Name each friend once.")
+    user = principal.user
+    progress = progress_of(db, user, campaign)
+    try:
+        check_start(progress, campaign, number, body.challenge)
+    except ApiError:
+        db.commit()
+        raise
+    return tables.open_campaign_table(
+        db,
+        request,
+        principal,
+        body.deck_id,
+        body.friends,
+        {
+            "campaign_id": campaign.id,
+            "encounter": number,
+            "user_id": str(user.id),
+            "challenge": body.challenge,
+            "title": encounter.title,
+            "opponents": court_opponents(encounter),
+        },
+        court.player_seat,
+        [
+            seat
+            for seat in range(kings_table.SEATS)
+            if seat != court.player_seat and seat not in court.ally_seats[: len(body.friends)]
+        ],
+        court.kings_table,
+        encounter.skill,
+        campaign.turn_cap,
+    )
+
+
+async def court_table(
+    request: Request,
+    engine: EngineClient,
+    db: Session,
+    table: GameTable,
+    plans: list[SeatPlan],
+    users: list[UUID | None],
+) -> tuple[list[SeatPlan], dict[str, object], Callable[[Session, Game], None]]:
+    """The start of a court the campaign opened as a table (v0.9.6, api/tables.py): the encounter
+    still open to its host, team B's seats served the court's decks (The Sphinx's with the
+    owner's finale when the engine has it), and the link that makes the game the campaign's."""
+    info = table.campaign or {}
+    campaign = campaign_of(request)
+    if info.get("campaign_id") != campaign.id:
+        raise ApiError(409, "table_closed", "This court belongs to another campaign.")
+    number = int(str(info.get("encounter")))
+    encounter = campaign.encounter(number)
+    court = encounter.court
+    if court is None:
+        raise ApiError(409, "table_closed", "This table is no longer the campaign's.")
+    host = db.get_one(User, table.host_id)
+    challenge = bool(info.get("challenge"))
+
+    def check() -> None:
+        progress = progress_of(db, host, campaign)
+        try:
+            check_start(progress, campaign, number, challenge)
+        finally:
+            db.commit()
+
+    await run_in_threadpool(check)
+    sphinx, finale, prize_card = await court_finale(request, engine, encounter, db)
+    players = {seat: plan for seat, plan in enumerate(plans) if users[seat] is not None}
+    allies = {seat: plans[seat] for seat in court.ally_seats if users[seat] is None}
+    seated = court_seats(encounter, sphinx, players, allies)
+    body = court_body(campaign, encounter, seated, TABLE_IDLE_SECONDS)
+    opponents = court_opponents(encounter)
+    host_id = table.host_id
+
+    def link(session: Session, game: Game) -> None:
+        session.add(
+            CampaignGame(
+                game_id=game.id,
+                user_id=host_id,
+                campaign_id=campaign.id,
+                encounter=number,
+                opponent=encounter.opponent,
+                opponent_name=encounter.name,
+                title=encounter.title,
+                deck="own",
+                hints=False,
+                finale=finale,
+                prize_card=prize_card,
+                challenge=challenge,
+                seat=court.player_seat,
+                opponents=opponents,
+                created_at=utcnow(),
+            )
+        )
+        session.flush()
+
+    return seated, body, link
 
 
 @router.post("/campaign/scenes", response_model=CampaignState)

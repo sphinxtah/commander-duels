@@ -605,6 +605,11 @@ class CampaignRef(Contract):
         default=False,
         description="The Apex Unbound challenge (v0.9.3): the finale again, for its badge alone.",
     )
+    seat: int = Field(
+        default=0,
+        description="Your seat (v0.9.6): 0 in a duel, King A's (1) at ward 15's court. Only the "
+        "campaign's own player sees the reference; friends at the court see a table's game.",
+    )
 
 
 class GameMatch(Contract):

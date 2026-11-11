@@ -243,11 +243,24 @@ export function TableLobby({
   return (
     <div className={styles.page}>
       <span className={game.eyebrow}>
-        {table.visibility === "private" ? "PRIVATE TABLE" : "PUBLIC TABLE"}
+        {table.campaign
+          ? "CAMPAIGN · KING'S TABLE"
+          : table.visibility === "private"
+            ? "PRIVATE TABLE"
+            : "PUBLIC TABLE"}
       </span>
       <h1 ref={heading} tabIndex={-1}>
-        {formatNames[table.format]} table
+        {table.campaign ?? `${formatNames[table.format]} table`}
       </h1>
+      {table.campaign && (
+        <p className={styles.lead}>
+          {table.host ?? "The host"} sits as King against The Sphinx&apos;s
+          court: The Sphinx as King, Nicol Bolas and Liliana as his Generals.
+          Take a General&apos;s seat beside them with one of your Commander
+          decks. The game counts nothing for your own record; a friend who helps
+          win it is paid once.
+        </p>
+      )}
       <TableTags table={table} />
       <p className={styles.lead}>
         Hosted by {table.host ?? "a player"}.{" "}
@@ -410,7 +423,7 @@ export function TableLobby({
         </ul>
       )}
 
-      {kings && host && table.status === "open" && (
+      {kings && host && table.status === "open" && !table.campaign && (
         <section className={styles.hostPanel} aria-labelledby="host-title">
           <h2 id="host-title">Change the table</h2>
           <p className={game.hint}>

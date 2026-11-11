@@ -14,6 +14,8 @@ import { hoverSound, selectSound } from "../shell/menuSound";
 import {
   arrived,
   changeTutorial,
+  COURT,
+  FLIGHT,
   loadCampaign,
   markSeen,
   scenesBefore,
@@ -83,6 +85,8 @@ export function CampaignPage({
   const [openings, setOpenings] = useState<WardenOpeningSummary[]>([]);
   const [notice, setNotice] = useState("");
   const [lost, setLost] = useState<Set<number>>(new Set());
+  // The Sphinx's flight from ward 14 (v0.9.6), played on the map once after its scene.
+  const [fleeing, setFleeing] = useState(false);
   const [settings, updateSettings] = useCampaignSettings();
   const started = useRef(false);
   const counter = useRef(0);
@@ -120,11 +124,13 @@ export function CampaignPage({
   /** The win's steps, split: the seal with the scene, the rest after the deck is opened when
    * one waits (v0.9.5: the duel's end, the cut scene, the opening, then the spoils card). */
   function afterWin(
-    scene: Scene,
+    scenes: Scene | Scene[],
     steps: Step[],
-    waiting: WardenOpeningSummary | undefined,
+    waiting: WardenOpeningSummary[],
   ) {
-    if (!waiting) return play({ scenes: [scene], extra: steps });
+    const all = Array.isArray(scenes) ? scenes : [scenes];
+    const scene = all[all.length - 1] as Scene;
+    if (waiting.length === 0) return play({ scenes: all, extra: steps });
     const seal = steps.filter((step) => step.kind === "seal");
     const rest = steps.filter((step) => step.kind !== "seal");
     // The rest plays over the scene's own scenery, without its lines.
@@ -135,14 +141,16 @@ export function CampaignPage({
       outro: undefined,
       lines: [],
     };
-    play({
-      scenes: [scene],
-      extra: seal,
-      then: () =>
-        unseal(waiting.id, () => {
-          if (rest.length > 0) play({ scenes: [after], extra: rest });
-        }),
-    });
+    // Each deck waiting is opened in turn (since v0.9.6 the court gives three).
+    const open = (left: WardenOpeningSummary[]) => {
+      const [next, ...others] = left;
+      if (!next) {
+        if (rest.length > 0) play({ scenes: [after], extra: rest });
+        return;
+      }
+      unseal(next.id, () => open(others));
+    };
+    play({ scenes: all, extra: seal, then: () => open(waiting) });
   }
 
   // What the visit opens on, once: the story of the duel it comes back from, else the opening
@@ -182,6 +190,14 @@ export function CampaignPage({
     const fresh = (await loadCampaign()) ?? state ?? null;
     if (fresh) setState(fresh);
     const number = ref.encounter;
+    if (ref.challenge && number === FLIGHT && ref.outcome === "won") {
+      // Apex Unbound's Sphinx flees too (v0.9.6): the challenge goes on at his court.
+      setFleeing(true);
+      setNotice(
+        "The Sphinx fled again. Apex Unbound goes on at The Unbound Court: take the challenge from the map.",
+      );
+      return;
+    }
     if (ref.challenge) {
       // Apex Unbound tells no story: the ending stays the one already won.
       setNotice(
@@ -199,9 +215,44 @@ export function CampaignPage({
     if (ref.outcome === "won") {
       const found = await loadOpenings();
       setOpenings(found);
-      const waiting = found.find(
-        (item) => item.encounter === number && !item.opened_at,
+      const waiting = found.filter(
+        (item) =>
+          !item.opened_at &&
+          (item.encounter === number ||
+            (number === COURT && item.encounter === FLIGHT)),
       );
+      if (number === FLIGHT && encounter.status === "fled") {
+        // The Sphinx flees (v0.9.6): his recall and flight, then the map shows the empty throne.
+        play({
+          scenes: [STORY.flight],
+          then: () => {
+            setFleeing(true);
+            setNotice(
+              "The Sphinx fled to his court. The Unbound Court is open: win it to claim both wards.",
+            );
+          },
+        });
+        return;
+      }
+      if (number === COURT) {
+        const flight = fresh.encounters.find((e) => e.number === FLIGHT);
+        const first = !fresh.progress.scenes_seen.includes(STORY.court.post.id);
+        afterWin(
+          [STORY.court.post, STORY.endings.win],
+          [
+            ...(first && flight ? stepsAfterWin(fresh, flight) : []),
+            ...(first ? stepsAfterWin(fresh, encounter) : []),
+            {
+              kind: "card",
+              kicker: fresh.title,
+              title: "The Concordance is revoked",
+              text: "The throne and its court are empty, and every seal answered to you. Replay any ward from the map; the Archive kept their shape.",
+            },
+          ],
+          waiting,
+        );
+        return;
+      }
       if (number === 14) {
         const early = arrived(gameId) === false;
         const ending = early ? STORY.endings.early : STORY.endings.win;
@@ -229,6 +280,10 @@ export function CampaignPage({
     if (ref.outcome === "lost" || ref.outcome === "draw") {
       setLost((current) => new Set(current).add(number));
       const loss = number === 14 ? STORY.finale.loss : story.loss;
+      if (number === COURT && encounter.status !== "open")
+        setNotice(
+          "The court held. You are back at the throne: win ward 14 again to reach it.",
+        );
       play({
         scenes: loss ? [loss] : [],
         then: () =>
@@ -301,6 +356,9 @@ export function CampaignPage({
       : []),
   ];
   const finale = state.encounters.find((e) => e.number === 14);
+  // Apex Unbound (since v0.9.6 wards 14 and 15 as one run): the ward its run stands at.
+  const challengeAt =
+    state.encounters.find((e) => e.number === state.challenge.at) ?? finale;
 
   return (
     <section className={styles.page} aria-labelledby="campaign-title">
@@ -347,9 +405,24 @@ export function CampaignPage({
               title={won.has(14) ? "The throne: revoked" : "The throne"}
               aria-hidden="true"
             />
+            {state.encounters.some((e) => e.number === COURT) && (
+              <span
+                className={[
+                  styles.sealCourt,
+                  won.has(COURT) ? styles.sealWon : "",
+                ].join(" ")}
+                title={
+                  won.has(COURT)
+                    ? "The court: emptied · Sovereignty"
+                    : "The court"
+                }
+                aria-hidden="true"
+              />
+            )}
             <span className={styles.visuallyHidden}>
-              {won.size >= 14 ? 13 : won.size} of 13 seals claimed
+              {[...won].filter((n) => n < 14).length} of 13 seals claimed
               {won.has(14) ? ", and the throne's claim revoked" : ""}
+              {won.has(COURT) ? ", and the court emptied" : ""}
             </span>
           </div>
           <div className={styles.heroActions}>
@@ -435,7 +508,10 @@ export function CampaignPage({
               (e) => e.number === aftermath.encounter,
             );
             setAftermath(null);
-            if (encounter) setSetup(encounter.number);
+            // A lost court (v0.9.6) is retried from the throne, unless it stays open.
+            if (encounter?.status === "locked" && encounter.number === COURT)
+              setSetup(FLIGHT);
+            else if (encounter) setSetup(encounter.number);
           }}
           onClose={() => setAftermath(null)}
         />
@@ -445,7 +521,7 @@ export function CampaignPage({
         <ol className={styles.map} aria-label="The wards">
           {state.chapters.map((chapter) => (
             <li
-              key={chapter.tier}
+              key={chapter.name}
               className={styles.chapter}
               data-tier={chapter.tier}
               data-complete={chapter.complete}
@@ -453,13 +529,17 @@ export function CampaignPage({
               <div className={styles.chapterHead}>
                 <TierBadge tier={chapter.tier} size={44} decorative />
                 <h2>
-                  {TIER_NAMES[chapter.tier]}
+                  {chapter.encounters.includes(COURT)
+                    ? chapter.name
+                    : TIER_NAMES[chapter.tier]}
                   <span className={styles.chapterCount}>
-                    {chapter.encounters.length === 1
-                      ? chapter.tier === "godlike"
-                        ? "The final duel"
-                        : "1 ward"
-                      : `${chapter.encounters.length} wards`}
+                    {chapter.encounters.includes(COURT)
+                      ? "King's Table"
+                      : chapter.encounters.length === 1
+                        ? chapter.tier === "godlike"
+                          ? "The final duel"
+                          : "1 ward"
+                        : `${chapter.encounters.length} wards`}
                   </span>
                 </h2>
                 {chapter.complete && (
@@ -475,6 +555,7 @@ export function CampaignPage({
                     <Node
                       key={number}
                       encounter={encounter}
+                      fleeing={fleeing && number === FLIGHT}
                       onBegin={() => begin(encounter)}
                     />
                   ) : null;
@@ -575,13 +656,17 @@ export function CampaignPage({
             <span>Kaya&rsquo;s hints in the first duel</span>
           </label>
 
-          {state.challenge.open && finale && (
+          {state.challenge.open && challengeAt && (
             <div className={styles.challenge}>
               <h3>{state.challenge.name}</h3>
               <p>
-                The throne again, as the Archive kept it, with Kaya&rsquo;s aids
-                off. Win it for a badge of its own; the ending you won stays
-                yours, and nothing else is won twice.
+                The throne and its court again, as one run, as the Archive kept
+                them, with Kaya&rsquo;s aids off. Win both for a badge of its
+                own; the ending you won stays yours, and nothing else is won
+                twice.
+                {state.challenge.at === COURT
+                  ? " The Sphinx has fled: the challenge stands at his court."
+                  : ""}
               </p>
               <button
                 type="button"
@@ -621,7 +706,12 @@ export function CampaignPage({
             <li>
               Beating a warden the first time wins their deck, every card of it
               yours, and tokens: 1,000 for the first warden, doubling with each
-              (8,192,000 for The Sphinx).
+              (8,192,000 for The Sphinx, 16,384,000 for his court).
+            </li>
+            <li>
+              The throne and the court are one run: The Sphinx flees the throne
+              to his court, and both pay when the court is won. Losing the court
+              sends you back to the throne.
             </li>
             <li>
               Campaign duels count no wins towards your tier and advance no
@@ -650,10 +740,10 @@ export function CampaignPage({
           onState={setState}
         />
       )}
-      {challenging && finale && (
+      {challenging && challengeAt && (
         <DuelSetup
           state={state}
-          encounter={finale}
+          encounter={challengeAt}
           lostBefore={false}
           canUseOwnDecks={me.permissions.includes("decks.edit")}
           challenge
@@ -714,19 +804,25 @@ async function gameOf(gameId: string) {
 
 function Node({
   encounter,
+  fleeing = false,
   onBegin,
 }: {
   encounter: CampaignEncounter;
+  /** The Sphinx's flight, played once (v0.9.6): he shakes with fury, then flees the throne. */
+  fleeing?: boolean;
   onBegin: () => void;
 }) {
   const locked = encounter.status === "locked";
   const finale = encounter.number === 14;
+  const court = encounter.number === COURT;
+  const fled = encounter.status === "fled";
   const number = String(encounter.number).padStart(2, "0");
   return (
     <li
       className={styles.node}
       data-status={encounter.status}
       data-finale={finale || undefined}
+      data-court={court || undefined}
       style={{ "--i": encounter.number } as CSSProperties}
     >
       <button
@@ -739,13 +835,42 @@ function Node({
           locked
             ? `Encounter ${number}: locked`
             : `Encounter ${number}: ${encounter.title}, against ${encounter.name}${
-                encounter.status === "won" ? ", won" : ""
+                encounter.status === "won"
+                  ? ", won"
+                  : fled
+                    ? ", fled: he waits at his court"
+                    : ""
               }`
         }
       >
         <span className={styles.medallion} aria-hidden="true">
-          {finale ? (
+          {finale && fled ? (
+            <>
+              {fleeing && (
+                <img
+                  className={styles.fleeing}
+                  src={portraitUrl(encounter.opponent, 256)}
+                  alt=""
+                />
+              )}
+              <span
+                className={styles.fledMarker}
+                data-after={fleeing || undefined}
+              >
+                Fled
+              </span>
+            </>
+          ) : finale ? (
             <span className={styles.throneIcon} />
+          ) : court ? (
+            <>
+              <img
+                src={portraitUrl(encounter.opponent, 256)}
+                alt=""
+                loading="lazy"
+              />
+              <span className={styles.courtCrown} />
+            </>
           ) : (
             <img
               src={portraitUrl(encounter.opponent, 256)}
@@ -758,7 +883,9 @@ function Node({
           )}
         </span>
         <span className={styles.nodeWords}>
-          <span className={styles.nodeNumber}>{finale ? "Final" : number}</span>
+          <span className={styles.nodeNumber}>
+            {finale ? "Final" : court ? "Court" : number}
+          </span>
           <span className={styles.nodeTitle}>
             {locked ? "Sealed ward" : encounter.title}
           </span>
@@ -766,11 +893,20 @@ function Node({
             {locked
               ? "Win the ward before it"
               : finale
-                ? "The throne"
-                : encounter.name}
+                ? fled
+                  ? "The throne stands empty"
+                  : "The throne"
+                : court
+                  ? "The Sphinx, Nicol Bolas and Liliana"
+                  : encounter.name}
           </span>
           {encounter.status === "won" && (
             <span className={styles.nodeSeal}>Seal · {encounter.seal}</span>
+          )}
+          {fled && (
+            <span className={styles.nodeSeal}>
+              Fled · its spoils wait with the court&rsquo;s
+            </span>
           )}
           {!locked && (
             <span
@@ -778,7 +914,9 @@ function Node({
               data-earned={encounter.spoils.earned || undefined}
             >
               {encounter.spoils.earned ? "Won · " : ""}
-              {encounter.spoils.deck} ·{" "}
+              {encounter.spoils.decks
+                .map((deck) => deck.title)
+                .join(" & ")} ·{" "}
               {encounter.spoils.tokens.toLocaleString("en-US")} tokens
             </span>
           )}

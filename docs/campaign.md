@@ -1,6 +1,6 @@
 # The campaign (v0.8.0)
 
-**The Final Concordance** is the game's story campaign, from the owner's handoff of 2026-10-31 (the gitignored `campaign/` folder beside `compose.yaml`: the campaign guide and its fourteen deck builds; the guide names the Godlike tier's custom cards, so it never enters this repository). Fourteen one-on-one Commander duels lead through the wards of the Archive of Concordance, a stolen pocket realm: thirteen wardens, each an incarnation of a Planeswalker, and then The Sphinx on his throne, who at 15 life crosses into the duel himself. Between the duels the story is told in cut scenes: the speakers' portraits at either side of the screen, their lines in speech bubbles, over painted, moving scenery, with effects. The owner's decisions are in [the v0.8.0 release notes](releases/0.8.0.md).
+**The Final Concordance** is the game's story campaign, from the owner's handoff of 2026-10-31 (the gitignored `campaign/` folder beside `compose.yaml`: the campaign guide and its fourteen deck builds; the guide names the Godlike tier's custom cards, so it never enters this repository). Fourteen one-on-one Commander duels lead through the wards of the Archive of Concordance, a stolen pocket realm, and since v0.9.6 a fifteenth ward, [The Unbound Court](#the-unbound-court-ward-15-v096), a King's Table game against The Sphinx's court: thirteen wardens, each an incarnation of a Planeswalker, and then The Sphinx on his throne, who at 15 life crosses into the duel himself. Between the duels the story is told in cut scenes: the speakers' portraits at either side of the screen, their lines in speech bubbles, over painted, moving scenery, with effects. The owner's decisions are in [the v0.8.0 release notes](releases/0.8.0.md).
 
 ## Where it is
 
@@ -61,6 +61,21 @@ Since v0.9.3 `IncarnationRemovalTest` checks the replacement against each way of
 
 An engine without the owner's content (the public images, a local stack) plays the finale with the same 99 cards, Morophon, the Boundless as the stand-in commander, and no incarnation; the campaign can still be finished there, and the game's summary says which finale ran (`campaign.finale`: `private` or `public`).
 
+## The Unbound Court: ward 15 (v0.9.6)
+
+The owner's request of 2026-11-10: The Sphinx no longer loses the duel. At the moment he would lose, he recalls Liliana and Nicol Bolas and flees, keeping his deck, and the player follows him into a fifteenth ward, a [King's Table](kings-table.md) game. The owner's decisions are in [the v0.9.6 release notes](releases/0.9.6.md).
+
+- **Ward 14's end.** A win of ward 14 is his flight: the engine's result is the moment he would lose (0 life, commander damage, an empty library, a concession). The win records `campaign_progress.fled_at` and opens ward 15, and pays nothing yet: no seal, no spoils, no chapter. The map shows ward 14 as **fled**: after the flight's scene (FC.E14.FLIGHT: his fury, the High Priest, the recall by the names Liliana and Bolas signed, the gold seam the tether pulls you through), its medallion plays The Sphinx shaking furiously, then fleeing, and leaves the Fled marker ("its spoils wait with the court's"). Reduce motion shows the marker alone.
+- **One run.** Wards 14 and 15 are one run. Losing the court (or a draw) clears the flight: the player is back at ward 14 (`highest_unlocked` 14) and must win it again. Winning the court wins both, in the transaction that records its end: ward 14's seal, its spoils (The Sphinx's deck with the commander he played: the High Priest with the owner's engine) and the Throne's chapter (Concordance Breaker, Fractured Throne), then ward 15's seal (Sovereignty, mythic), its spoils and its chapter. A closed, idle or turn-limited court changes nothing, as anywhere in the campaign.
+- **The court** is a King's Table game with Commander decks, everyone at 40 life, and the house rule off (a King attacks no one: the court falls General by General). The player is **King A** (seat 1). **Team B** is The Sphinx as King (seat 4) with Nicol Bolas (seat 3, Right General) and Liliana (seat 5, Left General), each a named bot with their portrait and their own deck, at skill 6: The Sphinx's deck is ward 14's (`cards_from`), led by the owner's commander with the owner's engine or the public stand-in; Bolas and Liliana play the decks he gifted them (`court.generals` in `content/campaign.json`: *Nicol Bolas's Gift*, Grixis power led by Nicol Bolas, the Ravager, and *Liliana's Gift*, mono-black power led by Liliana, Heretical Healer, both built for XMage's AI and checked against its card database). Every bot of the game plays at the ward's skill, the player's bot Generals too: the engine has one skill a game.
+- **The incarnation** (the owner, 2026-11-10: "free, unlimited, put onto battlefield"). With the owner's engine, The Sphinx's reserve card comes in court mode (`{"name", "mode": "court"}`, [below](#the-finales-incarnation)): it is on the battlefield from the start, at its printed loyalty; whenever it is gone at the beginning of his upkeep, it is put onto the battlefield again, for free, every time; it is never cast, so it can't be countered or cast from the reserve; and leaving the battlefield for anywhere else sends it to the reserve, as in the duel. At the table its first sight plays the court's arrival lines and tip, its removal and return their own. The Sphinx himself starts at 40 life, as every seat.
+- **Generals: bots or friends.** The ward's setup offers the loaner or one of the player's Commander decks with **bots as Generals** (the start route, a King's Table game at once), or **friends as Generals**: one or two friends invited to a private table the campaign opens (`POST /api/v1/campaign/encounters/15/court`, one of the player's own Commander decks). The player hosts it, seated as King A; team B's seats are the court's bots, by name and portrait; a General's seat waits for each friend invited and the other is a bot's. The court's settings and seats are fixed (`409 campaign_table`); the host may still give an open General's seat to a bot, and starts the court from the table's page as any table. Its game is the campaign's: its end is read as the court's, the friends see a table's game (no campaign reference), and it counts no win, tokens, quests or achievements for anyone.
+- **The helpers.** Each friend who played the won court to its end (never left) and is still the player's friend is paid **10,000 tokens, once ever per player and friend** (`campaign-helper:<campaign>:<player>:<friend>`), and only for a win. Their own campaign is untouched.
+- **Players who won ward 14 before v0.9.6** (only SysOp) play the court alone, the run's one exception: it opens at once, losing it never sends them back, and its win pays ward 15's own rewards.
+- **Ward 15's rewards**: 16,384,000 tokens (doubling ward 14's), the two gifted decks, each opened as a warden's deck is (with ward 14's, three openings after the win, The Sphinx's first), the mythic seal Sovereignty, and its chapter, *The Unbound Court*: the **Courtbreaker** title and the **Unbound Court** card back (`web/public/brand/backs/unbound-court.svg`: the King's crown and the Generals' circlets broken under a mythic seal). The ending scenes (FC.E15.POST, then the standard ending) follow the court's win.
+- **Barks for three speakers**: the court's barks come from The Sphinx, Nicol Bolas, Liliana and Kaya, read from the King's seat (`bossSeat` 4 in the script), not the first opponent.
+- **Data.** Migration 0042: `campaign_progress.fled_at` and `challenge_fled_at`; `campaign_games.seat` (1 at the court) and `opponents` (team B's names and portraits by seat, for the game's summary); `game_tables.campaign` (the court's table). The campaign's state: ward 14's status `fled`, each encounter's `court` (the player's seat, the allies' seats, team B, the helpers' pay) and `spoils.decks`; `challenge.at`.
+
 ## Progress and rewards
 
 `api/campaign.py`; migration 0032:
@@ -89,6 +104,7 @@ The handoff's optional post-campaign challenge: "An optional Apex Unbound challe
 - **The badge.** A win earns the reward `badge:apex-unbound`, once (campaign_rewards, keyed by progress like every reward). It never gives a seal, spoils, tokens or chapter rewards again, and a duel with passive bots gives nothing. The badge shows under Rewards and on the player's profile (`badges` on `GET /api/v1/players/{id}`, read without making anyone's campaign progress). An account reset takes it away with the rest.
 - **Refused.** On any encounter but the finale (`422 invalid_seat`), and before the finale is won (`409 challenge_locked`).
 - **Data.** `campaign_games.challenge` (migration 0040); `challenge` on the game summary's `campaign` and in the campaign's state (`name`, `open`, `earned`).
+- **Since v0.9.6 a dual level**: wards 14 and 15 as one run, run as the campaign's. It opens once the court is won; it starts at ward 14, whose win is The Sphinx's flight again (`challenge_fled_at`), then stands at the court (`challenge.at` 15; the challenge on ward 14 is then refused, `409 challenge_locked`); a lost court sends it back to ward 14; the court won earns the badge, once. The court's challenge may be played with friends too.
 
 ### Routes
 
@@ -96,6 +112,7 @@ The handoff's optional post-campaign challenge: "An optional Apex Unbound challe
 | --- | --- | --- |
 | `GET /api/v1/campaign` | `games.play` | The campaign: its encounters (status locked, open or won; the finale's commander null), chapters with their rewards earned, the progress and the tutorial, and the account's campaign duel still running |
 | `POST /api/v1/campaign/encounters/{n}/start` | `games.play` (own decks: `decks.edit`) | `{"deck_id"}`, `{"loaner": true}` or `{"learn": true}`, and since v0.9.3 `"challenge": true` on the finale (Apex Unbound): the duel, as a game summary (201). 409 `encounter_locked`, `challenge_locked`, `game_limit`; 422 `invalid_seat` (no deck or two), `invalid_deck`, `deck_not_playable`, `custom_not_loaded`; 429 `games_busy`; 503 as practice games |
+| `POST /api/v1/campaign/encounters/15/court` | `decks.edit` | Since v0.9.6: `{"deck_id", "friends": [1–2 friends], "challenge"}`: the court's private King's Table table, the player seated as King A and the friends invited (201, the table). 409 `encounter_locked`, `challenge_locked`, `at_a_table`, `in_queue`; 422 `not_friend`, `invalid_deck` |
 | `POST /api/v1/campaign/scenes` | `games.play` | `{"scene": "FC.E01.POST"}`: a scene seen (to its end or skipped); FC.END.WIN or FC.END.EARLY after the finale's win records the ending |
 | `PUT /api/v1/campaign/tutorial` | `games.play` | `{"hints", "skip", "lessons"}`: the hints, the teaching skipped (never the duel), lessons seen added |
 
@@ -208,6 +225,26 @@ With thirty games a ward the curve holds by tier, and most wards sit within the 
 - **Liliana** (33%) and **the finale's public stand-in** (30%) are left as they are: Liliana is within reach of its 20% at this sample's noise once the turn-cap games are counted out, and the live finale plays with the High Priest and the incarnation at 15 life, which the public run cannot measure.
 
 The workflow ran again on the tuned decks from the branch `difficulty/v0.9.5` (10 games a reference); its table goes here when it finishes.
+
+**The run on v0.9.5's tuned decks** (2026-11-10, branch `difficulty/v0.9.5`, [Actions run 42912720584](https://github.com/sphinxtah/commander-duels/actions/runs/42912720584); 30 games a ward, the same references at skill 3). Ward 13 was still playing at v0.9.6's close; its row comes with the next version. Read in v0.9.6 from the wards' reports:
+
+| Ward | Reference won (v0.9.5) | v0.9.4 | Target |
+|---|---|---|---|
+| 1 Tibalt | 87% | 90% | 85% |
+| 2 Daretti (stronger deck) | 100% | 100% | 80% |
+| 3 Domri | 73% | 67% | 75% |
+| 4 Dovin (weaker deck) | 47% | 53% | 65% |
+| 5 Oko (stronger deck) | 70% | 73% | 60% |
+| 6 Xenagos | 50% | 47% | 55% |
+| 7 Tezzeret | 40% | 40% | 50% |
+| 8 Arzakon | 53% | 43% | 45% |
+| 9 Ashiok | 33% | 40% | 40% |
+| 10 Ob Nixilis (weaker deck) | 37% | 23% | 35% |
+| 11 Geyadrone Dihada (stronger deck) | 50% | 43% | 30% |
+| 12 Nicol Bolas | 20% (1 game to the turn cap) | 23% | 25% |
+| 14 The Sphinx (stand-in) | 43% (1 game to the turn cap) | 30% | 10% |
+
+Ob Nixilis is now on target. Daretti still loses every game to the references, Dihada measured easier rather than harder (within the noise of ±9 points of v0.9.4's 43%), and Dovin harder than before; these three and the stand-in finale are carried to v0.9.7's tuning. The court (ward 15) is a King's Table game the duel harness doesn't play; `CourtDecksTest` (opt-in) plays its decks under the leak checks.
 
 ## Content
 

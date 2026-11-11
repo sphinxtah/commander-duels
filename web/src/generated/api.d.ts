@@ -1139,6 +1139,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/campaign/encounters/{number}/court": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open Court
+         * @description Ward 15 with friends as your Generals (v0.9.6): opens a private King's Table table for the
+         *     court, you seated as King A with one of your Commander decks, and invites the friends named.
+         *     Team B's three seats are the court's bots; your Generals' seats wait for the friends, and
+         *     those not taken when you start are played by bots. The table starts as any other, from its
+         *     page; its game is the campaign's, and its end is read as the court's.
+         */
+        post: operations["open_court_api_v1_campaign_encounters__number__court_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/campaign/encounters/{number}/start": {
         parameters: {
             query?: never;
@@ -1152,7 +1176,8 @@ export interface paths {
          * Start Encounter
          * @description Starts an encounter's duel: you in seat 0, with your deck or the loaner, against the
          *     encounter's opponent. An encounter opens once the one before it is won; one won may be played
-         *     again, for no new reward.
+         *     again, for no new reward. Since v0.9.6 ward 15, the court, starts here with bots as your two
+         *     Generals: a King's Table game, you as King A (with friends instead: the court route).
          */
         post: operations["start_encounter_api_v1_campaign_encounters__number__start_post"];
         delete?: never;
@@ -4122,7 +4147,7 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.9.5
+             * @default 0.9.6
              */
             version: string;
         };
@@ -4149,6 +4174,11 @@ export interface components {
          * @description The Apex Unbound challenge (v0.9.3).
          */
         CampaignChallenge: {
+            /**
+             * At
+             * @description The encounter the challenge stands at: since v0.9.6 wards 14 and 15 as one run, so 15 once The Sphinx fled 14 in it.
+             */
+            at: number;
             /**
              * Earned
              * @description Its badge is yours.
@@ -4185,6 +4215,8 @@ export interface components {
              * @description The opponent's commander; null for the finale's, which is the owner's own.
              */
             commander: string | null;
+            /** @description Ward 15 (v0.9.6): the court's seats; null for a duel. */
+            court?: components["schemas"]["CourtView"] | null;
             /** Location */
             location: string;
             /** Name */
@@ -4207,9 +4239,10 @@ export interface components {
             spoils: components["schemas"]["EncounterSpoils"];
             /**
              * Status
+             * @description Since v0.9.6 ward 14 is fled once The Sphinx fled it in this run, until the court is won (then won) or lost (then open again).
              * @enum {string}
              */
-            status: "locked" | "open" | "won";
+            status: "locked" | "open" | "won" | "fled";
             /**
              * Tier
              * @enum {string}
@@ -4298,6 +4331,12 @@ export interface components {
              * @description How the duel ended for you, once its end is recorded.
              */
             outcome: ("won" | "lost" | "draw" | "unfinished") | null;
+            /**
+             * Seat
+             * @description Your seat (v0.9.6): 0 in a duel, King A's (1) at ward 15's court. Only the campaign's own player sees the reference; friends at the court see a table's game.
+             * @default 0
+             */
+            seat: number;
             /**
              * Title
              * @description The encounter's title.
@@ -4943,6 +4982,78 @@ export interface components {
             /** Title */
             title?: string | null;
         };
+        /** CourtSeat */
+        CourtSeat: {
+            /**
+             * Commander
+             * @description Null for The Sphinx's, the owner's own.
+             */
+            commander: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Opponent
+             * @description The roster ID naming their portrait.
+             */
+            opponent: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "king" | "general";
+            /** Seat */
+            seat: number;
+        };
+        /**
+         * CourtStart
+         * @description Ward 15 with friends as your Generals (v0.9.6): a private King's Table table the campaign
+         *     opens, you as King A with one of your Commander decks.
+         */
+        CourtStart: {
+            /**
+             * Challenge
+             * @description Apex Unbound's court (v0.9.6).
+             * @default false
+             */
+            challenge: boolean;
+            /**
+             * Deck Id
+             * Format: uuid
+             * @description One of your Commander decks.
+             */
+            deck_id: string;
+            /**
+             * Friends
+             * @description One or two friends, invited as your Generals.
+             */
+            friends: string[];
+        };
+        /**
+         * CourtView
+         * @description Ward 15, The Unbound Court (v0.9.6): a King's Table game against The Sphinx's court.
+         */
+        CourtView: {
+            /**
+             * Ally Seats
+             * @description Your Generals' seats: friends or bots.
+             */
+            ally_seats: number[];
+            /**
+             * Helper Tokens
+             * @description What a friend who helps win it is paid, once.
+             */
+            helper_tokens: number;
+            /**
+             * Opponents
+             * @description Team B: The Sphinx as King, two Generals.
+             */
+            opponents: components["schemas"]["CourtSeat"][];
+            /**
+             * Player Seat
+             * @description Your seat: King A's.
+             */
+            player_seat: number;
+        };
         /**
          * Coverage
          * @description How many cards of each format the engine can play, and why the rest cannot (CAT07).
@@ -5486,9 +5597,14 @@ export interface components {
             commander: string;
             /**
              * Deck
-             * @description The title of the deck the first win gives.
+             * @description The title of the deck the first win gives (the first of them).
              */
             deck: string;
+            /**
+             * Decks
+             * @description Every deck the first win gives: one for a warden, two at the court (v0.9.6).
+             */
+            decks: components["schemas"]["SpoilsDeck"][];
             /** Earned */
             earned: boolean;
             /**
@@ -5925,7 +6041,7 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.9.5
+             * @default 0.9.6
              */
             version: string;
         };
@@ -8613,6 +8729,18 @@ export interface components {
             /** Sleeves */
             sleeves: components["schemas"]["Sleeve"][];
         };
+        /** SpoilsDeck */
+        SpoilsDeck: {
+            /** Commander */
+            commander: string;
+            /**
+             * Opponent
+             * @description Whose deck it is: their roster ID, naming their portrait.
+             */
+            opponent: string;
+            /** Title */
+            title: string;
+        };
         /** StartEncounter */
         StartEncounter: {
             /**
@@ -9072,6 +9200,11 @@ export interface components {
             bot_skill: number;
             /** Bots */
             bots: number;
+            /**
+             * Campaign
+             * @description Since v0.9.6: the campaign encounter's title when the campaign opened the table (ward 15's court); null for every other table.
+             */
+            campaign?: string | null;
             /**
              * Can Start
              * @description You host it, every player's seat is taken and ready.
@@ -15740,6 +15873,104 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CampaignState"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    open_court_api_v1_campaign_encounters__number__court_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CourtStart"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableView"];
                 };
             };
             /** @description Bad Request */

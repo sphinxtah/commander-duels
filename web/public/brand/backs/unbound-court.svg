@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="630" height="880" viewBox="0 0 630 880">
+  <!-- Unbound Court (v0.9.6): ward 15's card back. The Sphinx's court of three, a King's crown between
+       two Generals' circlets, each broken open, under a mythic seal; drawn in mythic orange and gold. -->
+  <defs>
+    <radialGradient id="void" cx="50%" cy="44%" r="78%">
+      <stop offset="0" stop-color="#3a1408"/>
+      <stop offset="0.55" stop-color="#160704"/>
+      <stop offset="1" stop-color="#060201"/>
+    </radialGradient>
+    <linearGradient id="mythic" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffe2a8"/>
+      <stop offset="0.4" stop-color="#f08a3c"/>
+      <stop offset="1" stop-color="#8f2e12"/>
+    </linearGradient>
+    <linearGradient id="crown" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe7b0"/>
+      <stop offset="1" stop-color="#b8661f"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="630" height="880" rx="30" fill="#050201"/>
+  <rect x="14" y="14" width="602" height="852" rx="22" fill="url(#void)"/>
+  <rect x="34" y="34" width="562" height="812" rx="16" fill="none" stroke="url(#mythic)" stroke-width="7"/>
+  <rect x="50" y="50" width="530" height="780" rx="10" fill="none" stroke="#f3b36b" stroke-width="1.5" opacity="0.5"/>
+  <!-- The mythic seal behind the court: an eight-pointed star in a ring. -->
+  <g filter="url(#glow)">
+    <circle cx="315" cy="360" r="150" fill="none" stroke="url(#mythic)" stroke-width="5"/>
+    <path d="M315 222 L338 336 L452 360 L338 384 L315 498 L292 384 L178 360 L292 336 Z" fill="url(#mythic)" opacity="0.85"/>
+    <path d="M315 262 L326 349 L413 360 L326 371 L315 458 L304 371 L217 360 L304 349 Z" fill="#fff1d2" opacity="0.7"/>
+  </g>
+  <!-- The King's crown, split down its middle. -->
+  <g stroke="#3a1606" stroke-width="5" stroke-linejoin="round" fill="url(#crown)">
+    <path d="M232 660 L222 560 L258 595 L285 540 L308 600 L308 660 Z"/>
+    <path d="M398 660 L408 560 L372 595 L345 540 L322 600 L322 660 Z"/>
+  </g>
+  <!-- The Generals' circlets, broken, at either side. -->
+  <g stroke="#3a1606" stroke-width="4" stroke-linejoin="round" fill="url(#crown)">
+    <path d="M110 720 L106 670 L130 688 L150 655 L162 690 L176 670 L172 704 L160 724 Z"/>
+    <path d="M520 720 L524 670 L500 688 L480 655 L468 690 L454 670 L458 704 L470 724 Z"/>
+  </g>
+  <g filter="url(#glow)" fill="none" stroke="#ffd29a" stroke-width="4" stroke-linecap="round">
+    <path d="M315 520 L315 700"/>
+    <path d="M140 640 L150 600"/>
+    <path d="M490 640 L480 600"/>
+  </g>
+  <!-- Shards of the broken crowns. -->
+  <g stroke="#3a1606" stroke-width="2">
+    <path d="M250 730 l24 -6 -8 24z" fill="#f3b36b"/>
+    <path d="M370 742 l22 10 -24 10z" fill="#ffe2a8"/>
+    <path d="M96 520 l28 4 -16 20z" fill="#d6782f"/>
+    <path d="M524 516 l-24 16 28 8z" fill="#f3b36b"/>
+  </g>
+  <g fill="url(#mythic)">
+    <path d="M315 70 l12 22 -12 22 -12 -22z"/><path d="M315 766 l12 22 -12 22 -12 -22z"/>
+  </g>
+</svg>

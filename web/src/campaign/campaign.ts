@@ -71,6 +71,34 @@ export async function startEncounter(
   };
 }
 
+/** Ward 15 with friends as the player's Generals (v0.9.6): a private King's Table table the
+ * campaign opens, whose page seats the friends and starts the court. */
+export async function openCourt(
+  number: number,
+  deckId: string,
+  friends: string[],
+  challenge = false,
+): Promise<{ code?: string; error?: string }> {
+  const { data, error } = await client.POST(
+    "/api/v1/campaign/encounters/{number}/court",
+    {
+      params: { path: { number } },
+      body: { deck_id: deckId, friends, challenge },
+    },
+  );
+  if (data) return { code: data.code };
+  const problem = error as ApiError | undefined;
+  return {
+    error:
+      problem?.message ??
+      "The court could not open. Check your connection and try again.",
+  };
+}
+
+/** Ward 14, The Sphinx's flight, and ward 15, his court (v0.9.6). */
+export const FLIGHT = 14;
+export const COURT = 15;
+
 /** The ward's name of a tier, as the map and the chapter cards say it. */
 export const TIER_NAMES: Record<Tier, string> = {
   bronze: "Bronze",
@@ -111,7 +139,7 @@ export function stepsAfterWin(
   encounter: CampaignEncounter,
 ): Step[] {
   const steps: Step[] = [];
-  if (encounter.number < 14)
+  if (encounter.number < 14 || encounter.number === COURT)
     steps.push({
       kind: "seal",
       number: encounter.number,
@@ -121,9 +149,11 @@ export function stepsAfterWin(
   if (encounter.spoils.earned)
     steps.push({
       kind: "spoils",
-      opponent: encounter.opponent,
-      deck: encounter.spoils.deck,
-      commander: encounter.spoils.commander,
+      opponent: encounter.spoils.decks[0]?.opponent ?? encounter.opponent,
+      deck: encounter.spoils.decks.map((deck) => deck.title).join(" and "),
+      commander: encounter.spoils.decks
+        .map((deck) => deck.commander)
+        .join(" and "),
       tokens: encounter.spoils.tokens,
     });
   const at = state.chapters.findIndex((chapter) =>

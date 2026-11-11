@@ -101,14 +101,19 @@ function sideOf(
   };
 }
 
-/** The view as the campaign reads it. The boss is the first opponent. */
+/** The view as the campaign reads it. The boss is the first opponent, or since v0.9.6 the seat
+ * given (The Sphinx as King B at the court). */
 export function observe(
   view: GameView,
   log: LogLine[],
   seenLog: number,
+  boss?: Seat,
 ): Observation {
   const youSeat = view.seat ?? 0;
-  const bossPlayer = view.opponents[0] ?? null;
+  const bossPlayer =
+    (boss === undefined
+      ? view.opponents[0]
+      : view.opponents.find((player) => player.seat === boss)) ?? null;
   const bossSeat = bossPlayer?.seat ?? null;
   const byId = new Map(view.battlefield.map((p) => [p.id, p]));
   let power = 0;
@@ -328,10 +333,13 @@ export function incarnation(
   before: Observation | null,
   now: Observation,
   memory: Memory,
+  court = false,
 ): Incarnation {
-  if (!before) return null;
-  const had = before.boss.walkers.length;
+  const had = before?.boss.walkers.length ?? 0;
   const has = now.boss.walkers.length;
+  // At the court (v0.9.6) it stands on the battlefield from the start: the first sight of it.
+  if (court && !memory.arrived) return has > 0 ? "arrived" : null;
+  if (!before) return null;
   if (!memory.arrived) {
     return has > had && now.boss.life <= 15 ? "arrived" : null;
   }

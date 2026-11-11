@@ -126,6 +126,13 @@ The owner's decisions for v0.8.7: King's Table at human tables and the practice 
 
 The pieces: `web/src/tables/kingsTable.ts` (the seats, the settings' words), `KingsSettingsFields`, `KingsRules` and the tags in `TableParts.tsx`, the circle and the host's changes in `TableLobby.tsx`, the opening in `TablesPage.tsx`, and the practice table's in `web/src/game/PracticeTable.tsx`.
 
+## The campaign's court (v0.9.6)
+
+Ward 15 of [the campaign](campaign.md#the-unbound-court-ward-15-v096), with friends as the player's Generals, is a table the campaign opens (`POST /api/v1/campaign/encounters/15/court`): private, King's Table with Commander decks under the court's settings (everyone at 40 life, the house rule off), casual rules, bots at skill 6. The player hosts it, seated as King A; team B's three seats are the court's bots, named and pictured in the table's view (The Sphinx, Nicol Bolas, Liliana); each friend invited has a General's seat waiting, the other is a bot's. The view says so (`campaign`: the encounter's title), and the page reads "Campaign · King's Table".
+
+- **Fixed.** The settings, team B's seats and the host's seat can't change (`409 campaign_table`); the host may still give an open General's seat to a bot. Friends join, choose decks and get ready as at any table.
+- **The start** serves team B the court's decks (The Sphinx's with the owner's finale when the engine has it) and links the game to the host's campaign in the transaction that records it (`campaign_games`). Its end is the court's: it counts no win, pay, quest or achievement for anyone, and the friends who played it to the end and won are paid 10,000 tokens once ever each. A rematch answers `409 campaign_game`.
+
 ## Routes
 
 | Route | What |

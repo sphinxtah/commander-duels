@@ -403,12 +403,16 @@ final class HumanGame {
             LegacyDuel.seat(created, match, players.get(index), decks.get(index));
         }
         format.seatTeams(created, seatIds);
-        // A campaign finale's incarnation in reserve (v0.8.0): its rules for the seat's player.
+        // A campaign finale's incarnation in reserve (v0.8.0; the court's since v0.9.6): its rules for the seat's player.
         for (int index = 0; index < request.seats().size(); index++) {
             DeckLists.CustomDeck custom = request.seats().get(index).custom();
             if (custom != null) {
                 for (DeckLists.Reserve reserve : custom.reserve()) {
-                    CampaignReserve.apply(created, seatIds.get(index), reserve.name(), reserve.threshold());
+                    if (reserve.court()) {
+                        CampaignReserve.applyCourt(created, seatIds.get(index), reserve.name());
+                    } else {
+                        CampaignReserve.apply(created, seatIds.get(index), reserve.name(), reserve.threshold());
+                    }
                 }
             }
         }
