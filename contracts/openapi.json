@@ -36658,7 +36658,7 @@
             }
           },
           {
-            "description": "Only tables whose host's handle or name holds this.",
+            "description": "Only tables whose host's handle holds this.",
             "in": "query",
             "name": "host",
             "required": false,
@@ -36672,7 +36672,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Only tables whose host's handle or name holds this.",
+              "description": "Only tables whose host's handle holds this.",
               "title": "Host"
             }
           },

@@ -400,14 +400,19 @@ final class CampaignReserve {
         }
     }
 
-    /** The upkeep's intervening "if": the card waits in the reserve. */
+    /**
+     * The upkeep's intervening "if": the card waits in the reserve. A card that never came into the
+     * game waits there too (v0.9.7): when the arrival at the court's start was countered (a
+     * Stifle on the trigger), nothing had brought the card in, and the incarnation then stayed out
+     * of the whole game. {@link Arrive} brings it in.
+     */
     static final class InReserve implements Condition {
         private static final long serialVersionUID = 1L;
 
         @Override
         public boolean apply(Game game, Ability source) {
             Card card = card(game, source.getSourceId());
-            return card != null && game.getState().getZone(card.getId()) == Zone.COMMAND;
+            return card == null || game.getState().getZone(card.getId()) == Zone.COMMAND;
         }
 
         @Override

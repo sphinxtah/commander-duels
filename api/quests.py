@@ -22,6 +22,11 @@ docs/quests.md describes them for players and staff.
   to 1,000; 2,000 for a weekly board, 200 more for each week in a row up to 5,000. A board not
   finished in its period starts the streak again. The streak is read from the previous period's
   recorded board, never from a request.
+- **Every quest is one player's to finish** (the owner's choice), so a quest that needs
+  something that may not be there is drawn only while it is (v0.9.7): a win with a colour's deck
+  or in a format needs a playable deck of it among the account's own (reach_of), a sleeve to
+  upload needs room under the limit, and an auction to win or to bid on needs other accounts'
+  auctions, twice what the goal asks for (weekly_available).
 - **Farming.** A weekly goal counts only what the server records, and only real exchanges: an
   auction won from another account at 50 tokens or more, a listing that stayed up an hour or sold,
   another account's auction bid on, a pack bought with tokens, a deck legal and complete that
@@ -40,7 +45,7 @@ from typing import Literal, cast
 
 from fastapi import APIRouter
 from pydantic import Field
-from sqlalchemy import ColumnElement, and_, func, select
+from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from api.auth import INPUT_ERRORS
@@ -96,6 +101,10 @@ SLEEVE_LIMIT = 20
 # The least an auction won counts at, and how long a listing must stay up.
 AUCTION_MINIMUM = 50
 LISTING_HOURS = 1
+# A goal that needs other accounts' auctions is drawn only while the market holds this many times
+# what it asks for, and an auction to bid on only while it has this long left to run (v0.9.7).
+MARKET_MARGIN = 2
+BIDDABLE_HOURS = 24
 # How long a deck must last to count as built.
 DECK_DAYS = 1
 COMMANDER_SIZE = 100
@@ -195,13 +204,67 @@ def previous(board: Board, period: date) -> date:
 
 # Drawing.
 
+# The decks a game's format is played with: Two-Headed Giant plays Legacy decks, King's Table
+# either. A rule that names no format takes any deck.
+DECK_FORMATS: dict[str, tuple[str, ...]] = {
+    "commander": ("commander",),
+    "legacy": ("legacy",),
+    "two_headed_giant": ("legacy",),
+    "kings_table": ("legacy", "commander"),
+}
+Reach = Callable[[Rule], bool]
 
-def choose_daily(_user: User) -> list[DailyDef]:
-    """One quest a step, no two of one family. Tests replace this to pick the quests they need."""
+
+def everything(_rule: Rule) -> bool:
+    return True
+
+
+def reach_of(db: Session, user: User) -> Reach:
+    """Which wins the account can go for with a deck it has (v0.9.7): a quest asks only for a win
+    one of its playable decks could bring, by the deck's format and colours, as the deck builder
+    shows them. Players play their own decks alone (the practice table offers nobody else a
+    fixture deck), so until v0.9.7 a day could ask a player with one black deck to win with a red
+    one, which no game that day could do. SysOp plays any deck, and an account without a playable
+    deck is asked for anything: nothing says what it will build."""
+    if user.kind == "sysop":
+        return everything
+    decks = [
+        (fmt, identity or "")
+        for fmt, identity in db.execute(
+            select(Deck.format, Deck.identity).where(
+                Deck.owner_id == user.id,
+                Deck.deleted_at.is_(None),
+                Deck.archived_at.is_(None),
+                Deck.playable.is_(True),
+            )
+        )
+    ]
+    if not decks:
+        return everything
+
+    def within_reach(rule: Rule) -> bool:
+        formats = DECK_FORMATS.get(rule.format) if rule.format is not None else None
+        return any(
+            (formats is None or fmt in formats)
+            and (rule.color is None or rule.color in identity)
+            and (not rule.mono or len(identity) == 1)
+            and len(identity) >= rule.colors_at_least
+            for fmt, identity in decks
+        )
+
+    return within_reach
+
+
+def choose_daily(_user: User, reach: Reach = everything) -> list[DailyDef]:
+    """One quest a step, no two of one family, each within the account's reach. Every step has
+    quests any deck can do (wins, games played, a bot's skill), so a step never runs dry. Tests
+    replace this to pick the quests they need."""
     chosen: list[DailyDef] = []
     families: set[str] = set()
     for step in range(1, DAILY_QUESTS + 1):
-        options = [q for q in DAILY if q.step == step and q.family not in families]
+        options = [
+            q for q in DAILY if q.step == step and q.family not in families and reach(q.rule)
+        ]
         quest = RANDOM.choice(options)
         chosen.append(quest)
         families.add(quest.family)
@@ -271,6 +334,57 @@ def sleeves_kept(db: Session, user: User) -> int:
     )
 
 
+def market_of(db: Session, user: User, now: datetime) -> tuple[int, int]:
+    """What Tivit's Auction House holds for the account now: other accounts' live auctions it
+    could win at AUCTION_MINIMUM or more (a Buy Now below it sells below it), and those among
+    them it could bid on, which an unlimited listing never takes and one about to end hardly
+    does."""
+    live = (
+        Auction.status == "active",
+        Auction.seller_id != user.id,
+        or_(Auction.ends_at.is_(None), Auction.ends_at > now),
+    )
+    winnable = db.scalar(
+        select(func.count())
+        .select_from(Auction)
+        .where(*live, or_(Auction.buy_now.is_(None), Auction.buy_now >= AUCTION_MINIMUM))
+    )
+    biddable = db.scalar(
+        select(func.count())
+        .select_from(Auction)
+        .where(*live, Auction.ends_at > now + timedelta(hours=BIDDABLE_HOURS))
+    )
+    return int(winnable or 0), int(biddable or 0)
+
+
+def weekly_available(db: Session, user: User, now: datetime) -> Callable[[WeeklyGoal], bool]:
+    """Which weekly goals the account can be asked for (v0.9.7): every goal must be one a player
+    can finish alone (the owner's choice), so a goal is left out of the draw while what it needs
+    is not there. A sleeve needs room under the upload limit. An auction to win or to bid on
+    needs other accounts' auctions, which a quiet market does not have: until v0.9.7 a board
+    could ask for three bids with no auction to bid on, and so never be finished. A win with a
+    colour's deck, or in a format, needs a playable deck of it (reach_of)."""
+    room = sleeves_kept(db, user) < SLEEVE_LIMIT
+    winnable, biddable = market_of(db, user, now)
+    reach = reach_of(db, user)
+
+    def available(goal: WeeklyGoal) -> bool:
+        if goal.metric == "sleeves":
+            return room
+        if goal.metric == "auctions_won":
+            return winnable >= MARKET_MARGIN * goal.target
+        if goal.metric == "bids":
+            return biddable >= MARKET_MARGIN * goal.target
+        if goal.metric == "wins":
+            # Wins a deck of the account's could bring, as for the daily quests. Wins of any
+            # kind, games played, a bot's skill, a table's game and King's Table take any deck,
+            # so the games' six families are always there.
+            return reach(goal.rule)
+        return True
+
+    return available
+
+
 def drawn(db: Session, user: User, board: Board, now: datetime) -> list[DailyQuest]:
     """The period's board, drawn the first time it is asked for. The caller holds the account's
     lock, so two looks at once draw once."""
@@ -279,10 +393,9 @@ def drawn(db: Session, user: User, board: Board, now: datetime) -> list[DailyQue
     if rows:
         return rows
     if board == "daily":
-        picks: list[DailyDef | WeeklyGoal] = list(choose_daily(user))
+        picks: list[DailyDef | WeeklyGoal] = list(choose_daily(user, reach_of(db, user)))
     else:
-        room = sleeves_kept(db, user) < SLEEVE_LIMIT
-        picks = list(choose_weekly(lambda goal: goal.metric != "sleeves" or room))
+        picks = list(choose_weekly(weekly_available(db, user, now)))
     for slot, quest in enumerate(picks):
         row = DailyQuest(
             user_id=user.id,

@@ -789,7 +789,7 @@ def browse_tables(
     ] = False,
     host: Annotated[
         str | None,
-        Query(max_length=40, description="Only tables whose host's handle or name holds this."),
+        Query(max_length=40, description="Only tables whose host's handle holds this."),
     ] = None,
     sort: Annotated[
         TableSort,
@@ -831,11 +831,11 @@ def browse_tables(
         statement = statement.where(GameTable.seats - GameTable.bots > taken)
     term = (host or "").strip()
     if term:
+        # By handle alone (v0.9.7). A display name is its account's and the staff's: it starts as
+        # the Google account's name, so matching it here told any player, a letter at a time,
+        # the name behind a host's handle.
         hosts = select(User.id).where(
-            or_(
-                User.normalized_handle.contains(term.casefold(), autoescape=True),
-                User.display_name.icontains(term, autoescape=True),
-            )
+            User.normalized_handle.contains(term.casefold(), autoescape=True)
         )
         statement = statement.where(GameTable.host_id.in_(hosts))
     if no_bots:

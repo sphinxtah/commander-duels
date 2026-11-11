@@ -354,9 +354,9 @@ def test_totals_are_public_and_the_history_is_its_players_and_sysops(client):
 # The quest boards (v0.9.5).
 
 
-def daily(*ids: str) -> Callable[[User], list[quest_pool.DailyQuest]]:
-    """A daily draw of the named quests, one a step, in order."""
-    return lambda _user: [quest_pool.DAILY_BY_ID[found] for found in ids]
+def daily(*ids: str) -> Callable[..., list[quest_pool.DailyQuest]]:
+    """A daily draw of the named quests, one a step, in order, whatever the account's decks."""
+    return lambda _user, _reach=None: [quest_pool.DAILY_BY_ID[found] for found in ids]
 
 
 def weekly(*ids: str) -> Callable[[Any], list[quest_pool.WeeklyGoal]]:
@@ -817,6 +817,173 @@ def test_weekly_goals_count_what_the_server_records(client, monkeypatch):
     keys = [key for _, key, _ in entries(client, ada.id, "quest")]
     week = quests.period_of("weekly", now)[0].isoformat()
     assert f"weekly:{ada.id}:{week}:w-buy-packs-3" in keys
+
+
+def own_deck(client: TestClient, owner: UUID, fmt: str, identity: str, **kw: Any) -> None:
+    """A deck of the account's, playable unless told otherwise, of the format and colours."""
+    now = utcnow()
+    values: dict[str, Any] = {
+        "owner_id": owner,
+        "title": f"{identity} {fmt}",
+        "format": fmt,
+        "draft": {},
+        "draft_hash": "",
+        "card_count": 100 if fmt == "commander" else 60,
+        "legal": True,
+        "playable": True,
+        "identity": identity,
+        "created_at": now,
+        "updated_at": now,
+    } | kw
+    with database(client) as db:
+        db.add(Deck(**values))
+        db.commit()
+
+
+def test_quests_ask_only_for_wins_the_accounts_own_decks_can_bring(client):
+    """v0.9.7: players play their own decks alone, so a quest for a win with a red deck, or in
+    Legacy, is drawn only for an account with a playable deck of it. The owner's board asked
+    for a win with a red deck of an account whose every game was a black deck's."""
+    rule = quests.Rule
+    ada, root = Account(client, "ada"), Account(client, "sysop", kind="sysop")
+    with database(client) as db:
+        # No playable deck yet: nothing says what the account will build, so anything is asked.
+        reach = quests.reach_of(db, db.get_one(User, ada.id))
+        assert reach(rule(color="R")) and reach(rule(format="legacy", colors_at_least=5))
+    own_deck(client, ada.id, "commander", "B")
+    # Decks that cannot be played, or are put away, open nothing.
+    own_deck(client, ada.id, "legacy", "RG", playable=False)
+    own_deck(client, ada.id, "legacy", "WU", deleted_at=utcnow())
+    own_deck(client, ada.id, "legacy", "WUBRG", archived_at=utcnow())
+    within = [
+        rule(),
+        rule(skill_at_least=6),
+        rule(color="B"),
+        rule(mono=True),
+        rule(format="commander", color="B"),
+        rule(format="commander", seats=4, skill_at_least=6),
+        rule(format="kings_table", skill_at_least=5),
+    ]
+    beyond = [
+        rule(color="R"),
+        rule(format="legacy"),
+        rule(format="two_headed_giant"),
+        rule(format="legacy", color="B"),
+        rule(colors_at_least=2),
+        rule(colors_at_least=5),
+    ]
+    with database(client) as db:
+        user = db.get_one(User, ada.id)
+        reach = quests.reach_of(db, user)
+        assert all(reach(found) for found in within)
+        assert not any(reach(found) for found in beyond)
+        available = quests.weekly_available(db, user, utcnow())
+        seen: set[str] = set()
+        for _ in range(80):
+            day = quests.choose_daily(user, reach)
+            assert [quest.step for quest in day] == [1, 2, 3, 4, 5]
+            assert len({quest.family for quest in day}) == 5
+            assert all(reach(quest.rule) for quest in day)
+            week = quests.choose_weekly(available)
+            assert len({goal.family for goal in week}) == quest_pool.WEEKLY_GOALS
+            assert sum(goal.in_game for goal in week) == quest_pool.WEEKLY_IN_GAME
+            assert all(reach(goal.rule) for goal in week if goal.metric == "wins")
+            seen |= {quest.family for quest in day} | {goal.family for goal in week}
+        # The black deck's own quests are still drawn, and the games' goals of any deck.
+        assert {"colour-black", "mono", "commander", "kings-table", "tables"} <= seen
+        assert not seen & {"colour-red", "legacy", "two-headed", "five-colours", "multicolour"}
+        # SysOp plays any deck: the fixture decks and deck lists are its own.
+        assert quests.reach_of(db, db.get_one(User, root.id))(rule(colors_at_least=5))
+    # A red and green Legacy deck opens Legacy, Two-Headed Giant and both colours.
+    own_deck(client, ada.id, "legacy", "RG")
+    with database(client) as db:
+        reach = quests.reach_of(db, db.get_one(User, ada.id))
+        assert all(
+            reach(found)
+            for found in (
+                rule(color="R"),
+                rule(format="two_headed_giant", skill_at_least=4),
+                rule(format="legacy", color="G"),
+                rule(colors_at_least=2),
+            )
+        )
+        assert not reach(rule(colors_at_least=3))
+        assert not reach(rule(format="commander", color="R"))
+    # The route draws the day's board from them.
+    shown = ada.get("/api/v1/me/quests").json()
+    with database(client) as db:
+        reach = quests.reach_of(db, db.get_one(User, ada.id))
+        for quest in shown["daily"]["quests"]:
+            assert reach(quest_pool.DAILY_BY_ID[quest["id"]].rule), quest
+
+
+def test_auction_goals_are_drawn_only_while_the_market_can_supply_them(client):
+    """v0.9.7: every weekly goal is one player's to finish, so a goal that needs other accounts'
+    auctions is left out of the draw while the market does not hold twice what it asks for. The
+    live site's board asked for three bids with not one auction to bid on."""
+    ada, bob = Account(client, "ada"), Account(client, "bob")
+    printing, concept = card_printing(client)
+    now = utcnow()
+    goals = quest_pool.WEEKLY_BY_ID
+
+    def open_to(*ids: str) -> list[bool]:
+        with database(client) as db:
+            available = quests.weekly_available(db, db.get_one(User, ada.id), now)
+            return [available(goals[found]) for found in ids]
+
+    def listing(seller: UUID, **kw: Any) -> None:
+        values: dict[str, Any] = {
+            "seller_id": seller,
+            "concept_id": concept,
+            "printing_id": printing,
+            "finish": "nonfoil",
+            "starting_bid": 100,
+            "duration": "3d",
+            "request_key": uuid4().hex,
+            "created_at": now,
+            "ends_at": now + timedelta(days=3),
+        } | kw
+        with database(client) as db:
+            db.add(Auction(**values))
+            db.commit()
+
+    def unlimited(seller: UUID, price: int) -> None:
+        listing(seller, duration="unlimited", ends_at=None, buy_now=price, starting_bid=price)
+
+    wanted = ("w-win-auctions-1", "w-win-auctions-2", "w-bids-1", "w-bids-3")
+    # An empty market, and one holding only the account's own auctions: none of them.
+    assert open_to(*wanted, "w-wins-3", "w-sleeve-1") == [False] * 4 + [True, True]
+    for _ in range(6):
+        listing(ada.id)
+    assert open_to(*wanted) == [False, False, False, False]
+    # One listing to buy is not twice one; a Buy Now under 50 tokens never counts as won.
+    unlimited(bob.id, 300)
+    unlimited(bob.id, 20)
+    assert open_to(*wanted) == [False, False, False, False]
+    # A second to win, which is also the first to bid on.
+    listing(bob.id)
+    assert open_to(*wanted) == [True, False, False, False]
+    # One about to end is no auction to plan a week's bids on; one over the weekend is.
+    listing(bob.id, duration="1h", ends_at=now + timedelta(hours=1))
+    assert open_to(*wanted) == [True, False, False, False]
+    listing(bob.id)
+    assert open_to(*wanted) == [True, True, True, False]
+    # An ended auction, sold or still waiting to be settled, is no part of the market.
+    listing(bob.id, ends_at=now - timedelta(minutes=1), created_at=now - timedelta(days=3))
+    listing(bob.id, status="withdrawn", ended_at=now)
+    assert open_to(*wanted) == [True, True, True, False]
+
+    # With an empty market no draw asks for either, and the board is still twenty of twenty
+    # families at its tiers.
+    with database(client) as db:
+        db.execute(text("DELETE FROM auctions"))
+        db.commit()
+        available = quests.weekly_available(db, db.get_one(User, ada.id), now)
+        for _ in range(60):
+            chosen = quests.choose_weekly(available)
+            assert not {goal.metric for goal in chosen} & {"auctions_won", "bids"}
+            assert len({goal.family for goal in chosen}) == quest_pool.WEEKLY_GOALS
+            assert sum(goal.in_game for goal in chosen) == quest_pool.WEEKLY_IN_GAME
 
 
 def card_printing(client: TestClient) -> tuple[UUID, UUID]:

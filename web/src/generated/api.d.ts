@@ -27335,7 +27335,7 @@ export interface operations {
                 best_of_three?: boolean;
                 /** @description Only tables a friend sits at or you were invited to. */
                 friends?: boolean;
-                /** @description Only tables whose host's handle or name holds this. */
+                /** @description Only tables whose host's handle holds this. */
                 host?: string | null;
                 /** @description newest (default), players (most seated) or fewest_open (seats). */
                 sort?: "newest" | "players" | "fewest_open";

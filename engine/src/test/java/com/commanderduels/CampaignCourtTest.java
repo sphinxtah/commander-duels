@@ -93,4 +93,64 @@ class CampaignCourtTest {
         assertTrue(arrivals.get() >= 2, "the incarnation came back " + (arrivals.get() - 1) + " times");
         assertEquals(1, most.get(), "more than one incarnation at once");
     }
+
+    /**
+     * v0.9.7: the arrival at the court's start is a trigger, and a trigger can be countered. Countered,
+     * it had brought no card into the game, and the upkeep's return asked for a card already in the
+     * reserve, so the incarnation stayed out of the whole game. It now arrives at its controller's
+     * next upkeep. The test takes the trigger off the stack as a counter would.
+     */
+    @Test
+    void theIncarnationArrivesAtTheUpkeepWhenItsFirstArrivalWasCountered() throws Exception {
+        var human = new DeckLists.CustomDeck(List.of(new DeckLists.Entry("Plains", 99)), List.of(COMMANDER));
+        var bot = new DeckLists.CustomDeck(List.of(new DeckLists.Entry("Mountain", 99)), List.of(COMMANDER),
+            List.of(), Map.of(), List.of(new DeckLists.Reserve(CARD, 15, true)));
+        var request = new HumanGameRequest(9156L, GameFormat.COMMANDER, List.of(
+            new HumanGameRequest.Seat(HumanGameRequest.HUMAN, HumanGameRequest.CUSTOM_DECK, human),
+            new HumanGameRequest.Seat(HumanGameRequest.BOT, HumanGameRequest.CUSTOM_DECK, bot)), 1, 6, 900);
+        AtomicBoolean countered = new AtomicBoolean(false);
+        AtomicInteger arrivals = new AtomicInteger();
+        AtomicBoolean present = new AtomicBoolean(false);
+        AtomicBoolean beforeTheCounter = new AtomicBoolean(false);
+        HumanGame.Hooks hooks = new HumanGame.Hooks() {
+            @Override
+            public void published(mage.game.Game game, ObjectRefs refs, int seat, SeatView view, PromptView prompt) {
+                if (countered.get()) {
+                    return;
+                }
+                for (mage.game.stack.StackObject object : List.copyOf(game.getStack())) {
+                    if (object.getStackAbility() instanceof CampaignReserve.CourtArrival) {
+                        game.getStack().remove(object, game);
+                        countered.set(true);
+                    }
+                }
+            }
+        };
+        HumanGame game = Tables.start(request, hooks);
+        Tables.play(game, (seat, prompt, view) -> {
+            if (view != null) {
+                boolean here = view.battlefield().stream()
+                    .anyMatch(permanent -> CARD.equals(permanent.card().name()) && permanent.controllerSeat() == 1);
+                if (here && !countered.get()) {
+                    beforeTheCounter.set(true);
+                }
+                if (here && !present.get()) {
+                    arrivals.incrementAndGet();
+                }
+                present.set(here);
+            }
+            if (prompt.kind().equals("mulligan")) {
+                return ScriptedPlayer.byAction(prompt.options(), "keep").get(0).id();
+            }
+            var pass = ScriptedPlayer.byAction(prompt.options(), "pass");
+            if (!pass.isEmpty()) {
+                return pass.get(0).id();
+            }
+            var done = ScriptedPlayer.byAction(prompt.options(), "done");
+            return done.isEmpty() ? prompt.options().get(0).id() : done.get(0).id();
+        }, 6, new Tables.Coverage());
+        assertTrue(countered.get(), "the court's arrival never waited on the stack");
+        assertTrue(!beforeTheCounter.get(), "the incarnation arrived before its trigger was countered");
+        assertTrue(arrivals.get() >= 2, "after the counter the incarnation arrived " + arrivals.get() + " times");
+    }
 }

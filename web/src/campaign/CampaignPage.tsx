@@ -234,14 +234,24 @@ export function CampaignPage({
         });
         return;
       }
+      // A later win that gives spoils an earlier one left owing (v0.9.7: a first win with
+      // passive bots pays nothing) still shows them: a deck of the ward's waits to be opened.
+      const owed = (ward: CampaignEncounter): Step[] =>
+        waiting.some((item) => item.encounter === ward.number)
+          ? stepsAfterWin(fresh, ward).filter((step) => step.kind === "spoils")
+          : [];
       if (number === COURT) {
         const flight = fresh.encounters.find((e) => e.number === FLIGHT);
         const first = !fresh.progress.scenes_seen.includes(STORY.court.post.id);
         afterWin(
           [STORY.court.post, STORY.endings.win],
           [
-            ...(first && flight ? stepsAfterWin(fresh, flight) : []),
-            ...(first ? stepsAfterWin(fresh, encounter) : []),
+            ...(flight
+              ? first
+                ? stepsAfterWin(fresh, flight)
+                : owed(flight)
+              : []),
+            ...(first ? stepsAfterWin(fresh, encounter) : owed(encounter)),
             {
               kind: "card",
               kicker: fresh.title,
@@ -274,7 +284,11 @@ export function CampaignPage({
       const post = story.post;
       if (!post) return;
       const first = !fresh.progress.scenes_seen.includes(post.id);
-      afterWin(post, first ? stepsAfterWin(fresh, encounter) : [], waiting);
+      afterWin(
+        post,
+        first ? stepsAfterWin(fresh, encounter) : owed(encounter),
+        waiting,
+      );
       return;
     }
     if (ref.outcome === "lost" || ref.outcome === "draw") {

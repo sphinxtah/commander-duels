@@ -23,7 +23,7 @@ from alembic.config import Config
 from alembic.script import ScriptDirectory
 from catalog_fixtures import bulk, engine_list, import_bulk
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import create_engine, select, text, update
 from sqlalchemy.orm import Session
 from test_decks_api import ACCOUNT_TABLES
 from test_games import ORIGIN, SERVICE_TOKEN, SYSOP_ADDRESS, FakeEngine, FakeGame, Tab, closed
@@ -31,7 +31,7 @@ from test_games import ORIGIN, SERVICE_TOKEN, SYSOP_ADDRESS, FakeEngine, FakeGam
 from api import economy, games
 from api.config import Settings
 from api.main import create_app
-from api.models import AuditEvent, CardConcept, GameSeat, GameTable, TokenEntry
+from api.models import AuditEvent, CardConcept, GameSeat, GameTable, TokenEntry, User
 
 content = test_progression.content
 TABLES = (
@@ -935,6 +935,15 @@ def test_the_lobby_pages_and_filters_its_tables(client, engine):
     assert codes(browse(root, host="CAR")) == [tournament]
     assert codes(browse(root, host="bo", sort="players")) == [commander]
     assert codes(browse(root, host="nobody")) == []
+    # By handle alone (v0.9.7): a display name starts as the Google account's name and is its
+    # account's and the staff's, so the search never matches it, for a player or for SysOp.
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        db.execute(update(User).where(User.id == cara.id).values(display_name="Caroline Example"))
+        db.commit()
+    for viewer in (dan, root):
+        assert codes(browse(viewer, host="caroline")) == []
+        assert codes(browse(viewer, host="Example")) == []
+        assert codes(browse(viewer, host="cara")) == [tournament]
     wrong = root.get("/api/v1/tables/browse", sort="oldest")
     assert wrong.status_code == 422
     # Pages: 20, 50 or 100 a page; a page past the last answers the last.
