@@ -247,7 +247,61 @@ The workflow ran again on the tuned decks from the branch `difficulty/v0.9.5` (1
 
 Ob Nixilis is now on target. Daretti still loses every game to the references, Dihada measured easier rather than harder (within the noise of ±9 points of v0.9.4's 43%), and Dovin harder than before; these three and the stand-in finale are carried to v0.9.7's tuning. The court (ward 15) is a King's Table game the duel harness doesn't play; `CourtDecksTest` (opt-in) plays its decks under the leak checks.
 
-**The court, measured (v0.9.7).** `CampaignDifficulty` plays ward 15 as a King's Table game of six fair bots (`playCourt`): the reference deck is King A's at the reference skill, its two Generals are bots at the ward's skill (what a player who brings no friend gets: since v0.9.8 on the beaten wardens' decks of `court.allies`, until then on the engine's fixture decks), and team B is the court as the API serves it: The Sphinx's deck under its public stand-in commander as King, and the two gifted decks, all at skill 6. It plays under the court's own settings, read from the content (Commander decks, everyone at 40 life, the house rule with its guard), to the court's limit of 240 turns; a King chosen at random plays first. A game team A wins counts for the reference, one the court wins for the warden. The owner's incarnation is not in it (only the owner's engine has the card), so the court on the live site is harder than this measures. The workflow measures ward 15 with the others, with at most two games a reference deck and a budget of 2,700 seconds a game; the run started at v0.9.7's close gives its row, which goes here with ward 13's. One game played here under the court's first settings (the house rule off, 60 turns) ran to the turn limit undecided, King A at 24 life and The Sphinx at 39: the reason the limit is now 40 turns for each player.
+**The court, measured (v0.9.7).** `CampaignDifficulty` plays ward 15 as a King's Table game of six fair bots (`playCourt`): the reference deck is King A's at the reference skill, its two Generals are bots at the ward's skill (what a player who brings no friend gets: since v0.9.8 on the beaten wardens' decks of `court.allies`, until then on the engine's fixture decks), and team B is the court as the API serves it: The Sphinx's deck under its public stand-in commander as King, and the two gifted decks, all at skill 6. It plays under the court's own settings, read from the content (Commander decks, everyone at 40 life, the house rule with its guard), to the court's limit of 240 turns; a King chosen at random plays first. A game team A wins counts for the reference, one the court wins for the warden. The owner's incarnation is not in it (only the owner's engine has the card), so the court on the live site is harder than this measures. The workflow measures ward 15 with the others, with at most two games a reference deck and a budget of 2,700 seconds a game; the run started at v0.9.7's close gave its row and ward 13's, which are with v0.9.8's measurements [below](#difficulty-after-the-bots-stopped-sacrificing-v098). One game played here under the court's first settings (the house rule off, 60 turns) ran to the turn limit undecided, King A at 24 life and The Sphinx at 39: the reason the limit is now 40 turns for each player.
+
+## Difficulty after the bots stopped sacrificing (v0.9.8)
+
+v0.9.8 changed how the bots play twice, so the campaign was measured again on GitHub's runners, three times on 2026-11-11, 30 games a ward each (the same three reference decks at skill 3):
+
+1. [Run 43091164592](https://github.com/sphinxtah/commander-duels/actions/runs/43091164592): with the search's memory bounded ([fair bots](engine/fair-bots.md#a-searchs-memory-v098)).
+2. [Run 43103460708](https://github.com/sphinxtah/commander-duels/actions/runs/43103460708): with the sacrifice outlets left alone as well.
+3. [Run 43106448862](https://github.com/sphinxtah/commander-duels/actions/runs/43106448862): with three decks tuned.
+
+**What the trace showed.** The harness's `-Dcampaign.trace` printed a Daretti game. His commander, Slobad, Goblin Tinkerer ("Sacrifice an artifact: Target artifact gains indestructible until end of turn"), sacrificed his artifacts one after another, each to make that same artifact indestructible: Skittering Surveyor, Scrap Trawler, Foundry Inspector, Mind Stone. That is why the references won 59 of his last 60 duels whatever his deck held, through two versions of stronger decks. A Liliana game showed Yawgmoth, Thran Physician sacrificing Phyrexian Obliterator, then Archfiend of Depravity, for a -1/-1 counter and a card each. A bot's search now leaves every ability paid for by another permanent's sacrifice alone ([fair bots](engine/fair-bots.md#sacrifice-outlets-left-alone-v098)). Wards 2, 6, 7, 10, 11 and 13 hold such cards.
+
+**The results.** A ward the second change does not touch pools all three runs (90 games, about ±5 points of noise); one it touches pools the last two (60, ±6); a tuned deck has its one run (30, ±9). The same deck's 30-game runs differed by up to 24 points here, so a single run settles little.
+
+| Ward | Reference won | Games | Before v0.9.8 | Target |
+|---|---|---|---|---|
+| 1 Tibalt | 89% | 90 | 87% | 85% |
+| 2 Daretti (stronger deck) | 73% | 30 | 100%; 97% in run 1, 90% in run 2 | 80% |
+| 3 Domri | 63% | 90 | 73% | 75% |
+| 4 Dovin | 64% | 90 | 47% | 65% |
+| 5 Oko | 67% | 90 | 70% | 60% |
+| 6 Xenagos (weaker deck) | 53% | 30 | 50%; 43% in run 1, 40% in run 2 | 55% |
+| 7 Tezzeret | 60% | 60 | 40%; 37% in run 1 | 50% |
+| 8 Arzakon | 47% | 90 | 53% | 45% |
+| 9 Ashiok | 32% | 90 | 33% | 40% |
+| 10 Ob Nixilis (weaker deck) | 27% | 30 | 37%; 23% in run 1, 20% in run 2 | 35% |
+| 11 Geyadrone Dihada | 30% | 60 | 50%; 40% in run 1 | 30% |
+| 12 Nicol Bolas | 22% | 90 | 20% | 25% |
+| 13 Liliana | 28% | 60 | 50% (v0.9.7's run) | 20% |
+| 14 The Sphinx (stand-in) | 39% | 90 | 43% | 10% |
+
+**Tuned in v0.9.8.** The decks are the lever, as before.
+
+- **Daretti** (Bronze, stronger). Once the bot kept its artifacts he still lost 27 of 30. Eight cards that did nothing against the references give way to creatures and burn: Tormod's Crypt, Soul-Guide Lantern, Prototype Portal, Mimic Vat, Implement of Combustion, Servo Schematic, Trading Post and Spine of Ish Sah to Juggernaut, Precursor Golem, Pia Nalaar, Flametongue Kavu, Cathodion, Searing Spear, Pia and Kiran Nalaar and Siege-Gang Commander. His artifact recursion (Goblin Welder, Trash for Treasure, Scrap Mastery, Daretti, Scrap Savant, Scarecrone) stays for his barks.
+- **Xenagos** (Silver, weaker). 42% over runs 1 and 2 against 55%. Terror of the Peaks, Balefire Dragon, Elder Gargaroth and Inferno Titan give way to Rumbling Baloth, Colossal Dreadmaw, Krosan Tusker and Vulpine Goliath.
+- **Ob Nixilis** (Gold, weaker). 22% over runs 1 and 2 against 35%. Massacre Wurm, Grave Titan, Glorybringer and Torbran, Thane of Red Fell give way to Gravedigger, Sengir Vampire, Volcanic Dragon and Borderland Marauder. At 27% he is still on the hard side of his target.
+- **Liliana and Geyadrone Dihada needed no new cards.** Both were measured too easy before; both are at their targets now that their bots keep their creatures.
+- **Dovin** needed nothing: 64% over 90 games against 65%.
+- **The finale's public stand-in is left as it is.** It measured 23%, 47% and 47% in the three runs, and plays without the High Priest and the incarnation, which only the owner's engine has. Its 99 are the court's King's as well, and at the court the references won 4 of 18 games.
+- **Left for the owner:** Domri measures harder than his place (63% over 90 games against 75%), and so does Ashiok by less (32% against 40%). Tezzeret measures easier (60% over 60 games against 50%; 39% over the 99 games measured before): his bot no longer feeds artifacts to Sai, Master Thopterist ("{1}{U}, Sacrifice two artifacts: Draw a card"). Keeping the outlets that cost mana was tried and dropped: a trace showed that one sacrificing Wurmcoil Engine and Sol Ring for a single card. The cards it drew seem to have won him games all the same.
+
+Players who already won a ward keep the deck they won; a first win from now on gives the deck as it is now. Sacrifice outlets stay in the decks: a player who wins one can use them.
+
+**The court.** Each run played six court games, two a reference deck, all with the player's bot Generals on the beaten wardens' decks.
+
+| Run | Reference won | Loaner | Red-green starter | White-blue starter | Turns | Heap peaks (of 10,240 MB) |
+|---|---|---|---|---|---|---|
+| v0.9.7's ([42969270514](https://github.com/sphinxtah/commander-duels/actions/runs/42969270514)), the Generals on fixture decks | 0 of 5; a sixth game ran out of memory at turn 39 | 0 of 1 | 0 of 2 | 0 of 2 | 44 to 51 | 11,047 to 16,687 MB |
+| 1 | 1 of 6 | 1 of 2 | 0 of 2 | 0 of 2 | 41 to 53 | 2,984 to 4,455 MB |
+| 2 | 2 of 6 | 2 of 2 | 0 of 2 | 0 of 2 | 39 to 53 | 3,473 to 4,294 MB |
+| 3 | 1 of 6 | 1 of 2 | 0 of 2 | 0 of 2 | 38 to 55 | 3,522 to 4,465 MB |
+
+Over the three runs the references won 4 of 18 (22%), every one with the loaner deck as King A; the two starter decks lost all twelve. Eighteen games are few: they say that the court is hard for a reference deck at skill 3 and no longer out of its reach, and nothing finer. No game came near the 240-turn limit, and none ran out of memory. A heap peak is the heap pools' peaks summed, an upper bound, which is how v0.9.7's could pass the limit; the measure is the same in every row.
+
+The court has no target of its own. A player reaches it with thirteen wardens' decks to choose from and not a starter deck, and the live court also plays the owner's incarnation, which this does not measure. Whether it is as hard as it should be is the owner's to say once he has played it with the new allies.
 
 ## Content
 

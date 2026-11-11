@@ -33,6 +33,9 @@ COPY engine/pom.xml ./
 COPY engine/xmage/pin.properties ./xmage/
 COPY engine/decks ./decks
 COPY engine/src ./src
+# The campaign's decks, for the tests alone (v0.9.8): CourtDecksTest checks that every ward's deck
+# names only cards this engine knows. Nothing of it reaches the runtime image.
+COPY content/campaign.json ../content/campaign.json
 RUN ln -s /xmage/carddb/db db
 RUN --mount=type=cache,target=/root/.m2/repository \
     mvn -B -ntp -Dmaven.repo.local.tail=/xmage/m2 -DskipTests=${ENGINE_SKIP_TESTS} verify \

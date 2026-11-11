@@ -12,7 +12,7 @@ The owner is adding the official text to the licensing agreement with Wizards of
 - **The account's menu** in the upper right (with the player's name, Settings and Sign out): How to play.
 - **Signed out**: `#how-to-play` and every address under it open for anyone, signed in or not, waiting for approval or not, as a page of its own with the mark (back to the sign-in), the Fan Content notice and the public pages' links. Nothing there asks the API for anything but the guide's card pictures.
 - **"What's this?"** under every prompt at the table (`web/src/game/PromptPanel.tsx`): the topic that explains that kind of choice (priority, mulligan, targets, attackers, blockers, damage assignment, paying mana, ordering triggers, modes…), in a new tab so the game goes on. The table is `PROMPT_TOPICS` in `guide.ts`.
-- **The tutorial**: each page of the Novice's Magic refresher and each lesson of the Beginner's guided game has "More in How to play" to its topic, in a new tab (`web/src/tutorial/LearnMore.tsx`, `TUTORIAL_TOPICS` in `guide.ts`).
+- **The tutorial**: each page of the Novice's Magic refresher and each lesson of the Beginner's guided game has "More in How to play" to its topic (`web/src/tutorial/LearnMore.tsx`, `TUTORIAL_TOPICS` in `guide.ts`). Since v0.9.8 it is a button that opens the topic in a pop-up over the tutorial (`TopicDialog.tsx`): the topic's own words, cards and examples, with no links in it, and Close, Escape or a click beside it to go back. Until then it opened the guide in a new tab, and a new tab for an account still in its setup opens the welcome again, so the link led in a circle (the owner's report). The guided game's "Play on its own" waits while the pop-up is open.
 
 ## Addresses
 

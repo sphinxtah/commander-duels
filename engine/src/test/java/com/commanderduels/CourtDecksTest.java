@@ -25,8 +25,9 @@ import org.junit.jupiter.api.condition.EnabledIf;
  * card of the three decks must be one the engine knows, and the game must play to its end or its turn
  * cap. (SeatChecks' leak checks know the fixture decks only.) The game is played only with
  * {@code -Dcampaign.court=true} (about two minutes); the decks' cards whenever the repository's
- * {@code content/} is beside the engine (not in the engine image's build, which copies the engine only).
- * Needs ./db.
+ * {@code content/campaign.json} is beside the engine. The engine image's build copies it there for
+ * these tests since v0.9.8 (until then it copied the engine only, and the hosted checks skipped
+ * the class). Needs ./db.
  */
 @EnabledIf("contentHere")
 class CourtDecksTest {
