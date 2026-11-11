@@ -234,8 +234,8 @@ export function CampaignPage({
         });
         return;
       }
-      // A later win that gives spoils an earlier one left owing (v0.9.7: a first win with
-      // passive bots pays nothing) still shows them: a deck of the ward's waits to be opened.
+      // A later win that gives spoils an earlier one left owing (v0.9.7: until then a first win
+      // with passive bots paid nothing) still shows them: a deck of the ward's waits to be opened.
       const owed = (ward: CampaignEncounter): Step[] =>
         waiting.some((item) => item.encounter === ward.number)
           ? stepsAfterWin(fresh, ward).filter((step) => step.kind === "spoils")

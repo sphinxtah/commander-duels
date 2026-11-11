@@ -26,22 +26,16 @@ describe("SysOp's passive bots", () => {
     expect(changed.mock.calls[0]![0]).toMatchObject({ passive_bots: true });
   });
 
-  it("warns before use and says so once the game no longer counts", () => {
-    const { rerender } = render(
-      <PassiveBots gameId="g" passive={false} onChange={() => {}} />,
-    );
+  it("says that the game counts as any other (v0.9.7)", () => {
+    render(<PassiveBots gameId="g" passive onChange={() => {}} />);
     expect(
-      screen.getByText(/Once used, the game counts for nothing/),
+      screen.getByText(
+        /The game counts as any other: its win, tokens, quests and achievements, and in the campaign the ward’s spoils and rewards\./,
+      ),
     ).toBeTruthy();
-    expect(screen.getByText(/no quests or achievements/)).toBeTruthy();
-    // Switched on and off again: the game stays uncounted, and the switch says so.
-    rerender(
-      <PassiveBots gameId="g" passive={false} uncounted onChange={() => {}} />,
-    );
-    expect(screen.getByText(/This game no longer counts/)).toBeTruthy();
-    expect(
-      screen.getByText(/no progress on quests or achievements/),
-    ).toBeTruthy();
+    // The warnings of the rule that ended with v0.9.7 are gone.
+    expect(screen.queryByText(/counts for nothing/)).toBeNull();
+    expect(screen.queryByText(/no longer counts/)).toBeNull();
   });
 
   it("says why when the server refuses", async () => {

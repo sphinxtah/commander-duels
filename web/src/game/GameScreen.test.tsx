@@ -696,7 +696,7 @@ describe("a human table's game (v0.4.0)", () => {
 });
 
 describe("a game played with passive bots (v0.9.7)", () => {
-  it("says on its result that it counts for nothing", async () => {
+  it("shows its result and its tokens as any other game's", async () => {
     const { client } = await import("../api");
     const get = vi.mocked(client.GET);
     const original = get.getMockImplementation()!;
@@ -738,13 +738,13 @@ describe("a game played with passive bots (v0.9.7)", () => {
                 ],
                 your_seat: 0,
                 bot_skill: 6,
-                turn_cap: 60,
+                turn_cap: 80,
                 created_at: "2026-11-10T10:00:00Z",
                 finished_at: finished ? "2026-11-10T10:30:00Z" : null,
                 result: finished ? result : null,
-                // No win, so no tokens: the bots were passive at some point.
-                tokens: null,
-                uncounted: true,
+                // The bots were passive at some point: the game pays as any other.
+                tokens: finished ? 20 : null,
+                passive_bots: finished ? null : false,
               },
               snapshot: null,
             },
@@ -766,7 +766,6 @@ describe("a game played with passive bots (v0.9.7)", () => {
           snapshot: snapshot(5, priority("A")),
         });
       });
-      expect(screen.queryByText(/Passive bots were used/)).toBeNull();
       finished = true;
       act(() =>
         socket.deliver({
@@ -780,11 +779,12 @@ describe("a game played with passive bots (v0.9.7)", () => {
       );
       await waitFor(() =>
         expect(
-          screen.getAllByText(
-            /Passive bots were used, so this game counts for nothing: no win, no tokens, no quest or achievement/,
-          ),
+          screen.getAllByText("This game paid you 20 tokens."),
         ).not.toHaveLength(0),
       );
+      // Nothing says the game did not count: since v0.9.7 it does.
+      expect(screen.queryByText(/Passive bots were used/)).toBeNull();
+      expect(screen.queryByText(/counts for nothing/)).toBeNull();
     } finally {
       get.mockImplementation(original);
     }

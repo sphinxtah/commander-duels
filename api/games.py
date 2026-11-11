@@ -1203,20 +1203,19 @@ def record_end(
             game.result = recorded(result, game.format) if result else None
             db.flush()
             link = db.get(CampaignGame, game.id)
-            # A game played with passive bots (SysOp's since v0.8.6, an administrator's since
-            # v0.8.7) pays nothing out: no win, tokens, quests or achievements, and in the
-            # campaign no spoils or chapter rewards, though a won duel still moves the player's
-            # own campaign on, for testing the wards that follow.
-            payouts = not game.passive_bots_used
+            # A game played with passive bots (the testing switch of SysOp, v0.8.6, and of
+            # administrators, v0.8.7) counts as any other since v0.9.7 (the owner, 2026-11-10:
+            # "Administrators should not have this restriction"): its win, tokens, quests and
+            # achievements, and in the campaign its spoils and chapter rewards, so that they
+            # test the campaign and the quests as a player finds them. Until then it paid
+            # nothing out. games.passive_bots_used still records that the switch was used.
             if link is not None:
                 content = campaign.campaign_in(content_dir) if content_dir else None
-                campaign.game_ended(db, game, link, content, content_dir, payouts=payouts)
-            elif payouts:
+                campaign.game_ended(db, game, link, content, content_dir)
+            else:
                 count_win(db, game)
                 pay_game(db, game)
                 settle(db, game)
-                matches.game_ended(db, game)
-            else:
                 matches.game_ended(db, game)
             db.commit()
 
@@ -1475,7 +1474,6 @@ def summary_of(
         match=match_ref(db, game),
         kings_table=kings,
         passive_bots=(game.bots_passive if passive_switchable(game, rows, principal) else None),
-        uncounted=game.passive_bots_used and (your_seat is not None or everything),
         inspectable=everything,
         campaign=(
             CampaignRef(
@@ -2359,8 +2357,8 @@ async def set_bots(
     """The switch between normal and passive bots, SysOp's (v0.8.6) and since v0.8.7 an
     administrator's (games.passive_bots), for testing cards and the campaign: passive bots only
     draw, pass and discard to hand size, from their next decision. Only in the switcher's own
-    running practice game (a campaign duel included) with no other human seat. Once they have
-    been passive, the game's end pays nothing out. Audited."""
+    running practice game (a campaign duel included) with no other human seat. Since v0.9.7 the
+    game counts as any other (until then its end paid nothing out). Audited."""
     if not principal.can("games.passive_bots"):
         raise ApiError(403, "forbidden", "Only SysOp and administrators can switch the bots.")
     game, _ = await run_in_threadpool(visible_game, db, game_id, principal)

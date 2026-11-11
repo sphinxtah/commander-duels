@@ -695,17 +695,10 @@ class GameSummary(Contract):
     passive_bots: bool | None = Field(
         default=None,
         description="SysOp, and since v0.8.7 administrators (games.passive_bots): whether this "
-        "game's bots are passive (they draw, pass and discard to hand size, and nothing about the "
-        "game pays out once they have been). Null for everyone else, and for a game where the "
-        "viewer may not switch them: one that is not their own running practice or campaign "
-        "game with them its only human seat.",
-    )
-    uncounted: bool = Field(
-        default=False,
-        description="Whether this game's bots have been passive at any point (v0.9.7), so its end "
-        "pays nothing and counts for nothing: no win, no tokens, no quest or achievement, and no "
-        "entry in the history. Told to the game's own player and to a viewer who sees its "
-        "concealed information; false for everyone else.",
+        "game's bots are passive (they draw, pass and discard to hand size). Since v0.9.7 the "
+        "game counts as any other; until then nothing about it paid out once they had been. "
+        "Null for everyone else, and for a game where the viewer may not switch them: one that "
+        "is not their own running practice or campaign game with them its only human seat.",
     )
     inspectable: bool = Field(
         default=False,

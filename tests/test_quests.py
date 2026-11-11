@@ -110,7 +110,8 @@ def played(
 ) -> UUID:
     """A game recorded as the API records an engine's result: per seat a player's account (or
     None for a bot), with its deck's name when given. `passive`: its bots were passive at some
-    point (an administrator's testing switch), so its end counts for nothing."""
+    point (an administrator's testing switch), which the game records; since v0.9.7 its end
+    counts as any other's."""
     game_id = uuid4()
     database_ = client.app.state.database  # type: ignore[attr-defined]
     owners = [seat[0] if isinstance(seat, tuple) else seat for seat in seats]
@@ -628,26 +629,27 @@ def test_the_days_quests_complete_in_any_order(client, monkeypatch):
     ]
 
 
-def test_a_game_with_passive_bots_counts_for_no_quest_and_says_so(client, monkeypatch):
-    """What the owner met (v0.9.7): a game whose bots were passive, an administrator's testing
-    switch, gives no result, so it completes no quest; the game says it is not counted, to its
-    own player only."""
+def test_a_game_with_passive_bots_counts_for_its_quest(client, monkeypatch):
+    """What the owner met, and then asked for (v0.9.7): a game whose bots were passive, the
+    testing switch of SysOp and administrators, used to give no result, so the day's fifth quest
+    stayed open after he won it. "Administrators should not have this restriction": the game
+    counts as any other, its result, its win and its quest."""
     monkeypatch.setattr(quests, "choose_daily", daily(*OWNERS_DAY))
-    ada, bob = Account(client, "ada"), Account(client, "bob")
-    ada.get("/api/v1/me/quests")
+    ada = Account(client, "ada")
+    day = ada.get("/api/v1/me/quests").json()["daily"]["period"]
     game = won(client, ada, bots=3, skill=6, passive=True)
-    assert results(client, game) == []
-    shown = ada.get("/api/v1/me/quests").json()
-    assert shown["paid"] == 0
-    assert [quest["progress"] for quest in shown["daily"]["quests"]] == [0, 0, 0, 0, 0]
-    assert entries(client, ada.id, "quest") == []
-    assert ada.get(f"/api/v1/games/{game}").json()["game"]["uncounted"] is True
-    # The same game without the switch counts, and says nothing.
-    counted = won(client, ada, bots=3, skill=6)
-    assert ada.get(f"/api/v1/games/{counted}").json()["game"]["uncounted"] is False
-    assert ada.get("/api/v1/me/quests").json()["daily"]["quests"][4]["completed_at"] is not None
-    # Another player is told nothing about a game that is not theirs to see.
-    assert bob.get(f"/api/v1/games/{game}").status_code in (403, 404)
+    # Its result is written: the win at seat 0, no other player, three bots.
+    assert [
+        (seat, outcome, players, bots) for seat, outcome, _, players, bots in results(client, game)
+    ] == [(0, "win", 0, 3)]
+    shown = ada.get("/api/v1/me/quests").json()["daily"]
+    assert [quest["progress"] for quest in shown["quests"]] == [0, 0, 1, 1, 1]
+    assert shown["quests"][4]["completed_at"] is not None
+    name = "Win a four-player Commander game against skill-6 bots"
+    paid = [entry for entry in entries(client, ada.id, "quest") if entry[1].startswith("daily:")]
+    assert paid == [(750, f"daily:{ada.id}:{day}:d5-four-players", name)]
+    # The summary no longer has anything to say about it.
+    assert "uncounted" not in ada.get(f"/api/v1/games/{game}").json()["game"]
 
 
 def test_the_old_quests_stay_and_the_board_replaces_them(client):

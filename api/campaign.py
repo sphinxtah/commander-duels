@@ -802,14 +802,14 @@ def game_ended(
     link: CampaignGame,
     campaign: Campaign | None,
     content_dir: str | None = None,
-    *,
-    payouts: bool = True,
 ) -> None:
     """In the transaction recording the game's end: its outcome, and for a win the encounter, its
     seal and spoils, the next encounter and a chapter's rewards, once. Called by
-    games.record_end. Without payouts (SysOp's duel with passive bots, v0.8.6) a win still opens
-    the next encounter and records its seal, but gives no spoils and no chapter rewards: a later
-    win without passive bots gives them as a first win would.
+    games.record_end. A duel played with passive bots counts as any other since v0.9.7 (the
+    owner: SysOp and administrators test the whole campaign as a player finds it); from v0.8.6
+    until then such a win opened the next encounter and recorded its seal but gave no spoils and
+    no chapter rewards. Spoils and rewards are keyed, so a win gives whatever an earlier one of
+    that kind left owing, as a first win would.
 
     Since v0.9.6 wards 14 and 15 are one run. The Sphinx flees ward 14 at the moment he would lose
     it: the win records the flight (fled_at) and opens the court, and pays nothing yet. Winning the
@@ -845,9 +845,8 @@ def game_ended(
             progress.challenge_fled_at = utcnow()
             progress.updated_at = utcnow()
             return
-        # Apex Unbound (v0.9.3): its badge, once, and nothing else; never with passive bots.
-        if payouts:
-            reward(db, user.id, campaign, progress, CHALLENGE_REWARD, game.id)
+        # Apex Unbound (v0.9.3): its badge, once, and nothing else.
+        reward(db, user.id, campaign, progress, CHALLENGE_REWARD, game.id)
         progress.challenge_fled_at = None
         progress.updated_at = utcnow()
         return
@@ -866,9 +865,10 @@ def game_ended(
         if flight not in progress.completed:
             won = [flight, number]
         # Ward 14's spoils and chapter are the court's to give, whenever they are still owed
-        # (v0.9.7): a court first won without payouts (passive bots), or before the finale's
-        # commander had its custom card, records ward 14 as won and gives none of them, and ward
-        # 14 played again gives nothing. Each is keyed, so a court won again pays nothing twice.
+        # (v0.9.7): a court first won before the finale's commander had its custom card, or with
+        # passive bots while those paid nothing (v0.9.6), records ward 14 as won and gives none
+        # of them, and ward 14 played again gives nothing. Each is keyed, so a court won again
+        # pays nothing twice.
         paying = [flight, number]
         progress.fled_at = None
     for each in won:
@@ -878,8 +878,6 @@ def game_ended(
     progress.highest_unlocked = max(progress.highest_unlocked, min(number + 1, campaign.last))
     progress.content_version = campaign.content_version
     progress.updated_at = utcnow()
-    if not payouts:
-        return
     for each in paying:
         encounter = campaign.encounter(each)
         if encounter.court is not None:

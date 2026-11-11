@@ -427,12 +427,13 @@ def test_friends_help_at_the_court_and_are_paid_once(
     assert campaign_tokens(client, bob) == [10000]
 
 
-def test_spoils_a_court_win_did_not_pay_come_with_the_next_one(
+def test_a_court_won_with_passive_bots_pays_both_wards(
     client: TestClient, engine: CourtEngine
 ) -> None:
-    """v0.9.7: a court first won with passive bots moves the campaign on and pays nothing; the
-    next court won without them pays both wards. Until v0.9.7 ward 14's spoils were then lost for
-    good: the run paid ward 14 only while ward 14 was not yet among the wards won."""
+    """v0.9.7, the owner: "I need to be able to complete the entire campaign, as if I were a
+    regular player. Administrators should not have this restriction." A court whose bots were
+    passive is a court won: both seals, the three decks, both wards' tokens and both chapters.
+    From v0.8.6 until then it moved the campaign on and gave none of them."""
     ada = Account(client, "ada", admin=True)
     unlock(client, ada, 14)
     flee(client, engine, ada)
@@ -443,8 +444,47 @@ def test_spoils_a_court_win_did_not_pay_come_with_the_next_one(
         )
         db.commit()
     engine.win(summary["id"], 0)
-    assert until_finished(ada, summary["id"])["uncounted"] is True
+    finished = until_finished(ada, summary["id"])
+    assert finished["campaign"]["outcome"] == "won" and "uncounted" not in finished
     assert state(ada)["progress"]["completed"] == [14, 15]
+    assert campaign_tokens(client, ada) == [8192000, 16384000]
+    assert rewards(client, ada) == sorted(
+        [
+            "seal:14",
+            "spoils:14",
+            "title:concordance-breaker",
+            "card_back:fractured-throne",
+            "seal:15",
+            "spoils:15",
+            "title:courtbreaker",
+            "card_back:unbound-court",
+        ]
+    )
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        titles = sorted(db.scalars(select(Deck.title).where(Deck.owner_id == ada.id)))
+        assert titles == ["Liliana's Gift", "Nicol Bolas's Gift", "The Sphinx's Deck"]
+
+
+def test_spoils_a_court_win_did_not_pay_come_with_the_next_one(
+    client: TestClient, engine: CourtEngine, court_content: Path
+) -> None:
+    """v0.9.7: a court won while passive bots paid nothing (v0.9.6) moved the campaign on and gave
+    no spoils, as a court won with the owner's engine before the finale's commander had its
+    custom card still does. The next court won pays both wards. Until v0.9.7 ward 14's spoils
+    were then lost for good: the run paid ward 14 only while ward 14 was not yet among the wards
+    won."""
+    ada = Account(client, "ada", admin=True)
+    # As such a win left the account: both wards won, their seals, and nothing else.
+    unlock(client, ada, 15, completed=[*range(1, 16)])
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        progress = db.scalars(
+            select(CampaignProgress).where(CampaignProgress.user_id == ada.id)
+        ).one()
+        installed = campaign.campaign_in(str(court_content))
+        assert installed is not None
+        for name in ("seal:14", "seal:15"):
+            assert campaign.reward(db, ada.id, installed, progress, name, None)
+        db.commit()
     assert rewards(client, ada) == ["seal:14", "seal:15"]
     assert campaign_tokens(client, ada) == []
     spoils = {e["number"]: e["spoils"]["earned"] for e in state(ada)["encounters"]}

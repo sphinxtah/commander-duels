@@ -10,19 +10,18 @@ type Summary = components["schemas"]["GameSummary"];
  * since v0.8.7 an administrator's (in the Priority controls drawer), for testing cards and the
  * campaign: passive bots only draw, pass and discard to hand size, from their next decision.
  * Shown only where the server allows it (the summary's passive_bots is not null): the viewer's
- * own practice game or campaign duel with no other human seat. The game's log says each change,
- * and once the bots have been passive the game counts for nothing (the summary's uncounted,
- * v0.9.7): the switch says so before it is used, and in a warning from then on.
+ * own practice game or campaign duel with no other human seat. The game's log says each change.
+ * Since v0.9.7 (the owner: "Administrators should not have this restriction") the game counts as
+ * any other, and the switch says so; from v0.8.6 until then a game whose bots had been passive
+ * counted for nothing.
  */
 export function PassiveBots({
   gameId,
   passive,
-  uncounted = false,
   onChange,
 }: {
   gameId: string;
   passive: boolean;
-  uncounted?: boolean;
   onChange: (summary: Summary) => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -59,13 +58,9 @@ export function PassiveBots({
         Passive bots only draw, pass and discard to hand size: no lands, spells,
         attacks or blocks. Takes effect at each bot’s next decision.
       </p>
-      <p
-        className={uncounted ? styles.uncounted : styles.hint}
-        data-uncounted={uncounted || undefined}
-      >
-        {uncounted
-          ? "This game no longer counts. Its bots have been passive, so it gives no win, no tokens and no progress on quests or achievements, even with the switch off again. A won campaign duel still opens the next ward."
-          : "Once used, the game counts for nothing, even with the switch off again: no win, no tokens, no quests or achievements. A won campaign duel still opens the next ward."}
+      <p className={styles.hint}>
+        The game counts as any other: its win, tokens, quests and achievements,
+        and in the campaign the ward’s spoils and rewards.
       </p>
       {problem && <p role="alert">{problem}</p>}
     </div>

@@ -249,12 +249,14 @@ class Game(Base):
     # A practice game's request (v0.5.0, api/rematches.py), for its rematch: the same format, decks,
     # bots, skill, turn cap and rules. Null for a table's game and for games before v0.5.0.
     settings: Mapped[dict[str, object] | None] = mapped_column(JsonType)
-    # Passive bots for SysOp (v0.8.6): the switch as it stands, and whether it was ever on, which
-    # keeps the game's end from paying anything out.
+    # Passive bots for SysOp (v0.8.6) and administrators (v0.8.7): the switch as it stands, and
+    # whether it was ever on. Until v0.9.7 that kept the game's end from paying anything out;
+    # since then it is a record only, and the game counts as any other.
     bots_passive: Mapped[bool] = mapped_column(default=False, server_default=false())
     passive_bots_used: Mapped[bool] = mapped_column(default=False, server_default=false())
     # King's Table (v0.8.7, api/kings_table.py): the settings it started with, as the engine took
-    # them ({deck_format, life, king_attacks_anyone}). Null in other formats.
+    # them ({deck_format, life, king_attacks_anyone}, and since v0.9.7 guarded_kings). Null in
+    # other formats.
     kings_table: Mapped[dict[str, object] | None] = mapped_column(JsonType)
 
 

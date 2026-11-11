@@ -747,12 +747,13 @@ def test_a_reset_starts_the_campaign_again(
     assert after["chapters"][0]["rewards"][0]["earned"] is False
 
 
-def test_a_duel_won_with_passive_bots_moves_on_without_spoils(
+def test_a_duel_won_with_passive_bots_counts_as_any_other(
     client: TestClient, app: FastAPI, engine: FakeEngine
 ) -> None:
-    """SysOp's passive bots (v0.8.6): a duel whose bots were passive still opens the next ward,
-    for testing it, but gives no spoils; a later win without them gives the spoils as a first
-    win does."""
+    """Passive bots in the campaign (v0.9.7, the owner: "I need to be able to complete the entire
+    campaign, as if I were a regular player"): a duel whose bots were passive gives what any win
+    gives, its seal, the warden's deck and tokens, the next ward and its chapter's rewards. From
+    v0.8.6 until then it opened the next ward and recorded the seal, and gave nothing else."""
     ada = Account(client, "ada")
     started = start(ada, 1)
     assert started.status_code == 201, started.text
@@ -761,19 +762,36 @@ def test_a_duel_won_with_passive_bots_moves_on_without_spoils(
         db.execute(update(Game).where(Game.id == uuid.UUID(game_id)).values(passive_bots_used=True))
         db.commit()
     end(engine, game_id, won())
-    assert until_status(ada, game_id, "finished")["game"]["campaign"]["outcome"] == "won"
+    finished = until_status(ada, game_id, "finished")["game"]
+    assert finished["campaign"]["outcome"] == "won" and "uncounted" not in finished
     after = state(ada)
     assert after["progress"]["completed"] == [1]
     assert after["progress"]["highest_unlocked"] == 2
-    assert after["encounters"][0]["spoils"]["earned"] is False
+    assert after["encounters"][0]["spoils"]["earned"] is True
     with Session(app.state.database) as db:
-        rewards = list(
+        rewards = sorted(
             db.scalars(select(CampaignReward.reward).where(CampaignReward.user_id == ada.id))
         )
-        assert rewards == ["seal:01"]
-        assert db.scalar(select(TokenEntry).where(TokenEntry.user_id == ada.id)) is None
+        assert rewards == ["seal:01", "spoils:01"]
+        paid = list(
+            db.scalars(
+                select(TokenEntry.amount).where(
+                    TokenEntry.user_id == ada.id, TokenEntry.kind == "campaign"
+                )
+            )
+        )
+        assert paid == [1000]
+    # Once: the ward won again, with the switch or without, gives nothing twice.
     play(ada, engine, 1, won())
-    assert state(ada)["encounters"][0]["spoils"]["earned"] is True
+    with Session(app.state.database) as db:
+        assert (
+            db.scalar(
+                select(func.count())
+                .select_from(TokenEntry)
+                .where(TokenEntry.user_id == ada.id, TokenEntry.kind == "campaign")
+            )
+            == 1
+        )
 
 
 def test_apex_unbound_is_the_finale_again_for_its_badge_alone(

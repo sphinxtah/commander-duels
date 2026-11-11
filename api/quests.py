@@ -32,9 +32,9 @@ docs/quests.md describes them for players and staff.
   another account's auction bid on, a pack bought with tokens, a deck legal and complete that
   lasted a day, a sleeve still kept. Nothing a player gives themselves counts.
 - **After a reset** (users.reset_at) the boards are drawn again, and count only what came since.
-- **What never counts.** A game whose bots were passive (an administrator's testing switch,
-  api/games.py) writes no result, so it completes no quest; since v0.9.7 the game says so
-  (GameSummary.uncounted). A campaign duel writes none either: only campaign_wins reads duels.
+- **What never counts.** A campaign duel writes no result: only campaign_wins reads duels. A
+  game whose bots were passive (the testing switch of SysOp and administrators, api/games.py)
+  counts as any other since v0.9.7; until then it wrote no result and completed no quest.
 """
 
 import random

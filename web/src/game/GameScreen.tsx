@@ -670,13 +670,6 @@ export function GameScreen({
     paid !== null
       ? `This game paid you ${paid.toLocaleString()} tokens.`
       : null;
-  // A game whose bots have been passive counts for nothing (v0.9.7): the result says so, since
-  // a win that completes no quest otherwise looks like a fault.
-  const uncountedLine = summary?.uncounted
-    ? campaign
-      ? "Passive bots were used, so this duel gives no spoils or rewards; a win still opens the next ward."
-      : "Passive bots were used, so this game counts for nothing: no win, no tokens, no quest or achievement."
-    : null;
   // A player who comes back after the API stopped following the game sees how it ended.
   const recordedOutcome =
     state.ended === "not_live" && summary?.result
@@ -832,9 +825,6 @@ export function GameScreen({
                           {tokensLine ? ` ${tokensLine}` : ""}
                         </p>
                       )}
-                      {recordedOutcome && uncountedLine && (
-                        <p data-uncounted>{uncountedLine}</p>
-                      )}
                       <a
                         href={back.href}
                         className={styles.secondaryButton}
@@ -932,11 +922,6 @@ export function GameScreen({
                       <h2 id="result-side-title">{outcome.title}</h2>
                       <p>{outcome.detail}</p>
                       {tokensLine && <p data-tokens={paid}>{tokensLine}</p>}
-                      {uncountedLine && (
-                        <p className={styles.uncounted} data-uncounted>
-                          {uncountedLine}
-                        </p>
-                      )}
                       {match && (
                         <MatchOutcome
                           match={match}
@@ -981,7 +966,6 @@ export function GameScreen({
                     <PassiveBots
                       gameId={gameId}
                       passive={summary.passive_bots}
-                      uncounted={summary.uncounted}
                       onChange={setSummary}
                     />
                   )}
@@ -998,7 +982,6 @@ export function GameScreen({
                       <PassiveBots
                         gameId={gameId}
                         passive={summary.passive_bots}
-                        uncounted={summary.uncounted}
                         onChange={setSummary}
                       />
                     )}
@@ -1186,11 +1169,6 @@ export function GameScreen({
               <h2 id="result-title">{outcome?.title}</h2>
               <p>{outcome?.detail}</p>
               {tokensLine && <p data-tokens={paid}>{tokensLine}</p>}
-              {uncountedLine && (
-                <p className={styles.uncounted} data-uncounted>
-                  {uncountedLine}
-                </p>
-              )}
               {match && (
                 <MatchOutcome
                   match={match}

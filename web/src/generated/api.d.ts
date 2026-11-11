@@ -2103,8 +2103,8 @@ export interface paths {
          * @description The switch between normal and passive bots, SysOp's (v0.8.6) and since v0.8.7 an
          *     administrator's (games.passive_bots), for testing cards and the campaign: passive bots only
          *     draw, pass and discard to hand size, from their next decision. Only in the switcher's own
-         *     running practice game (a campaign duel included) with no other human seat. Once they have
-         *     been passive, the game's end pays nothing out. Audited.
+         *     running practice game (a campaign duel included) with no other human seat. Since v0.9.7 the
+         *     game counts as any other (until then its end paid nothing out). Audited.
          */
         put: operations["set_bots_api_v1_games__game_id__bots_put"];
         post?: never;
@@ -5951,7 +5951,7 @@ export interface components {
             match?: components["schemas"]["GameMatch"] | null;
             /**
              * Passive Bots
-             * @description SysOp, and since v0.8.7 administrators (games.passive_bots): whether this game's bots are passive (they draw, pass and discard to hand size, and nothing about the game pays out once they have been). Null for everyone else, and for a game where the viewer may not switch them: one that is not their own running practice or campaign game with them its only human seat.
+             * @description SysOp, and since v0.8.7 administrators (games.passive_bots): whether this game's bots are passive (they draw, pass and discard to hand size). Since v0.9.7 the game counts as any other; until then nothing about it paid out once they had been. Null for everyone else, and for a game where the viewer may not switch them: one that is not their own running practice or campaign game with them its only human seat.
              */
             passive_bots?: boolean | null;
             result: components["schemas"]["GameResult"] | null;
@@ -5969,12 +5969,6 @@ export interface components {
             tokens?: number | null;
             /** Turn Cap */
             turn_cap: number;
-            /**
-             * Uncounted
-             * @description Whether this game's bots have been passive at any point (v0.9.7), so its end pays nothing and counts for nothing: no win, no tokens, no quest or achievement, and no entry in the history. Told to the game's own player and to a viewer who sees its concealed information; false for everyone else.
-             * @default false
-             */
-            uncounted: boolean;
             /** Your Seat */
             your_seat: number | null;
         };

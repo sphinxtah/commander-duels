@@ -314,9 +314,11 @@ def test_the_migration_welcomes_and_pays_back(tmp_path, monkeypatch):
     database.dispose()
 
 
-def test_a_game_with_passive_bots_pays_nothing(client):
-    """SysOp's passive bots (v0.8.6): once a game's bots have been passive, its end records the
-    result and nothing else: no win, no tokens, no quests or achievements."""
+def test_a_game_with_passive_bots_pays_as_any_other(client):
+    """Passive bots (SysOp's since v0.8.6, administrators' since v0.8.7): from v0.8.6 a game whose
+    bots had been passive recorded its result and nothing else. Since v0.9.7 (the owner:
+    "Administrators should not have this restriction") it counts as any other: its win and its
+    tokens, as here, and its quests and achievements (tests/test_quests.py)."""
     ada = Account(client, "ada")
     database = client.app.state.database
     game_id = uuid4()
@@ -346,9 +348,8 @@ def test_a_game_with_passive_bots_pays_nothing(client):
             )
         db.commit()
     games.record_end(database, game_id, "finished", completed(0))
-    assert ledger(client, ada.id) == []
-    tokens = ada.get("/api/v1/me/tokens").json()
-    assert tokens["balance"] == 0 and tokens["entries"] == []
+    assert ledger(client, ada.id) == [("bot_win", 14, None)]
+    assert ada.get("/api/v1/me/progress").json()["counted_wins"] == 1
     with Session(database) as db:
         game = db.get_one(Game, game_id)
         assert game.status == "finished" and game.result["winner_seat"] == 0
