@@ -292,12 +292,7 @@ function TopicView({
       <h2 ref={title} tabIndex={-1}>
         {topic.title}
       </h2>
-      <p className={styles.lead}>
-        <RichText text={topic.summary} rules={false} />
-      </p>
-      {topic.blocks.map((block, index) => (
-        <BlockView key={index} block={block} />
-      ))}
+      <TopicBody topic={topic} />
       {topic.rules.length > 0 && (
         <aside className={styles.officialRefs} aria-label="Official rules">
           <span>Official rules</span>
@@ -330,18 +325,50 @@ function TopicView({
   );
 }
 
-function BlockView({ block }: { block: Block }): ReactNode {
+/**
+ * A topic's own words and pictures: its summary and its blocks. The page puts the chapter, the
+ * title, the official rules and the neighbouring topics around it; the tutorial's pop-up
+ * (TopicDialog, v0.9.8) shows it alone, with `links` false, so that nothing in it leads away.
+ */
+export function TopicBody({
+  topic,
+  links = true,
+}: {
+  topic: Topic;
+  links?: boolean;
+}) {
+  return (
+    <>
+      <p className={styles.lead}>
+        <RichText text={topic.summary} rules={false} />
+      </p>
+      {topic.blocks.map((block, index) => (
+        <BlockView key={index} block={block} links={links} />
+      ))}
+    </>
+  );
+}
+
+function BlockView({
+  block,
+  links = true,
+}: {
+  block: Block;
+  /** Whether references to official rules are links (the page) or plain words (a pop-up). */
+  links?: boolean;
+}): ReactNode {
   switch (block.kind) {
     case "p":
       return (
         <p>
-          <RichText text={block.text} />
+          <RichText text={block.text} rules={links} />
         </p>
       );
     case "tip":
       return (
         <p className={styles.tip}>
-          <strong>At the table</strong> <RichText text={block.text} />
+          <strong>At the table</strong>{" "}
+          <RichText text={block.text} rules={links} />
         </p>
       );
     case "list":
@@ -349,7 +376,7 @@ function BlockView({ block }: { block: Block }): ReactNode {
         <ul className={styles.list}>
           {block.items.map((item) => (
             <li key={item}>
-              <RichText text={item} />
+              <RichText text={item} rules={links} />
             </li>
           ))}
         </ul>
@@ -361,7 +388,7 @@ function BlockView({ block }: { block: Block }): ReactNode {
           <ol>
             {block.steps.map((step) => (
               <li key={step}>
-                <RichText text={step} />
+                <RichText text={step} rules={links} />
               </li>
             ))}
           </ol>
@@ -393,12 +420,12 @@ function BlockView({ block }: { block: Block }): ReactNode {
           <ol>
             {block.steps.map((step) => (
               <li key={step}>
-                <RichText text={step} />
+                <RichText text={step} rules={links} />
               </li>
             ))}
           </ol>
           <p className={styles.outcome}>
-            <RichText text={block.outcome} />
+            <RichText text={block.outcome} rules={links} />
           </p>
         </section>
       );
@@ -425,7 +452,8 @@ function BlockView({ block }: { block: Block }): ReactNode {
                 <tr key={row.join("|")}>
                   {row.map((cell, index) => (
                     <td key={index}>
-                      {block.head[index] === "Rule" &&
+                      {links &&
+                      block.head[index] === "Rule" &&
                       RULE_NUMBER.test(cell) ? (
                         <a href={ruleHref(cell)}>{cell}</a>
                       ) : (

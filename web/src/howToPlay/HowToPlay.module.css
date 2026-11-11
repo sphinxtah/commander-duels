@@ -758,3 +758,67 @@
     font-size: 0.8rem;
   }
 }
+
+/* A topic in a pop-up (v0.9.8, TopicDialog): the tutorial's "More in How to play". The reading
+   column of the page, in a box over whatever the player was looking at; it scrolls inside. */
+.topicDialog {
+  width: min(860px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 0;
+  color: var(--cd-text);
+  background: var(--cd-panel-bg, #121b1c);
+  border: 1px solid #d5b77c66;
+  border-radius: 10px;
+  box-shadow:
+    var(--cd-frame),
+    0 0 60px #000c;
+  overflow: hidden;
+}
+.topicDialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.topicDialog::backdrop {
+  background: #050909cc;
+}
+.topicDialogHead,
+.topicDialogFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 22px;
+  flex: none;
+}
+.topicDialogHead {
+  border-bottom: 1px solid #d5b77c33;
+}
+.topicDialogHead h2 {
+  font: 600 clamp(1.3rem, 2vw, 1.8rem) / 1.15 var(--cd-display);
+  color: var(--cd-gold-hi);
+  margin: 4px 0 0;
+}
+.topicDialogBody {
+  padding: 18px 22px 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.topicDialogFoot {
+  border-top: 1px solid #d5b77c33;
+}
+.topicDialogFoot p {
+  margin: 0;
+  color: var(--cd-muted);
+  font-size: 0.85rem;
+}
+.topicDialogFoot button,
+.topicDialogHead button {
+  flex: none;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .topicDialogFoot {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

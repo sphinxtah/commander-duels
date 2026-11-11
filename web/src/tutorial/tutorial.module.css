@@ -342,6 +342,17 @@
   margin: 4px 0 10px;
   font-size: 0.85rem;
 }
-.learnMore a {
+.learnMore button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
   color: var(--cd-gold-hi, #f4dca6);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  text-align: left;
+}
+.learnMore button:hover {
+  color: #fff;
 }

@@ -52,6 +52,8 @@ export function DemoGame({
   const [beat, setBeat] = useState(0);
   const [frame, setFrame] = useState(0);
   const [auto, setAuto] = useState(false);
+  // A topic of How to play open over the lesson (v0.9.8): a game playing on its own waits.
+  const [reading, setReading] = useState(false);
   const [settings] = useTableSettings();
   const motion = useMotionLevel(settings.animationSpeed);
   const holds = useMemo(() => frameHolds(beats, motion), [beats, motion]);
@@ -73,7 +75,7 @@ export function DemoGame({
   }, [beat, frame, framesDone, holds]);
   // On its own: the next lesson once the last frame has settled and the words have been read.
   useEffect(() => {
-    if (!auto || !framesDone || last) return;
+    if (!auto || reading || !framesDone || last) return;
     const wait = autoWaitMs(
       lesson.text,
       holds[beat]![frame]!,
@@ -81,7 +83,7 @@ export function DemoGame({
     );
     const timer = window.setTimeout(() => go(beat + 1), wait);
     return () => window.clearTimeout(timer);
-  }, [auto, framesDone, last, beat, frame, holds, lesson.text]);
+  }, [auto, reading, framesDone, last, beat, frame, holds, lesson.text]);
   // The narration takes the keyboard once the table has drawn, and keeps it from lesson to lesson.
   useEffect(() => {
     const timer = window.setTimeout(() => next.current?.focus(), 50);
@@ -113,7 +115,14 @@ export function DemoGame({
       <p aria-live="polite" className={styles.narrationText}>
         {lesson.text}
       </p>
-      <LearnMore title={lesson.title} />
+      <LearnMore
+        title={lesson.title}
+        onOpenChange={(open) => {
+          // Closed again: the lesson's reading time starts over.
+          if (!open) opened.current = Date.now();
+          setReading(open);
+        }}
+      />
       <div className={styles.narrationActions}>
         {last ? (
           <button
