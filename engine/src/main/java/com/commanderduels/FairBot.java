@@ -31,6 +31,9 @@ import mage.abilities.Ability;
 import mage.abilities.ActivatedAbility;
 import mage.abilities.PlayLandAbility;
 import mage.abilities.SpellAbility;
+import mage.abilities.costs.Cost;
+import mage.abilities.costs.common.SacrificeTargetCost;
+import mage.abilities.costs.common.SacrificeXTargetCost;
 import mage.abilities.effects.SearchEffect;
 import mage.cards.Card;
 import mage.choices.Choice;
@@ -220,6 +223,8 @@ class FairBot extends ComputerPlayerControllableProxy {
         private final AtomicLong heapStops = new AtomicLong();
         private final AtomicLong finds = new AtomicLong();
         private final AtomicLong found = new AtomicLong();
+        // Sacrifice outlets a search left out of its options (v0.9.8).
+        private final AtomicLong outlets = new AtomicLong();
 
         /** Determinized copies made: one per search. */
         long samples() {
@@ -325,6 +330,11 @@ class FairBot extends ComputerPlayerControllableProxy {
             return found.get();
         }
 
+        /** Sacrifice outlets the searches left out of their options (v0.9.8): {@link #isSacrificeOutlet}. */
+        long outlets() {
+            return outlets.get();
+        }
+
         @Override
         public String toString() {
             return searches() + " searches, " + completed() + " completed, " + timedOut() + " cut off by the budget, "
@@ -333,7 +343,8 @@ class FairBot extends ComputerPlayerControllableProxy {
                 + " slips, " + naivePlays() + " naive plays, " + heldBack() + " held back, " + recklessAttacks()
                 + " reckless attacks, " + unblocked() + " unblocked; " + passive() + " passive decisions; "
                 + pressed() + " pressed attacks; " + light() + " light searches, " + pacts() + " unpayable Pacts held; "
-                + heapStops() + " stopped by a full heap, " + finds() + " search effects trying " + found() + " cards";
+                + heapStops() + " stopped by a full heap, " + finds() + " search effects trying " + found() + " cards; "
+                + outlets() + " sacrifice outlets left alone";
         }
 
         /** Decisions that continued a planned chain of actions instead of searching again. */
@@ -489,6 +500,44 @@ class FairBot extends ComputerPlayerControllableProxy {
             stats.pacts.incrementAndGet();
         }
         super.act(game);
+    }
+
+    /**
+     * XMage's pruning of a search's options, without the sacrifice outlets (v0.9.8): the search no
+     * longer considers them, for any player in it.
+     *
+     * <p>XMage's AI feeds its board to an ability paid for by sacrificing another permanent. The
+     * difficulty harness's trace showed it twice. Daretti's commander, Slobad, Goblin Tinkerer
+     * ("Sacrifice an artifact: Target artifact gains indestructible until end of turn"), sacrificed
+     * his artifacts one after another, each to make itself indestructible, and the references won 59
+     * of the last 60 duels measured against him. Liliana's, Yawgmoth, Thran Physician ("Pay 1 life,
+     * Sacrifice another creature: …"), sacrificed Phyrexian Obliterator, then Archfiend of Depravity,
+     * for a -1/-1 counter and a card each.
+     */
+    @Override
+    protected void optimize(Game game, List<Ability> allActions) {
+        int before = allActions.size();
+        allActions.removeIf(FairBot::isSacrificeOutlet);
+        stats.outlets.addAndGet(before - allActions.size());
+        super.optimize(game, allActions);
+    }
+
+    /**
+     * An activated ability paid for by sacrificing another permanent: "Sacrifice an artifact: …",
+     * "Sacrifice two creatures: …". Not a mana ability (Phyrexian Tower: XMage pays with those, it
+     * does not search them), not a spell with a sacrifice among its costs (Diabolic Intent), and not
+     * a permanent that sacrifices itself (Mind Stone, Evolving Wilds, a Treasure).
+     */
+    static boolean isSacrificeOutlet(Ability ability) {
+        if (!ability.isNonManaActivatedAbility()) {
+            return false;
+        }
+        for (Cost cost : ability.getCosts()) {
+            if (cost instanceof SacrificeTargetCost || cost instanceof SacrificeXTargetCost) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** A Pact cast whose upkeep cost is more than the mana sources this bot controls. */
