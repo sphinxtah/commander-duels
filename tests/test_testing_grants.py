@@ -235,12 +235,19 @@ def test_campaign_cosmetics_are_chosen_once_earned_and_shown(
     before = ada.get("/api/v1/me/cosmetics").json()
     assert (before["card_back"], before["title"]) == (None, None)
     backs = {item["id"]: item for item in before["card_backs"]}
-    assert set(backs) == {"broken-writ", "unclaimed-world", "broken-throne", "fractured-throne"}
+    assert set(backs) == {
+        "broken-writ",
+        "unclaimed-world",
+        "broken-throne",
+        "fractured-throne",
+        "unbound-court",
+    }
     assert backs["broken-writ"] == {"id": "broken-writ", "name": "Broken Writ", "earned": False}
     assert {item["id"] for item in before["titles"]} == {
         "unbowed",
         "witness-of-the-unbound",
         "concordance-breaker",
+        "courtbreaker",
     }
     # Not earned yet: refused.
     refused = ada.put("/api/v1/me/cosmetics", {"card_back": "broken-writ", "title": None})

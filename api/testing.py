@@ -322,7 +322,10 @@ def set_campaign(
         progress.highest_unlocked = 1
         progress.completed = []
         progress.ending = None
+        progress.challenge_fled_at = None
         progress.started_at = now
+    # Since v0.9.6 ward 14 won is no flight to finish: the court opens as for an earlier winner.
+    progress.fled_at = None
     numbers = list(range(1, through + 1))
     if numbers:
         progress.completed = sorted({*progress.completed, *numbers})

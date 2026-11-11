@@ -329,7 +329,8 @@
     transform: translateY(8px);
   }
 }
-.node[data-finale] {
+.node[data-finale],
+.node[data-court] {
   grid-column: 1 / -1;
 }
 .nodeButton {
@@ -985,7 +986,16 @@ button.choice:focus-visible {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: #f4dca6;
+  text-shadow:
+    0 0 6px #000,
+    0 0 2px #000;
   background:
+    linear-gradient(
+      transparent 40%,
+      #0a0806e6 40%,
+      #0a0806e6 60%,
+      transparent 60%
+    ),
     linear-gradient(115deg, transparent 47%, #f4dca6aa 48%, transparent 50%),
     radial-gradient(circle at 50% 40%, #3a2f1c, #0a0806 72%);
 }

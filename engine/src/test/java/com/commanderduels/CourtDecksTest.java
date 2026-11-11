@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 
 /**
  * The court's decks (v0.9.6): ward 15 as the API serves it, from {@code content/campaign.json}. The
@@ -23,17 +24,25 @@ import org.junit.jupiter.api.Test;
  * team B, bots at skill 6, against a scripted human King A and two bot Generals on fixture decks. Every
  * card of the three decks must be one the engine knows, and the game must play to its end or its turn
  * cap. (SeatChecks' leak checks know the fixture decks only.) The game is played only with
- * {@code -Dcampaign.court=true} (about two minutes); the decks' cards are checked always. Needs ./db.
+ * {@code -Dcampaign.court=true} (about two minutes); the decks' cards whenever the repository's
+ * {@code content/} is beside the engine (not in the engine image's build, which copies the engine only).
+ * Needs ./db.
  */
+@EnabledIf("contentHere")
 class CourtDecksTest {
+    private static final Path CONTENT = Path.of("..", "content", "campaign.json");
     private static JsonObject court;
+
+    static boolean contentHere() {
+        return Files.isRegularFile(CONTENT);
+    }
 
     @BeforeAll
     static void load() throws Exception {
         assertTrue(CardDatabase.load().printings() > 50_000);
         Tables.actAsClient();
         JsonObject content = JsonParser.parseString(
-            Files.readString(Path.of("../content/campaign.json"), StandardCharsets.UTF_8)).getAsJsonObject();
+            Files.readString(CONTENT, StandardCharsets.UTF_8)).getAsJsonObject();
         JsonArray encounters = content.getAsJsonArray("encounters");
         JsonObject sphinx = null;
         JsonObject found = null;

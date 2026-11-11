@@ -171,9 +171,12 @@ export function DuelSetup({
           </h2>
           <p className={styles.quiet}>
             {encounter.name}
-            {encounter.commander
-              ? `, commanding ${encounter.commander}`
-              : ""}. {encounter.location}.
+            {court
+              ? ", with Nicol Bolas and Liliana as his Generals"
+              : encounter.commander
+                ? `, commanding ${encounter.commander}`
+                : ""}
+            . {encounter.location}.
           </p>
           {court && !challenge ? (
             <p className={styles.spoilsLine}>
