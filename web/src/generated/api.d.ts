@@ -3110,7 +3110,9 @@ export interface paths {
         };
         /**
          * Sets
-         * @description Sets with a card a game can play, each with the number of such cards.
+         * @description Sets with a card a game can play, each with the number of such cards, newest first. Since
+         *     v0.9.6 every edition of the catalog's deck cards with every (the edition codes' list beside
+         *     the auction house's and the card search's set code).
          */
         get: operations["sets_api_v1_sets_get"];
         put?: never;
@@ -26084,7 +26086,9 @@ export interface operations {
     };
     sets_api_v1_sets_get: {
         parameters: {
-            query?: never;
+            query?: {
+                every?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;

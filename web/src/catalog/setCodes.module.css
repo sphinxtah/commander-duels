@@ -1,0 +1,117 @@
+/* The edition codes' "i" and its pop-up (v0.9.6), beside a set-code field. */
+.info {
+  position: relative;
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+.button {
+  display: inline-grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  padding: 0;
+  border: 1px solid #e6c68c99;
+  border-radius: 50%;
+  background: #0b1111;
+  color: #e6c68c;
+  font:
+    italic 700 0.68rem / 1 Georgia,
+    serif;
+  cursor: pointer;
+}
+.button:hover,
+.button:focus-visible,
+.button[aria-expanded="true"] {
+  background: #e6c68c;
+  color: #0b1111;
+  outline: none;
+}
+.popup {
+  position: fixed;
+  z-index: 1000;
+  display: grid;
+  gap: 8px;
+  width: min(330px, 80vw);
+  padding: 10px;
+  border: 1px solid #e6c68c55;
+  border-radius: 10px;
+  background: #0d1414f7;
+  box-shadow: 0 12px 32px #000c;
+  color: #e9ece6;
+  font-size: 0.8rem;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.head strong {
+  color: #e6c68c;
+  font-size: 0.85rem;
+}
+.head span {
+  color: #9aa49c;
+  font-size: 0.72rem;
+}
+.close {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  color: #c9d0c6;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.filter {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #ffffff22;
+  border-radius: 6px;
+  background: #050909;
+  color: inherit;
+  font: inherit;
+}
+.list {
+  max-height: 300px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.list button {
+  display: grid;
+  grid-template-columns: 4.2em 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.list button:hover:enabled,
+.list button:focus-visible {
+  background: #e6c68c1f;
+  outline: none;
+}
+.list button:disabled {
+  cursor: default;
+}
+.list code {
+  color: #e6c68c;
+  font-weight: 700;
+}
+.list small {
+  color: #9aa49c;
+}
+.note {
+  margin: 0;
+  color: #9aa49c;
+}

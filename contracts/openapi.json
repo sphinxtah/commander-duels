@@ -35085,8 +35085,20 @@
     },
     "/api/v1/sets": {
       "get": {
-        "description": "Sets with a card a game can play, each with the number of such cards.",
+        "description": "Sets with a card a game can play, each with the number of such cards, newest first. Since\nv0.9.6 every edition of the catalog's deck cards with every (the edition codes' list beside\nthe auction house's and the card search's set code).",
         "operationId": "sets_api_v1_sets_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "every",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Every",
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {

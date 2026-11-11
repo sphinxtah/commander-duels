@@ -7,6 +7,7 @@ import {
   type Search,
 } from "./catalog";
 import styles from "./catalog.module.css";
+import { SetCodesInfo } from "./SetCodes";
 
 const COLORS = [
   ["W", "White"],
@@ -207,15 +208,19 @@ export function SearchControls({
               <option value="mythic">Mythic</option>
             </select>
           </label>
-          <label className={styles.field}>
-            <span>Set code</span>
+          <div className={styles.field}>
+            <span>
+              <label htmlFor="search-set-code">Set code</label>
+              <SetCodesInfo onPick={(code) => set("set", code.toLowerCase())} />
+            </span>
             <input
+              id="search-set-code"
               value={search.set}
               placeholder="lea, m10"
               maxLength={8}
               onChange={(event) => set("set", event.target.value)}
             />
-          </label>
+          </div>
           <label className={styles.field}>
             <span>Legal in</span>
             <select

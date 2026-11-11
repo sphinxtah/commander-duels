@@ -271,7 +271,11 @@ def test_card_search_and_details(client):
         len(page["items"]) == 5
         and page["items"][0]["mana_value"] >= page["items"][-1]["mana_value"]
     )
-    assert ada.get("/api/v1/sets").json()
+    playable_sets = ada.get("/api/v1/sets").json()
+    assert playable_sets
+    # Since v0.9.6 every edition of the catalog's deck cards, for the edition codes' list.
+    every = ada.get("/api/v1/sets", every="true").json()
+    assert {s["code"] for s in playable_sets} <= {s["code"] for s in every}
     status = ada.get("/api/v1/catalog").json()
     assert status["revision"]["id"] == 1 and status["playable"] > 0
     assert status["format_versions"] == {"legacy": 1, "commander": 1}

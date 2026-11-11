@@ -17,6 +17,7 @@ import {
 import { ItemTile } from "./ItemViews";
 import type { AuctionItem, AuctionPage, AuctionSort, Finish } from "./types";
 import styles from "./auctions.module.css";
+import { SetCodesInfo } from "../catalog/SetCodes";
 
 // Search the market (v0.6.0), Madden's transfer market search: the filters at the side (folded
 // away on a phone), Search and Reset, and the results as item cards, a page at a time. The page
@@ -150,9 +151,13 @@ export function SearchMarket({
             />
           </label>
           <div className={styles.fieldPair}>
-            <label className={styles.field}>
-              <span>Set code</span>
+            <div className={styles.field}>
+              <span>
+                <label htmlFor="market-set-code">Set code</label>
+                <SetCodesInfo onPick={(code) => update("set", code)} />
+              </span>
               <input
+                id="market-set-code"
                 type="text"
                 value={form.set}
                 maxLength={8}
@@ -160,7 +165,7 @@ export function SearchMarket({
                 autoCapitalize="characters"
                 onChange={(event) => update("set", event.target.value)}
               />
-            </label>
+            </div>
             <label className={styles.field}>
               <span>Type</span>
               <input

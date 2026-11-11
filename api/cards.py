@@ -700,9 +700,11 @@ def card_printings(
 
 
 @router.get("/sets", response_model=list[SetSummary])
-def sets(principal: Active, db: Db) -> list[SetSummary]:
-    """Sets with a card a game can play, each with the number of such cards."""
-    rows = db.execute(
+def sets(principal: Active, db: Db, every: bool = False) -> list[SetSummary]:
+    """Sets with a card a game can play, each with the number of such cards, newest first. Since
+    v0.9.6 every edition of the catalog's deck cards with every (the edition codes' list beside
+    the auction house's and the card search's set code)."""
+    query = (
         select(
             CardPrinting.set_code,
             func.max(CardPrinting.set_name),
@@ -711,9 +713,13 @@ def sets(principal: Active, db: Db) -> list[SetSummary]:
             func.count(func.distinct(CardPrinting.concept_id)),
         )
         .join(CardConcept, CardConcept.id == CardPrinting.concept_id)
-        .where(CardPrinting.removed_revision.is_(None), in_the_game())
-        .group_by(CardPrinting.set_code)
-        .order_by(func.min(CardPrinting.released_at).desc(), CardPrinting.set_code)
+        .where(CardPrinting.removed_revision.is_(None))
+    )
+    query = query.where(CardConcept.deck_card.is_(True)) if every else query.where(in_the_game())
+    rows = db.execute(
+        query.group_by(CardPrinting.set_code).order_by(
+            func.min(CardPrinting.released_at).desc(), CardPrinting.set_code
+        )
     )
     return [
         SetSummary(code=code, name=name, type=kind, released_at=released, cards=count)
