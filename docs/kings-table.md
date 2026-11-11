@@ -72,6 +72,12 @@ A General reaches one seat each way and a King two (809.4a). A player is always 
 - **It belongs to the house rule.** With the house rule off the guard changes nothing: by 809.4b the two Kings sit beside each other only once the Generals on one side of the table are both out, one of each King's. The setting is offered only with the house rule on, and turning the house rule off in the app turns it off.
 - **In the engine** it is one more test in the single attack hook (`KingsTable.attackable`, `KingsTable.guarded`), so the seat views' `attackable` flags, the bots' attack plans and combat across range follow it.
 
+**Choosing whom to attack (fixed in v0.9.8).** When an attacker has more than one thing it may attack, the player is asked which: every player the rules above let them attack, with the planeswalkers and battles those players defend, whatever the range.
+
+- **The owner's report.** At the campaign's court, Liliana's Contract made both of The Sphinx's Generals lose at the player's upkeep, and in that turn's combat neither The Sphinx nor his planeswalker could be chosen. The guard had fallen and the combat named both, but the choice kept to the attacking player's range, which is set as a turn begins, so it offered nothing.
+- **Who else it reached.** Any King the house rule let a human King attack across range, whenever there was a second thing to attack: the faraway King beside the Generals (without the guard, since v0.8.7), or a King with a planeswalker or a battle. With one thing to attack nothing is asked, which hid it.
+- **What stays.** Range still holds for spells, abilities and effects until the next turn begins: only the attack reaches across it.
+
 **Combat across range.** An attack that the house rule sends out of range is a whole combat:
 
 - The defender blocks with their own creatures.
@@ -114,6 +120,7 @@ Each creature has "{T}: Target teammate in your range gains control of this crea
   - **Bots.** They spare allies, score allies' permanents with their own, and plan attacks only at players the game lets them attack.
 
   Every default keeps other formats as they were.
+- **XMage patch 0016** (v0.9.8): the choice of a defender (`TargetDefender`) offers every defender the combat names that is still there, in place of those among them in the attacking player's range. Other games name only defenders in range, so their choice is unchanged.
 - **`KingsTableTest`.** It covers the owner's acceptance checks:
   - every setting combination, each seat's starting life, team and range;
   - the Kings' attacks with the house rule off and on;
@@ -124,6 +131,7 @@ Each creature has "{T}: Target teammate in your range gains control of this crea
   - a deployed King's creature attacking by the General's rules;
   - six bots playing whole games in both deck formats, every attack checked against the rules;
   - a human King with five bots under every leak check.
+- **`KingsTableAttackChoiceTest`** (v0.9.8). It plays the owner's report through a human seat: the Contract and four Demons beat both opposing Generals at the upkeep, and in that turn the other King and his planeswalker are both offered and the attack lands. `KingsTableTest` checks the choice itself, with and without the guard. Both fail without patch 0016.
 
 ## Not built, or to watch in play
 
