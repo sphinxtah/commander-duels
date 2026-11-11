@@ -44,6 +44,7 @@ from api.models import (
     BoosterSyncRun,
     CardConcept,
     CardPrinting,
+    Deck,
     LibraryGrant,
     Pack,
     PackCard,
@@ -173,6 +174,8 @@ def client(collated: str, content: Path, engine, tmp_path):
         yield client
         with Session(app.state.database) as db:
             db.execute(text("DELETE FROM shop_weekly_sales"))
+            # A deck saved from an opened pack refers to it (v0.9.8): the decks go first.
+            db.execute(text("DELETE FROM decks"))
             for table in SHOP_TABLES:
                 db.execute(text(f"DELETE FROM {table}"))
             db.execute(
@@ -940,12 +943,30 @@ def test_starter_decks_are_free_first_then_sold_once_each(client):
     assert (purchase["tokens"], purchase["balance"], purchase["repeated"]) == (1_500, 500, False)
     decks = {deck["id"]: deck for deck in new.get("/api/v1/decks").json()}
     assert decks[purchase["deck"]]["title"] == "Karlach Test"
+    # Its cards as a pack reveals them (v0.9.8): one per copy, the commander last. The Mountains'
+    # edition came with the free red deck; the other two are new to the library.
+    cards = purchase["cards"]
+    assert [card["position"] for card in cards] == list(range(100))
+    assert Counter(card["name"] for card in cards) == {
+        "Mountain": 98,
+        "Lightning Bolt": 1,
+        "Karlach, Fury of Avernus": 1,
+    }
+    assert [(card["name"], card["commander"]) for card in cards if card["commander"]] == [
+        ("Karlach, Fury of Avernus", True)
+    ]
+    assert cards[-1]["commander"]
+    assert {card["name"] for card in cards if card["new"]} == {
+        "Lightning Bolt",
+        "Karlach, Fury of Avernus",
+    }
     library = {item["card"]["name"]: item for item in new.get("/api/v1/library").json()["cards"]}
     assert library["Karlach, Fury of Avernus"]["sources"] == ["starter"]
     assert library["Lightning Bolt"]["copies"] == 1
     # A retry buys nothing more; the deck is owned from now on.
     again = buy_deck(new, "starter_karlach_test").json()
     assert (again["deck"], again["balance"], again["repeated"]) == (purchase["deck"], 500, True)
+    assert len(again["cards"]) == 100 and not any(card["new"] for card in again["cards"])
     view = new.get("/api/v1/shop").json()
     assert [deck["owned"] for deck in view["decks"]] == [True, True, True, False]
     with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
@@ -955,6 +976,120 @@ def test_starter_decks_are_free_first_then_sold_once_each(client):
         assert [(entry.kind, entry.key, entry.amount, entry.reason) for entry in spent] == [
             ("pack", f"deck:{new.id}:starter_karlach_test", -1_500, "Starter deck: Karlach Test")
         ]
+
+
+def test_a_starter_deck_bought_unbuilt_is_built_when_its_player_asks(client):
+    """v0.9.8, the owner's request: the shop reveals a starter deck's cards, then asks whether to
+    build it into a Commander deck or keep its cards loose. The purchase builds none; the deck
+    comes from POST /decks, as a copy of a starter deck does."""
+    ada = Account(client, "ada-unbuilt", onboarding="starters")
+    root = Account(client, "root-unbuilt", kind="sysop")
+    root.send(
+        "POST", f"/api/v1/admin/users/{ada.id}/tokens", {"amount": 2_000, "reason": "Testing"}
+    )
+    chosen = ada.send(
+        "POST", "/api/v1/me/starters", {"decks": ["starter_red_test", "starter_blue_test"]}
+    )
+    assert chosen.status_code == 201, chosen.text
+    before = {deck["title"] for deck in ada.get("/api/v1/decks").json()}
+    bought = ada.send(
+        "POST", "/api/v1/shop/decks", {"deck": "starter_karlach_test", "build": False}
+    )
+    assert bought.status_code == 201, bought.text
+    purchase = bought.json()
+    assert (purchase["deck"], purchase["tokens"], purchase["repeated"]) == (None, 1_500, False)
+    assert len(purchase["cards"]) == 100 and purchase["cards"][-1]["commander"]
+    # The cards are the player's, loose: no deck was made.
+    assert {deck["title"] for deck in ada.get("/api/v1/decks").json()} == before
+    library = {item["card"]["name"]: item for item in ada.get("/api/v1/library").json()["cards"]}
+    assert library["Karlach, Fury of Avernus"]["sources"] == ["starter"]
+    assert library["Lightning Bolt"]["copies"] == 1
+    assert [deck["owned"] for deck in ada.get("/api/v1/shop").json()["decks"]][2] is True
+    # A retry answers the same: bought, and still no deck.
+    again = ada.send(
+        "POST", "/api/v1/shop/decks", {"deck": "starter_karlach_test", "build": False}
+    ).json()
+    assert (again["deck"], again["repeated"], again["balance"]) == (None, True, 500)
+    # Built when asked: a Commander deck its library plays.
+    built = ada.send(
+        "POST",
+        "/api/v1/decks",
+        {
+            "title": "Karlach Test",
+            "format": "commander",
+            "source": {"kind": "starter", "starter": "starter_karlach_test"},
+        },
+    )
+    assert built.status_code == 201, built.text
+    deck = built.json()
+    assert (deck["format"], deck["card_count"], deck["playable"]) == ("commander", 100, True)
+    assert (
+        ada.send("POST", "/api/v1/shop/decks", {"deck": "starter_karlach_test"}).json()["deck"]
+        == deck["id"]
+    )
+
+
+def test_a_deck_pack_is_kept_as_a_legacy_deck_or_as_its_cards(client, monkeypatch):
+    """v0.9.8, the owner's request: a pack that is a deck (a Starter Deck, a Tournament Pack) asks
+    whether to keep its cards together as a Legacy deck. Its cards are in the library either way;
+    the deck is saved once per opening while it is among the account's decks."""
+    ada = funded(client, "ada-decks", 5_000)
+    bob = Account(client, "bob-decks")
+    product = fixture_product(client)
+
+    def opened() -> Any:
+        pack = buy(ada, product.id).json()["pack"]
+        answer = ada.send("POST", f"/api/v1/shop/packs/{pack}/open")
+        assert answer.status_code == 200, answer.text
+        return answer.json()
+
+    # A booster is not a deck: nothing is offered, and nothing is saved.
+    booster = opened()
+    assert booster["deck"] is None
+    refused = ada.send("POST", f"/api/v1/shop/openings/{booster['id']}/deck")
+    assert (refused.status_code, refused.json()["code"]) == (409, "not_a_deck")
+
+    # The fixture's product stands in for a Starter Deck.
+    monkeypatch.setattr(shop_api, "kind_of", lambda booster: "starter")
+    opening = opened()
+    assert opening["product"]["kind"] == "starter"
+    assert opening["deck"] == {"format": "legacy", "deck": None, "deck_title": None}
+    assert bob.send("POST", f"/api/v1/shop/openings/{opening['id']}/deck").status_code == 404
+    assert ada.send("POST", f"/api/v1/shop/openings/{uuid4()}/deck").status_code == 404
+    saved = ada.send("POST", f"/api/v1/shop/openings/{opening['id']}/deck")
+    assert saved.status_code == 201, saved.text
+    first = saved.json()
+    assert (first["title"], first["format"], first["repeated"]) == (product.name, "legacy", False)
+    # Every card the pack gave, in its edition, in the main deck.
+    deck = ada.get(f"/api/v1/decks/{first['deck']}").json()
+    assert (deck["format"], deck["source"], deck["card_count"]) == ("legacy", "pack", 15)
+    held = Counter()
+    for entry in deck["draft"]["entries"]:
+        assert entry["location"] == "main"
+        held[(entry["card_id"], entry["printing_id"])] += entry["quantity"]
+    assert held == Counter((card["card_id"], card["printing_id"]) for card in opening["cards"])
+    # Its cards joined the library when the pack opened: saving the deck granted nothing.
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        keys = set(db.scalars(select(LibraryGrant.grant_key).where(LibraryGrant.user_id == ada.id)))
+        assert keys == {f"pack:{booster['id']}", f"pack:{opening['id']}"}
+    # The opening names its deck from now on, and asking again answers with it.
+    named = {"format": "legacy", "deck": first["deck"], "deck_title": product.name}
+    assert ada.get(f"/api/v1/shop/openings/{opening['id']}").json()["deck"] == named
+    again = ada.send("POST", f"/api/v1/shop/openings/{opening['id']}/deck").json()
+    assert (again["deck"], again["repeated"]) == (first["deck"], True)
+    assert sum(1 for deck in ada.get("/api/v1/decks").json() if deck["source"] == "pack") == 1
+
+    # A second pack of the same product takes the title's next number.
+    other = opened()
+    second = ada.send("POST", f"/api/v1/shop/openings/{other['id']}/deck").json()
+    assert (second["title"], second["repeated"]) == (f"{product.name} 2", False)
+
+    # A deck in the trash no longer counts: the opening offers its deck again.
+    assert ada.send("DELETE", f"/api/v1/decks/{first['deck']}").status_code in (200, 204)
+    assert ada.get(f"/api/v1/shop/openings/{opening['id']}").json()["deck"]["deck"] is None
+    third = ada.send("POST", f"/api/v1/shop/openings/{opening['id']}/deck").json()
+    assert third["deck"] != first["deck"]
+    assert (third["title"], third["repeated"]) == (product.name, False)
 
 
 def test_opening_draws_once_and_grants_the_cards(client, monkeypatch):
@@ -1401,6 +1536,22 @@ def test_concurrent_opens_and_purchases_on_postgresql(monkeypatch, tmp_path, con
                     select(LibraryGrant.grant_key).where(LibraryGrant.user_id == ada.id).distinct()
                 ).all()
                 assert grants == [f"pack:{opened[0]['id']}"]
+            # A deck pack saved by four requests at once is one deck (v0.9.8), which names its
+            # opening. The fixture's product stands in for a Starter Deck.
+            monkeypatch.setattr(shop_api, "kind_of", lambda booster: "starter")
+            with ThreadPoolExecutor(max_workers=4) as workers:
+                saved = list(
+                    workers.map(
+                        lambda _: ada.send(
+                            "POST", f"/api/v1/shop/openings/{opened[0]['id']}/deck"
+                        ).json(),
+                        range(4),
+                    )
+                )
+            assert len({item["deck"] for item in saved}) == 1
+            assert sorted(item["repeated"] for item in saved) == [False, True, True, True]
+            with Session(engine) as db:
+                assert db.scalars(select(Deck.opening_id)).all() == [UUID(opened[0]["id"])]
             # What a pack held stays recorded.
             for statement in (
                 "UPDATE packs SET tokens = 0",

@@ -16,7 +16,14 @@ import {
   vi,
 } from "vitest";
 import { client } from "../api";
-import { deckOffer, history, opening, player, shopView } from "./fixtures";
+import {
+  card,
+  deckOffer,
+  history,
+  opening,
+  player,
+  shopView,
+} from "./fixtures";
 import { ShopPage } from "./ShopPage";
 
 vi.mock("../game/sound/engine", () => ({
@@ -329,6 +336,96 @@ describe("Leng's card shop", () => {
       ),
     );
   });
+
+  it("asks whether to keep a deck pack together as a Legacy deck (v0.9.8)", async () => {
+    document.documentElement.dataset.reducedMotion = "true";
+    const starter = {
+      ...opening,
+      id: "opening-9",
+      product: {
+        ...opening.product,
+        name: "Tempest Starter Deck",
+        kind: "starter" as const,
+      },
+      deck: { format: "legacy" as const, deck: null, deck_title: null },
+    };
+    on("POST /api/v1/shop/packs/{pack_id}/open", () => reply(200, starter));
+    on("POST /api/v1/shop/openings/{opening_id}/deck", () =>
+      reply(201, {
+        deck: "deck-7",
+        title: "Tempest Starter Deck",
+        format: "legacy",
+        repeated: false,
+      }),
+    );
+    render(<ShopPage me={player} heading={createRef()} onSetup={vi.fn()} />);
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Open a pack of Zendikar Rising Draft Booster",
+      }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Tear open the Tempest Starter Deck",
+      }),
+    );
+    // Nothing is asked until the cards are revealed.
+    expect(screen.queryByText("Keep this deck together?")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Reveal all" }));
+    const choice = screen.getByRole("region", {
+      name: "Keep this deck together?",
+    });
+    expect(choice).toHaveTextContent(
+      "Its cards are in your library either way. Save them as a Legacy deck to play it as it came, or keep them as individual cards for decks of your own.",
+    );
+    expect(
+      within(choice).getByRole("button", { name: "Keep as individual cards" }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      within(choice).getByRole("button", { name: "Save as a Legacy deck" }),
+    );
+    const kept = await screen.findByRole("region", {
+      name: "Kept together as a Legacy deck",
+    });
+    expect(kept).toHaveTextContent(
+      "Saved as “Tempest Starter Deck”, among your decks.",
+    );
+    expect(
+      within(kept).getByRole("link", { name: "Open the deck" }),
+    ).toHaveAttribute("href", "#deck/deck-7");
+    expect(client.POST).toHaveBeenCalledWith(
+      "/api/v1/shop/openings/{opening_id}/deck",
+      { params: { path: { opening_id: "opening-9" } } },
+    );
+    expect(within(kept).queryByRole("button")).toBeNull();
+  });
+
+  it("shows the deck a pack opened before was saved as", async () => {
+    on("GET /api/v1/shop/openings/{opening_id}", () =>
+      reply(200, {
+        ...opening,
+        deck: { format: "legacy", deck: "deck-7", deck_title: "My Tempest" },
+      }),
+    );
+    render(<ShopPage me={player} heading={createRef()} onSetup={vi.fn()} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: /See its cards/ }),
+    );
+    const kept = await screen.findByRole("region", {
+      name: "Kept together as a Legacy deck",
+    });
+    expect(kept).toHaveTextContent("Saved as “My Tempest”, among your decks.");
+    // A booster asks nothing.
+    on("GET /api/v1/shop/openings/{opening_id}", () => reply(200, opening));
+    fireEvent.click(screen.getByRole("button", { name: "Back to the shop" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /See its cards/ }),
+    );
+    expect(
+      await screen.findByRole("list", { name: "Cards in the pack" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /deck/i })).toBeNull();
+  });
 });
 
 describe("Leng's starter decks (v0.4.2)", () => {
@@ -372,15 +469,25 @@ describe("Leng's starter decks (v0.4.2)", () => {
     on("GET /api/v1/shop", () =>
       reply(200, { ...shopView, decks, free_decks: false }),
     );
+    // Unbuilt since v0.9.8: the purchase answers with the deck's cards, the commander last.
     on("POST /api/v1/shop/decks", () =>
       reply(201, {
-        deck: "deck-9",
+        deck: null,
         starter: "two",
         tokens: 900,
         balance: 100,
         repeated: false,
+        cards: [
+          card(0, { name: "Island", new: false }),
+          card(1, { name: "Counterspell", new: true }),
+          { ...card(2, { name: "two Leader", new: true }), commander: true },
+        ],
       }),
     );
+    on("POST /api/v1/decks", () =>
+      reply(201, { id: "deck-9", title: "Stand-in two" }),
+    );
+    document.documentElement.dataset.reducedMotion = "true";
     render(<ShopPage me={player} heading={createRef()} onSetup={vi.fn()} />);
     fireEvent.click(await screen.findByRole("tab", { name: "Starter decks" }));
     const item = (name: string) =>
@@ -388,7 +495,7 @@ describe("Leng's starter decks (v0.4.2)", () => {
         "listitem",
         { name },
       );
-    expect(item("Stand-in one")).toHaveTextContent("In your decks");
+    expect(item("Stand-in one")).toHaveTextContent("Yours");
     expect(item("Stand-in four")).toHaveTextContent("Not for sale yet");
     expect(item("Stand-in three")).toHaveTextContent(
       "You need 93,000 tokens more.",
@@ -405,18 +512,72 @@ describe("Leng's starter decks (v0.4.2)", () => {
     );
     const dialog = screen.getByRole("dialog", { name: "Buy Stand-in two?" });
     expect(dialog).toHaveTextContent(
-      "It costs 900 tokens. You have 1,000 tokens, and will have 100 tokens left.",
+      "It costs 900 tokens. You have 1,000 tokens, and will have 100 tokens left. Its cards join your library for good; once you have seen them, you choose whether to build them into a Commander deck.",
     );
     fireEvent.click(
       within(dialog).getByRole("button", { name: "Buy for 900 tokens" }),
     );
+    // Its box tears open as a pack does (v0.9.8): the commander's card is on it.
+    const box = await screen.findByRole("button", {
+      name: "Tear open the Stand-in two",
+    });
+    expect(box.querySelector("img")).toHaveAttribute(
+      "src",
+      "/api/v1/card-images/printings/printing-two?size=normal",
+    );
+    expect(client.POST).toHaveBeenCalledWith("/api/v1/shop/decks", {
+      body: { deck: "two", build: false },
+    });
+    fireEvent.click(box);
+    fireEvent.click(screen.getByRole("button", { name: "Reveal all" }));
+    expect(
+      screen.getByText(/3 cards · 2 new to your library/),
+    ).toBeInTheDocument();
+    // Then it asks: build it into a Commander deck, or keep its cards loose.
+    const choice = screen.getByRole("region", {
+      name: "Keep this deck together?",
+    });
+    fireEvent.click(
+      within(choice).getByRole("button", { name: "Keep as individual cards" }),
+    );
+    const loose = screen.getByRole("region", {
+      name: "Kept as individual cards",
+    });
+    expect(loose).toHaveTextContent(
+      "The cards are in your library, and no deck was made. You can still build it later: on the Decks page, under Starter decks, choose Copy.",
+    );
+    expect(client.POST).not.toHaveBeenCalledWith(
+      "/api/v1/decks",
+      expect.anything(),
+    );
+    // A change of mind, there and then.
+    fireEvent.click(
+      within(loose).getByRole("button", {
+        name: "Build it into a Commander deck after all",
+      }),
+    );
+    const built = await screen.findByRole("region", {
+      name: "Kept together as a Commander deck",
+    });
+    expect(built).toHaveTextContent(
+      "Built as “Stand-in two”, among your decks.",
+    );
+    expect(
+      within(built).getByRole("link", { name: "Open the deck" }),
+    ).toHaveAttribute("href", "#deck/deck-9");
+    expect(client.POST).toHaveBeenCalledWith("/api/v1/decks", {
+      body: {
+        title: "Stand-in two",
+        format: "commander",
+        notes: "",
+        source: { kind: "starter", starter: "two" },
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Back to the shop" }));
     expect(
       await screen.findByText(
-        "You bought Stand-in two for 900 tokens. It is in your decks, and its cards in your library.",
+        "You bought Stand-in two for 900 tokens. Its cards are in your library.",
       ),
     ).toBeInTheDocument();
-    expect(client.POST).toHaveBeenCalledWith("/api/v1/shop/decks", {
-      body: { deck: "two" },
-    });
   });
 });

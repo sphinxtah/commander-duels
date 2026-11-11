@@ -4342,6 +4342,135 @@
         "title": "CustomCardUpload",
         "type": "object"
       },
+      "DeckCard": {
+        "additionalProperties": false,
+        "description": "A card of a deck shown as a pack's (v0.9.5 a warden's deck, v0.9.8 a starter deck).",
+        "properties": {
+          "card_id": {
+            "format": "uuid",
+            "title": "Card Id",
+            "type": "string"
+          },
+          "collector_number": {
+            "title": "Collector Number",
+            "type": "string"
+          },
+          "commander": {
+            "default": false,
+            "description": "The deck's commander: revealed last.",
+            "title": "Commander",
+            "type": "boolean"
+          },
+          "extra": {
+            "default": false,
+            "description": "Given in a pack opened before v0.6.2 in place of the card listed before it, which the game could not play then; since v0.6.2 the account holds both.",
+            "title": "Extra",
+            "type": "boolean"
+          },
+          "faces": {
+            "description": "Faces with images of their own; 0 for one image.",
+            "title": "Faces",
+            "type": "integer"
+          },
+          "finish": {
+            "enum": [
+              "nonfoil",
+              "foil",
+              "etched"
+            ],
+            "title": "Finish",
+            "type": "string"
+          },
+          "mana_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mana Cost"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "new": {
+            "description": "No copy of its edition was in the library for good before (by edition since v0.5.0).",
+            "title": "New",
+            "type": "boolean"
+          },
+          "position": {
+            "description": "Its place in the pack as revealed; since v0.6.2 in the order shown, a past pack's card drawn and the one given in its place each with its own.",
+            "title": "Position",
+            "type": "integer"
+          },
+          "printing_id": {
+            "format": "uuid",
+            "title": "Printing Id",
+            "type": "string"
+          },
+          "rarity": {
+            "title": "Rarity",
+            "type": "string"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When its edition was released (v0.9.0).",
+            "title": "Released At"
+          },
+          "set_code": {
+            "title": "Set Code",
+            "type": "string"
+          },
+          "set_name": {
+            "default": "",
+            "description": "Its edition's name (v0.9.0).",
+            "title": "Set Name",
+            "type": "string"
+          },
+          "sheet": {
+            "title": "Sheet",
+            "type": "string"
+          },
+          "stand_in": {
+            "default": false,
+            "description": "The game has no rules for this card yet (v0.6.2): casual games play it as a stand-in.",
+            "title": "Stand In",
+            "type": "boolean"
+          },
+          "type_line": {
+            "title": "Type Line",
+            "type": "string"
+          }
+        },
+        "required": [
+          "position",
+          "card_id",
+          "printing_id",
+          "name",
+          "mana_cost",
+          "type_line",
+          "rarity",
+          "set_code",
+          "collector_number",
+          "finish",
+          "sheet",
+          "new",
+          "faces"
+        ],
+        "title": "DeckCard",
+        "type": "object"
+      },
       "DeckCounts": {
         "additionalProperties": false,
         "properties": {
@@ -4767,6 +4896,14 @@
             "title": "Balance",
             "type": "integer"
           },
+          "cards": {
+            "description": "Its cards as a pack reveals them (v0.9.8): one per copy, the commonest first, the commander last. A retry marks none new.",
+            "items": {
+              "$ref": "#/components/schemas/DeckCard"
+            },
+            "title": "Cards",
+            "type": "array"
+          },
           "deck": {
             "anyOf": [
               {
@@ -4777,7 +4914,7 @@
                 "type": "null"
               }
             ],
-            "description": "The new deck of the player's own; null on a retry once it has been deleted.",
+            "description": "The new deck of the player's own; null when the purchase built none (v0.9.8), or on a retry once it has been deleted.",
             "title": "Deck"
           },
           "repeated": {
@@ -4808,6 +4945,12 @@
       "DeckPurchaseRequest": {
         "additionalProperties": false,
         "properties": {
+          "build": {
+            "default": true,
+            "description": "Make it a deck of the player's own at once. False (v0.9.8): its cards join the library and no deck is made; the shop shows the cards, then asks whether to build it.",
+            "title": "Build",
+            "type": "boolean"
+          },
           "deck": {
             "maxLength": 64,
             "minLength": 1,
@@ -8057,6 +8200,17 @@
             "title": "Collation Revision",
             "type": "integer"
           },
+          "deck": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PackDeck"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The pack is a deck (v0.9.8), and whether it was saved as one; null for every other pack."
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -8221,6 +8375,87 @@
           "origin"
         ],
         "title": "PackArt",
+        "type": "object"
+      },
+      "PackDeck": {
+        "additionalProperties": false,
+        "description": "A pack that is a deck (v0.9.8): a Starter Deck or a Tournament Pack. Its cards are in the\nlibrary; they may also be kept together as a deck.",
+        "properties": {
+          "deck": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The deck saved from it, while it is among the account's decks; null: none.",
+            "title": "Deck"
+          },
+          "deck_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deck Title"
+          },
+          "format": {
+            "description": "The format of the deck it may be saved as.",
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          }
+        },
+        "required": [
+          "format",
+          "deck",
+          "deck_title"
+        ],
+        "title": "PackDeck",
+        "type": "object"
+      },
+      "PackDeckSaved": {
+        "additionalProperties": false,
+        "properties": {
+          "deck": {
+            "format": "uuid",
+            "title": "Deck",
+            "type": "string"
+          },
+          "format": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "repeated": {
+            "description": "The pack's deck was saved before: this is that deck.",
+            "title": "Repeated",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "deck",
+          "title",
+          "format",
+          "repeated"
+        ],
+        "title": "PackDeckSaved",
         "type": "object"
       },
       "PackGrant": {
@@ -19194,7 +19429,7 @@
     },
     "/api/v1/admin/users/{user_id}/reset": {
       "post": {
-        "description": "SysOp resets an account to a new one's state (v0.4.5, api/resets.py), so the setup wizard\nruns again: its handle, alliance, library and packs are cleared, its decks go to the trash,\nand its wins and tokens go back to 0 and 1,000; its friends, messages and reports stay.\nRefused 409 while it plays a game or sits at an open table. The account's game lock is held\nmeanwhile, as for a deletion, so no game of it starts.",
+        "description": "SysOp, and since v0.9.8 an administrator, resets an account to a new one's state (v0.4.5,\napi/resets.py), so the setup wizard runs again: its handle, alliance, library and packs are\ncleared, its decks go to the trash, and its wins and tokens go back to 0 and 1,000; its\nfriends, messages and reports stay. Never the caller's own account, SysOp's or a deleted one,\nand an administrator's only by SysOp (managed_user). Refused 409 while it plays a game or\nsits at an open table. The account's game lock is held meanwhile, as for a deletion, so no\ngame of it starts.",
         "operationId": "reset_user_api_v1_admin_users__user_id__reset_post",
         "parameters": [
           {
@@ -29179,7 +29414,7 @@
     },
     "/api/v1/games/{game_id}/close": {
       "post": {
-        "description": "Ends the game for every seat: its owner's choice, or SysOp's. The reply shows the game\nas it ended. A table's game goes on for the other players, so its players concede their own\nseat instead; only SysOp closes it while it runs.",
+        "description": "Ends the game for every seat: its owner's choice, or SysOp's. The reply shows the game\nas it ended. A table's game goes on for the other players, so its players concede their own\nseat instead; only SysOp closes it while it runs. A game closed counts for nothing, with one\nexception since v0.9.8: the campaign's court closed by its own player is the court lost\n(campaign.game_ended), as conceding it would be.",
         "operationId": "close_game_api_v1_games__game_id__close_post",
         "parameters": [
           {
@@ -35714,7 +35949,7 @@
     },
     "/api/v1/shop/decks": {
       "post": {
-        "description": "Buys a starter deck, once: its price leaves the balance, it becomes a deck of the player's\nown, and every copy of its cards joins the library for good, together.",
+        "description": "Buys a starter deck, once: its price leaves the balance, it becomes a deck of the player's\nown, and every copy of its cards joins the library for good, together. With build false\n(v0.9.8) it becomes no deck: the cards join the library, and the answer's cards are what the\nshop reveals before asking whether to build it.",
         "operationId": "buy_deck_api_v1_shop_decks_post",
         "requestBody": {
           "content": {
@@ -36063,6 +36298,117 @@
           }
         },
         "summary": "Opening"
+      }
+    },
+    "/api/v1/shop/openings/{opening_id}/deck": {
+      "post": {
+        "description": "Keeps an opened deck pack's cards together as a deck (v0.9.8, the owner's request): a\nStarter Deck's or a Tournament Pack's, every card it gave in its edition, as a Legacy deck\nnamed for the product. The cards joined the library when the pack opened; this grants\nnothing. Once per opening while that deck is among the account's decks: asking again answers\nwith it.",
+        "operationId": "save_pack_deck_api_v1_shop_openings__opening_id__deck_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "opening_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Opening Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackDeckSaved"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Save Pack Deck"
       }
     },
     "/api/v1/shop/packs/{pack_id}/open": {

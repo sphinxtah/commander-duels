@@ -25,7 +25,7 @@ from api.identity import Active, Db, not_found, utcnow
 from api.library import since_reset
 from api.models import CardConcept, CardPrinting, CustomCard, User, WardenOpening
 from api.schemas import Contract
-from api.shop import PulledCard
+from api.shop import DeckCard
 from api.social import notify_award
 from api.validation import DeckEntry
 from catalog.statuses import stands_in
@@ -36,8 +36,7 @@ router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 RARITY_ORDER = {"common": 0, "uncommon": 1, "rare": 2, "mythic": 3, "special": 4, "bonus": 5}
 
 
-class WardenCard(PulledCard):
-    commander: bool = Field(default=False, description="The deck's commander: revealed last.")
+class WardenCard(DeckCard):
     custom: bool = Field(
         default=False,
         description="One of the Godlike tier's custom cards (the High Priest): its image is the "

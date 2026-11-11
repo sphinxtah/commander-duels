@@ -43,12 +43,20 @@ card by card, their cards the player's for good.
   and a pack of each basic (40, 50 tokens) are products of their own, on a shelf of their own,
   bought, held, opened and on the weekly sale like any pack; the newer the edition, the likelier
   its lands, and each color's 40 hold 1 to 5 foils.
+- **Deck packs** (v0.9.8, the owner's request). A pack that is a deck asks, once its cards are
+  revealed, whether to keep them together as a deck or as individual cards; they are in the
+  library either way. A Starter Deck or a Tournament Pack (DECK_KINDS) may be saved as a Legacy
+  deck, once per opening while that deck is among the account's decks (decks.opening_id), now or
+  later from the opened packs. A starter deck bought with build false joins the library without
+  becoming a deck, and the purchase answers with its cards as a pack reveals them, the commander
+  last; the player then builds it into a Commander deck (POST /decks, from the starter) or leaves
+  its cards loose.
 """
 
 import secrets
 from collections import defaultdict
 from datetime import date, datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID, uuid4, uuid5
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -79,6 +87,7 @@ from api.lands import ensure_land_packs, is_land_pack, land_layout
 from api.library import (
     Starter,
     commander_printing,
+    default_printings,
     grant_starter,
     library_of,
     one_of_a_kind,
@@ -125,6 +134,7 @@ from api.products import (
 from api.roster import roster_of
 from api.sales import Sale, SaleInfo, weekly_sale
 from api.schemas import Contract, StoredText
+from api.validation import DeckEntry, GameFormatName
 from catalog import boosters
 from catalog.statuses import deck_cards, in_game, stands_in
 
@@ -144,6 +154,9 @@ RequestKey = Annotated[str, Field(min_length=8, max_length=64, pattern=r"^[A-Za-
 Reason = Annotated[StoredText, Field(min_length=3, max_length=200)]
 # The namespace of SysOp's pack grants' IDs made from the client's key (a retry finds its grant).
 PACK_GRANTS = UUID("6f4c8e0a-3f8e-5b1d-9a57-0c2d7e6b4a91")
+# The packs that are decks (v0.9.8), and the format of the deck one may be kept as: a Starter
+# Deck holds 60 cards and a Tournament Pack 75, lands among them.
+DECK_KINDS: dict[str, GameFormatName] = {"starter": "legacy", "tournament": "legacy"}
 
 
 class EraInfo(Contract):
@@ -255,16 +268,12 @@ class ShopView(Contract):
 
 class DeckPurchaseRequest(Contract):
     deck: str = Field(min_length=1, max_length=64)
-
-
-class DeckPurchase(Contract):
-    deck: UUID | None = Field(
-        description="The new deck of the player's own; null on a retry once it has been deleted."
+    build: bool = Field(
+        default=True,
+        description="Make it a deck of the player's own at once. False (v0.9.8): its cards join "
+        "the library and no deck is made; the shop shows the cards, then asks whether to build "
+        "it.",
     )
-    starter: str
-    tokens: int = Field(description="The price paid.")
-    balance: int
-    repeated: bool = Field(description="A retry: the deck was bought already.")
 
 
 class PurchaseRequest(Contract):
@@ -318,6 +327,46 @@ class PulledCard(Contract):
     )
 
 
+class DeckCard(PulledCard):
+    """A card of a deck shown as a pack's (v0.9.5 a warden's deck, v0.9.8 a starter deck)."""
+
+    commander: bool = Field(default=False, description="The deck's commander: revealed last.")
+
+
+class DeckPurchase(Contract):
+    deck: UUID | None = Field(
+        description="The new deck of the player's own; null when the purchase built none "
+        "(v0.9.8), or on a retry once it has been deleted."
+    )
+    starter: str
+    tokens: int = Field(description="The price paid.")
+    balance: int
+    repeated: bool = Field(description="A retry: the deck was bought already.")
+    cards: list[DeckCard] = Field(
+        default_factory=list,
+        description="Its cards as a pack reveals them (v0.9.8): one per copy, the commonest "
+        "first, the commander last. A retry marks none new.",
+    )
+
+
+class PackDeck(Contract):
+    """A pack that is a deck (v0.9.8): a Starter Deck or a Tournament Pack. Its cards are in the
+    library; they may also be kept together as a deck."""
+
+    format: GameFormatName = Field(description="The format of the deck it may be saved as.")
+    deck: UUID | None = Field(
+        description="The deck saved from it, while it is among the account's decks; null: none."
+    )
+    deck_title: str | None
+
+
+class PackDeckSaved(Contract):
+    deck: UUID
+    title: str
+    format: GameFormatName
+    repeated: bool = Field(description="The pack's deck was saved before: this is that deck.")
+
+
 class Opening(Contract):
     id: UUID
     pack: UUID
@@ -326,6 +375,11 @@ class Opening(Contract):
     mtgjson_version: str
     opened_at: datetime
     cards: list[PulledCard]
+    deck: PackDeck | None = Field(
+        default=None,
+        description="The pack is a deck (v0.9.8), and whether it was saved as one; null for "
+        "every other pack.",
+    )
 
 
 class OpeningSummary(Contract):
@@ -613,12 +667,87 @@ def deck_offers(request: Request, db: Session, user: User) -> list[DeckOffer]:
     return offers
 
 
+def pulled_fields(printing: CardPrinting, concept: CardConcept) -> dict[str, Any]:
+    """What a pulled card says of its card and edition."""
+    image = image_of(printing)
+    return {
+        "card_id": concept.id,
+        "printing_id": printing.id,
+        "name": concept.name,
+        "mana_cost": concept.mana_cost,
+        "type_line": concept.type_line,
+        "rarity": printing.rarity,
+        "set_code": printing.set_code,
+        "set_name": printing.set_name,
+        "released_at": printing.released_at,
+        "collector_number": printing.collector_number,
+        "faces": image.faces if image else 0,
+        "stand_in": stands_in(
+            concept.status,
+            concept.status_reason,
+            concept.deck_card,
+            concept.removed_revision is not None,
+        ),
+    }
+
+
+def revealed_deck(db: Session, entries: list[DeckEntry], buyer: User | None) -> list[DeckCard]:
+    """A deck's cards as a pack reveals them (v0.9.8): one per copy, each in the edition the grant
+    gives (library.grant_deck), the commonest first and by name, the commander last. buyer: the
+    account about to be granted the deck, whose library says which editions are new to it; None
+    marks no card new (a purchase repeated)."""
+    fallback = default_printings(
+        db, {entry.card_id for entry in entries if entry.printing_id is None}
+    )
+    chosen = [(entry, entry.printing_id or fallback.get(entry.card_id)) for entry in entries]
+    rows = {
+        printing.id: (printing, concept)
+        for printing, concept in db.execute(
+            select(CardPrinting, CardConcept)
+            .join(CardConcept, CardConcept.id == CardPrinting.concept_id)
+            .where(CardPrinting.id.in_({printing_id for _, printing_id in chosen} - {None}))
+        ).all()
+    }
+    main: list[tuple[CardPrinting, CardConcept, bool]] = []
+    last: list[tuple[CardPrinting, CardConcept, bool]] = []
+    for entry, printing_id in chosen:
+        found = rows.get(printing_id) if printing_id else None
+        if found is None:
+            continue
+        commander = entry.location == "commander"
+        (last if commander else main).extend([(*found, commander)] * entry.quantity)
+    main.sort(key=lambda card: (RARITY_ORDER.get(card[0].rarity, 4), card[1].name))
+    held = None if buyer is None else granted_editions(db, buyer, set(rows))
+    cards: list[DeckCard] = []
+    for printing, concept, commander in main + last:
+        new = held is not None and printing.id not in held
+        if held is not None:
+            held.add(printing.id)
+        cards.append(
+            DeckCard(
+                position=len(cards),
+                finish="nonfoil",
+                sheet="",
+                new=new,
+                commander=commander,
+                **pulled_fields(printing, concept),
+            )
+        )
+    return cards
+
+
 def deck_bought(
-    db: Session, user: User, starter: Starter, entry: TokenEntry, deck: UUID | None = None
+    db: Session,
+    user: User,
+    starter: Starter,
+    entry: TokenEntry,
+    cards: list[DeckCard],
+    deck: UUID | None = None,
+    repeated: bool = False,
 ) -> DeckPurchase:
-    repeated = deck is None
     if repeated:
-        # A retry: the newest deck of the account's made from it is the one the purchase made.
+        # A retry: the newest deck of the account's made from it is the one the purchase made,
+        # if it made one.
         deck = db.scalar(
             select(Deck.id)
             .where(Deck.owner_id == user.id, Deck.source == "starter", Deck.title == starter.title)
@@ -631,6 +760,7 @@ def deck_bought(
         tokens=-entry.amount,
         balance=balance_of(db, user.id),
         repeated=repeated,
+        cards=cards,
     )
 
 
@@ -639,7 +769,9 @@ def buy_deck(
     body: DeckPurchaseRequest, request: Request, principal: Builder, db: Db
 ) -> DeckPurchase:
     """Buys a starter deck, once: its price leaves the balance, it becomes a deck of the player's
-    own, and every copy of its cards joins the library for good, together."""
+    own, and every copy of its cards joins the library for good, together. With build false
+    (v0.9.8) it becomes no deck: the cards join the library, and the answer's cards are what the
+    shop reveals before asking whether to build it."""
     user = principal.user
     starter = starters_of(request).get(body.deck)
     if starter is None:
@@ -648,9 +780,14 @@ def buy_deck(
     lock_account(db, user.id)
     db.refresh(user)
     key = reset_key(user, f"deck:{user.id}:{starter.id}")
+
+    def again(earlier: TokenEntry) -> DeckPurchase:
+        held, _ = starter_entries(db, starter)
+        return deck_bought(db, user, starter, earlier, revealed_deck(db, held, None), repeated=True)
+
     earlier = db.scalar(select(TokenEntry).where(TokenEntry.key == key))
     if earlier is not None:
-        return deck_bought(db, user, starter, earlier)
+        return again(earlier)
     if free_decks(user):
         raise ApiError(
             409, "starters_first", "Choose your two free starter decks first: they cost nothing."
@@ -668,18 +805,23 @@ def buy_deck(
             "The card catalog is not ready for the starter decks yet. Try again later.",
         )
     entry = spend(db, user.id, price, key, f"Starter deck: {starter.title}")
+    # The cards as the shop reveals them, new where the library held no copy of the edition.
+    cards = revealed_deck(db, entries, user)
     grant_starter(db, user, starter, entries)
     db.flush()
     roster = roster_of(request)
-    deck, _ = create_deck(
-        db,
-        principal,
-        starter.title,
-        "commander",
-        entries,
-        library_of(db, user, principal.permissions, roster),
-        source="starter",
-    )
+    built: UUID | None = None
+    if body.build:
+        deck, _ = create_deck(
+            db,
+            principal,
+            starter.title,
+            "commander",
+            entries,
+            library_of(db, user, principal.permissions, roster),
+            source="starter",
+        )
+        built = deck.id
     refresh_decks(db, user.id, library_of(db, user, principal.permissions, roster))
     try:
         db.commit()
@@ -688,8 +830,8 @@ def buy_deck(
         earlier = db.scalar(select(TokenEntry).where(TokenEntry.key == key))
         if earlier is None:
             raise
-        return deck_bought(db, user, starter, earlier)
-    return deck_bought(db, user, starter, entry, deck.id)
+        return again(earlier)
+    return deck_bought(db, user, starter, entry, cards, built)
 
 
 def purchase_of(db: Session, pack: Pack, repeated: bool, art: ArtIndex) -> Purchase:
@@ -790,31 +932,14 @@ def opening_of(db: Session, opening: PackOpening, art: ArtIndex) -> Opening:
     def pulled(
         card: PackCard, printing: CardPrinting, concept: CardConcept, new: bool, extra: bool
     ) -> PulledCard:
-        image = image_of(printing)
         return PulledCard(
             # In the order shown: a past pack's card drawn and the one given for it are two.
             position=len(cards),
-            card_id=concept.id,
-            printing_id=printing.id,
-            name=concept.name,
-            mana_cost=concept.mana_cost,
-            type_line=concept.type_line,
-            rarity=printing.rarity,
-            set_code=printing.set_code,
-            set_name=printing.set_name,
-            released_at=printing.released_at,
-            collector_number=printing.collector_number,
             finish=card.finish,  # type: ignore[arg-type]
             sheet=card.sheet,
             new=new,
-            faces=image.faces if image else 0,
-            stand_in=stands_in(
-                concept.status,
-                concept.status_reason,
-                concept.deck_card,
-                concept.removed_revision is not None,
-            ),
             extra=extra,
+            **pulled_fields(printing, concept),
         )
 
     cards: list[PulledCard] = []
@@ -831,7 +956,103 @@ def opening_of(db: Session, opening: PackOpening, art: ArtIndex) -> Opening:
         mtgjson_version=collation.mtgjson_version,
         opened_at=opening.created_at,
         cards=cards,
+        deck=pack_deck(db, opening, product),
     )
+
+
+# Deck packs (v0.9.8).
+
+
+def saved_deck(db: Session, opening: PackOpening) -> Deck | None:
+    """The deck saved from the opening, while it is among its account's decks: the trash's are
+    not."""
+    return db.scalar(
+        select(Deck)
+        .where(
+            Deck.owner_id == opening.user_id,
+            Deck.opening_id == opening.id,
+            Deck.deleted_at.is_(None),
+        )
+        .order_by(Deck.created_at.desc())
+        .limit(1)
+    )
+
+
+def pack_deck(db: Session, opening: PackOpening, product: ShopProduct) -> PackDeck | None:
+    fmt = DECK_KINDS.get(kind_of(product.booster))
+    if fmt is None:
+        return None
+    saved = saved_deck(db, opening)
+    return PackDeck(
+        format=fmt,
+        deck=saved.id if saved else None,
+        deck_title=saved.title if saved else None,
+    )
+
+
+def free_title(db: Session, user_id: UUID, wanted: str) -> str:
+    """The title, or the title and the first number from 2 that no deck of the account's has."""
+    base = wanted[:72]
+    taken = set(
+        db.scalars(select(Deck.title).where(Deck.owner_id == user_id, Deck.deleted_at.is_(None)))
+    )
+    if base not in taken:
+        return base
+    number = 2
+    while f"{base} {number}" in taken:
+        number += 1
+    return f"{base} {number}"
+
+
+@router.post("/shop/openings/{opening_id}/deck", response_model=PackDeckSaved, status_code=201)
+def save_pack_deck(opening_id: UUID, request: Request, principal: Builder, db: Db) -> PackDeckSaved:
+    """Keeps an opened deck pack's cards together as a deck (v0.9.8, the owner's request): a
+    Starter Deck's or a Tournament Pack's, every card it gave in its edition, as a Legacy deck
+    named for the product. The cards joined the library when the pack opened; this grants
+    nothing. Once per opening while that deck is among the account's decks: asking again answers
+    with it."""
+    user = principal.user
+    # The account's row is locked first, so two requests at once save one deck.
+    lock_account(db, user.id)
+    db.refresh(user)
+    found = db.scalar(
+        select(PackOpening).where(
+            PackOpening.id == opening_id,
+            PackOpening.user_id == user.id,
+            since_reset(user, PackOpening.created_at),
+        )
+    )
+    if found is None:
+        raise not_found()
+    product = db.get_one(ShopProduct, found.product_id)
+    fmt = DECK_KINDS.get(kind_of(product.booster))
+    if fmt is None:
+        raise ApiError(
+            409, "not_a_deck", f"A {product.name} is not a deck: its cards are in your library."
+        )
+    saved = saved_deck(db, found)
+    if saved is not None:
+        return PackDeckSaved(deck=saved.id, title=saved.title, format=fmt, repeated=True)
+    # Every card the opening shows is the account's (opening_of): one entry per card and edition.
+    quantities: dict[tuple[UUID, UUID], int] = defaultdict(int)
+    for card in opening_of(db, found, art_of(request)).cards:
+        quantities[(card.card_id, card.printing_id)] += 1
+    entries = [
+        DeckEntry(card_id=card_id, printing_id=printing_id, quantity=quantity)
+        for (card_id, printing_id), quantity in quantities.items()
+    ]
+    deck, _ = create_deck(
+        db,
+        principal,
+        free_title(db, user.id, product.name),
+        fmt,
+        entries,
+        library_of(db, user, principal.permissions, roster_of(request)),
+        source="pack",
+    )
+    deck.opening_id = found.id
+    db.commit()
+    return PackDeckSaved(deck=deck.id, title=deck.title, format=fmt, repeated=False)
 
 
 def granted_editions(db: Session, user: User, printings: set[UUID]) -> set[UUID]:

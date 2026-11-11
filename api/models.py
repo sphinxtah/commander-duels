@@ -1005,8 +1005,14 @@ class Deck(Base):
     needs: Mapped[list[str] | None] = mapped_column(JsonType)
     identity: Mapped[str] = mapped_column(String(8), default="")
     latest_revision: Mapped[int | None]
-    # How it began: empty, imported, duplicated, starter or guided.
+    # How it began: empty, imported, duplicated, starter, guided, campaign (a warden's deck) or
+    # pack (a deck pack from Leng's shop kept together, v0.9.8).
     source: Mapped[str] = mapped_column(String(16), default="empty")
+    # The opened deck pack it was saved from (v0.9.8, api/shop.py): a Starter Deck or a Tournament
+    # Pack kept together as a deck. One deck per opening while it is among the account's decks.
+    opening_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("pack_openings.id", name="fk_decks_opening")
+    )
     # Cards that left the draft because the game cannot play them (v0.4.5), until the owner
     # dismisses the note: [{card_id, name, quantity, reason, removed_at}].
     removed_cards: Mapped[list[dict[str, object]]] = mapped_column(JsonType, default=list)

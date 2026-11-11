@@ -192,6 +192,58 @@ describe("opening a pack", () => {
     ).toBeInTheDocument();
   });
 
+  it("asks in a deck's summary whether to keep its cards together (v0.9.8)", async () => {
+    const save = vi
+      .fn()
+      .mockResolvedValueOnce("An account keeps at most 250 decks.")
+      .mockResolvedValueOnce({ id: "deck-3", title: "Tempest Starter Deck 2" });
+    render(
+      <PackOpening
+        opening={opening}
+        onDone={vi.fn()}
+        startOpen
+        deck={{
+          format: "legacy",
+          saved: null,
+          save,
+          later: "You can still save the deck later.",
+        }}
+      />,
+    );
+    const choice = screen.getByRole("region", {
+      name: "Keep this deck together?",
+    });
+    // What went wrong is said, and the choice stays open.
+    fireEvent.click(
+      within(choice).getByRole("button", { name: "Save as a Legacy deck" }),
+    );
+    expect(await within(choice).findByRole("alert")).toHaveTextContent(
+      "An account keeps at most 250 decks.",
+    );
+    fireEvent.click(
+      within(choice).getByRole("button", { name: "Save as a Legacy deck" }),
+    );
+    const kept = await screen.findByRole("region", {
+      name: "Kept together as a Legacy deck",
+    });
+    expect(kept).toHaveTextContent(
+      "Saved as “Tempest Starter Deck 2”, among your decks.",
+    );
+    expect(within(kept).queryByRole("alert")).toBeNull();
+    expect(save).toHaveBeenCalledTimes(2);
+    // The cards are listed all the same.
+    expect(
+      within(
+        screen.getByRole("list", { name: "Cards in the pack" }),
+      ).getAllByRole("listitem"),
+    ).toHaveLength(6);
+  });
+
+  it("asks nothing of a pack that is not a deck", () => {
+    render(<PackOpening opening={opening} onDone={vi.fn()} startOpen />);
+    expect(screen.queryByRole("region", { name: /deck/i })).toBeNull();
+  });
+
   it("shows a pack opened before as its summary", () => {
     render(<PackOpening opening={opening} onDone={vi.fn()} startOpen />);
     expect(

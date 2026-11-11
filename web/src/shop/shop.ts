@@ -13,6 +13,7 @@ export type OpeningSummary = components["schemas"]["OpeningSummary"];
 export type PulledCard = components["schemas"]["PulledCard"];
 export type Purchase = components["schemas"]["Purchase"];
 export type DeckOffer = components["schemas"]["DeckOffer"];
+export type DeckPurchase = components["schemas"]["DeckPurchase"];
 export type SaleInfo = components["schemas"]["SaleInfo"];
 export type BoosterKind = Product["kind"];
 

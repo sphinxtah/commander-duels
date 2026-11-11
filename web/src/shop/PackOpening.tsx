@@ -15,6 +15,7 @@ import { useImageRetry } from "../game/RetryingImage";
 import { getSoundEngine } from "../game/sound/engine";
 import type { Cue } from "../game/sound/recipes";
 import shell from "../App.module.css";
+import { DeckChoicePanel, type DeckChoice } from "./DeckChoice";
 import { LandTally } from "./LandTally";
 import { LengBackdrop } from "./Leng";
 import { PackArt } from "./PackArt";
@@ -35,7 +36,8 @@ import { signalTutorial } from "../tutorial/tutorial";
 // A summary follows, with new cards marked; clicking a card opens its details (v0.9.1). The server drew
 // the pack before any of this: the show only reveals it. With reduced motion every step is
 // immediate and nothing moves. Since v0.4.3 the pack is the product's own picture (PackArt), whose
-// top strip tears off, and Leng's counter shows dimly behind it all.
+// top strip tears off, and Leng's counter shows dimly behind it all. Since v0.9.8 a pack that is
+// a deck asks in its summary whether to keep its cards together as one (DeckChoice).
 
 /** How long each step takes, in ms, when motion is allowed. */
 export const TIMING = { tear: 650, deal: 70, settle: 300, revealAll: 140 };
@@ -114,8 +116,17 @@ export function PackOpening({
   art,
   tutorial = true,
   summaryLine,
+  deck,
+  doneLabel = "Back to the shop",
+  noun = "pack",
 }: {
   opening: Opening;
+  /** The pack is a deck (v0.9.8): its summary asks whether to keep the cards together. */
+  deck?: DeckChoice;
+  /** What the summary's way out says. */
+  doneLabel?: string;
+  /** What tears open: a pack, or a deck in its box (a warden's, a starter deck). */
+  noun?: "pack" | "deck";
   /** What tears open in place of the product's pack: a warden's deck box (v0.9.5). */
   art?: ReactNode;
   /** Whether the tutorial's tour hears of it (a pack from the shop does). */
@@ -272,7 +283,7 @@ export function PackOpening({
         data-stage="summary"
       >
         <LengBackdrop />
-        <span className={shell.eyebrow}>PACK OPENED</span>
+        <span className={shell.eyebrow}>{noun.toUpperCase()} OPENED</span>
         <h2 id="opening-summary-title" ref={heading} tabIndex={-1}>
           {title}
         </h2>
@@ -282,6 +293,7 @@ export function PackOpening({
           {foils ? ` · ${foils} foil${foils === 1 ? "" : "s"}` : ""}. Every card
           is now in your library for good.
         </p>
+        {deck && <DeckChoicePanel choice={deck} />}
         {lands && (
           <div
             className={styles.viewSwitch}
@@ -365,7 +377,7 @@ export function PackOpening({
             </button>
           )}
           <button type="button" className={styles.secondary} onClick={onDone}>
-            Back to the shop
+            {doneLabel}
           </button>
         </div>
         <dialog
@@ -406,7 +418,7 @@ export function PackOpening({
       data-tour="pack-opening"
     >
       <LengBackdrop />
-      <span className={shell.eyebrow}>OPENING A PACK</span>
+      <span className={shell.eyebrow}>OPENING A {noun.toUpperCase()}</span>
       <h2 id="opening-title">{title}</h2>
       {stage === "sealed" || stage === "tearing" ? (
         <div className={styles.packStage}>
@@ -432,7 +444,7 @@ export function PackOpening({
           </button>
           <p className={styles.note}>
             {stage === "sealed"
-              ? "Click the pack to tear it open."
+              ? `Click the ${noun} to tear it open.`
               : "Tearing it open…"}
           </p>
         </div>

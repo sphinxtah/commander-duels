@@ -619,11 +619,13 @@ export interface paths {
         put?: never;
         /**
          * Reset User
-         * @description SysOp resets an account to a new one's state (v0.4.5, api/resets.py), so the setup wizard
-         *     runs again: its handle, alliance, library and packs are cleared, its decks go to the trash,
-         *     and its wins and tokens go back to 0 and 1,000; its friends, messages and reports stay.
-         *     Refused 409 while it plays a game or sits at an open table. The account's game lock is held
-         *     meanwhile, as for a deletion, so no game of it starts.
+         * @description SysOp, and since v0.9.8 an administrator, resets an account to a new one's state (v0.4.5,
+         *     api/resets.py), so the setup wizard runs again: its handle, alliance, library and packs are
+         *     cleared, its decks go to the trash, and its wins and tokens go back to 0 and 1,000; its
+         *     friends, messages and reports stay. Never the caller's own account, SysOp's or a deleted one,
+         *     and an administrator's only by SysOp (managed_user). Refused 409 while it plays a game or
+         *     sits at an open table. The account's game lock is held meanwhile, as for a deletion, so no
+         *     game of it starts.
          */
         post: operations["reset_user_api_v1_admin_users__user_id__reset_post"];
         delete?: never;
@@ -2127,7 +2129,9 @@ export interface paths {
          * Close Game
          * @description Ends the game for every seat: its owner's choice, or SysOp's. The reply shows the game
          *     as it ended. A table's game goes on for the other players, so its players concede their own
-         *     seat instead; only SysOp closes it while it runs.
+         *     seat instead; only SysOp closes it while it runs. A game closed counts for nothing, with one
+         *     exception since v0.9.8: the campaign's court closed by its own player is the court lost
+         *     (campaign.game_ended), as conceding it would be.
          */
         post: operations["close_game_api_v1_games__game_id__close_post"];
         delete?: never;
@@ -3214,7 +3218,9 @@ export interface paths {
         /**
          * Buy Deck
          * @description Buys a starter deck, once: its price leaves the balance, it becomes a deck of the player's
-         *     own, and every copy of its cards joins the library for good, together.
+         *     own, and every copy of its cards joins the library for good, together. With build false
+         *     (v0.9.8) it becomes no deck: the cards join the library, and the answer's cards are what the
+         *     shop reveals before asking whether to build it.
          */
         post: operations["buy_deck_api_v1_shop_decks_post"];
         delete?: never;
@@ -3254,6 +3260,30 @@ export interface paths {
         get: operations["opening_api_v1_shop_openings__opening_id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shop/openings/{opening_id}/deck": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Save Pack Deck
+         * @description Keeps an opened deck pack's cards together as a deck (v0.9.8, the owner's request): a
+         *     Starter Deck's or a Tournament Pack's, every card it gave in its edition, as a Legacy deck
+         *     named for the product. The cards joined the library when the pack opened; this grants
+         *     nothing. Once per opening while that deck is among the account's decks: asking again answers
+         *     with it.
+         */
+        post: operations["save_pack_deck_api_v1_shop_openings__opening_id__deck_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5187,6 +5217,85 @@ export interface components {
             /** Type Line */
             type_line: string;
         };
+        /**
+         * DeckCard
+         * @description A card of a deck shown as a pack's (v0.9.5 a warden's deck, v0.9.8 a starter deck).
+         */
+        DeckCard: {
+            /**
+             * Card Id
+             * Format: uuid
+             */
+            card_id: string;
+            /** Collector Number */
+            collector_number: string;
+            /**
+             * Commander
+             * @description The deck's commander: revealed last.
+             * @default false
+             */
+            commander: boolean;
+            /**
+             * Extra
+             * @description Given in a pack opened before v0.6.2 in place of the card listed before it, which the game could not play then; since v0.6.2 the account holds both.
+             * @default false
+             */
+            extra: boolean;
+            /**
+             * Faces
+             * @description Faces with images of their own; 0 for one image.
+             */
+            faces: number;
+            /**
+             * Finish
+             * @enum {string}
+             */
+            finish: "nonfoil" | "foil" | "etched";
+            /** Mana Cost */
+            mana_cost: string | null;
+            /** Name */
+            name: string;
+            /**
+             * New
+             * @description No copy of its edition was in the library for good before (by edition since v0.5.0).
+             */
+            new: boolean;
+            /**
+             * Position
+             * @description Its place in the pack as revealed; since v0.6.2 in the order shown, a past pack's card drawn and the one given in its place each with its own.
+             */
+            position: number;
+            /**
+             * Printing Id
+             * Format: uuid
+             */
+            printing_id: string;
+            /** Rarity */
+            rarity: string;
+            /**
+             * Released At
+             * @description When its edition was released (v0.9.0).
+             */
+            released_at?: string | null;
+            /** Set Code */
+            set_code: string;
+            /**
+             * Set Name
+             * @description Its edition's name (v0.9.0).
+             * @default
+             */
+            set_name: string;
+            /** Sheet */
+            sheet: string;
+            /**
+             * Stand In
+             * @description The game has no rules for this card yet (v0.6.2): casual games play it as a stand-in.
+             * @default false
+             */
+            stand_in: boolean;
+            /** Type Line */
+            type_line: string;
+        };
         /** DeckCounts */
         DeckCounts: {
             /**
@@ -5373,8 +5482,13 @@ export interface components {
             /** Balance */
             balance: number;
             /**
+             * Cards
+             * @description Its cards as a pack reveals them (v0.9.8): one per copy, the commonest first, the commander last. A retry marks none new.
+             */
+            cards?: components["schemas"]["DeckCard"][];
+            /**
              * Deck
-             * @description The new deck of the player's own; null on a retry once it has been deleted.
+             * @description The new deck of the player's own; null when the purchase built none (v0.9.8), or on a retry once it has been deleted.
              */
             deck: string | null;
             /**
@@ -5392,6 +5506,12 @@ export interface components {
         };
         /** DeckPurchaseRequest */
         DeckPurchaseRequest: {
+            /**
+             * Build
+             * @description Make it a deck of the player's own at once. False (v0.9.8): its cards join the library and no deck is made; the shop shows the cards, then asks whether to build it.
+             * @default true
+             */
+            build: boolean;
             /** Deck */
             deck: string;
         };
@@ -6690,6 +6810,8 @@ export interface components {
             cards: components["schemas"]["PulledCard"][];
             /** Collation Revision */
             collation_revision: number;
+            /** @description The pack is a deck (v0.9.8), and whether it was saved as one; null for every other pack. */
+            deck?: components["schemas"]["PackDeck"] | null;
             /**
              * Id
              * Format: uuid
@@ -6771,6 +6893,46 @@ export interface components {
             origin: "tcgplayer" | "wizards";
             /** @description 160 pixels tall. */
             small: components["schemas"]["PackImage"];
+        };
+        /**
+         * PackDeck
+         * @description A pack that is a deck (v0.9.8): a Starter Deck or a Tournament Pack. Its cards are in the
+         *     library; they may also be kept together as a deck.
+         */
+        PackDeck: {
+            /**
+             * Deck
+             * @description The deck saved from it, while it is among the account's decks; null: none.
+             */
+            deck: string | null;
+            /** Deck Title */
+            deck_title: string | null;
+            /**
+             * Format
+             * @description The format of the deck it may be saved as.
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+        };
+        /** PackDeckSaved */
+        PackDeckSaved: {
+            /**
+             * Deck
+             * Format: uuid
+             */
+            deck: string;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+            /**
+             * Repeated
+             * @description The pack's deck was saved before: this is that deck.
+             */
+            repeated: boolean;
+            /** Title */
+            title: string;
         };
         /** PackGrant */
         PackGrant: {
@@ -26794,6 +26956,100 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Opening"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    save_pack_deck_api_v1_shop_openings__opening_id__deck_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                opening_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackDeckSaved"];
                 };
             };
             /** @description Bad Request */

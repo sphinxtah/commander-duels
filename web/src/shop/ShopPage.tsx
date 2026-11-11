@@ -9,6 +9,7 @@ import {
 import { client, describe, type Me } from "../api";
 import shell from "../App.module.css";
 import { hudChanged } from "../shell/hud";
+import { StarterBox, type DeckChoice } from "./DeckChoice";
 import { DeckShelf } from "./DeckShelf";
 import { Leng } from "./Leng";
 import { PackArt } from "./PackArt";
@@ -27,6 +28,8 @@ import {
   sortLabels,
   tokens,
   yearsOf,
+  type DeckOffer,
+  type DeckPurchase,
   type Filters,
   type Opening,
   type OpeningSummary,
@@ -41,7 +44,10 @@ import styles from "./shop.module.css";
 // shows what it says and keeps one client key per purchase, so a retried request buys once. Since
 // v0.4.2 a second tab sells the starter decks (DeckShelf). Since v0.4.3 every pack shows its
 // picture (PackArt) on the shelves, among the packs held and in the history, Leng's counter is
-// the owner's painting, and the counter shows the weekly sale (WeeklySale).
+// the owner's painting, and the counter shows the weekly sale (WeeklySale). Since v0.9.8 (the
+// owner's request) a pack that is a deck asks, once its cards are revealed, whether to keep them
+// together: a Starter Deck or a Tournament Pack as a Legacy deck, one of the ten starter decks,
+// revealed as a pack is, as a Commander deck (DeckChoice).
 
 type Shelf = "packs" | "decks";
 
@@ -51,6 +57,78 @@ function day(value: string | null | undefined): string {
     "en-US",
     { year: "numeric", month: "short", day: "numeric" },
   );
+}
+
+/** A starter deck just bought, as the opening the reveal shows: the deck as its product. */
+export function starterOpening(
+  deck: DeckOffer,
+  purchase: DeckPurchase,
+): Opening {
+  return {
+    id: `starter-${deck.id}`,
+    pack: `starter-${deck.id}`,
+    product: {
+      id: deck.id,
+      set_code: "",
+      set_name: deck.color_names,
+      name: deck.title,
+      kind: "starter",
+      released: null,
+      booster: "starter-deck",
+      era: "play",
+      art: null,
+      symbol: null,
+    },
+    collation_revision: 0,
+    mtgjson_version: "",
+    opened_at: new Date().toISOString(),
+    cards: purchase.cards ?? [],
+    deck: null,
+  };
+}
+
+/** The choice a Starter Deck or a Tournament Pack offers: saved as a Legacy deck, or not. */
+function packChoice(opening: Opening): DeckChoice | undefined {
+  const deck = opening.deck;
+  if (!deck) return undefined;
+  return {
+    format: deck.format,
+    saved:
+      deck.deck && deck.deck_title
+        ? { id: deck.deck, title: deck.deck_title }
+        : null,
+    later:
+      "You can still save the deck later: see its cards again under Packs you opened.",
+    save: async () => {
+      const { data, error } = await client.POST(
+        "/api/v1/shop/openings/{opening_id}/deck",
+        { params: { path: { opening_id: opening.id } } },
+      );
+      return data ? { id: data.deck, title: data.title } : describe(error);
+    },
+  };
+}
+
+/** The choice a starter deck offers once bought: built into a Commander deck, or not. */
+function starterChoice(deck: DeckOffer, purchase: DeckPurchase): DeckChoice {
+  return {
+    format: "commander",
+    // A purchase repeated finds the deck an earlier one built.
+    saved: purchase.deck ? { id: purchase.deck, title: deck.title } : null,
+    later:
+      "You can still build it later: on the Decks page, under Starter decks, choose Copy.",
+    save: async () => {
+      const { data, error } = await client.POST("/api/v1/decks", {
+        body: {
+          title: deck.title,
+          format: "commander",
+          notes: "",
+          source: { kind: "starter", starter: deck.id },
+        },
+      });
+      return data ? { id: data.id, title: data.title } : describe(error);
+    },
+  };
 }
 
 function speech(view: ShopView | undefined): string {
@@ -85,6 +163,8 @@ export function ShopPage({
   const [opening, setOpening] = useState<{
     opening: Opening;
     startOpen: boolean;
+    /** A starter deck just bought (v0.9.8): its box tears open, and it asks to be built. */
+    starter?: { deck: DeckOffer; choice: DeckChoice };
   } | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   // The purchase being confirmed keeps its key until it succeeds, so "Try again" buys once.
@@ -198,6 +278,15 @@ export function ShopPage({
           startOpen={opening.startOpen}
           remaining={next?.count ?? 0}
           onAnother={next ? () => void open(next.next_pack) : undefined}
+          deck={opening.starter?.choice ?? packChoice(opening.opening)}
+          art={
+            opening.starter ? (
+              <StarterBox deck={opening.starter.deck} />
+            ) : undefined
+          }
+          noun={opening.starter ? "deck" : "pack"}
+          // The tutorial's tour waits for a pack, not a deck.
+          tutorial={!opening.starter}
           onDone={() => {
             setOpening(null);
             void load();
@@ -261,9 +350,17 @@ export function ShopPage({
           free={view?.free_decks ?? false}
           balance={balance}
           onSetup={onSetup}
-          onBought={async (said) => {
+          onBought={async (deck, purchase) => {
             hudChanged();
-            setMessage(said);
+            setMessage(
+              `You bought ${deck.title} for ${tokens(purchase.tokens)}. Its cards are in your library.`,
+            );
+            // Its box tears open like a pack (v0.9.8), then asks whether to build the deck.
+            setOpening({
+              opening: starterOpening(deck, purchase),
+              startOpen: false,
+              starter: { deck, choice: starterChoice(deck, purchase) },
+            });
             await load();
           }}
         />

@@ -3,14 +3,16 @@ import { client, describe } from "../api";
 import shell from "../App.module.css";
 import { printingImage } from "../catalog/catalog";
 import { RetryingImage } from "../game/RetryingImage";
-import { tokens, type DeckOffer } from "./shop";
+import { tokens, type DeckOffer, type DeckPurchase } from "./shop";
 import styles from "./shop.module.css";
 
 /**
  * Leng's starter decks (v0.4.2): the ten Commander starter decks. The first two are free, chosen
  * in the setup wizard, which this tab opens while they are still to choose; after them, each of
- * the others sells once, at the value of its cards in tokens. A deck bought becomes a deck of the
- * player's own, and every card in it joins the library for good.
+ * the others sells once, at the value of its cards in tokens. Every card of a deck bought joins
+ * the library for good. Since v0.9.8 (the owner's request) the purchase builds no deck: the shop
+ * reveals the cards as a pack's, then asks whether to build them into a Commander deck or keep
+ * them as individual cards (ShopPage, DeckChoice).
  */
 export function DeckShelf({
   decks,
@@ -24,7 +26,8 @@ export function DeckShelf({
   free: boolean;
   balance: number;
   onSetup: () => void;
-  onBought: (message: string) => Promise<void>;
+  /** The deck just bought, with its cards as the shop reveals them. */
+  onBought: (deck: DeckOffer, purchase: DeckPurchase) => Promise<void>;
 }) {
   const [buying, setBuying] = useState<DeckOffer | null>(null);
   const [error, setError] = useState("");
@@ -39,16 +42,15 @@ export function DeckShelf({
     setBusy(true);
     setError("");
     try {
+      // Unbuilt (v0.9.8): its cards join the library, and the player chooses once they see them.
       const { data, error: refused } = await client.POST("/api/v1/shop/decks", {
-        body: { deck: buying.id },
+        body: { deck: buying.id, build: false },
       });
       if (!data) return setError(describe(refused));
-      const title = buying.title;
+      const bought = buying;
       dialog.current?.close();
       setBuying(null);
-      await onBought(
-        `You bought ${title} for ${tokens(data.tokens)}. It is in your decks, and its cards in your library.`,
-      );
+      await onBought(bought, data);
     } catch {
       setError(describe(undefined));
     } finally {
@@ -73,8 +75,9 @@ export function DeckShelf({
       ) : (
         <p className={styles.note}>
           Ten 100-card Commander decks, ready to play. Each sells once, priced
-          by the market value of its cards; it becomes a deck of your own, and
-          its cards join your library for good.
+          by the market value of its cards. Its cards join your library for
+          good, and once you have seen them you choose: build them into a deck,
+          or keep them as individual cards.
         </p>
       )}
       <ul className={styles.decks} aria-label="Starter decks">
@@ -109,7 +112,7 @@ export function DeckShelf({
                 <p>{deck.description}</p>
                 <div className={styles.price}>
                   {deck.owned ? (
-                    <b>In your decks</b>
+                    <b>Yours</b>
                   ) : free ? (
                     <b>Free</b>
                   ) : deck.price === null ? (
@@ -157,8 +160,9 @@ export function DeckShelf({
             <h2 id="buy-deck-title">Buy {buying.title}?</h2>
             <p>
               It costs {tokens(buying.price)}. You have {tokens(balance)}, and
-              will have {tokens(balance - buying.price)} left. It becomes a deck
-              of your own, and its cards join your library for good.
+              will have {tokens(balance - buying.price)} left. Its cards join
+              your library for good; once you have seen them, you choose whether
+              to build them into a Commander deck.
             </p>
             {error && (
               <p className={styles.error} role="alert">

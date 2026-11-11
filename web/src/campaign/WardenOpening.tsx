@@ -136,6 +136,8 @@ export function WardenOpening({
           onDone={onDone}
           startOpen={false}
           tutorial={false}
+          doneLabel="Back to the campaign"
+          noun="deck"
           art={<DeckBox opponent={view.opponent} />}
           summaryLine={`${view.pulled.length} cards, every one yours${
             commander ? `, led by ${commander.name}` : ""
