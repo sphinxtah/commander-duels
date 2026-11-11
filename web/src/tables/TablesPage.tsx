@@ -747,7 +747,7 @@ function OpenTable({
         bots: allBots,
         bot_teammate: teams && teammateBot,
         bot_skill: skill,
-        turn_cap: 60,
+        // No turn limit is named: the API gives the table 40 turns for each seat (v0.9.7).
         visibility,
         rules,
         best_of: format === "legacy" ? bestOf : 1,

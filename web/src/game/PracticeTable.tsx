@@ -22,7 +22,14 @@ import {
   type KingsTableSettings,
 } from "../tables/kingsTable";
 import { KingsSettingsFields, RulesFields } from "../tables/TableParts";
-import { casualRules, unfit, type TableRules } from "../tables/tables";
+import {
+  MAX_TURN_LIMIT,
+  TURNS_PER_PLAYER,
+  casualRules,
+  defaultTurnLimit,
+  unfit,
+  type TableRules,
+} from "../tables/tables";
 import { getSoundEngine } from "./sound/engine";
 import type { components } from "../generated/api";
 import styles from "./game.module.css";
@@ -271,7 +278,9 @@ function Table({ me }: { me: Me }) {
   const [bots, setBots] = useState(1);
   const [botDecks, setBotDecks] = useState<string[]>(blankBots);
   const [skill, setSkill] = useState(4);
-  const [turnCap, setTurnCap] = useState(60);
+  // The turn limit the player typed; null leaves it to the table: 40 turns for each player
+  // (v0.9.7), which follows the format and the number of bots.
+  const [turnCap, setTurnCap] = useState<number | null>(null);
   const [rules, setRules] = useState<TableRules>(casualRules);
   // One game, or (v0.5.0, Legacy only) a best-of-three match with sideboards.
   const [bestOf, setBestOf] = useState<BestOf>(1);
@@ -395,6 +404,11 @@ function Table({ me }: { me: Me }) {
 
   const chosenFormat = options?.formats.find((f) => f.id === format);
   const kingsTable = format === KINGS_TABLE;
+  // The API names each table's default turn limit by its bots; before the options arrive, the
+  // same rule here: 40 turns for each player who takes turns.
+  const defaultTurnCap =
+    chosenFormat?.turn_caps?.[String(bots)] ?? defaultTurnLimit(format, bots);
+  const maxTurnCap = options?.max_turn_cap ?? MAX_TURN_LIMIT;
   const decksFormat = deckFormat(format, kings);
   // King's Table's fixture decks come by its deck format (v0.8.8); an older API's single list
   // is told apart by the decks' names.
@@ -435,7 +449,8 @@ function Table({ me }: { me: Me }) {
     const body: Request = {
       format,
       bot_skill: skill,
-      turn_cap: turnCap,
+      // Left out, the API gives the table its default: 40 turns for each player.
+      ...(turnCap !== null ? { turn_cap: turnCap } : {}),
       rules,
       best_of: chosenFormat?.best_of?.includes(bestOf) ? bestOf : 1,
       bots: Array.from({ length: bots }, (_, i) =>
@@ -652,13 +667,24 @@ function Table({ me }: { me: Me }) {
           />
         </label>
         <label className={styles.field}>
-          <span>Turn limit</span>
+          <span>
+            Turn limit{" "}
+            <small>
+              {turnCap === null
+                ? `${TURNS_PER_PLAYER} turns for each player`
+                : `instead of the table's ${defaultTurnCap}`}
+            </small>
+          </span>
           <input
             type="number"
             min={1}
-            max={200}
-            value={turnCap}
-            onChange={(event) => setTurnCap(Number(event.target.value) || 60)}
+            max={maxTurnCap}
+            value={turnCap ?? defaultTurnCap}
+            onChange={(event) => {
+              // An emptied field goes back to the table's own limit.
+              const typed = Math.floor(Number(event.target.value));
+              setTurnCap(typed >= 1 ? Math.min(typed, maxTurnCap) : null);
+            }}
           />
         </label>
         {options?.deck_lists && (

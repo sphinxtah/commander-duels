@@ -113,6 +113,13 @@ describe("the court's setup (v0.9.6)", () => {
       ally_seats: [0, 2],
       opponents: [],
       helper_tokens: 10000,
+      kings_table: {
+        deck_format: "commander",
+        life: "all_40",
+        king_attacks_anyone: true,
+        guarded_kings: true,
+      },
+      turn_cap: 240,
     },
   } as unknown as CampaignEncounter;
 
@@ -158,6 +165,11 @@ describe("the court's setup (v0.9.6)", () => {
       />,
     );
     expect(screen.getByText("The court · King's Table")).toBeInTheDocument();
+    // The court's rules as its settings give them (v0.9.7): the house rule with its guard, and
+    // 40 turns for each of the six players.
+    expect(screen.getByText(/^The Sphinx is King B/)).toHaveTextContent(
+      "A King's creatures may attack any opposing General, and the other King once one of that King's Generals is defeated; every player starts at 40 life. The court ends with no result after 240 turns, 40 for each player. Lose the court and you return to the throne’s ward.",
+    );
     expect(
       screen.getByText("Nicol Bolas's Gift and Liliana's Gift"),
     ).toBeInTheDocument();

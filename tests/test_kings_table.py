@@ -42,9 +42,11 @@ from api.models import Game, PlayerResult, ProgressEntry, TokenEntry
 content = test_progression.content
 __all__ = ["url"]
 KINGS = "kings_table"
-SETTINGS = {"deck_format", "life", "king_attacks_anyone"}
+SETTINGS = {"deck_format", "life", "king_attacks_anyone", "guarded_kings"}
 LIVES = ("all_20", "all_40", "generals_20_kings_40")
-COMBINATIONS = list(itertools.product(("legacy", "commander"), LIVES, (False, True)))
+# The house rule off, on, and on with its guard (v0.9.7).
+HOUSE_RULES = ((False, False), (True, False), (True, True))
+COMBINATIONS = list(itertools.product(("legacy", "commander"), LIVES, HOUSE_RULES))
 # Rows these tests leave behind, removed before the tables' own cleanup.
 KINGS_TABLES = (
     "rematch_players",
@@ -104,7 +106,15 @@ class KingsGame(TableGame):
             "role": "king" if other in (1, 4) else "general",
             "starting_life": life_of(self.settings, other),
             "in_range": in_range,
-            "attackable": foe and (in_range or (king and self.settings["king_attacks_anyone"])),
+            "attackable": foe
+            and (
+                in_range
+                or (
+                    king
+                    and self.settings["king_attacks_anyone"]
+                    and not (self.settings["guarded_kings"] and other in (1, 4))
+                )
+            ),
         }
 
     def concede(self, seat: int) -> None:
@@ -194,6 +204,8 @@ class KingsEngine(TableEngine):
             return "unknown King's Table settings"
         if not isinstance(settings["king_attacks_anyone"], bool):
             return "king_attacks_anyone is a boolean"
+        if not isinstance(settings["guarded_kings"], bool):
+            return "guarded_kings is a boolean"
         if len(body["seats"]) != 6:
             return "King's Table seats six"
         if "starting_seat" in body:
@@ -310,7 +322,11 @@ def test_the_settings_and_the_seats() -> None:
         "deck_format": "commander",
         "life": "all_40",
         "king_attacks_anyone": False,
+        "guarded_kings": False,
     }
+    # A row from before v0.9.7 names no guard: that is the guard off.
+    old = {"deck_format": "legacy", "life": "all_20", "king_attacks_anyone": True}
+    assert kings_table.engine_settings(kings_table.config_of(old)) == old | {"guarded_kings": False}
     # A practice game asked for without settings takes the practice defaults (v0.9.1); tables
     # keep the plain defaults.
     assert kings_table.practice_config(None).king_attacks_anyone is True
@@ -348,6 +364,7 @@ def test_the_play_page_and_the_practice_options_list_it(client):
         "deck_format": "commander",
         "life": "all_40",
         "king_attacks_anyone": True,
+        "guarded_kings": False,
     }
     assert options["legacy"]["kings_table"] is None
     # Its fixture decks by deck format (v0.8.8), each list of its own format; others have none.
@@ -357,15 +374,16 @@ def test_the_play_page_and_the_practice_options_list_it(client):
     assert options["legacy"]["decks_by_format"] is None
 
 
-@pytest.mark.parametrize(("deck_format", "life", "king_attacks_anyone"), COMBINATIONS)
+@pytest.mark.parametrize(("deck_format", "life", "house_rule"), COMBINATIONS)
 def test_every_combination_of_settings_reaches_the_engine(
-    client, engine, deck_format, life, king_attacks_anyone
+    client, engine, deck_format, life, house_rule
 ):
     ada = Account(client, "ada", admin=True)
     settings = {
         "deck_format": deck_format,
         "life": life,
-        "king_attacks_anyone": king_attacks_anyone,
+        "king_attacks_anyone": house_rule[0],
+        "guarded_kings": house_rule[1],
     }
     mine = deck(ada, client, deck_format, "Mine")
 
@@ -516,6 +534,7 @@ def test_seats_moves_and_readiness(client, engine):
         "deck_format": "legacy",
         "life": "generals_20_kings_40",
         "king_attacks_anyone": False,
+        "guarded_kings": False,
     }
     stuck = patch_seat(bob, code, ready=True)
     assert (stuck.status_code, stuck.json()["code"]) == (422, "invalid_deck")
@@ -550,6 +569,7 @@ def test_the_start_locks_the_table_and_the_team_result_counts_for_every_teammate
         "deck_format": "legacy",
         "life": "all_20",
         "king_attacks_anyone": True,
+        "guarded_kings": False,
     }
     assert [seat["player"] for seat in body["seats"]] == [
         "human",
@@ -640,12 +660,55 @@ def test_a_draw_pays_nobody_and_is_every_players(client, engine):
     assert finished["tokens"] == 0
 
 
+def test_the_host_guards_the_kings_under_the_house_rule(client, engine):
+    """The house rule's guard (v0.9.7): a setting the host changes like the others, kept by the
+    table and its game and sent to the engine as chosen."""
+    ada = Account(client, "ada", admin=True)
+    table = kings_table_of(ada, deck(ada, client, "commander", "Mine"), bot_seats=[0, 2, 3, 4, 5])
+    code = table["code"]
+    assert table["kings_table"]["guarded_kings"] is False
+    guarded = change(
+        ada, code, kings_table={"king_attacks_anyone": True, "guarded_kings": True}
+    ).json()
+    assert guarded["kings_table"] == {
+        "deck_format": "commander",
+        "life": "all_40",
+        "king_attacks_anyone": True,
+        "guarded_kings": True,
+    }
+    # A setting left out stays.
+    assert change(ada, code, kings_table={"life": "all_20"}).json()["kings_table"] == {
+        "deck_format": "commander",
+        "life": "all_20",
+        "king_attacks_anyone": True,
+        "guarded_kings": True,
+    }
+    assert change(ada, code, kings_table={"guarded_kings": "perhaps"}).status_code == 422
+    begun = ada.send("POST", f"/api/v1/tables/{code}/start")
+    assert begun.status_code == 200, begun.text
+    body = engine.created[-1]
+    assert body["kings_table"]["guarded_kings"] is True
+    # 40 turns for each of the six players (v0.9.7): the host named no limit.
+    assert body["turn_cap"] == 240
+    game = ada.get(f"/api/v1/games/{begun.json()['game_id']}").json()
+    assert game["game"]["kings_table"]["guarded_kings"] is True and game["game"]["turn_cap"] == 240
+    # The King's view, as the engine makes it: the opposing Generals, not the guarded King.
+    view = game["snapshot"]["view"]
+    assert view["you"]["seat"] == 1
+    assert {p["seat"]: p["attackable"] for p in view["opponents"] if p["team"] == 1} == {
+        3: True,
+        4: False,
+        5: True,
+    }
+
+
 def test_a_rematch_keeps_the_seats_and_the_settings(client, engine):
     ada, bob = players("ada", "bob", client=client)
     settings = {
         "deck_format": "legacy",
         "life": "generals_20_kings_40",
         "king_attacks_anyone": True,
+        "guarded_kings": True,
     }
     table = kings_table_of(
         ada,
@@ -693,7 +756,10 @@ def test_practice_from_every_seat(client, engine, seat):
         "deck_format": "commander",
         "life": "all_40",
         "king_attacks_anyone": True,
+        "guarded_kings": False,
     }
+    # 40 turns for each of the six players (v0.9.7).
+    assert body["turn_cap"] == 240
     assert body["skill"] == 2 and len(body["seats"]) == 6
     assert [index for index, s in enumerate(body["seats"]) if s["player"] == "human"] == [seat]
     # The bots in seat order without the player's: the first bot's chosen deck in the first.
@@ -721,7 +787,12 @@ def test_practice_from_every_seat(client, engine, seat):
 
 def test_a_practice_rematch_keeps_the_seat_and_the_settings(client, engine):
     ada = Account(client, "ada", admin=True)
-    settings = {"deck_format": "legacy", "life": "all_20", "king_attacks_anyone": True}
+    settings = {
+        "deck_format": "legacy",
+        "life": "all_20",
+        "king_attacks_anyone": True,
+        "guarded_kings": True,
+    }
     game = practice(ada, deck(ada, client, "legacy", "Burn"), seat=5, kings_table=settings).json()
     engine.win(game["id"], 1)
     finished = until_finished(ada, game["id"])
@@ -938,6 +1009,7 @@ def test_the_fake_engine_deals_the_deck_formats_fixtures() -> None:
                 "deck_format": "legacy",
                 "life": "all_40",
                 "king_attacks_anyone": False,
+                "guarded_kings": False,
             },
         }
     )

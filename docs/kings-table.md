@@ -1,18 +1,19 @@
 # King's Table (v0.8.7)
 
-King's Table is the owner's six-player mode: Magic's Emperor variant (rule 809) with the owner's settings and one house rule. Two teams of three each have a **King**, the variant's emperor, and two **Generals**. A team wins when the other team's King is out. "King" and "General" are player roles, apart from commanders and the monarch: losing a commander changes neither.
+King's Table is the owner's six-player mode: Magic's Emperor variant (rule 809) with the owner's settings and one house rule, which since v0.9.7 has a guard. Two teams of three each have a **King**, the variant's emperor, and two **Generals**. A team wins when the other team's King is out. "King" and "General" are player roles, apart from commanders and the monarch: losing a commander changes neither.
 
 It is played at [tables](tables.md#kings-table-v087), with humans in any seats and bots filling the rest, and on the practice table, one player and five bots. It isn't in the public queues. The owner asked for it on 2026-11-03 as "Emperor", renamed King's Table the same day.
 
 ## The settings
 
-The host picks them before the game. All twelve combinations play. The table shows them before anyone readies, changing a setting or a seat clears every seat's readiness, and they lock when the game starts.
+The host picks them before the game. Every combination plays. The table shows them before anyone readies, changing a setting or a seat clears every seat's readiness, and they lock when the game starts.
 
 | Setting | Choices | Default |
 | --- | --- | --- |
 | Deck format, for all six players | Legacy or Commander | Commander |
 | Starting life | Everyone 20, everyone 40, or Generals 20 and Kings 40 | Everyone 40 |
 | House rule: "King can attack anyone" | Off or on | Off at a table; on in a practice game (v0.9.1) |
+| The house rule's guard: "Generals guard their King" (v0.9.7) | Off or on, with the house rule on | Off; on at [the campaign's court](campaign.md) |
 
 - **Legacy decks.** They use the format's own legality and banned list: at least 60 cards and four copies at most. There are no commanders, no commander tax and no commander damage. Single games have no sideboard.
 - **Commander decks.** They use the format's own legality and banned list: 100 cards with a commander or a legal pair, singleton and colour identity. Every player has their own commander, Generals included, with the command zone, commander tax and 21 combat damage from one commander (903.10a). That 21 holds at any starting life and counts across control and zone changes. Noncombat damage doesn't count.
@@ -63,6 +64,14 @@ A General reaches one seat each way and a King two (809.4a). A player is always 
 - **The Generals.** They keep the usual restriction.
 - **Who the permission follows.** It goes with the attacking player, the creatures' controller: a King's creature that a General controls attacks as the General's.
 
+**With the house rule's guard on (v0.9.7, "Generals guard their King").** The owner's rule of 2026-11-10 for the campaign's court: "Kings can attack anyone, except other kings, unless a general is defeated."
+
+- **From the start.** Either King's creatures may attack either opposing General, and the planeswalkers and battles they defend, but not the other King.
+- **Once a General is out.** A King may attack the other King as soon as one of *that* King's Generals is out of the game: defeated, conceded or removed. Which of the two doesn't matter. The guard is each King's own: beating one of team B's Generals opens team B's King to team A's King, and team A's King stays guarded while both of its Generals stand.
+- **The Generals** attack as ever: the opponent beside them and in range, which is the opposing King once the General facing them is out.
+- **It belongs to the house rule.** With the house rule off the guard changes nothing: by 809.4b the two Kings sit beside each other only once the Generals on one side of the table are both out, one of each King's. The setting is offered only with the house rule on, and turning the house rule off in the app turns it off.
+- **In the engine** it is one more test in the single attack hook (`KingsTable.attackable`, `KingsTable.guarded`), so the seat views' `attackable` flags, the bots' attack plans and combat across range follow it.
+
 **Combat across range.** An attack that the house rule sends out of range is a whole combat:
 
 - The defender blocks with their own creatures.
@@ -96,7 +105,7 @@ Each creature has "{T}: Target teammate in your range gains control of this crea
 ## In the engine
 
 - **Game classes.** `KingsTableGame` (Legacy decks) and `KingsTableCommanderGame` (Commander decks) share `KingsTable`'s rules. `KingsTableRules` holds the settings and the seats.
-- **The request.** `"format": "kings_table"`, six seats, and `"kings_table": {"deck_format", "life", "king_attacks_anyone"}`. A starting seat must be a King's. Without one, a King drawn at random starts.
+- **The request.** `"format": "kings_table"`, six seats, and `"kings_table": {"deck_format", "life", "king_attacks_anyone", "guarded_kings"}` (the last since v0.9.7; each left out takes its default). A starting seat must be a King's. Without one, a King drawn at random starts. A request without a `turn_cap` takes 240 turns, 40 for each of the six players (v0.9.7).
 - **The seat views.** Each player carries `team`, `role`, `starting_life`, `in_range` and `attackable`. The settings echo `kings_table` ([the seat-view contract](../contracts/engine-seat-view.schema.json)).
 - **XMage patch 0011** ([the patches](../engine/xmage/patches/README.md)):
   - **Allies.** Players of a team who keep their own turns, apart from patch 0001's shared-turn teammates.
@@ -108,6 +117,7 @@ Each creature has "{T}: Target teammate in your range gains control of this crea
 - **`KingsTableTest`.** It covers the owner's acceptance checks:
   - every setting combination, each seat's starting life, team and range;
   - the Kings' attacks with the house rule off and on;
+  - the guard (v0.9.7): a King attacking the opposing Generals from the start and the other King only once one of that King's Generals is out, each King by its own Generals, and the guard changing nothing with the house rule off;
   - a General's exit opening neighbours at once and range at the next turn;
   - a King's loss ending the game for the whole team, a General out earlier included, and both Kings at once as a draw;
   - a King's attack across range: blocks, and no new targets or "each opponent";

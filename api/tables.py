@@ -122,6 +122,8 @@ from api.roster import roster_of
 from api.schemas import (
     BEST_OF_TEXT,
     KINGS_TABLE_SEAT_TEXT,
+    MAX_TURN_CAP,
+    TURN_CAP_TEXT,
     BestOf,
     Contract,
     Error,
@@ -131,6 +133,7 @@ from api.schemas import (
     TableFormatId,
     TableRules,
     casual,
+    default_turn_cap,
 )
 from api.validation import DeckEntry
 
@@ -186,7 +189,7 @@ class TableRequest(Contract):
         description="Two-Headed Giant (v0.5.1): a bot is your teammate, in seat 1; one of bots.",
     )
     bot_skill: int = Field(default=4, ge=1, le=6)
-    turn_cap: int = Field(default=60, ge=1, le=200)
+    turn_cap: int | None = Field(default=None, ge=1, le=MAX_TURN_CAP, description=TURN_CAP_TEXT)
     visibility: Visibility = Field(
         default="public",
         description="public tables are listed; a private one is reached by its invite link only.",
@@ -979,7 +982,10 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
         bot_seats=bot_seats,
         kings_table=kings_table.engine_settings(kings) if kings is not None else None,
         bot_skill=body.bot_skill,
-        turn_cap=body.turn_cap,
+        # 40 turns for each player unless the host named a limit (v0.9.7).
+        turn_cap=(
+            body.turn_cap if body.turn_cap is not None else default_turn_cap(fmt, body.seats)
+        ),
         allow_banned=body.rules.banned,
         allow_not_legal=body.rules.not_legal,
         allow_stand_in=body.rules.stand_in,

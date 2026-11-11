@@ -89,7 +89,15 @@ from api.models import (
 from api.progression import winning_seats
 from api.roster import load as load_roster
 from api.roster import roster_of
-from api.schemas import Contract, Error, GameSummary, PracticeGameRequest, casual
+from api.schemas import (
+    Contract,
+    Error,
+    GameSummary,
+    KingsTableSettings,
+    PracticeGameRequest,
+    casual,
+    default_turn_cap,
+)
 from api.tables import TableView
 from api.validation import DeckEntry
 from catalog.text import normalize
@@ -108,11 +116,16 @@ SCENE_KEY = r"^FC\.[A-Z0-9]+(\.[A-Z0-9]+){0,3}$"
 LESSON_KEY = r"^T(0[1-9]|1[0-2])$"
 # The rule a warden's tokens are paid under, recorded with each payment.
 SPOILS_POLICY = "campaign-v1"
-# The handoff's optional post-campaign challenge (v0.9.3): the finale played again once it is won,
-# with the tutorial's aids off, for a cosmetic badge of its own. It never replaces the ending.
 # How a friend leaves the court (api/games.py LEFT_REASONS): by conceding, or voted out while
 # away. A General eliminated in play has not left.
 LEFT_THE_COURT = ("conceded", "removed")
+# The campaign's games take the game-wide turn limit (v0.9.7, schemas.default_turn_cap): 40 turns
+# for each player, so a ward's duel stops after 80 turns and the court's six seats after 240.
+# Until v0.9.7 the content named one limit for every game, 60: ten turns each at the court.
+DUEL_TURN_CAP = default_turn_cap("commander", 2)
+COURT_TURN_CAP = default_turn_cap(kings_table.FORMAT, kings_table.SEATS)
+# The handoff's optional post-campaign challenge (v0.9.3): the finale played again once it is won,
+# with the tutorial's aids off, for a cosmetic badge of its own. It never replaces the ending.
 CHALLENGE_NAME = "Apex Unbound"
 CHALLENGE_REWARD = "badge:apex-unbound"
 Tier = Literal["bronze", "silver", "gold", "platinum", "mythic", "godlike"]
@@ -210,7 +223,6 @@ class Campaign:
     id: str
     content_version: int
     title: str
-    turn_cap: int
     training_seed: int
     # Learn Commander's training seven (v0.9.1): the loaner's opening hand, stacked by the engine.
     training_hand: tuple[str, ...]
@@ -297,7 +309,6 @@ def campaign_in(folder: str) -> Campaign | None:
         id=data["id"],
         content_version=int(data["content_version"]),
         title=data["title"],
-        turn_cap=int(data["turn_cap"]),
         training_seed=int(data["training_seed"]),
         training_hand=tuple(str(name) for name in data.get("training_hand", [])),
         loaner_title=data["loaner"]["title"],
@@ -378,6 +389,14 @@ class CourtView(Contract):
     ally_seats: list[int] = Field(description="Your Generals' seats: friends or bots.")
     opponents: list[CourtSeat] = Field(description="Team B: The Sphinx as King, two Generals.")
     helper_tokens: int = Field(description="What a friend who helps win it is paid, once.")
+    kings_table: KingsTableSettings = Field(
+        description="The court's King's Table settings, as its game plays them (v0.9.7): the "
+        "house rule with its guard, so a King attacks any opposing General, and the other King "
+        "once one of that King's Generals is defeated."
+    )
+    turn_cap: int = Field(
+        description="The court's turn limit (v0.9.7): 40 turns for each of its six players."
+    )
 
 
 class CampaignEncounter(Contract):
@@ -675,6 +694,8 @@ def court_view(encounter: Encounter) -> CourtView | None:
         ally_seats=list(court.ally_seats),
         opponents=sorted(seats, key=lambda seat: seat.seat),
         helper_tokens=court.helper_tokens,
+        kings_table=kings_table.config_of(court.kings_table),
+        turn_cap=COURT_TURN_CAP,
     )
 
 
@@ -1369,7 +1390,7 @@ def court_body(
         "format": kings_table.FORMAT,
         "seats": [plan.engine for plan in plans],
         "skill": encounter.skill,
-        "turn_cap": campaign.turn_cap,
+        "turn_cap": COURT_TURN_CAP,
         "kings_table": kings_table.engine_settings(kings_table.config_of(court.kings_table)),
     }
     if idle is not None:
@@ -1508,7 +1529,7 @@ async def start_encounter(
             "format": "commander",
             "seats": [human.engine, bot.engine],
             "skill": encounter.skill,
-            "turn_cap": campaign.turn_cap,
+            "turn_cap": DUEL_TURN_CAP,
         }
     hints = (
         (body.learn or (number == 1 and progress.hints))
@@ -1519,7 +1540,7 @@ async def start_encounter(
         format="kings_table" if court is not None else "commander",
         deck_id=body.deck_id,
         bot_skill=encounter.skill,
-        turn_cap=campaign.turn_cap,
+        turn_cap=COURT_TURN_CAP if court is not None else DUEL_TURN_CAP,
         seat=mine if court is not None else None,
         kings_table=(kings_table.config_of(court.kings_table) if court is not None else None),
     )
@@ -1631,7 +1652,7 @@ def open_court(
         ],
         court.kings_table,
         encounter.skill,
-        campaign.turn_cap,
+        COURT_TURN_CAP,
     )
 
 

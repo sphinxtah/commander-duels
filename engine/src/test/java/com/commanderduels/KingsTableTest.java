@@ -210,6 +210,70 @@ class KingsTableTest {
         assertEquals(Set.of(3, 4, 5), table.attackable(1));
     }
 
+    /**
+     * The house rule's guard (v0.9.7, the campaign's court): a King attacks any opposing General
+     * from the start, and the other King only once one of that King's own Generals is out.
+     */
+    @Test
+    void generalsGuardTheirKingFromTheOtherKing() throws Exception {
+        Seated table = seated(new KingsTableRules(true, KingsTableRules.ALL_40, true, true), 14L);
+        Game game = table.game();
+        UUID kingA = table.ids().get(1);
+        UUID kingB = table.ids().get(4);
+        assertTrue(table.table().guarded(game, kingA));
+        assertTrue(table.table().guarded(game, kingB));
+        assertFalse(table.table().guarded(game, table.ids().get(0)), "only a King is guarded");
+        // At the start: the opposing Generals, not the King behind them. The Generals attack as ever.
+        assertEquals(Set.of(3, 5), table.attackable(1), "King A attacks team B's Generals");
+        assertEquals(Set.of(0, 2), table.attackable(4), "King B attacks team A's Generals");
+        assertEquals(Set.of(5), table.attackable(0));
+        assertEquals(Set.of(3), table.attackable(2));
+        assertEquals(Set.of(2), table.attackable(3));
+        assertEquals(Set.of(0), table.attackable(5));
+        game.getCombat().setAttacker(kingA);
+        game.getCombat().setDefenders(game);
+        assertFalse(game.getCombat().getDefenders().contains(kingB), "the guarded King is no defender");
+        assertTrue(game.getCombat().getDefenders().contains(table.ids().get(5)), "a General across the table is");
+        game.getCombat().clear();
+
+        // Team B's Right General (seat 3) is defeated: King B is open to King A at once, whichever
+        // General it was. King A's own Generals both stand, so King B still cannot attack King A.
+        table.player(3).lostForced(game);
+        assertNull(table.table().over(game), "a General's loss ends nothing");
+        assertFalse(table.table().guarded(game, kingB));
+        assertTrue(table.table().guarded(game, kingA));
+        assertEquals(Set.of(4, 5), table.attackable(1), "the other King, and the General left");
+        assertEquals(Set.of(0, 2), table.attackable(4), "King A is still guarded");
+        game.getCombat().setAttacker(kingA);
+        game.getCombat().setDefenders(game);
+        assertTrue(game.getCombat().getDefenders().contains(kingB), "King B is a defender now");
+        Permanent attacker = creature(table, 1);
+        assertTrue(game.getCombat().declareAttacker(attacker.getId(), kingB, kingA, game), "the King attacks the King");
+        assertTrue(game.inCombatAcrossRange(kingB, kingA), "across range, as the house rule's attacks are");
+        game.getCombat().clear();
+
+        // One of King A's Generals is defeated: now King B may attack King A too.
+        table.player(0).lostForced(game);
+        assertFalse(table.table().guarded(game, kingA));
+        assertEquals(Set.of(1, 2), table.attackable(4), "King A, and the General left");
+        assertEquals(Set.of(4, 5), table.attackable(1));
+    }
+
+    @Test
+    void theGuardChangesNothingWithoutTheHouseRule() throws Exception {
+        // 809.4b alone already keeps the Kings apart until the Generals on one side are both out,
+        // one of each King's: the guard has nothing to add, whatever the request says.
+        Seated table = seated(new KingsTableRules(true, KingsTableRules.ALL_40, false, true), 15L);
+        assertEquals(Set.of(), table.attackable(1), "a King cannot attack at the start");
+        assertEquals(Set.of(), table.attackable(4), "a King cannot attack at the start");
+        assertEquals(Set.of(3), table.attackable(2));
+        table.player(2).lostForced(table.game());
+        table.player(3).lostForced(table.game());
+        table.newTurn();
+        assertEquals(Set.of(4), table.attackable(1), "the Kings sit beside each other, each a General down");
+        assertEquals(Set.of(1), table.attackable(4));
+    }
+
     /** Puts the first creature card of the seat's library onto the battlefield, ready to attack or block. */
     private static Permanent creature(Seated table, int seat) {
         Player player = table.player(seat);
@@ -296,8 +360,19 @@ class KingsTableTest {
         HumanGameRequest defaults = HumanGameRequest.parse("{\"format\": \"kings_table\"}", () -> 1L, true);
         assertEquals(GameFormat.KINGS_TABLE_COMMANDER, defaults.format());
         assertEquals(KingsTableRules.DEFAULT, defaults.kingsTable());
+        assertFalse(defaults.kingsTable().guardedKings(), "the guard is off unless the request names it");
         assertEquals(6, defaults.seats().size());
         assertEquals(1, defaults.humanSeats());
+        assertEquals(240, defaults.turnCap(), "40 turns for each of the six players (v0.9.7)");
+        // The house rule's guard (v0.9.7) is a setting like the others, and the settings echo it.
+        HumanGameRequest guarded = HumanGameRequest.parse("{\"format\": \"kings_table\", \"kings_table\": "
+            + "{\"king_attacks_anyone\": true, \"guarded_kings\": true}}", () -> 1L, true);
+        assertEquals(new KingsTableRules(true, KingsTableRules.ALL_40, true, true), guarded.kingsTable());
+        assertTrue(guarded.kingsTable().json().get("guarded_kings").getAsBoolean());
+        assertEquals(new HumanGame.KingsTableSettings("commander", KingsTableRules.ALL_40, true, true),
+            HumanGame.KingsTableSettings.of(guarded.kingsTable()));
+        assertThrows(JsonRequest.Invalid.class, () -> HumanGameRequest.parse(
+            "{\"format\": \"kings_table\", \"kings_table\": {\"guarded_kings\": \"yes\"}}", () -> 1L, true));
         assertThrows(JsonRequest.Invalid.class, () -> HumanGameRequest.parse(
             "{\"format\": \"kings_table\", \"seats\": [{\"player\": \"human\"}, {\"player\": \"bot\"}]}", () -> 1L, true));
         assertThrows(JsonRequest.Invalid.class, () -> HumanGameRequest.parse(
@@ -350,7 +425,7 @@ class KingsTableTest {
         HumanGame.Snapshot last = played.last();
         assertEquals("kings_table", last.settings().format());
         assertEquals("kings_table_commander", last.settings().rulesProfile());
-        assertEquals(new HumanGame.KingsTableSettings("commander", KingsTableRules.GENERALS_20_KINGS_40, true),
+        assertEquals(new HumanGame.KingsTableSettings("commander", KingsTableRules.GENERALS_20_KINGS_40, true, false),
             last.settings().kingsTable());
         SeatView.PlayerState you = last.view().you();
         assertEquals("king", you.role());
@@ -376,38 +451,44 @@ class KingsTableTest {
                    List<String> violations, int engineErrors, String criticalError) {}
 
     /**
-     * Six bots play whole games in each deck format, with and without the house rule. Every attack
-     * must go at a player the table's rules allow at that moment, never at a teammate; with the
-     * house rule off no King attacks while both their Generals live; the first turn is a King's;
-     * a finished game has a winning team (all its players still in the game) or a draw.
+     * Six bots play whole games in each deck format, with and without the house rule, and (v0.9.7)
+     * under the house rule's guard, as the campaign's court plays. Every attack must go at a player
+     * the table's rules allow at that moment, never at a teammate; with the house rule off no King
+     * attacks while both their Generals live; under the guard no King attacks a King whose Generals
+     * both live; the first turn is a King's; a finished game has a winning team (all its players
+     * still in the game) or a draw.
      */
     @Test
     void sixBotsPlayWholeGamesByTheTablesRules() throws Exception {
         int completed = 0;
         int across = 0;
         long seed = 31L;
+        List<KingsTableRules> tables = new ArrayList<>();
         for (boolean commander : new boolean[] {false, true}) {
             for (boolean anyone : new boolean[] {false, true}) {
-                var rules = new KingsTableRules(commander, commander ? KingsTableRules.ALL_20 : KingsTableRules.ALL_40,
-                    anyone);
-                BotGame played = playBots(rules, seed++, 40);
-                System.out.println("King's Table bots, " + rules + ": " + played);
-                assertEquals(0, played.engineErrors(), "XMage recovered from no error: " + played);
-                assertNull(played.criticalError());
-                assertTrue(played.violations().isEmpty(), "attacks the rules forbid: " + played.violations());
-                assertTrue(KingsTableRules.king(played.firstSeat()), "a King took the first turn: " + played);
-                assertFalse(played.attacks().isEmpty(), "the bots attacked");
-                if (played.kind().equals("completed")) {
-                    completed++;
-                    assertTrue(played.winners().isEmpty()
-                        || played.winners().stream().map(KingsTableRules::team).distinct().count() == 1,
-                        "one team won: " + played.winners());
-                }
-                across += (int) played.attacks().stream().filter(attack -> attack.endsWith("across")).count();
+                tables.add(new KingsTableRules(commander, commander ? KingsTableRules.ALL_20 : KingsTableRules.ALL_40,
+                    anyone));
             }
         }
-        System.out.println("King's Table bots: " + completed + " of 4 games completed, " + across
-            + " attacks across range");
+        tables.add(new KingsTableRules(true, KingsTableRules.ALL_20, true, true));
+        for (KingsTableRules rules : tables) {
+            BotGame played = playBots(rules, seed++, 40);
+            System.out.println("King's Table bots, " + rules + ": " + played);
+            assertEquals(0, played.engineErrors(), "XMage recovered from no error: " + played);
+            assertNull(played.criticalError());
+            assertTrue(played.violations().isEmpty(), "attacks the rules forbid: " + played.violations());
+            assertTrue(KingsTableRules.king(played.firstSeat()), "a King took the first turn: " + played);
+            assertFalse(played.attacks().isEmpty(), "the bots attacked");
+            if (played.kind().equals("completed")) {
+                completed++;
+                assertTrue(played.winners().isEmpty()
+                    || played.winners().stream().map(KingsTableRules::team).distinct().count() == 1,
+                    "one team won: " + played.winners());
+            }
+            across += (int) played.attacks().stream().filter(attack -> attack.endsWith("across")).count();
+        }
+        System.out.println("King's Table bots: " + completed + " of " + tables.size() + " games completed, "
+            + across + " attacks across range");
     }
 
     static BotGame playBots(KingsTableRules rules, long seed, int turnCap) throws Exception {
@@ -506,6 +587,13 @@ class KingsTableTest {
                 if (generalsLive) {
                     violations.add(attack + ": a King attacked while both their Generals live");
                 }
+            }
+            // The guard (v0.9.7), counted here by itself: a King never attacks a King whose two
+            // Generals are both still in the game.
+            if (table.rules().guardedKings() && KingsTableRules.king(from) && KingsTableRules.king(to)
+                && table.team(KingsTableRules.team(to)).stream().filter(id -> !id.equals(defender))
+                    .allMatch(id -> game.getPlayer(id).isInGame())) {
+                violations.add(attack + ": a King attacked a King both of whose Generals live");
             }
         }
     }

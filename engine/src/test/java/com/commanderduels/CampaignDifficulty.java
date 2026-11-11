@@ -82,7 +82,10 @@ class CampaignDifficulty {
         int referenceSkill = Integer.parseInt(System.getProperty("campaign.reference.skill", "3"));
         long budget = Long.parseLong(System.getProperty("campaign.budget", "300"));
         JsonObject campaign = JsonParser.parseString(Files.readString(CONTENT.resolve("campaign.json"))).getAsJsonObject();
-        int turnCap = campaign.get("turn_cap").getAsInt();
+        // The games' turn limits are the game's own (v0.9.7): 40 turns for each player, so 80 in a
+        // duel and 240 at the court. Until v0.9.7 the content named one for all, 60.
+        int duelTurns = HumanGameRequest.defaultTurnCap(GameFormat.COMMANDER, 2);
+        int courtTurns = HumanGameRequest.defaultTurnCap(GameFormat.KINGS_TABLE_COMMANDER, KingsTableRules.SEATS);
         List<Contender> references = references(campaign,
             System.getProperty("campaign.references", "loaner,starter_rg_v1,starter_wu_v1"));
         String wardsWanted = System.getProperty("campaign.wards", "");
@@ -101,9 +104,12 @@ class CampaignDifficulty {
                 ? cardsOf(campaign, encounter.get("cards_from").getAsInt()) : encounter.getAsJsonArray("cards");
             var warden = new DeckLists.CustomDeck(entries(cards), List.of(commander));
             int wardenSkill = encounter.get("skill").getAsInt();
-            // The court (v0.9.7): its two Generals' decks by seat; null for a duel.
+            // The court (v0.9.7): its two Generals' decks by seat, and its King's Table settings as
+            // the content names them; null for a duel.
             Map<Integer, DeckLists.CustomDeck> generals = null;
+            KingsTableRules courtRules = null;
             if (encounter.has("court")) {
+                courtRules = KingsTableRules.parse(encounter.getAsJsonObject("court").get("kings_table"));
                 generals = new LinkedHashMap<>();
                 for (JsonElement element2 : encounter.getAsJsonObject("court").getAsJsonArray("generals")) {
                     JsonObject general = element2.getAsJsonObject();
@@ -116,8 +122,9 @@ class CampaignDifficulty {
                     long seed = 1_000L * ward + 37L * game + reference.id().hashCode() % 1000;
                     resetHeapPeaks();
                     Played result = generals != null
-                        ? playCourt(ward, reference, warden, generals, referenceSkill, wardenSkill, seed, turnCap, budget)
-                        : play(ward, reference, warden, referenceSkill, wardenSkill, seed, turnCap, budget);
+                        ? playCourt(ward, reference, warden, generals, courtRules, referenceSkill, wardenSkill, seed,
+                            courtTurns, budget)
+                        : play(ward, reference, warden, referenceSkill, wardenSkill, seed, duelTurns, budget);
                     // What the game needed of the heap (v0.9.7): the court's six seats ran out of 2 GB.
                     System.out.println("CAMPAIGN heap peak " + heapPeakMegabytes() + " MB of "
                         + Runtime.getRuntime().maxMemory() / (1024 * 1024) + " MB, ward " + ward);
@@ -295,15 +302,18 @@ class CampaignDifficulty {
     private static final int KING_B = 4;
 
     /**
-     * One game of the court (v0.9.7): King's Table with Commander decks, everyone at 40 life, a King
-     * attacking no one. Seat 1 is the reference, King A, at the reference skill; seats 0 and 2 its bot
-     * Generals on the fixture decks a bot without a deck gets; seats 3, 4 and 5 the court. The first
-     * hit is the reference King's first life lost, by its own turns; no first lethal threat is read,
-     * since a King is attacked only once a General beside it has fallen.
+     * One game of the court (v0.9.7): King's Table under the court's own settings (Commander decks,
+     * everyone at 40 life, and since v0.9.7 the house rule with its guard: a King attacks any
+     * opposing General, and the other King once one of that King's Generals is out). Seat 1 is the
+     * reference, King A, at the reference skill; seats 0 and 2 its bot Generals on the fixture decks
+     * a bot without a deck gets; seats 3, 4 and 5 the court. The first hit is the reference King's
+     * first life lost, by its own turns; no first lethal threat is read, since a King is attacked
+     * only once one of its Generals has fallen.
      */
     private static Played playCourt(int ward, Contender reference, DeckLists.CustomDeck sphinx,
-                                    Map<Integer, DeckLists.CustomDeck> generals, int referenceSkill, int wardenSkill,
-                                    long seed, int turnCap, long budgetSeconds) throws Exception {
+                                    Map<Integer, DeckLists.CustomDeck> generals, KingsTableRules rules,
+                                    int referenceSkill, int wardenSkill, long seed, int turnCap,
+                                    long budgetSeconds) throws Exception {
         AtomicReference<Played> result = new AtomicReference<>();
         AtomicReference<Throwable> failure = new AtomicReference<>();
         int[] firstHit = {0};
@@ -332,8 +342,7 @@ class CampaignDifficulty {
                     players.add(new FairBot(name, format.range(seat), seat == KING_A ? referenceSkill : wardenSkill,
                         FairBot.seedFor(seed, seat)));
                 }
-                Game game = format.newGame(KingsTableRules.SEATS, turnCap,
-                    new KingsTableRules(true, KingsTableRules.ALL_40, false));
+                Game game = format.newGame(KingsTableRules.SEATS, turnCap, rules);
                 Match match = format.newMatch("Campaign difficulty", KingsTableRules.SEATS);
                 for (int index : HumanGame.additionOrder(KingsTableRules.SEATS)) {
                     LegacyDuel.seat(game, match, players.get(index), decks.get(index));

@@ -3,7 +3,6 @@
  "content_version": 1,
  "title": "The Final Concordance",
  "source": "The owner's campaign handoff (version 1, 2026-10-31) and its fourteen deck builds; the loaner deck was completed for v0.8.0 as the handoff asks. Ward 15 (v0.9.6, the owner's request of 2026-11-10): The Unbound Court, a King's Table game, with the gifted decks of Liliana and Nicol Bolas built for XMage's AI.",
- "turn_cap": 60,
  "training_seed": 20261031,
  "training_hand": ["Plains", "Plains", "Plains", "Sol Ring", "Arcane Signet", "Raise the Alarm", "Pacifism"],
  "loaner": {
@@ -1490,7 +1489,7 @@
    "private": "campaign-finale",
    "cards_from": 14,
    "court": {
-    "kings_table": {"deck_format": "commander", "life": "all_40", "king_attacks_anyone": false},
+    "kings_table": {"deck_format": "commander", "life": "all_40", "king_attacks_anyone": true, "guarded_kings": true},
     "player_seat": 1,
     "king_seat": 4,
     "helper_tokens": 10000,

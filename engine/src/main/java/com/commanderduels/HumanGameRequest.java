@@ -29,16 +29,23 @@ import java.util.function.LongSupplier;
  *
  * <p>Since v0.8.7 the format may be {@code kings_table}, with exactly six seats in the table's order
  * ({@link KingsTableRules}) and its settings in {@code kings_table}: {@code deck_format},
- * {@code life} and {@code king_attacks_anyone}, each defaulting as the owner suggested. A starting
- * seat must then be a King's; without one a King drawn at random starts.
+ * {@code life}, {@code king_attacks_anyone} and, since v0.9.7, {@code guarded_kings}, each
+ * defaulting as the owner suggested. A starting seat must then be a King's; without one a King
+ * drawn at random starts.
  */
 public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, int skill, int turnCap,
                                int idleTimeoutSeconds, int spectatorDelaySeconds, Integer startingSeat,
                                String gameId, KingsTableRules kingsTable) {
     public static final int DEFAULT_SKILL = 4;
     public static final int MAX_SKILL = 6;
-    public static final int DEFAULT_TURN_CAP = 60;
-    public static final int MAX_TURN_CAP = 200;
+    /**
+     * The turn limit a request without one takes (v0.9.7): 40 turns for each player. A limit counts
+     * the game's turns, each player's own in turn, so a duel stops after 80, a table of four after
+     * 160 and King's Table after 240; in Two-Headed Giant a team takes its turns together, so 80
+     * turns are 40 for each player. Before v0.9.7 every game stopped after 60.
+     */
+    public static final int TURNS_PER_PLAYER = 40;
+    public static final int MAX_TURN_CAP = 400;
     public static final int DEFAULT_IDLE_TIMEOUT_SECONDS = 900;
     public static final int MIN_IDLE_TIMEOUT_SECONDS = 5;
     public static final int MAX_IDLE_TIMEOUT_SECONDS = 3600;
@@ -109,6 +116,11 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
 
     int humanSeats() {
         return (int) seats.stream().filter(Seat::human).count();
+    }
+
+    /** The turn limit of a game of the format with so many seats, when its request names none. */
+    static int defaultTurnCap(GameFormat format, int seats) {
+        return TURNS_PER_PLAYER * format.turnTakers(seats);
     }
 
     /** Every deck list's names the card database does not know, in seat and list order. */
@@ -226,7 +238,7 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
             format,
             seats,
             JsonRequest.clamped(json, "skill", DEFAULT_SKILL, 1, MAX_SKILL),
-            JsonRequest.clamped(json, "turn_cap", DEFAULT_TURN_CAP, 1, MAX_TURN_CAP),
+            JsonRequest.clamped(json, "turn_cap", defaultTurnCap(format, seats.size()), 1, MAX_TURN_CAP),
             JsonRequest.clamped(json, "idle_timeout_seconds", DEFAULT_IDLE_TIMEOUT_SECONDS, MIN_IDLE_TIMEOUT_SECONDS,
                 MAX_IDLE_TIMEOUT_SECONDS),
             JsonRequest.clamped(json, "spectator_delay_seconds", 0, 0, MAX_SPECTATOR_DELAY_SECONDS),

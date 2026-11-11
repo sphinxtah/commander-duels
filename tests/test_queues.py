@@ -265,7 +265,8 @@ def test_two_players_meet_at_a_table(client, engine, clock):
     # One table's game, through the human tables' path: casual, never listed, every player first.
     body = engine.created[-1]
     assert [seat["player"] for seat in body["seats"]] == ["human", "human"]
-    assert (body["skill"], body["turn_cap"], body["idle_timeout_seconds"]) == (4, 60, 3600)
+    # Skill 4, and 40 turns for each of the duel's two players (v0.9.7).
+    assert (body["skill"], body["turn_cap"], body["idle_timeout_seconds"]) == (4, 80, 3600)
     table = table_of(client, game_id)
     assert table is not None and table.queued and table.visibility == "private"
     assert (table.status, table.allow_banned, table.allow_not_legal) == ("started", True, True)

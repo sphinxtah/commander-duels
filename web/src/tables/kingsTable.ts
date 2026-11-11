@@ -7,6 +7,11 @@ import type { components } from "../generated/api";
 // rows facing each other is team B's 5, 4, 3 across from team A's 0, 1, 2.
 
 export type KingsTableSettings = components["schemas"]["KingsTableSettings"];
+/** The settings as anything that shows them takes them: the API's, or the engine's echo in a
+ * game's snapshot, where an engine before v0.9.7 names no guard (the guard off). */
+export type KingsRules = Omit<KingsTableSettings, "guarded_kings"> & {
+  guarded_kings?: boolean;
+};
 export type KingsLife = KingsTableSettings["life"];
 export type KingsDeckFormat = KingsTableSettings["deck_format"];
 export type KingsRole = "king" | "general";
@@ -24,6 +29,7 @@ export const DEFAULT_KINGS_TABLE: KingsTableSettings = {
   deck_format: "commander",
   life: "all_40",
   king_attacks_anyone: false,
+  guarded_kings: false,
 };
 
 /** Practice games' defaults (v0.9.1): the house rule on, so a table of bots doesn't stall. The
@@ -98,10 +104,37 @@ export const DECK_FORMAT_DETAIL: Record<KingsDeckFormat, string> = {
 export const HOUSE_RULE = "King can attack anyone";
 export const HOUSE_RULE_DETAIL =
   "A King's creatures may attack any opponent, the other King included; spells and abilities still keep to range";
+/** The house rule's guard (v0.9.7, the owner's rule for the campaign's court): with it a King
+ * attacks the opposing Generals from the start, and the other King only once one of that King's
+ * own Generals is defeated. It needs the house rule: without it no King attacks across the table. */
+export const GUARD_RULE = "Generals guard their King";
+export const GUARD_RULE_DETAIL =
+  "Except the other King, whom a King's creatures may attack only once one of that King's Generals is defeated";
+/** What a King may attack under the house rule with its guard, as a sentence's start. */
+export const GUARDED_ATTACKS =
+  "A King's creatures may attack any opposing General, and the other King once one of that King's Generals is defeated";
 
 /** The house rule as a tag or a line: "King can attack anyone: on". */
 export function houseRuleWords(on: boolean): string {
   return `${HOUSE_RULE}: ${on ? "on" : "off"}`;
+}
+
+/** Whether the guard holds: it is chosen, and the house rule it belongs to is on. */
+export function kingsGuarded(
+  settings: Pick<KingsRules, "king_attacks_anyone" | "guarded_kings">,
+): boolean {
+  return settings.king_attacks_anyone && settings.guarded_kings === true;
+}
+
+/** Whom a King may attack under the settings, in a sentence without its full stop. */
+export function kingsAttackWords(
+  settings: Pick<KingsRules, "king_attacks_anyone" | "guarded_kings">,
+): string {
+  if (!settings.king_attacks_anyone)
+    return "A King attacks only an opponent beside them and in range, as a General does";
+  return kingsGuarded(settings)
+    ? GUARDED_ATTACKS
+    : "A King's creatures may attack any opponent, the other King included";
 }
 
 export function startingLife(
@@ -113,27 +146,34 @@ export function startingLife(
   return kingsRole(seat) === "king" ? 40 : 20;
 }
 
-/** The settings as the lobby's tags: the decks, the life and the house rule. */
-export function settingsTags(settings: KingsTableSettings): string[] {
+/** The settings as the lobby's tags: the decks, the life, the house rule and, when it holds, the
+ * rule's guard. */
+export function settingsTags(settings: KingsRules): string[] {
   return [
     DECK_FORMAT_WORDS[settings.deck_format],
     LIFE_WORDS[settings.life],
     houseRuleWords(settings.king_attacks_anyone),
+    ...(kingsGuarded(settings) ? [GUARD_RULE] : []),
   ];
 }
 
 /** The settings in one line, for the game's menu: "Commander decks · Generals 20, Kings 40 · King
  * can attack anyone: off". */
-export function settingsLine(settings: KingsTableSettings): string {
+export function settingsLine(settings: KingsRules): string {
   return settingsTags(settings).join(" · ");
 }
 
+/** A sentence's start in the middle of another: its first letter small. */
+function inSentence(words: string): string {
+  return `${words.charAt(0).toLowerCase()}${words.slice(1)}`;
+}
+
 /** The settings in sentences, as a table shows them before anyone readies. */
-export function settingsSentence(settings: KingsTableSettings): string {
+export function settingsSentence(settings: KingsRules): string {
   return `${DECK_FORMAT_WORDS[settings.deck_format]} for all six players (${DECK_FORMAT_DETAIL[settings.deck_format]}). ${LIFE_DETAIL[settings.life]}. ${
     settings.king_attacks_anyone
-      ? `House rule on: ${HOUSE_RULE_DETAIL.charAt(0).toLowerCase()}${HOUSE_RULE_DETAIL.slice(1)}.`
-      : "House rule off: a King attacks only an opponent beside them and in range, as a General does."
+      ? `House rule on${kingsGuarded(settings) ? ", Generals guarding their King" : ""}: ${inSentence(kingsAttackWords(settings))}; spells and abilities still keep to range.`
+      : `House rule off: ${inSentence(kingsAttackWords(settings))}.`
   }`;
 }
 

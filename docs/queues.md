@@ -52,7 +52,7 @@ Taken while building v0.5.1's Two-Headed Giant queue, each open to the owner too
 
 - **Two players or more** play a table's game, made through the human tables' path: a table started at once, marked `queued` and private, so never listed, with a seat for each player (`tables.add_table_game`). The game's kind is `table`, so the table's chat and alliances, away players and the vote to remove them, concessions, wins and tokens all work as at any table ([human tables](tables.md#playing)). The player who waited longest is its host in the records.
 - **A player alone with bots** plays a practice game. It records its request, as the practice table's games do, so its rematch plays it again.
-- **Bots** play at skill 4, the practice table's and the lobby's default (14 tokens each when beaten), with the starter decks in Commander (`CD_BOT_DECKS`) and the engine's fixture decks in Legacy. The turn limit is 60.
+- **Bots** play at skill 4, the practice table's and the lobby's default (14 tokens each when beaten), with the starter decks in Commander (`CD_BOT_DECKS`) and the engine's fixture decks in Legacy. The turn limit is the game's own (v0.9.7): 40 turns for each player, so 80 in Legacy and in Two-Headed Giant, whose teams take their turns together, and 80, 120 or 160 at a Commander table of two, three or four ([the turn limit](games.md#the-turn-limit-v097)). It was 60 for every game before.
 - **Audit.** A queue's games are audited as any table's: a removal (`table.player_removed`), SysOp observing, inspecting or closing. Joining and leaving a queue are not audited, as taking a seat at a table is not.
 
 ## Two-Headed Giant (v0.5.1)

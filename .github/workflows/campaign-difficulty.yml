@@ -4,7 +4,8 @@ name: Campaign difficulty
 # one summary of them all. Too long for CI on every push, so it runs on demand: from Actions ›
 # Campaign difficulty › Run workflow, or by pushing a branch named difficulty/<anything>.
 # Since v0.9.7 ward 15, the court, is measured too: a King's Table game of six bots at skill 6 is
-# long, so it plays at most three games a reference deck, each with a longer budget.
+# long, and since v0.9.7 it may run to 240 turns (40 for each player), so it plays at most two
+# games a reference deck, each with a longer budget.
 on:
   workflow_dispatch:
     inputs:
@@ -22,7 +23,8 @@ jobs:
   ward:
     runs-on: ubuntu-24.04
     # Ward 13 at skill 6 takes up to about 5 minutes a game: 30 games fit in under three hours.
-    timeout-minutes: 300
+    # The court's six games of up to 45 minutes need the most: four and a half hours.
+    timeout-minutes: 330
     strategy:
       fail-fast: false
       matrix:
@@ -49,11 +51,12 @@ jobs:
           budget=900
           heap=2g
           if [ "$WARD" = 15 ]; then
-            # The court: nine games of up to 25 minutes fit the job's five hours. Six bots at
-            # skill 6 ran out of a 2 GB heap; the runner has 16 GB.
-            budget=1500
+            # The court: six games of up to 45 minutes fit the job's five and a half hours. A
+            # game of 60 turns took over eight minutes, and its limit is 240 turns since v0.9.7.
+            # Six bots at skill 6 ran out of a 2 GB heap; the runner has 16 GB.
+            budget=2700
             heap=10g
-            if [ "$GAMES" -gt 3 ]; then GAMES=3; fi
+            if [ "$GAMES" -gt 2 ]; then GAMES=2; fi
           fi
           docker run --rm -v "$PWD:/src:ro" -v "$PWD/out:/out" commander-duels-carddb:latest sh -c "
             cp -r /src /build && cd /build/engine && ln -s /xmage/carddb/db db &&

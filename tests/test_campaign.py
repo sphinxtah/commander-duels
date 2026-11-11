@@ -154,6 +154,15 @@ def test_the_campaign_opens_at_its_first_encounter(client: TestClient) -> None:
         "locked",
     )
     assert court["court"]["player_seat"] == 1 and court["court"]["ally_seats"] == [0, 2]
+    # The court's rules as its game plays them (v0.9.7): the house rule with its guard, and 40
+    # turns for each of the six players.
+    assert court["court"]["kings_table"] == {
+        "deck_format": "commander",
+        "life": "all_40",
+        "king_attacks_anyone": True,
+        "guarded_kings": True,
+    }
+    assert court["court"]["turn_cap"] == 240
     assert [(seat["seat"], seat["name"], seat["role"]) for seat in court["court"]["opponents"]] == [
         (3, "Nicol Bolas", "general"),
         (4, "The Sphinx", "king"),
@@ -198,6 +207,8 @@ def test_a_won_duel_opens_the_next_encounter_once(
     assert (bot["player"], bot["handle"], bot["portrait"]) == ("bot", "Tibalt", "tibalt")
     body = engine.created[-1]
     assert body["format"] == "commander" and body["skill"] == 1 and "seed" not in body
+    # 40 turns for each of the duel's two players (v0.9.7; 60 for the whole game before).
+    assert body["turn_cap"] == 80 and summary["turn_cap"] == 80
     assert body["seats"][1]["deck_list"]["commanders"] == ["Judith, the Scourge Diva"]
     assert sum(card["count"] for card in body["seats"][1]["deck_list"]["cards"]) == 99
     assert body["seats"][0]["deck_list"]["commanders"] == ["Adeline, Resplendent Cathar"]
@@ -698,6 +709,10 @@ def test_the_content_holds_fifteen_wards_of_complete_decks() -> None:
     assert court.court is not None and court.cards == loaded.encounter(14).cards
     assert (court.private, court.commander, court.tokens) == ("campaign-finale", None, 16384000)
     assert (loaded.court, loaded.flight, loaded.last) == (15, 14, 15)
+    # The content names no turn limit of its own since v0.9.7: the campaign's games take the
+    # game-wide one, 40 turns for each player.
+    assert "turn_cap" not in content
+    assert (campaign.DUEL_TURN_CAP, campaign.COURT_TURN_CAP) == (80, 240)
     decks = [(e["name"], e["commander"], e["cards"]) for e in content["encounters"][:14]] + [
         (g["name"], g["commander"], g["cards"])
         for g in content["encounters"][14]["court"]["generals"]

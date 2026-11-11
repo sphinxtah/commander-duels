@@ -39,7 +39,7 @@ A table's game ([human tables](tables.md)) seats every player of the table in on
 ```json
 POST /api/v1/practice-games
 {"format": "commander", "deck": "commander-mono-red-raiders",
- "bots": [{}, {"deck": "commander-mono-blue-flyers"}, {}], "bot_skill": 4, "turn_cap": 60}
+ "bots": [{}, {"deck": "commander-mono-blue-flyers"}, {}], "bot_skill": 4, "turn_cap": 160}
 ```
 
 | Field | Meaning |
@@ -50,13 +50,30 @@ POST /api/v1/practice-games
 | `deck_list` | SysOp only (`cards.any`): a deck list as text, below |
 | `bots` | One entry per bot, in turn order, each with an optional `deck`, `deck_id` (one of your decks) or (SysOp) `deck_list` |
 | `bot_skill` | XMage's AI skill, 1–6 (default 4) |
-| `turn_cap` | 1–200 turns (default 60) |
+| `turn_cap` | The game's turn limit, 1–400 turns: it ends with no result at the untap step after that many turns, counting every player's. Left out (since v0.9.7): **40 turns for each player** ([below](#the-turn-limit-v097)). Before v0.9.7: 1–200, default 60 |
 | `rules` | Since v0.4.5: which cards the game's own decks may hold, `{"banned": bool, "not_legal": bool}`, as at a human table ([the table's rules](tables.md#the-tables-rules-v045)), and since v0.6.2 `"stand_in": bool` ([below](#stand-ins-v062)). All true, casual, by default; left out, `stand_in` is allowed when both others are. The bots' starter and fixture decks, and SysOp's deck lists, are not checked |
 | `best_of` | Since v0.5.0: 1 (the default), or in Legacy 3 for a best-of-three match with sideboards ([matches](matches.md)) |
 | `seat` | Since v0.8.7, King's Table only: your seat, 0–5 (team A's King, 1, by default) |
-| `kings_table` | Since v0.8.7, King's Table only: its settings, `{"deck_format", "life", "king_attacks_anyone"}`, each defaulting as at a table ([tables](tables.md#kings-table-v087)) |
+| `kings_table` | Since v0.8.7, King's Table only: its settings, `{"deck_format", "life", "king_attacks_anyone"}` and since v0.9.7 `"guarded_kings"`, each defaulting as at a table ([tables](tables.md#kings-table-v087)) |
 
-The account sits in seat 0, or since v0.8.7 at King's Table in its `seat`. `GET /api/v1/practice-games/options` lists the formats, bot counts and fixture decks, whether the account may use deck lists, and (`own_decks`) whether it may play its own decks.
+The account sits in seat 0, or since v0.8.7 at King's Table in its `seat`. `GET /api/v1/practice-games/options` lists the formats, bot counts and fixture decks, whether the account may use deck lists, and (`own_decks`) whether it may play its own decks; since v0.9.7 also each format's default turn limit by its number of bots (`turn_caps`) and the longest a game may ask (`max_turn_cap`).
+
+#### The turn limit (v0.9.7)
+
+The owner's rule of 2026-11-10: "go throughout the game and make 40 per player the default". A game whose request names no `turn_cap` takes 40 turns for each player. The limit counts the game's turns, each player's own in turn order, and a game that passes it ends with no result (`turn_limit`).
+
+| Game | Players who take turns | Default limit |
+| --- | --- | --- |
+| Legacy, and a Commander duel | 2 | 80 |
+| Commander, three players | 3 | 120 |
+| Commander, four players | 4 | 160 |
+| Two-Headed Giant | 2 teams, each taking its turns together (805) | 80, which is 40 for each of the four players |
+| King's Table | 6 | 240 |
+
+- **Where it applies.** Practice games, tables, the queues' games, the campaign's duels (80) and its court (240), the engine's own default for a request without a limit, and the development bot match (80). One rule in the API (`api/schemas.py`, `default_turn_cap`) and the same in the engine (`HumanGameRequest.defaultTurnCap`).
+- **A limit someone names is kept:** the practice table's field (which shows the table's own limit until the player types one, and goes back to it when emptied) and a table's `turn_cap`. The most a game may ask rose from 200 to 400, so King's Table's 240 fits.
+- **A game keeps its limit.** A rematch replays the limit its game had, and a best-of-three match its first game's: games from before v0.9.7 keep their 60.
+- **Before v0.9.7** every game stopped after 60 turns whatever its table: 30 turns each in a duel, 15 each at a table of four and 10 each at King's Table, which the campaign's court reached before it could be decided.
 
 The engine checks no deck's legality in its format. Players' own decks and the bots' starter decks reach it as deck lists, which it loads without XMage's deck validator; only its own fixture decks, named by `deck`, pass XMage's Legacy or Commander validator as they load. So the table's rules (v0.4.5) are the API's alone, and a casual deck plays as any other.
 
@@ -93,7 +110,8 @@ Two teams of three, a King and two Generals each, after Magic's Emperor variant 
 ```json
 POST /api/v1/practice-games
 {"format": "kings_table", "deck_id": "…", "seat": 3, "bot_skill": 4,
- "kings_table": {"deck_format": "commander", "life": "generals_20_kings_40", "king_attacks_anyone": false},
+ "kings_table": {"deck_format": "commander", "life": "generals_20_kings_40", "king_attacks_anyone": true,
+                 "guarded_kings": true},
  "bots": [{}, {}, {"deck": "commander-mono-red-raiders"}, {}, {}]}
 ```
 

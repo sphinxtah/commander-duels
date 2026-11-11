@@ -5045,6 +5045,8 @@ export interface components {
              * @description What a friend who helps win it is paid, once.
              */
             helper_tokens: number;
+            /** @description The court's King's Table settings, as its game plays them (v0.9.7): the house rule with its guard, so a King attacks any opposing General, and the other King once one of that King's Generals is defeated. */
+            kings_table: components["schemas"]["KingsTableSettings"];
             /**
              * Opponents
              * @description Team B: The Sphinx as King, two Generals.
@@ -5055,6 +5057,11 @@ export interface components {
              * @description Your seat: King A's.
              */
             player_seat: number;
+            /**
+             * Turn Cap
+             * @description The court's turn limit (v0.9.7): 40 turns for each of its six players.
+             */
+            turn_cap: number;
         };
         /**
          * Coverage
@@ -6250,6 +6257,8 @@ export interface components {
         KingsTableChange: {
             /** Deck Format */
             deck_format?: ("legacy" | "commander") | null;
+            /** Guarded Kings */
+            guarded_kings?: boolean | null;
             /** King Attacks Anyone */
             king_attacks_anyone?: boolean | null;
             /** Life */
@@ -6268,6 +6277,12 @@ export interface components {
              * @enum {string}
              */
             deck_format: "legacy" | "commander";
+            /**
+             * Guarded Kings
+             * @description The house rule's guard (v0.9.7, "Generals guard their King"): a King may attack the other King only once one of that King's Generals is defeated, and the opposing Generals at any time. It changes nothing while king_attacks_anyone is false.
+             * @default false
+             */
+            guarded_kings: boolean;
             /**
              * King Attacks Anyone
              * @description House rule: a King may attack any opponent, not only those in range.
@@ -7017,6 +7032,13 @@ export interface components {
             kings_table?: components["schemas"]["KingsTableSettings"] | null;
             /** Name */
             name: string;
+            /**
+             * Turn Caps
+             * @description Since v0.9.7: the turn limit a game takes when its request names none, by its number of bots: 40 turns for each player (Two-Headed Giant's teams take their turns together, so its 80 turns are 40 each).
+             */
+            turn_caps?: {
+                [key: string]: number;
+            };
         };
         /**
          * PracticeGameRequest
@@ -7070,9 +7092,9 @@ export interface components {
             seat?: number | null;
             /**
              * Turn Cap
-             * @default 60
+             * @description The game's turn limit: it ends with no result at the untap step after this many turns, counting every player's. Left out (since v0.9.7): 40 turns for each player, so 80 in a duel and in Two-Headed Giant (whose teams take their turns together), 120 or 160 at a Commander table of three or four, 240 at King's Table. At most 400 (200 before v0.9.7).
              */
-            turn_cap: number;
+            turn_cap?: number | null;
         };
         /** PracticeOptions */
         PracticeOptions: {
@@ -7083,6 +7105,12 @@ export interface components {
             deck_lists: boolean;
             /** Formats */
             formats: components["schemas"]["PracticeFormat"][];
+            /**
+             * Max Turn Cap
+             * @description Since v0.9.7: the longest turn limit a game may ask.
+             * @default 400
+             */
+            max_turn_cap: number;
             /**
              * Own Decks
              * @description Whether this account may play its own decks (decks.edit).
@@ -9167,9 +9195,9 @@ export interface components {
             seats: number;
             /**
              * Turn Cap
-             * @default 60
+             * @description The game's turn limit: it ends with no result at the untap step after this many turns, counting every player's. Left out (since v0.9.7): 40 turns for each player, so 80 in a duel and in Two-Headed Giant (whose teams take their turns together), 120 or 160 at a Commander table of three or four, 240 at King's Table. At most 400 (200 before v0.9.7).
              */
-            turn_cap: number;
+            turn_cap?: number | null;
             /**
              * Visibility
              * @description public tables are listed; a private one is reached by its invite link only.

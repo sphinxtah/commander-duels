@@ -9,8 +9,9 @@ import java.util.function.LongSupplier;
  * not rejected; the response reports the values actually used.
  */
 public record BotMatchRequest(long seed, int turnCap, int timeBudgetSeconds, int skill, boolean includeLog) {
-    public static final int DEFAULT_TURN_CAP = 60;
-    public static final int MAX_TURN_CAP = 200;
+    /** A Legacy duel's two players at 40 turns each (v0.9.7), as {@link HumanGameRequest} counts them. */
+    public static final int DEFAULT_TURN_CAP = 2 * HumanGameRequest.TURNS_PER_PLAYER;
+    public static final int MAX_TURN_CAP = HumanGameRequest.MAX_TURN_CAP;
     public static final int DEFAULT_TIME_BUDGET_SECONDS = 120;
     public static final int MAX_TIME_BUDGET_SECONDS = 600;
     public static final int DEFAULT_SKILL = 4;

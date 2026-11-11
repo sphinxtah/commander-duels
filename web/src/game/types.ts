@@ -311,6 +311,9 @@ export interface KingsTableView {
   deck_format: "legacy" | "commander";
   life: "all_20" | "all_40" | "generals_20_kings_40";
   king_attacks_anyone: boolean;
+  /** The house rule's guard (v0.9.7): a King attacks the other King only once one of that King's
+   * Generals is out. Missing from an engine before v0.9.7, which is the guard off. */
+  guarded_kings?: boolean;
 }
 
 export interface SeatSettings {

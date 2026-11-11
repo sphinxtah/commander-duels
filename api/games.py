@@ -110,6 +110,7 @@ from api.schemas import (
     PracticeOptions,
     SeatChoice,
     TableRules,
+    default_turn_cap,
 )
 from api.schemas import GameSeat as SeatSummary
 
@@ -1531,6 +1532,7 @@ def practice_options(principal: Player) -> PracticeOptions:
                 default_bots=DEFAULT_BOTS[fmt],
                 decks=decks if fixtures else [],
                 best_of=BEST_OF[fmt],
+                turn_caps={bots: default_turn_cap(fmt, bots + 1) for bots in BOTS[fmt]},
                 kings_table=kings_table.PRACTICE_DEFAULTS if fmt == kings_table.FORMAT else None,
                 decks_by_format=(
                     {
@@ -1903,6 +1905,12 @@ async def require_loaded(request: Request, plans: list[SeatPlan]) -> None:
         )
 
 
+def turn_cap_of(body: PracticeGameRequest, seats: int) -> int:
+    """A practice game's turn limit: the one its request names, or 40 turns for each player at
+    its table of so many seats (v0.9.7, schemas.default_turn_cap)."""
+    return body.turn_cap if body.turn_cap is not None else default_turn_cap(body.format, seats)
+
+
 def record_game(
     db: Session,
     request: Request,
@@ -1920,7 +1928,7 @@ def record_game(
         created_by=principal.user.id,
         created_at=now,
         bot_skill=body.bot_skill,
-        turn_cap=body.turn_cap,
+        turn_cap=turn_cap_of(body, len(plans)),
         catalog_revision_id=db.scalar(select(func.max(CatalogRevision.id))),
         # The decks' format: Two-Headed Giant plays Legacy decks (v0.5.0), King's Table those of
         # its settings (v0.8.7).
@@ -2162,6 +2170,8 @@ async def create_practice_game(
         )
     if body.best_of not in BEST_OF[fmt]:
         raise ApiError(422, "invalid_table", "Only Legacy plays best of three.")
+    # The turn limit the game plays (v0.9.7): kept whole with it, for its rematch.
+    body = body.model_copy(update={"turn_cap": turn_cap_of(body, len(bots) + 1)})
     plans = await run_in_threadpool(plan_seats, db, request, principal, body, bots)
     await require_loaded(request, plans)
     seats = [plan.engine for plan in plans]

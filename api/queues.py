@@ -117,6 +117,7 @@ from api.schemas import (
     SeatChoice,
     TableFormatId,
     casual,
+    default_turn_cap,
 )
 from api.tables import add_table_game, check_deck, open_table_of, shared_with, team_cards
 
@@ -150,9 +151,9 @@ BOT_WAIT = timedelta(seconds=60)
 STALE_AFTER = timedelta(seconds=150)
 # How often the process looks for a match in every queue with players waiting.
 TICK_SECONDS = 2.0
-# The bots' skill, and the turn cap: the defaults of the practice table and the lobby.
+# The bots' skill: the default of the practice table and the lobby. The turn limit is theirs too:
+# 40 turns for each player of the queue's game (v0.9.7, schemas.default_turn_cap).
 BOT_SKILL = 4
-TURN_CAP = 60
 # A row in either is the player's place in line: starting is a place a match has claimed.
 WAITING = ("waiting", "starting")
 # A row in any is the player's place in a queue, an invitation to a friend (v0.5.1) included.
@@ -271,6 +272,11 @@ class Group:
     def __post_init__(self) -> None:
         if not self.seats:
             self.seats = [*self.users, *([None] * self.bots)]
+
+    @property
+    def turn_cap(self) -> int:
+        """The game's turn limit: 40 turns for each player of the queue's table (v0.9.7)."""
+        return default_turn_cap(self.key.format, self.key.seats)
 
 
 class Refused(Exception):
@@ -946,7 +952,7 @@ def record_group(
                     else None
                 ),
                 bot_skill=BOT_SKILL,
-                turn_cap=TURN_CAP,
+                turn_cap=group.turn_cap,
                 allow_banned=True,
                 allow_not_legal=True,
                 allow_stand_in=True,
@@ -997,7 +1003,7 @@ def add_practice_game(
         deck_id=group.decks[0],
         bots=[SeatChoice() for _ in range(group.bots)],
         bot_skill=BOT_SKILL,
-        turn_cap=TURN_CAP,
+        turn_cap=group.turn_cap,
         rules=casual(),
         best_of=group.key.best_of,  # type: ignore[arg-type]
     )
@@ -1009,7 +1015,7 @@ def add_practice_game(
         created_by=group.users[0],
         created_at=utcnow(),
         bot_skill=BOT_SKILL,
-        turn_cap=TURN_CAP,
+        turn_cap=group.turn_cap,
         catalog_revision_id=db.scalar(select(func.max(CatalogRevision.id))),
         # The decks' format: Two-Headed Giant plays Legacy decks (v0.5.1).
         format_version=db.scalar(
@@ -1138,7 +1144,7 @@ class QueueHub:
                     "format": group.key.format,
                     "seats": [plan.engine for plan in plans],
                     "skill": BOT_SKILL,
-                    "turn_cap": TURN_CAP,
+                    "turn_cap": group.turn_cap,
                 }
                 if table:
                     body["idle_timeout_seconds"] = TABLE_IDLE_SECONDS

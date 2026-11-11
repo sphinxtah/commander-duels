@@ -8,8 +8,11 @@ describes the mode; this module holds what the API needs of it.
 - **Settings** (KingsTableSettings), chosen before anyone is ready and fixed once the game
   starts: the decks' format (Legacy or Commander, for all six decks, checked by that format's
   own legality and banned list), the starting life (20 or 40 for everyone, or 20 for the
-  Generals and 40 for the Kings, whatever the deck format would give), and whether a King may
-  attack anyone (a house rule the engine enforces). Kept with the table and with its game.
+  Generals and 40 for the Kings, whatever the deck format would give), whether a King may
+  attack anyone (a house rule the engine enforces) and, since v0.9.7, whether that rule is
+  guarded: a King then attacks the other King only once one of that King's Generals is defeated
+  (the campaign's court plays so). Kept with the table and with its game; a row from before
+  v0.9.7 has no guard, which is the guard off.
 - **The result.** A King's elimination loses their team the game; both Kings at once is a draw. An
   eliminated General leaves and their team plays on, and the team's result is theirs too: the
   engine's winner_seats leaves such a General out, so the API takes the winning team from any
@@ -64,7 +67,7 @@ def starting_life(settings: KingsTableSettings, seat: int) -> int:
 
 
 def engine_settings(settings: KingsTableSettings) -> dict[str, object]:
-    """The engine's kings_table object: exactly the three settings."""
+    """The engine's kings_table object: exactly the settings."""
     return settings.model_dump(mode="json")
 
 

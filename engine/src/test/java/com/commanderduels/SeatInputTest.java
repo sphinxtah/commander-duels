@@ -37,7 +37,7 @@ class SeatInputTest {
         assertEquals(List.of("human", "bot"), players(defaults));
         assertEquals(List.of("legacy-mono-red-burn", "legacy-mono-green-creatures"), decks(defaults));
         assertEquals(HumanGameRequest.DEFAULT_SKILL, defaults.skill());
-        assertEquals(HumanGameRequest.DEFAULT_TURN_CAP, defaults.turnCap());
+        assertEquals(80, defaults.turnCap(), "40 turns for each of a duel's two players (v0.9.7)");
         assertEquals(HumanGameRequest.DEFAULT_IDLE_TIMEOUT_SECONDS, defaults.idleTimeoutSeconds());
 
         HumanGameRequest green = HumanGameRequest.parse("{\"seats\":[{\"player\":\"human\",\"deck\":"
@@ -52,12 +52,20 @@ class SeatInputTest {
         HumanGameRequest commander = HumanGameRequest.parse("{\"format\":\"commander\"}", () -> 0L);
         assertEquals(List.of("human", "bot", "bot", "bot"), players(commander), "one human and three bots");
         assertEquals(GameFormat.COMMANDER.decks(), decks(commander));
+        assertEquals(160, commander.turnCap(), "40 turns for each of the four");
 
         HumanGameRequest mixed = HumanGameRequest.parse("{\"format\":\"commander\",\"seats\":[{\"player\":\"bot\"},"
             + "{\"player\":\"human\",\"deck\":\"commander-mono-white-soldiers\"},{\"player\":\"human\"}]}", () -> 0L);
         assertEquals(List.of("bot", "human", "human"), players(mixed));
         assertEquals(List.of("commander-mono-blue-flyers", "commander-mono-white-soldiers",
             "commander-mono-red-raiders"), decks(mixed), "unnamed decks skip the ones other seats chose");
+        assertEquals(120, mixed.turnCap(), "40 turns for each of the three");
+        // Two-Headed Giant's teams take their turns together: 80 turns are 40 for each player.
+        assertEquals(80, HumanGameRequest.parse("{\"format\":\"two_headed_giant\"}", () -> 0L).turnCap());
+        assertEquals(HumanGameRequest.MAX_TURN_CAP,
+            HumanGameRequest.parse("{\"turn_cap\":100000}", () -> 0L).turnCap(), "clamped, not refused");
+        assertEquals(240, HumanGameRequest.parse("{\"turn_cap\":240}", () -> 0L).turnCap(),
+            "King's Table's limit is within the maximum");
         assertEquals(2, mixed.humanSeats());
 
         for (String body : new String[]{"[]", "{\"seat\":1}", "{\"human_deck\":\"legacy-mono-red-burn\"}",

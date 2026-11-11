@@ -623,6 +623,37 @@ def test_seats_limits_and_privacy(client, engine):
     assert root.get("/api/v1/tables").json() == []
 
 
+def test_a_table_takes_forty_turns_for_each_seat_unless_its_host_says(client, engine):
+    """The owner's default (v0.9.7): a table whose host names no turn limit takes 40 turns for
+    each seat, bots included; a limit the host names is kept, up to 400."""
+    ada, bob = Account(client, "ada", admin=True), Account(client, "bob", admin=True)
+    for request, turns in (
+        ({"format": "legacy"}, 80),
+        ({"format": "legacy", "turn_cap": 25}, 25),
+        ({"format": "legacy", "turn_cap": 400}, 400),
+    ):
+        made = ada.send("POST", "/api/v1/tables", request | {"deck_id": deck(ada, client)})
+        assert made.status_code == 201, made.text
+        assert made.json()["turn_cap"] == turns
+        assert ada.send("POST", f"/api/v1/tables/{made.json()['code']}/leave").status_code == 200
+    for seats, turns in ((2, 80), (3, 120), (4, 160)):
+        code = commander_table(client, ada, [], free=1, bots=seats - 2)
+        assert ada.get(f"/api/v1/tables/{code}").json()["turn_cap"] == turns
+        assert ada.send("POST", f"/api/v1/tables/{code}/leave").status_code == 200
+    for refused in (0, 401):
+        made = ada.send(
+            "POST",
+            "/api/v1/tables",
+            {"format": "legacy", "turn_cap": refused, "deck_id": deck(ada, client)},
+        )
+        assert made.status_code == 422
+    # The game the table starts is told the table's limit, and keeps it.
+    code = commander_table(client, ada, [bob], bots=2)
+    game_id = ada.send("POST", f"/api/v1/tables/{code}/start").json()["game_id"]
+    assert engine.created[-1]["turn_cap"] == 160
+    assert ada.get(f"/api/v1/games/{game_id}").json()["game"]["turn_cap"] == 160
+
+
 def test_the_hosts_rules_choose_which_decks_sit(client, engine):
     """The host chooses which cards its decks may hold by their legality (v0.4.5): casual by
     default, tournament rules allowing neither banned cards nor cards not legal in the format.

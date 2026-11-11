@@ -56,7 +56,10 @@ import mage.watchers.Watcher;
  *   range, so at the start the Generals face each other and neither King can attack; leaving
  *   players open new neighbours at once, and new range at the next turn. With the house rule "King
  *   can attack anyone", a King's creatures may attack any opponent still in the game, and the
- *   battles and planeswalkers that player defends. The permission follows the attacking player:
+ *   battles and planeswalkers that player defends. With that rule's guard, "Generals guard their
+ *   King" (v0.9.7), the other King is not among them while both of that King's Generals are still
+ *   in the game: a King attacks the opposing Generals from the start, and the other King once one
+ *   of that King's own Generals is out. The permission follows the attacking player:
  *   a King's creature a General controls attacks as the General's. An attack across range is a
  *   whole combat ({@code Game.inCombatAcrossRange}): the defender blocks, both sides' creatures deal
  *   and are dealt combat damage, and each player's abilities see the combat's events; targets and
@@ -174,7 +177,8 @@ final class KingsTable implements Serializable {
     /**
      * 809.4b and the house rule: who the attacking player may attack, of the opponents in range
      * still in the game that XMage's attack option gives. A King under the house rule: every
-     * opponent still in the game, in seat order. Otherwise those of them beside the player.
+     * opponent still in the game, in seat order, but not a King its Generals still guard (the
+     * rule's guard, v0.9.7). Otherwise those of them beside the player.
      */
     List<UUID> attackable(Game game, UUID attackingPlayerId, List<UUID> inRange) {
         if (seatOf(attackingPlayerId) < 0) {
@@ -184,7 +188,8 @@ final class KingsTable implements Serializable {
             List<UUID> anyone = new ArrayList<>();
             for (UUID other : seats) {
                 Player player = game.getPlayer(other);
-                if (player != null && player.isInGame() && teamOf(other) != teamOf(attackingPlayerId)) {
+                if (player != null && player.isInGame() && teamOf(other) != teamOf(attackingPlayerId)
+                    && !(rules.guardedKings() && guarded(game, other))) {
                     anyone.add(other);
                 }
             }
@@ -192,6 +197,25 @@ final class KingsTable implements Serializable {
         }
         List<UUID> beside = neighbours(game, attackingPlayerId);
         return inRange.stream().filter(beside::contains).toList();
+    }
+
+    /**
+     * The house rule's guard (v0.9.7): whether the player is a King with both Generals still in the
+     * game, whom the other King may not attack. A General who lost, conceded or left guards no
+     * longer, from that moment. Without the house rule nothing needs it: the two Kings sit beside
+     * each other only once the Generals on one side of the table are both out, one of each King's.
+     */
+    boolean guarded(Game game, UUID playerId) {
+        if (!isKing(playerId)) {
+            return false;
+        }
+        for (UUID teammate : allies(playerId)) {
+            Player general = game.getPlayer(teammate);
+            if (general == null || !general.isInGame()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

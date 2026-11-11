@@ -3,8 +3,11 @@ import game from "../game/game.module.css";
 import {
   DECK_FORMAT_DETAIL,
   DECK_FORMAT_WORDS,
+  GUARD_RULE,
+  GUARD_RULE_DETAIL,
   HOUSE_RULE,
   HOUSE_RULE_DETAIL,
+  kingsGuarded,
   KINGS_TABLE,
   LIFE_DETAIL,
   LIFE_WORDS,
@@ -170,12 +173,32 @@ export function KingsSettingsFields({
             type="checkbox"
             checked={settings.king_attacks_anyone}
             onChange={(event) =>
-              onChange({ king_attacks_anyone: event.target.checked })
+              onChange(
+                event.target.checked
+                  ? { king_attacks_anyone: true }
+                  : { king_attacks_anyone: false, guarded_kings: false },
+              )
             }
           />
           <span>
             <strong>{HOUSE_RULE}</strong>
             <small>{HOUSE_RULE_DETAIL}</small>
+          </span>
+        </label>
+        {/* The rule's guard (v0.9.7): it belongs to the house rule, so it is chosen only with
+            it, and turning the house rule off turns it off too. */}
+        <label className={game.choice}>
+          <input
+            type="checkbox"
+            checked={kingsGuarded(settings)}
+            disabled={!settings.king_attacks_anyone}
+            onChange={(event) =>
+              onChange({ guarded_kings: event.target.checked })
+            }
+          />
+          <span>
+            <strong>{GUARD_RULE}</strong>
+            <small>{GUARD_RULE_DETAIL}</small>
           </span>
         </label>
       </fieldset>

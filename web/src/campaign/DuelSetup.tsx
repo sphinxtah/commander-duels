@@ -3,6 +3,8 @@ import { client } from "../api";
 import { portraitUrl } from "../game/table/portrait";
 import { selectSound } from "../shell/menuSound";
 import { FriendPicker, useFriendList } from "../tables/InviteFriends";
+import { LIFE_DETAIL, kingsAttackWords } from "../tables/kingsTable";
+import { TURNS_PER_PLAYER } from "../tables/tables";
 import {
   changeTutorial,
   COURT,
@@ -24,6 +26,16 @@ import styles from "./campaign.module.css";
 // their two Generals are bots, or one or two friends invited to a table the campaign opens.
 
 type OwnDeck = { id: string; title: string; commanders: string[] };
+type Court = NonNullable<CampaignEncounter["court"]>;
+
+/** The court's rules in two sentences (v0.9.7), from its settings as the API gives them: whom a
+ * King may attack, the starting life, and the turn limit, 40 turns for each of the six players.
+ * Until v0.9.7 this said "Kings cannot attack", which the court's settings then were. */
+function courtRules(court: Court): string {
+  const { kings_table: rules, turn_cap: turns } = court;
+  const life = LIFE_DETAIL[rules.life];
+  return `${kingsAttackWords(rules)}; ${life.charAt(0).toLowerCase()}${life.slice(1)}. The court ends with no result after ${turns} turns, ${TURNS_PER_PLAYER} for each player.`;
+}
 
 export function DuelSetup({
   state,
@@ -338,8 +350,8 @@ export function DuelSetup({
         <p className={styles.warning}>
           The Sphinx is King B, with Nicol Bolas and Liliana as his Generals,
           all at full strength. His incarnation starts on the battlefield and
-          returns at each of his upkeeps. Kings cannot attack; everyone starts
-          at 40 life. Lose the court and you return to the throne&rsquo;s ward.
+          returns at each of his upkeeps. {courtRules(court)} Lose the court and
+          you return to the throne&rsquo;s ward.
         </p>
       )}
 

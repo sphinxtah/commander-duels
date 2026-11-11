@@ -191,11 +191,16 @@ def test_the_sphinx_flees_and_the_court_pays_both_wards(
     summary = court(ada)
     body = engine.created[-1]
     assert body["format"] == "kings_table" and body["skill"] == 6
+    # The owner's rule for the court (v0.9.7): a King attacks any General, and the other King once
+    # one of that King's Generals is defeated; and 40 turns for each of the six players.
     assert body["kings_table"] == {
         "deck_format": "commander",
         "life": "all_40",
-        "king_attacks_anyone": False,
+        "king_attacks_anyone": True,
+        "guarded_kings": True,
     }
+    assert body["turn_cap"] == 240 and summary["turn_cap"] == 240
+    assert summary["kings_table"] == body["kings_table"]
     assert [seat["player"] for seat in body["seats"]] == [
         "bot",
         "human",
@@ -366,6 +371,14 @@ def test_friends_help_at_the_court_and_are_paid_once(
     assert seats[2]["player"] == "bot" and seats[2]["handle"] is None
     assert [seats[s]["handle"] for s in (3, 4, 5)] == ["Nicol Bolas", "The Sphinx", "Liliana"]
     code = table["code"]
+    # The court's rule and its turn limit are the solo court's (v0.9.7).
+    assert table["kings_table"] == {
+        "deck_format": "commander",
+        "life": "all_40",
+        "king_attacks_anyone": True,
+        "guarded_kings": True,
+    }
+    assert table["turn_cap"] == 240
     # The court's settings and seats are the campaign's.
     changed = ada.send("PATCH", f"/api/v1/tables/{code}", {"kings_table": {"life": "all_20"}})
     assert (changed.status_code, changed.json()["code"]) == (409, "campaign_table")

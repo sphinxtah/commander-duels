@@ -38,6 +38,19 @@ export function deckFormat(
   return format === TEAM_FORMAT ? "legacy" : format;
 }
 
+/** A game's turn limit when nobody names one (v0.9.7, the owner's rule): 40 turns for each
+ * player. The API gives every table and game this default; the app shows it. */
+export const TURNS_PER_PLAYER = 40;
+/** The longest turn limit a game may ask (200 before v0.9.7). */
+export const MAX_TURN_LIMIT = 400;
+
+/** The default turn limit of a game of the format against so many bots: 40 turns for each of
+ * its players. A limit counts the game's turns, and Two-Headed Giant's teams take theirs
+ * together, so its 80 turns are 40 for each player. */
+export function defaultTurnLimit(format: TableFormat, bots: number): number {
+  return TURNS_PER_PLAYER * (format === TEAM_FORMAT ? 2 : bots + 1);
+}
+
 /** A team's name as the lobby says it: "Team 1", "Team 2"; at King's Table (v0.8.7) "Team A",
  * "Team B", as its rules name them. */
 export function teamName(team: number, format?: TableFormat): string {

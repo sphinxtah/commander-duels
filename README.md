@@ -28,7 +28,7 @@ Since v0.8.9 players sleeve their decks: up to 20 uploaded pictures, three defau
 
 Since v0.9.0 a deck's sleeve covers its library too, a removed sleeve can be restored, Weathered Sentinels plays as printed, unlimited auctions' prices change in place, basic land packs sum up by land and edition, and King's Table's bot Generals fight ([release notes](docs/releases/0.9.0.md)).
 
-Since v0.9.7 the quest boards ask only for what a player can do with their own decks and the auction house as it stands, the day's five quests read "Quest 1" to "Quest 5" and complete in any order, and a game played with passive bots says it counts for nothing ([release notes](docs/releases/0.9.7.md)).
+Since v0.9.7 the quest boards ask only for what a player can do with their own decks and the auction house as it stands, the day's five quests read "Quest 1" to "Quest 5" and complete in any order, and a game played with passive bots says it counts for nothing. A game's turn limit is 40 turns for each player unless someone names one (80 in a duel, 160 at a table of four, 240 at King's Table; 60 for every game before), and the campaign's court plays the house rule with its guard: a King attacks any opposing General, and the other King once one of that King's Generals is defeated ([release notes](docs/releases/0.9.7.md)).
 
 Since v0.9.5 every player has a daily board of five quests and a weekly board of twenty goals, mostly outside the games, with bonuses that grow with a streak ([quests](docs/quests.md#quest-boards-v095)); achievements pay four times as much; and a warden's first defeat opens their deck as a 100-card pack ([release notes](docs/releases/0.9.5.md)).
 
@@ -139,7 +139,7 @@ With the stack running, play one development bot match (Legacy rules, two XMage 
 docker compose exec api python -c "import httpx, json, os; r = httpx.post(os.environ['CD_ENGINE_URL'] + '/v1/bot_match', json={'seed': 42}, timeout=700); print(json.dumps(r.json(), indent=2))"
 ```
 
-Optional inputs: `seed`, `turn_cap` (1–200, default 60), `time_budget_seconds` (1–600, default 120), `skill` (1–6, default 4) and `include_log`. Out-of-range values are clamped. One match runs at a time; others get 429. To run several in a row and summarize them:
+Optional inputs: `seed`, `turn_cap` (1–400, default 80: 40 turns for each of the duel's two players, since v0.9.7), `time_budget_seconds` (1–600, default 120), `skill` (1–6, default 4) and `include_log`. Out-of-range values are clamped. One match runs at a time; others get 429. To run several in a row and summarize them:
 
 ```sh
 docker compose exec -T api python - --count 10 < scripts/engine_bot_matches.py

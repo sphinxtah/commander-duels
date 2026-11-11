@@ -37,7 +37,12 @@
           }
         },
         "skill": {"type": "integer", "minimum": 1, "maximum": 6},
-        "turn_cap": {"type": "integer", "minimum": 1, "maximum": 200},
+        "turn_cap": {
+          "description": "The game's turn limit: it stops, with no result, at the untap step after this many turns. Since v0.9.7 a request without one takes 40 turns for each player who takes turns (80 in a duel and in Two-Headed Giant, whose teams take theirs together; 160 at a table of four; 240 at King's Table), and the maximum is 400 (200 before).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 400
+        },
         "idle_timeout_seconds": {"type": "integer", "minimum": 5, "maximum": 3600},
         "spectator_delay_seconds": {"type": "integer", "minimum": 0, "maximum": 300},
         "kings_table": {
@@ -47,7 +52,7 @@
             {
               "type": "object",
               "additionalProperties": false,
-              "required": ["deck_format", "life", "king_attacks_anyone"],
+              "required": ["deck_format", "life", "king_attacks_anyone", "guarded_kings"],
               "properties": {
                 "deck_format": {"enum": ["legacy", "commander"]},
                 "life": {
@@ -55,7 +60,11 @@
                   "enum": ["all_20", "all_40", "generals_20_kings_40"]
                 },
                 "king_attacks_anyone": {
-                  "description": "The house rule: a King's creatures may attack any opponent still in the game, the other King included; spells and abilities keep to range.",
+                  "description": "The house rule: a King's creatures may attack any opponent still in the game, the other King included (unless guarded_kings); spells and abilities keep to range.",
+                  "type": "boolean"
+                },
+                "guarded_kings": {
+                  "description": "The house rule's guard (since v0.9.7): a King's creatures may attack the other King only once one of that King's Generals is out of the game. It changes nothing while king_attacks_anyone is false.",
                   "type": "boolean"
                 }
               }

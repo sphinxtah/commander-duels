@@ -7,7 +7,7 @@ v0.1.0 put the practice games on screen and v0.2.0 added the priority controls. 
 The Play page (since v0.8.7 for the bots alone, with a plain heading in place of the owner's banner; "Find a game" in the public queues is in Tables) opens with the practice table, which offers:
 - **the format.** Legacy against one bot, or Commander against one to three bots;
 - **your deck, and each bot's:** a starter deck, or one of your own playable decks ([decks](decks.md#at-the-practice-table)). "Play it at the practice table" in the deck builder opens the table with that deck chosen;
-- **the bots' skill** (1–6) and a turn limit;
+- **the bots' skill** (1–6) and a turn limit. Since v0.9.7 the limit shown is the table's own, 40 turns for each player, and it follows the format and the number of bots (80 for a duel, 160 against three bots, 240 at King's Table) until the player types one; emptying the field goes back to it;
 - **for SysOp, a deck list.** Any card the engine implements, with card-name lookup that adds a line per click.
 
 The table also lists your running games (resume or close) and your recent ones with their results. SysOp may list every player's games and observe any running one.

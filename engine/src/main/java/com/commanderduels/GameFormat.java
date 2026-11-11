@@ -95,6 +95,14 @@ enum GameFormat {
         return maxSeats;
     }
 
+    /**
+     * How many of the game's seats take turns of their own: every seat, or the two teams of
+     * Two-Headed Giant, which take theirs together (805). A game's default turn limit counts them.
+     */
+    int turnTakers(int seats) {
+        return this == TWO_HEADED_GIANT ? 2 : seats;
+    }
+
     /** The fixture decks, by file name in the deck folder. */
     List<String> decks() {
         return decks;

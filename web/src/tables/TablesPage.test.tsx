@@ -702,6 +702,7 @@ describe("King's Table at a table (v0.8.7)", () => {
     deck_format: "commander" as const,
     life: "generals_20_kings_40" as const,
     king_attacks_anyone: false,
+    guarded_kings: false,
   };
   const life = (n: number) => (n === 1 || n === 4 ? 40 : 20);
   /** A King's Table seat, its team, role and life filled in as the API gives them. */
@@ -775,9 +776,16 @@ describe("King's Table at a table (v0.8.7)", () => {
     await act(async () =>
       screen.getByRole("radio", { name: /^Generals 20, Kings 40/ }).click(),
     );
+    // The house rule, and its guard (v0.9.7), which is offered only with it.
+    const guard = screen.getByRole("checkbox", {
+      name: /^Generals guard their King/,
+    });
+    expect(guard).toBeDisabled();
     await act(async () =>
       screen.getByRole("checkbox", { name: /^King can attack anyone/ }).click(),
     );
+    await act(async () => guard.click());
+    expect(guard).toBeChecked();
     // Team A's King by default; Team B's Right General instead, and bots in two seats.
     expect(screen.getByRole("radio", { name: /^Team A's King/ })).toBeChecked();
     await act(async () =>
@@ -825,9 +833,77 @@ describe("King's Table at a table (v0.8.7)", () => {
           deck_format: "legacy",
           life: "generals_20_kings_40",
           king_attacks_anyone: true,
+          guarded_kings: true,
         },
       },
     });
+    // No turn limit is named: the API gives the table 40 turns for each seat (v0.9.7).
+    expect(
+      (opened.options as { body: Record<string, unknown> }).body,
+    ).not.toHaveProperty("turn_cap");
+  });
+
+  it("says the house rule's guard in the lobby, at the table and to its host (v0.9.7)", async () => {
+    const api = mockApi();
+    const guarded = {
+      ...settings,
+      king_attacks_anyone: true,
+      guarded_kings: true,
+    };
+    const hosting = (kings: typeof settings) =>
+      kingsTable({
+        host: "ada",
+        your_seat: 1,
+        kings_table: kings,
+        players: kingsTable().players.map((p) =>
+          p.seat === 1
+            ? {
+                ...p,
+                handle: "ada",
+                you: true,
+                deck: "Soldiers",
+                deck_id: "deck-c",
+              }
+            : p,
+        ),
+      });
+    let current = hosting({ ...settings, king_attacks_anyone: true });
+    api.on("GET /api/v1/tables/{code}", () => reply(200, current));
+    api.on("GET /api/v1/decks", () => reply(200, [commanderDeck]));
+    api.on("PATCH /api/v1/tables/{code}", () => {
+      current = hosting(guarded);
+      return reply(200, current);
+    });
+    render(<TablesPage me={ada} heading={createRef()} code={CODE} />);
+    await settle();
+    expect(
+      screen.getByText(/^Commander decks for all six players/),
+    ).toHaveTextContent(
+      "House rule on: a King's creatures may attack any opponent, the other King included; spells and abilities still keep to range.",
+    );
+    const host = screen.getByRole("region", { name: "Change the table" });
+    await act(async () =>
+      within(host)
+        .getByRole("checkbox", { name: /^Generals guard their King/ })
+        .click(),
+    );
+    await settle();
+    expect(
+      api.calls
+        .filter((c) => c.route === "PATCH /api/v1/tables/{code}")
+        .map((c) => (c.options as { body: unknown }).body),
+    ).toEqual([{ kings_table: { guarded_kings: true } }]);
+    // The table says the rule as it now plays.
+    expect(
+      screen.getByText(/^Commander decks for all six players/),
+    ).toHaveTextContent(
+      "House rule on, Generals guarding their King: a King's creatures may attack any opposing General, and the other King once one of that King's Generals is defeated; spells and abilities still keep to range.",
+    );
+    expect(
+      within(host).getByRole("checkbox", {
+        name: /^Generals guard their King/,
+      }),
+    ).toBeChecked();
   });
 
   it("draws the six seats as the circle's two sides, shows the rules before anyone readies, and takes a seat", async () => {

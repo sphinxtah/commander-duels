@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Me } from "../api";
@@ -260,6 +260,49 @@ describe("the practice table for a player (v0.3.1)", () => {
       body: { format: "commander", deck_id: "deck-a", bots: [{}, {}, {}] },
     });
     expect(screen.getByRole("alert")).toHaveTextContent(/busy/);
+  });
+
+  it("gives a game 40 turns for each player unless the player types a limit (v0.9.7)", async () => {
+    const api = await sitDown(starters);
+    // Commander against three bots: four players, 160 turns.
+    const limit = screen.getByRole("spinbutton", { name: /^Turn limit/ });
+    expect(limit).toHaveValue(160);
+    expect(limit.closest("label")).toHaveTextContent(
+      "40 turns for each player",
+    );
+    // The limit follows the table: one bot is a duel, 80 turns.
+    fireEvent.change(screen.getByLabelText("Bots"), { target: { value: "1" } });
+    expect(limit).toHaveValue(80);
+    fireEvent.change(screen.getByLabelText("Bots"), { target: { value: "2" } });
+    expect(limit).toHaveValue(120);
+    const start = screen.getByRole("button", { name: "Start the game" });
+    await act(async () => start.click());
+    await settle();
+    const started = () =>
+      api.calls
+        .filter((c) => c.route === "POST /api/v1/practice-games")
+        .map((c) => (c.options as { body: Record<string, unknown> }).body);
+    // Nothing typed: no limit is sent, and the API gives the table its own.
+    expect(started()[0]).not.toHaveProperty("turn_cap");
+    // A limit the player types is theirs, whatever the table: it is sent, and it stays when
+    // the bots change. The field then says what the table's own would be.
+    fireEvent.change(limit, { target: { value: "25" } });
+    expect(limit.closest("label")).toHaveTextContent(
+      "instead of the table's 120",
+    );
+    fireEvent.change(screen.getByLabelText("Bots"), { target: { value: "3" } });
+    expect(limit).toHaveValue(25);
+    await act(async () => start.click());
+    await settle();
+    expect(started()[1]).toMatchObject({ turn_cap: 25 });
+    // More than the most a game may ask is that most; an emptied field is the table's again.
+    fireEvent.change(limit, { target: { value: "9999" } });
+    expect(limit).toHaveValue(400);
+    fireEvent.change(limit, { target: { value: "" } });
+    expect(limit).toHaveValue(160);
+    await act(async () => start.click());
+    await settle();
+    expect(started()[2]).not.toHaveProperty("turn_cap");
   });
 
   it("plays by casual rules unless the player chooses others (v0.4.5)", async () => {
@@ -712,16 +755,33 @@ describe("King's Table at the practice table (v0.8.7)", () => {
       screen.getByRole("radio", { name: /^Legacy decks/ }).click(),
     );
     expect(screen.getByLabelText("Your deck")).toHaveValue("own:deck-l");
+    // The house rule's guard (v0.9.7) belongs to the house rule: it is offered only with it.
+    const guard = screen.getByRole("checkbox", {
+      name: /^Generals guard their King/,
+    });
+    expect(guard).toBeDisabled();
+    expect(guard).not.toBeChecked();
     await act(async () =>
       screen.getByRole("checkbox", { name: /^King can attack anyone/ }).click(),
+    );
+    expect(guard).toBeEnabled();
+    expect(guard.closest("label")).toHaveTextContent(
+      "Except the other King, whom a King's creatures may attack only once one of that King's Generals is defeated",
+    );
+    await act(async () => guard.click());
+    expect(guard).toBeChecked();
+    // Six players at 40 turns each (v0.9.7).
+    expect(screen.getByRole("spinbutton", { name: /^Turn limit/ })).toHaveValue(
+      240,
     );
     await act(async () =>
       screen.getByRole("button", { name: "Start the game" }).click(),
     );
     await settle();
-    expect(
-      api.calls.find((c) => c.route === "POST /api/v1/practice-games")!.options,
-    ).toMatchObject({
+    const started = api.calls.filter(
+      (c) => c.route === "POST /api/v1/practice-games",
+    );
+    expect(started[0]!.options).toMatchObject({
       body: {
         format: "kings_table",
         seat: 3,
@@ -732,7 +792,27 @@ describe("King's Table at the practice table (v0.8.7)", () => {
           deck_format: "legacy",
           life: "generals_20_kings_40",
           king_attacks_anyone: true,
+          guarded_kings: true,
         },
+      },
+    });
+    // The house rule off again takes its guard with it.
+    await act(async () =>
+      screen.getByRole("checkbox", { name: /^King can attack anyone/ }).click(),
+    );
+    expect(guard).not.toBeChecked();
+    expect(guard).toBeDisabled();
+    await act(async () =>
+      screen.getByRole("button", { name: "Start the game" }).click(),
+    );
+    await settle();
+    expect(started.length).toBe(1);
+    expect(
+      api.calls.filter((c) => c.route === "POST /api/v1/practice-games")[1]!
+        .options,
+    ).toMatchObject({
+      body: {
+        kings_table: { king_attacks_anyone: false, guarded_kings: false },
       },
     });
   });

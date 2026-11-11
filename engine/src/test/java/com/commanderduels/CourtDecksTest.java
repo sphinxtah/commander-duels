@@ -102,7 +102,9 @@ class CourtDecksTest {
         teamB.add(sphinx);
         teamB.add(liliana);
 
-        var rules = new KingsTableRules(true, KingsTableRules.ALL_40, false);
+        // The court's own settings (v0.9.7: the house rule with its guard), as the content names them.
+        var rules = KingsTableRules.parse(court.getAsJsonObject("court").get("kings_table"));
+        assertEquals(new KingsTableRules(true, KingsTableRules.ALL_40, true, true), rules);
         List<String> fixtures = GameFormat.KINGS_TABLE_COMMANDER.decks();
         List<HumanGameRequest.Seat> seats = new ArrayList<>();
         seats.add(Tables.bot(fixtures.get(0)));

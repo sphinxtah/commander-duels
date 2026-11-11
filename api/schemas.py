@@ -351,6 +351,27 @@ KingsTableLife = Literal["all_20", "all_40", "generals_20_kings_40"]
 KingsTableRole = Literal["king", "general"]
 
 
+# A game's turn limit (v0.9.7, the owner's rule): unless its request names one, 40 turns for each
+# player. The limit counts the game's turns, each player's own in turn order, so a duel stops after
+# 80, a Commander table of three after 120, of four after 160, and King's Table's six after 240.
+# Two-Headed Giant's two teams take their turns together (805), so its 80 turns are 40 for each
+# player. Until v0.9.7 every game stopped after 60 turns, and the most a request could ask was 200.
+TURNS_PER_PLAYER = 40
+MAX_TURN_CAP = 400
+TURN_CAP_TEXT = (
+    "The game's turn limit: it ends with no result at the untap step after this many turns, "
+    "counting every player's. Left out (since v0.9.7): 40 turns for each player, so 80 in a duel "
+    "and in Two-Headed Giant (whose teams take their turns together), 120 or 160 at a Commander "
+    "table of three or four, 240 at King's Table. At most 400 (200 before v0.9.7)."
+)
+
+
+def default_turn_cap(fmt: str, seats: int) -> int:
+    """The turn limit of a game of the format with so many seats, bots included, when nobody
+    named one: 40 turns for each player who takes turns."""
+    return TURNS_PER_PLAYER * (2 if fmt == "two_headed_giant" else seats)
+
+
 class KingsTableSettings(Contract):
     """King's Table's settings (v0.8.7), chosen by the host or the practice player before the
     game and fixed once it starts. The engine takes them as they are."""
@@ -369,6 +390,12 @@ class KingsTableSettings(Contract):
         default=False,
         description="House rule: a King may attack any opponent, not only those in range.",
     )
+    guarded_kings: bool = Field(
+        default=False,
+        description='The house rule\'s guard (v0.9.7, "Generals guard their King"): a King may '
+        "attack the other King only once one of that King's Generals is defeated, and the "
+        "opposing Generals at any time. It changes nothing while king_attacks_anyone is false.",
+    )
 
 
 class KingsTableChange(Contract):
@@ -377,6 +404,7 @@ class KingsTableChange(Contract):
     deck_format: Literal["legacy", "commander"] | None = None
     life: KingsTableLife | None = None
     king_attacks_anyone: bool | None = None
+    guarded_kings: bool | None = None
 
 
 KINGS_TABLE_SEAT_TEXT = (
@@ -470,7 +498,7 @@ class PracticeGameRequest(Contract):
         "engine's fixture decks of the deck format.",
     )
     bot_skill: int = Field(default=4, ge=1, le=6)
-    turn_cap: int = Field(default=60, ge=1, le=200)
+    turn_cap: int | None = Field(default=None, ge=1, le=MAX_TURN_CAP, description=TURN_CAP_TEXT)
     rules: TableRules = Field(
         default_factory=casual,
         description="Which cards the game's own decks may hold by their legality; casual unless "
@@ -511,6 +539,12 @@ class PracticeFormat(Contract):
         description="King's Table (v0.8.8): its fixture decks by the deck format its settings "
         "choose, so each list fits it; null in other formats.",
     )
+    turn_caps: dict[int, int] = Field(
+        default_factory=dict,
+        description="Since v0.9.7: the turn limit a game takes when its request names none, by "
+        "its number of bots: 40 turns for each player (Two-Headed Giant's teams take their turns "
+        "together, so its 80 turns are 40 each).",
+    )
 
 
 class PracticeOptions(Contract):
@@ -518,6 +552,9 @@ class PracticeOptions(Contract):
     deck_lists: bool = Field(description="Whether this account may seat deck lists (cards.any).")
     own_decks: bool = Field(
         default=False, description="Whether this account may play its own decks (decks.edit)."
+    )
+    max_turn_cap: int = Field(
+        default=MAX_TURN_CAP, description="Since v0.9.7: the longest turn limit a game may ask."
     )
 
 

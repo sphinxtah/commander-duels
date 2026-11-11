@@ -85,10 +85,10 @@ final class HumanGame {
     record SeatSettings(int seat, String player, String deck) {}
 
     /** A King's Table game's settings (v0.8.7), as the request named them. */
-    record KingsTableSettings(String deckFormat, String life, boolean kingAttacksAnyone) {
+    record KingsTableSettings(String deckFormat, String life, boolean kingAttacksAnyone, boolean guardedKings) {
         static KingsTableSettings of(KingsTableRules rules) {
-            return rules == null ? null
-                : new KingsTableSettings(rules.deckFormat(), rules.life(), rules.kingAttacksAnyone());
+            return rules == null ? null : new KingsTableSettings(rules.deckFormat(), rules.life(),
+                rules.kingAttacksAnyone(), rules.guardedKings());
         }
     }
 

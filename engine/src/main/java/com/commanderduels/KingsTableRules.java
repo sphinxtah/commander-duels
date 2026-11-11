@@ -8,8 +8,9 @@ import java.util.Set;
 
 /**
  * A King's Table game's settings (v0.8.7), which its host chooses before the game: the deck format
- * all six players use, the starting life, and the house rule "King can attack anyone". All twelve
- * combinations play. See {@link KingsTable} for the rules they set.
+ * all six players use, the starting life, the house rule "King can attack anyone" and, since v0.9.7,
+ * that rule's guard, "Generals guard their King". Every combination plays. See {@link KingsTable}
+ * for the rules they set.
  *
  * <p>The six seats are in the table's circular order: 0 is team A's Left General, 1 team A's King,
  * 2 team A's Right General, 3 team B's Right General, 4 team B's King and 5 team B's Left General.
@@ -19,8 +20,12 @@ import java.util.Set;
  * @param commander         whether the decks are Commander decks (else Legacy)
  * @param life              {@link #ALL_20}, {@link #ALL_40} or {@link #GENERALS_20_KINGS_40}
  * @param kingAttacksAnyone the house rule: a King's creatures may attack any opponent still in the game
+ * @param guardedKings      the house rule's guard (v0.9.7): a King's creatures may attack the other King
+ *                          only once one of that King's Generals is out of the game. It changes nothing
+ *                          with the house rule off, where the Kings meet only after such a loss
  */
-record KingsTableRules(boolean commander, String life, boolean kingAttacksAnyone) implements Serializable {
+record KingsTableRules(boolean commander, String life, boolean kingAttacksAnyone, boolean guardedKings)
+    implements Serializable {
     static final int SEATS = 6;
     static final String ALL_20 = "all_20";
     static final String ALL_40 = "all_40";
@@ -30,12 +35,17 @@ record KingsTableRules(boolean commander, String life, boolean kingAttacksAnyone
     static final String COMMANDER = "commander";
     /** The owner's suggested defaults: Commander decks, 40 life each, the house rule off. */
     static final KingsTableRules DEFAULT = new KingsTableRules(true, ALL_40, false);
-    private static final Set<String> FIELDS = Set.of("deck_format", "life", "king_attacks_anyone");
+    private static final Set<String> FIELDS = Set.of("deck_format", "life", "king_attacks_anyone", "guarded_kings");
 
     KingsTableRules {
         if (!LIFE.contains(life)) {
             throw new IllegalArgumentException("Unknown starting life " + life);
         }
+    }
+
+    /** Settings without the guard, as every game before v0.9.7 had them. */
+    KingsTableRules(boolean commander, String life, boolean kingAttacksAnyone) {
+        this(commander, life, kingAttacksAnyone, false);
     }
 
     /** The two Kings' seats. */
@@ -72,6 +82,7 @@ record KingsTableRules(boolean commander, String life, boolean kingAttacksAnyone
         json.addProperty("deck_format", deckFormat());
         json.addProperty("life", life);
         json.addProperty("king_attacks_anyone", kingAttacksAnyone);
+        json.addProperty("guarded_kings", guardedKings);
         return json;
     }
 
@@ -104,6 +115,10 @@ record KingsTableRules(boolean commander, String life, boolean kingAttacksAnyone
         if (json.has("king_attacks_anyone")) {
             anyone = JsonRequest.bool(json, "king_attacks_anyone");
         }
-        return new KingsTableRules(commander, life, anyone);
+        boolean guarded = DEFAULT.guardedKings;
+        if (json.has("guarded_kings")) {
+            guarded = JsonRequest.bool(json, "guarded_kings");
+        }
+        return new KingsTableRules(commander, life, anyone, guarded);
     }
 }

@@ -887,6 +887,46 @@ def test_limits_and_configuration(database: str) -> None:
         Settings(engine_service_token="short")
 
 
+def test_a_game_takes_forty_turns_for_each_player_unless_told(
+    client: TestClient, engine: FakeEngine
+) -> None:
+    """The owner's default (v0.9.7): 40 turns for each player, counted as the engine counts a
+    game's turns, so a duel stops after 80, a table of three after 120 and of four after 160.
+    Two-Headed Giant's teams take their turns together: its 80 turns are 40 for each player."""
+    ada = Account(client, "ada")
+    options = ada.get("/api/v1/practice-games/options").json()
+    assert options["max_turn_cap"] == 400
+    assert {found["id"]: found["turn_caps"] for found in options["formats"]} == {
+        "legacy": {"1": 80},
+        "commander": {"1": 80, "2": 120, "3": 160},
+        "two_headed_giant": {"3": 80},
+        "kings_table": {"5": 240},
+    }
+    for body, turns in (
+        ({}, 80),
+        ({"format": "commander"}, 160),
+        ({"format": "commander", "bots": [{}, {}]}, 120),
+        ({"format": "commander", "bots": [{}]}, 80),
+        ({"format": "two_headed_giant"}, 80),
+        # A limit the player names is kept, up to the new maximum (200 before).
+        ({"format": "commander", "turn_cap": 33}, 33),
+        ({"turn_cap": 400}, 400),
+    ):
+        created = ada.post("/api/v1/practice-games", body)
+        assert created.status_code == 201, created.text
+        # The engine is told the number, the game keeps it, and so does its request (a rematch
+        # replays it).
+        assert engine.created[-1]["turn_cap"] == turns, body
+        assert created.json()["turn_cap"] == turns, body
+        with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+            game = db.get(Game, uuid.UUID(created.json()["id"]))
+            assert game is not None and game.turn_cap == turns
+            assert game.settings is not None and game.settings["turn_cap"] == turns
+        assert ada.post(f"/api/v1/games/{created.json()['id']}/close").status_code == 200
+    for refused in (0, 401):
+        assert ada.post("/api/v1/practice-games", {"turn_cap": refused}).status_code == 422
+
+
 def test_fixture_decks_are_the_engines() -> None:
     files = {path.stem for path in Path("engine/decks").glob("*.txt")}
     assert {deck for decks in games.FIXTURE_DECKS.values() for deck in decks} == files

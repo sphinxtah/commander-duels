@@ -237,7 +237,7 @@ class Table {
           { seat: VOK, player: "bot", deck: null },
         ],
         skill: 4,
-        turn_cap: 60,
+        turn_cap: 80,
         idle_timeout_seconds: 900,
         spectator_delay_seconds: 0,
       },

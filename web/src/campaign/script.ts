@@ -1920,7 +1920,7 @@ export const STORY: Story = {
       story:
         "The Sphinx kept a court behind his throne, and bound Liliana and Nicol Bolas to it by the names they signed. Beating it breaks the last claim: the court's seats empty, and the gifted decks are yours with his.",
       counterplay:
-        "Kings cannot attack here, so the court falls General by General: break Nicol Bolas or Liliana first and the path to The Sphinx opens. His incarnation returns at each of his upkeeps, so spend removal on it only when it threatens to end the game, and keep your Generals alive: a General out leaves your King open.",
+        "Here a King may attack either opposing General from the start, but the other King only once one of that King's Generals is defeated: break Nicol Bolas or Liliana first and the path to The Sphinx opens. His incarnation returns at each of his upkeeps, so spend removal on it only when it threatens to end the game, and keep your Generals alive: lose one and The Sphinx may attack you.",
       design:
         "A King's Table game (v0.9.6): the player is King A, with friends or bots as Generals; team B is The Sphinx as King and the two Generals he recalled, every one at the highest skill.",
     },
@@ -2344,7 +2344,7 @@ export const STORY: Story = {
       ],
     },
     arrivalTip:
-      "The Sphinx's incarnation starts on the battlefield. Destroyed, it returns at the beginning of his next upkeep, every time. Kings cannot attack: beat his Generals to reach him.",
+      "The Sphinx's incarnation starts on the battlefield. Destroyed, it returns at the beginning of his next upkeep, every time. A King may attack the other King only once one of that King's Generals is defeated: beat Nicol Bolas or Liliana to reach him.",
   },
   tutorial: [
     {
