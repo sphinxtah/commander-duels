@@ -718,11 +718,12 @@ def test_roles_follow_least_privilege_and_players_cannot_administer(
     held = set(promoted.json()["permissions"])
     assert {"games.view_concealed", "chat.read_all", "players.history"} <= held
     assert {"progress.manage", "economy.grant"} <= held
+    # Since v0.9.8 it resets a player's account too (SysOp's alone since v0.4.5).
+    assert "admin.users.reset" in held
     assert not held & {
         "economy.manage",
         "custom_cards.manage",
         "admin.roles.administrator",
-        "admin.users.reset",
         "cards.any",
     }
     # Since v0.8.8 an administrator builds from a library of its own, as a player does.

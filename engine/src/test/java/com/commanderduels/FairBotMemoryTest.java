@@ -14,6 +14,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BooleanSupplier;
 import mage.abilities.Ability;
 import mage.abilities.ActivatedAbility;
+import mage.abilities.TriggeredAbility;
 import mage.abilities.effects.SearchEffect;
 import mage.cards.Card;
 import mage.constants.RangeOfInfluence;
@@ -24,6 +25,7 @@ import mage.game.permanent.Permanent;
 import mage.game.permanent.PermanentCard;
 import mage.game.stack.StackAbility;
 import mage.player.ai.ComputerPlayerControllableProxy;
+import mage.player.ai.SimulatedPlayer2;
 import mage.player.ai.SimulationNode2;
 import mage.players.Player;
 import org.junit.jupiter.api.BeforeAll;
@@ -155,6 +157,48 @@ class FairBotMemoryTest {
         Set<String> names = new TreeSet<>();
         names.add(table.sim().getCard(best.getTargets().get(0)).getName());
         assertEquals(Set.of("Forest"), names, "the first name in order, when every card scores the same");
+    }
+
+    /**
+     * The other place XMage copies the game for every option at once (patch 0017): a triggered
+     * ability with more than one way to choose its targets. Flametongue Kavu's trigger may aim at
+     * any of the creatures on the battlefield; the simulation tries twelve of them at most, spread
+     * over the list, and all of them when there are no more than twelve.
+     */
+    @Test
+    void aTriggersOptionsAreSampledNotAllCopied() throws Exception {
+        assertEquals(12, SimulatedPlayer2.MAX_TRIGGER_OPTIONS);
+        for (int creatures : new int[] {5, 12, 30}) {
+            Game game = LegacyDuel.newGame(10);
+            Match match = LegacyDuel.newMatch("fair bot memory test");
+            var bot = new Counting("Fair");
+            var opponent = new ComputerPlayerControllableProxy("Opponent", RangeOfInfluence.ONE, 1);
+            LegacyDuel.seat(game, match, bot, DeckLists.load(new DeckLists.CustomDeck(
+                List.of(new DeckLists.Entry("Flametongue Kavu", 1), new DeckLists.Entry("Mountain", 59)), List.of())));
+            LegacyDuel.seat(game, match, opponent, DeckLists.load(new DeckLists.CustomDeck(
+                List.of(new DeckLists.Entry("Grizzly Bears", 60)), List.of())));
+            bot.updateRange(game);
+            opponent.updateRange(game);
+            List<Card> bears = opponent.getLibrary().getCards(game).subList(0, creatures);
+            for (Card bear : List.copyOf(bears)) {
+                opponent.getLibrary().remove(bear.getId(), game);
+                game.getBattlefield().addPermanent(new PermanentCard(bear, opponent.getId(), game));
+                game.getState().setZone(bear.getId(), Zone.BATTLEFIELD);
+            }
+            Game sim = bot.createSimulation(game);
+            Card kavu = sim.getPlayer(bot.getId()).getLibrary().getCards(sim).stream()
+                .filter(card -> card.getName().equals("Flametongue Kavu")).findFirst().orElseThrow();
+            TriggeredAbility trigger = kavu.getAbilities(sim).stream()
+                .filter(ability -> ability instanceof TriggeredAbility).map(ability -> (TriggeredAbility) ability)
+                .findFirst().orElseThrow();
+            var node = new SimulationNode2(null, sim, 4, bot.getId());
+            assertTrue(sim.getPlayer(bot.getId()).triggerAbility(trigger, sim));
+            int tried = Math.min(creatures, SimulatedPlayer2.MAX_TRIGGER_OPTIONS);
+            assertEquals(tried, node.getChildren().size(), creatures + " creatures to aim at");
+            Set<UUID> aimedAt = new java.util.HashSet<>();
+            node.getChildren().forEach(child -> aimedAt.addAll(child.getTargets()));
+            assertEquals(tried, aimedAt.size(), "each copy aims at another creature");
+        }
     }
 
     @Test

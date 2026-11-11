@@ -91,15 +91,19 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "players.history",
             "progress.manage",
             "economy.grant",
+            # Since v0.9.8 an administrator resets a player's account to a new one's state (the
+            # owner, 2026-11-11; SysOp's alone since v0.4.5). Never its own, another
+            # administrator's or SysOp's: admin.managed_user, as for every account change.
+            "admin.users.reset",
         }
     ),
 }
 # Held by SysOp alone and grantable to no role, the system-level powers: making or removing
 # administrators, putting any card in the engine's database into its own library or a deck list,
-# uploading the Godlike tier's custom cards, setting the economy's limits and cancelling auctions
-# (economy.manage), and resetting an account to a new one's state (v0.4.5). Until v0.8.9 SysOp
-# alone also saw concealed information in games, set wins, gave tokens and packs, read any chat
-# and any player's history; administrators now do too.
+# uploading the Godlike tier's custom cards, and setting the economy's limits and cancelling
+# auctions (economy.manage). Until v0.8.9 SysOp alone also saw concealed information in games,
+# set wins, gave tokens and packs, read any chat and any player's history; administrators now do
+# too, and since v0.9.8 they reset a player's account to a new one's state (SysOp's since v0.4.5).
 SYSOP_ONLY = ALL_PERMISSIONS - frozenset().union(*ROLE_PERMISSIONS.values())
 
 

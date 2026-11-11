@@ -1,0 +1,69 @@
+A simulation tries at most twelve of a triggered ability's options (Commander Duels v0.9.8). Every
+format.
+
+Reason: the campaign's court ran the engine out of memory (v0.9.7 measured it: one court game in
+six on a 10 GB heap, and every game's peak at or over the limit). A histogram of the live objects
+and a thread dump showed what filled it. When a triggered ability triggers in a simulation and has
+more than one way to choose its targets or modes, SimulatedPlayer2.triggerAbility copies the game
+for every one of them, all before the search scores the first, and adds each copy to the search
+tree. A trigger with two targets among thirty permanents is 870 copies: at the court one search
+held near 900 copies of the game alive, 3 GB of a 3 GB heap, and the same game, seed 14525, died at
+turn 39 here and on GitHub. The loop does not look for the search's interruption either, so a
+search told to stop (its budget, or since v0.9.8 a filling heap) went on copying for seconds and
+was abandoned still holding its copies. The real game never takes a trigger's targets from the
+simulation (XMage's own TODO there says so): the simulation only scores the line that sets the
+trigger off, and a sample of the options does that. So triggerAbility now tries at most
+MAX_TRIGGER_OPTIONS (12) of them, spread evenly over the list in its order, and stops between
+copies when the search is interrupted. With twelve options or fewer nothing changes. The same
+court game then finishes, holding at most 38 copies of the game at once.
+The other fan-out of this kind, a search effect's cards (ComputerPlayer6.resolve), is bounded in
+Commander Duels' own FairBot, which overrides it.
+Upstream: none.
+Remove when: XMage's simulation bounds the options it tries for a triggered ability.
+
+diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/SimulatedPlayer2.java b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/SimulatedPlayer2.java
+index bf8ade55..fec1bba7 100644
+--- a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/SimulatedPlayer2.java
++++ b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/SimulatedPlayer2.java
+@@ -336,14 +336,41 @@ public final class SimulatedPlayer2 extends ComputerPlayer {
+             if (depth == 0) {
+                 return true;
+             }
++            // Commander Duels: at most MAX_TRIGGER_OPTIONS of the options, spread over them. Each is
++            // a copy of the game, and all are made here before the search scores the first: a
++            // trigger with two targets among thirty permanents is 870 copies at once, which no
++            // search finishes and no heap holds. The search is asked to stop between them, too.
++            options = spreadOver(options, MAX_TRIGGER_OPTIONS);
+             logger.debug("simulating -- triggered ability - adding children:" + options.size());
+             for (Ability option : options) {
++                if (!COMPUTER_DISABLE_TIMEOUT_IN_GAME_SIMULATIONS && Thread.currentThread().isInterrupted()) {
++                    break;
++                }
+                 addAbilityNode(parent, option, depth, game);
+             }
+         }
+         return true;
+     }
+ 
++    /**
++     * Commander Duels: how many of a triggered ability's options a simulation tries. The real game
++     * does not take the trigger's targets from the simulation (see the TODO above), which scores
++     * the line that sets the trigger off: a sample of the options is enough for that.
++     */
++    public static final int MAX_TRIGGER_OPTIONS = 12;
++
++    /** At most {@code limit} of the options, evenly spread over the list, in its order. */
++    static <T> List<T> spreadOver(List<T> options, int limit) {
++        if (options.size() <= limit) {
++            return options;
++        }
++        List<T> spread = new ArrayList<>(limit);
++        for (int i = 0; i < limit; i++) {
++            spread.add(options.get((int) ((long) i * options.size() / limit)));
++        }
++        return spread;
++    }
++
+     protected void addAbilityNode(SimulationNode2 parent, Ability ability, int depth, Game game) {
+         Game sim = game.createSimulationForAI();
+         sim.getStack().push(sim, new StackAbility(ability, playerId));

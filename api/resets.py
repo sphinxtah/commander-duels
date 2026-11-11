@@ -42,6 +42,12 @@ from api.tables import open_table_of
 
 # The reason the ledgers' entries give.
 REASON = "Account reset by SysOp"
+# Since v0.9.8 an administrator resets accounts too: the ledgers name which of the two it was.
+ADMIN_REASON = "Account reset by an administrator"
+
+
+def reason_for(actor: User) -> str:
+    return REASON if actor.kind == "sysop" else ADMIN_REASON
 
 
 @dataclass
@@ -132,9 +138,9 @@ def reset_account(db: Session, user: User, actor: User, roster: dict[str, Planes
     user.alliance = user.alliance_since = None
     user.reset_at = now
     user.updated_at = now
-    set_wins(db, user, 0, REASON, actor)
+    set_wins(db, user, 0, reason_for(actor), actor)
     if cleared.tokens != WELCOME:
-        grant(db, user, WELCOME - cleared.tokens, REASON, actor)
+        grant(db, user, WELCOME - cleared.tokens, reason_for(actor), actor)
     db.flush()
     permissions = permissions_for(user, roles_of(db, user))
     refresh_decks(db, user.id, library_of(db, user, permissions, roster))

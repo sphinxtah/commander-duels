@@ -98,7 +98,9 @@ import org.apache.log4j.Logger;
  *       play until the last was scored: hundreds of copies at the campaign's court, and the engine's
  *       heap. The cards are tried one at a time, one for each name ({@link #resolve}), a line that
  *       is not the best is let go as soon as it is scored ({@link #minimaxAB}), and a search ends,
- *       as when its budget runs out, when the heap fills while it runs ({@link #heapFull}).</li>
+ *       as when its budget runs out, when the heap fills while it runs ({@link #heapFull}). XMage
+ *       made the same pile of copies for the options of a triggered ability, near 900 at the
+ *       court; XMage patch 0017 has the simulation try twelve of them at most.</li>
  * </ul>
  *
  * See docs/engine/fair-bots.md for the audit of XMage's AI code behind these changes. Not final

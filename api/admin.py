@@ -335,11 +335,13 @@ def deleted_by(
 async def reset_user(
     user_id: UUID, request: Request, principal: CanResetUsers, db: Db
 ) -> AccountReset:
-    """SysOp resets an account to a new one's state (v0.4.5, api/resets.py), so the setup wizard
-    runs again: its handle, alliance, library and packs are cleared, its decks go to the trash,
-    and its wins and tokens go back to 0 and 1,000; its friends, messages and reports stay.
-    Refused 409 while it plays a game or sits at an open table. The account's game lock is held
-    meanwhile, as for a deletion, so no game of it starts."""
+    """SysOp, and since v0.9.8 an administrator, resets an account to a new one's state (v0.4.5,
+    api/resets.py), so the setup wizard runs again: its handle, alliance, library and packs are
+    cleared, its decks go to the trash, and its wins and tokens go back to 0 and 1,000; its
+    friends, messages and reports stay. Never the caller's own account, SysOp's or a deleted one,
+    and an administrator's only by SysOp (managed_user). Refused 409 while it plays a game or
+    sits at an open table. The account's game lock is held meanwhile, as for a deletion, so no
+    game of it starts."""
     require_recent_sign_in(request, principal)
     user = await run_in_threadpool(managed_user, db, principal, user_id)
     async with hub_of(request).locks[user.id]:

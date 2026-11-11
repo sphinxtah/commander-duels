@@ -28,7 +28,16 @@ from test_tables import deck
 
 from api.config import Settings
 from api.main import create_app
-from api.models import Friendship, LibraryGrant, Pack, TokenEntry, User, UserSession
+from api.models import (
+    AuditEvent,
+    Friendship,
+    LibraryGrant,
+    Pack,
+    RoleGrant,
+    TokenEntry,
+    User,
+    UserSession,
+)
 from catalog import boosters
 
 url = test_progression.url
@@ -289,11 +298,42 @@ def test_who_may_reset_and_when_it_is_refused(client):
         db.execute(update(User).where(User.id == deleted.id).values(status="deleted"))
         db.commit()
 
-    # SysOp's alone: administrators, who delete accounts, may not reset one.
-    refused = ada.send("POST", f"/api/v1/admin/users/{bob.id}/reset")
+    # SysOp's, and since v0.9.8 an administrator's (the owner, 2026-11-11): a moderator and a
+    # player may not.
+    mod, carl = Account(client, "mod"), Account(client, "carl")
+    eve = Account(client, "eve", admin=True)
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        db.add(RoleGrant(user_id=mod.id, role="moderator", granted_at=datetime.now(UTC)))
+        db.commit()
+    for staff in (root, ada):
+        assert "admin.users.reset" in staff.get("/api/v1/me").json()["permissions"]
+    for other in (mod, bob):
+        assert "admin.users.reset" not in other.get("/api/v1/me").json()["permissions"]
+        refused = reset(other, carl)
+        assert (refused.status_code, refused.json()["code"]) == (403, "forbidden")
+
+    # An administrator resets a player's account, and the ledgers say an administrator did.
+    give(root, carl, 250)
+    assert reset(ada, carl).status_code == 200
+    tokens = carl.get("/api/v1/me/tokens").json()
+    assert tokens["balance"] == 1_000
+    assert tokens["entries"][0]["reason"] == "Account reset by an administrator"
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        event = db.scalars(
+            select(AuditEvent)
+            .where(AuditEvent.action == "admin.user_reset", AuditEvent.target_user_id == carl.id)
+            .order_by(AuditEvent.id.desc())
+        ).first()
+        assert event is not None and event.actor_id == ada.id
+
+    # Never its own account, another administrator's or SysOp's: those are SysOp's to change.
+    refused = reset(ada, ada)
+    assert (refused.status_code, refused.json()["code"]) == (409, "self_change")
+    refused = reset(ada, eve)
     assert (refused.status_code, refused.json()["code"]) == (403, "forbidden")
-    assert "admin.users.reset" not in ada.get("/api/v1/me").json()["permissions"]
-    assert "admin.users.reset" in root.get("/api/v1/me").json()["permissions"]
+    assert "administrator" in refused.json()["message"]
+    assert reset(ada, root).status_code == 404
+    assert reset(root, eve).status_code == 200
     assert reset(root, root).status_code == 404
     assert root.send("POST", f"/api/v1/admin/users/{uuid.uuid4()}/reset").status_code == 404
     refused = reset(root, deleted)
