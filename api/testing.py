@@ -88,6 +88,13 @@ class ResultsGrant(Contract):
     )
     against: Literal["bots", "players"] = "bots"
     bot_skill: int = Field(default=4, ge=1, le=6, description="The bots' skill, against bots.")
+    seats: int | None = Field(
+        default=None,
+        ge=2,
+        le=4,
+        description="A Commander table's seats, 2 to 4 (v0.9.7), so a quest for a four-player "
+        "game can be tested; the other formats' tables have one size, and take none.",
+    )
     reason: Reason
 
 
@@ -146,6 +153,12 @@ def grant_results(db: Session, user: User, body: ResultsGrant, actor: User) -> t
     lock_account(db, user.id)
     now = utcnow()
     seats = table_size(body.format)
+    if body.seats is not None and body.seats != seats:
+        if body.format != "commander":
+            raise ApiError(
+                422, "invalid_seats", f"A {body.format} table has {seats} seats, never another."
+            )
+        seats = body.seats
     # A team format's opponents are the other team; otherwise every other seat.
     opponents = seats // 2 if body.format in (teams.FORMAT, kings_table.FORMAT) else seats - 1
     for index in range(body.count):
@@ -211,6 +224,7 @@ def give_results(
             "colors": body.colors,
             "against": body.against,
             "bot_skill": body.bot_skill if body.against == "bots" else None,
+            "seats": body.seats,
             "wins_from": before,
             "wins_to": before + body.count,
             "reason": body.reason,

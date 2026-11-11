@@ -972,6 +972,17 @@ button.life[data-selected] {
 .passiveBots[data-passive-bots="true"] .switch span {
   color: #f0b46a;
 }
+/* A game that no longer counts (v0.9.7): its bots have been passive. */
+.uncounted {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border: 1px solid #f0b46a88;
+  border-radius: 6px;
+  background: #f0b46a1a;
+  color: #f6d7a8;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
 .switch {
   display: flex;
   gap: 10px;

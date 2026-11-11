@@ -18,9 +18,10 @@ export function QuestsPage({
           Quests
         </h1>
         <p>
-          Five quests a day, easiest to hardest, and twenty goals a week, most
-          of them outside the games. Each pays once; finish a whole board for
-          its bonus, which grows each day or week in a row.
+          Five quests a day, from the easiest to the hardest, and twenty goals a
+          week, most of them outside the games. Do them in any order: each
+          counts by itself and pays once. Finish a whole board for its bonus,
+          which grows each day or week in a row.
         </p>
       </header>
       {error && (
@@ -49,9 +50,14 @@ export function QuestsPage({
                 midnight. What you did earlier in the day or week counts.
               </li>
               <li>
+                Quests and goals count in any order: a harder one completes
+                whether or not the easier ones have.
+              </li>
+              <li>
                 Games count from what the server records: practice games against
                 bots and tables alike. Daily quests can all be done against
-                bots.
+                bots. Campaign duels count only for the goals that name the
+                campaign.
               </li>
               <li>
                 Goals outside the games count real exchanges only: an auction

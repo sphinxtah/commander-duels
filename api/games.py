@@ -1474,6 +1474,7 @@ def summary_of(
         match=match_ref(db, game),
         kings_table=kings,
         passive_bots=(game.bots_passive if passive_switchable(game, rows, principal) else None),
+        uncounted=game.passive_bots_used and (your_seat is not None or everything),
         inspectable=everything,
         campaign=(
             CampaignRef(

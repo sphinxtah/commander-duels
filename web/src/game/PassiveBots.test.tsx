@@ -26,6 +26,24 @@ describe("SysOp's passive bots", () => {
     expect(changed.mock.calls[0]![0]).toMatchObject({ passive_bots: true });
   });
 
+  it("warns before use and says so once the game no longer counts", () => {
+    const { rerender } = render(
+      <PassiveBots gameId="g" passive={false} onChange={() => {}} />,
+    );
+    expect(
+      screen.getByText(/Once used, the game counts for nothing/),
+    ).toBeTruthy();
+    expect(screen.getByText(/no quests or achievements/)).toBeTruthy();
+    // Switched on and off again: the game stays uncounted, and the switch says so.
+    rerender(
+      <PassiveBots gameId="g" passive={false} uncounted onChange={() => {}} />,
+    );
+    expect(screen.getByText(/This game no longer counts/)).toBeTruthy();
+    expect(
+      screen.getByText(/no progress on quests or achievements/),
+    ).toBeTruthy();
+  });
+
   it("says why when the server refuses", async () => {
     vi.spyOn(client, "PUT").mockResolvedValue(
       reply(409, {

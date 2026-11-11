@@ -6221,6 +6221,12 @@
             "title": "Turn Cap",
             "type": "integer"
           },
+          "uncounted": {
+            "default": false,
+            "description": "Whether this game's bots have been passive at any point (v0.9.7), so its end pays nothing and counts for nothing: no win, no tokens, no quest or achievement, and no entry in the history. Told to the game's own player and to a viewer who sees its concealed information; false for everyone else.",
+            "title": "Uncounted",
+            "type": "boolean"
+          },
           "your_seat": {
             "anyOf": [
               {
@@ -10030,7 +10036,7 @@
                 "type": "null"
               }
             ],
-            "description": "A daily quest's step, 1 (easiest) to 5 (hardest).",
+            "description": "A daily quest's difficulty, 1 (easiest) to 5 (hardest), which sets its tokens. No order: the day's five complete in any order, each by itself (v0.9.7).",
             "title": "Step"
           },
           "target": {
@@ -11730,6 +11736,20 @@
             "minLength": 3,
             "title": "Reason",
             "type": "string"
+          },
+          "seats": {
+            "anyOf": [
+              {
+                "maximum": 4.0,
+                "minimum": 2.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Commander table's seats, 2 to 4 (v0.9.7), so a quest for a four-player game can be tested; the other formats' tables have one size, and take none.",
+            "title": "Seats"
           }
         },
         "required": [

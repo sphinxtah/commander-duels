@@ -106,9 +106,11 @@ def played(
     kind: str = "practice",
     revisions: dict[int, UUID] | None = None,
     left: dict[int, str] | None = None,
+    passive: bool = False,
 ) -> UUID:
     """A game recorded as the API records an engine's result: per seat a player's account (or
-    None for a bot), with its deck's name when given."""
+    None for a bot), with its deck's name when given. `passive`: its bots were passive at some
+    point (an administrator's testing switch), so its end counts for nothing."""
     game_id = uuid4()
     database_ = client.app.state.database  # type: ignore[attr-defined]
     owners = [seat[0] if isinstance(seat, tuple) else seat for seat in seats]
@@ -123,6 +125,7 @@ def played(
                 created_at=utcnow() - timedelta(minutes=12),
                 bot_skill=skill,
                 turn_cap=60,
+                passive_bots_used=passive,
             )
         )
         db.flush()
@@ -580,6 +583,71 @@ def test_a_loss_counts_for_games_played(client, monkeypatch):
     played(client, [ada.id, None], completed(1))
     shown = ada.get("/api/v1/me/quests").json()["daily"]["quests"]
     assert shown[0]["completed_at"] is not None and shown[1]["progress"] == 0
+
+
+OWNERS_DAY = (
+    "d1-colour-black",
+    "d2-two-headed",
+    "d3-play-5",
+    "d4-commander-3",
+    "d5-four-players",
+)
+
+
+def test_the_days_quests_complete_in_any_order(client, monkeypatch):
+    """The owner's report (v0.9.7): the day's five are no steps to climb. The hardest completes
+    and pays while the four before it are open, and an easier one completes after it."""
+    monkeypatch.setattr(quests, "choose_daily", daily(*OWNERS_DAY))
+    ada = Account(client, "ada")
+    day = ada.get("/api/v1/me/quests").json()["daily"]["period"]
+    won(client, ada, bots=3, skill=6)
+    shown = ada.get("/api/v1/me/quests").json()["daily"]
+    assert [quest["completed_at"] is not None for quest in shown["quests"]] == [
+        False,
+        False,
+        False,
+        False,
+        True,
+    ]
+    assert [quest["progress"] for quest in shown["quests"]] == [0, 0, 1, 1, 1]
+    assert shown["completed_at"] is None
+    name = "Win a four-player Commander game against skill-6 bots"
+    assert entries(client, ada.id, "quest") == [
+        (750, f"daily:{ada.id}:{day}:d5-four-players", name)
+    ]
+    # The third after the fifth, the second and the first still open.
+    for _ in range(4):
+        played(client, [ada.id, None], completed(1))
+    shown = ada.get("/api/v1/me/quests").json()["daily"]["quests"]
+    assert [quest["completed_at"] is not None for quest in shown] == [
+        False,
+        False,
+        True,
+        False,
+        True,
+    ]
+
+
+def test_a_game_with_passive_bots_counts_for_no_quest_and_says_so(client, monkeypatch):
+    """What the owner met (v0.9.7): a game whose bots were passive, an administrator's testing
+    switch, gives no result, so it completes no quest; the game says it is not counted, to its
+    own player only."""
+    monkeypatch.setattr(quests, "choose_daily", daily(*OWNERS_DAY))
+    ada, bob = Account(client, "ada"), Account(client, "bob")
+    ada.get("/api/v1/me/quests")
+    game = won(client, ada, bots=3, skill=6, passive=True)
+    assert results(client, game) == []
+    shown = ada.get("/api/v1/me/quests").json()
+    assert shown["paid"] == 0
+    assert [quest["progress"] for quest in shown["daily"]["quests"]] == [0, 0, 0, 0, 0]
+    assert entries(client, ada.id, "quest") == []
+    assert ada.get(f"/api/v1/games/{game}").json()["game"]["uncounted"] is True
+    # The same game without the switch counts, and says nothing.
+    counted = won(client, ada, bots=3, skill=6)
+    assert ada.get(f"/api/v1/games/{counted}").json()["game"]["uncounted"] is False
+    assert ada.get("/api/v1/me/quests").json()["daily"]["quests"][4]["completed_at"] is not None
+    # Another player is told nothing about a game that is not theirs to see.
+    assert bob.get(f"/api/v1/games/{game}").status_code in (403, 404)
 
 
 def test_the_old_quests_stay_and_the_board_replaces_them(client):

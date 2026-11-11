@@ -110,6 +110,9 @@ LESSON_KEY = r"^T(0[1-9]|1[0-2])$"
 SPOILS_POLICY = "campaign-v1"
 # The handoff's optional post-campaign challenge (v0.9.3): the finale played again once it is won,
 # with the tutorial's aids off, for a cosmetic badge of its own. It never replaces the ending.
+# How a friend leaves the court (api/games.py LEFT_REASONS): by conceding, or voted out while
+# away. A General eliminated in play has not left.
+LEFT_THE_COURT = ("conceded", "removed")
 CHALLENGE_NAME = "Apex Unbound"
 CHALLENGE_REWARD = "badge:apex-unbound"
 Tier = Literal["bronze", "silver", "gold", "platinum", "mythic", "godlike"]
@@ -836,10 +839,16 @@ def game_ended(
             progress.updated_at = utcnow()
         return
     won = [number]
+    paying = [number]
     if court is not None and flight is not None and number == court:
         # The court won: ward 14 too, when the run began there.
         if flight not in progress.completed:
             won = [flight, number]
+        # Ward 14's spoils and chapter are the court's to give, whenever they are still owed
+        # (v0.9.7): a court first won without payouts (passive bots), or before the finale's
+        # commander had its custom card, records ward 14 as won and gives none of them, and ward
+        # 14 played again gives nothing. Each is keyed, so a court won again pays nothing twice.
+        paying = [flight, number]
         progress.fled_at = None
     for each in won:
         if each not in progress.completed:
@@ -850,7 +859,7 @@ def game_ended(
     progress.updated_at = utcnow()
     if not payouts:
         return
-    for each in won:
+    for each in paying:
         encounter = campaign.encounter(each)
         if encounter.court is not None:
             if reward(db, user.id, campaign, progress, f"spoils:{each:02d}", game.id):
@@ -860,7 +869,7 @@ def game_ended(
             win_spoils(db, game, link, user, campaign, progress, encounter, content_dir)
     done = set(progress.completed)
     for chapter in campaign.chapters:
-        if any(each in chapter.encounters for each in won) and all(
+        if any(each in chapter.encounters for each in paying) and all(
             n in done for n in chapter.encounters
         ):
             for id_, _ in chapter.rewards:
@@ -880,6 +889,9 @@ def win_spoils(
     """A warden's spoils for a first win, once. The Sphinx's (ward 14) from the court's game since
     v0.9.6: his deck as the court served it, his commander as the finale's."""
     number = encounter.number
+    if f"spoils:{number:02d}" in earned(db, user.id, campaign, progress):
+        # Given already (a court won again, or ward 14 won before the court existed).
+        return
     court = campaign.encounter(campaign.court).court if campaign.court is not None else None
     seat = court.king_seat if court is not None and link.encounter == campaign.court else None
     served = served_list(db, game, seat)
@@ -952,9 +964,11 @@ def give_court_spoils(
 def pay_helpers(
     db: Session, game: Game, link: CampaignGame, encounter: Encounter, campaign: Campaign
 ) -> None:
-    """The friends who helped win the court (v0.9.6): each player seated with the winner who played
-    to the end and is their friend is paid once, ever, per player and friend, whatever later wins
-    or resets: the key names only the two accounts."""
+    """The friends who helped win the court (v0.9.6): each player seated with the winner who did
+    not leave and is their friend is paid once, ever, per player and friend, whatever later wins
+    or resets: the key names only the two accounts. A friend who conceded or was voted out left.
+    One the court eliminated in play did not (v0.9.7): at King's Table a team wins together, a
+    General out before the end too, as the results and the pay of any other table have it."""
     court = encounter.court
     if court is None or court.helper_tokens <= 0:
         return
@@ -967,7 +981,7 @@ def pay_helpers(
         select(GameSeat).where(GameSeat.game_id == game.id, GameSeat.user_id.is_not(None))
     ):
         helper = row.user_id
-        if helper is None or helper == link.user_id or row.left_reason is not None:
+        if helper is None or helper == link.user_id or row.left_reason in LEFT_THE_COURT:
             continue
         if helper not in friends:
             continue

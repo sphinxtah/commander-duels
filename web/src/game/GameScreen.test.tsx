@@ -695,6 +695,102 @@ describe("a human table's game (v0.4.0)", () => {
   });
 });
 
+describe("a game played with passive bots (v0.9.7)", () => {
+  it("says on its result that it counts for nothing", async () => {
+    const { client } = await import("../api");
+    const get = vi.mocked(client.GET);
+    const original = get.getMockImplementation()!;
+    const result = {
+      kind: "completed",
+      winner_seat: 0,
+      draw: false,
+      conceded_seats: [],
+      turns: 9,
+    };
+    let finished = false;
+    get.mockImplementation((async (path: string) =>
+      path.endsWith("/rematch")
+        ? { data: undefined }
+        : {
+            data: {
+              game: {
+                id: "g1",
+                kind: "practice",
+                format: "commander",
+                status: finished ? "finished" : "active",
+                seats: [
+                  {
+                    seat: 0,
+                    player: "human",
+                    handle: "alice",
+                    portrait: null,
+                    deck: "Red deck",
+                    left: null,
+                  },
+                  {
+                    seat: 1,
+                    player: "bot",
+                    handle: null,
+                    portrait: null,
+                    deck: null,
+                    left: null,
+                  },
+                ],
+                your_seat: 0,
+                bot_skill: 6,
+                turn_cap: 60,
+                created_at: "2026-11-10T10:00:00Z",
+                finished_at: finished ? "2026-11-10T10:30:00Z" : null,
+                result: finished ? result : null,
+                // No win, so no tokens: the bots were passive at some point.
+                tokens: null,
+                uncounted: true,
+              },
+              snapshot: null,
+            },
+          }) as never);
+    try {
+      render(<GameScreen gameId="g1" me={null} />);
+      const socket = FakeSocket.made[0];
+      act(() => {
+        socket.accept();
+        socket.deliver(welcome(0, false));
+        socket.deliver({
+          type: "lease",
+          role: "controller",
+          controlled: true,
+          reason: "granted",
+        });
+        socket.deliver({
+          type: "snapshot",
+          snapshot: snapshot(5, priority("A")),
+        });
+      });
+      expect(screen.queryByText(/Passive bots were used/)).toBeNull();
+      finished = true;
+      act(() =>
+        socket.deliver({
+          type: "snapshot",
+          snapshot: {
+            ...snapshot(6, null),
+            status: "finished",
+            result: { ...result, error: null },
+          },
+        }),
+      );
+      await waitFor(() =>
+        expect(
+          screen.getAllByText(
+            /Passive bots were used, so this game counts for nothing: no win, no tokens, no quest or achievement/,
+          ),
+        ).not.toHaveLength(0),
+      );
+    } finally {
+      get.mockImplementation(original);
+    }
+  });
+});
+
 describe("a best-of-three match's game (v0.5.0)", () => {
   it("shows the score, concedes the match apart from the game, and leads to sideboarding", async () => {
     const { client } = await import("../api");

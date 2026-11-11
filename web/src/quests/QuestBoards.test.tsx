@@ -60,7 +60,9 @@ describe("the quest boards", () => {
     expect(today.textContent).toContain("1 of 5 done");
     expect(within(today).getByText(/Finish all 5 for/)).toBeTruthy();
     expect(within(today).getByText("Complete, paid")).toBeTruthy();
-    expect(within(today).getByText("Step 5")).toBeTruthy();
+    // Never "Step 5" (v0.9.7): the five are no steps, and complete in any order.
+    expect(within(today).getByText("Quest 5")).toBeTruthy();
+    expect(today.textContent).not.toContain("Step");
     const week = screen.getByRole("link", { name: /This week's goals/ });
     expect(week.getAttribute("href")).toBe("#quests");
     expect(week.textContent).toContain("2 weeks in a row");
@@ -79,6 +81,33 @@ describe("the quest boards", () => {
       0,
     );
     expect(within(week).getAllByText("Hard")).toHaveLength(5);
+    expect(screen.getByText(/Do them in any order/)).toBeTruthy();
+  });
+
+  it("show a harder quest complete while the easier ones are open", async () => {
+    const five = board().quests;
+    const shown = questBoards({
+      daily: board({
+        quests: [
+          ...five.slice(0, 4),
+          { ...five[4]!, completed_at: "2026-11-10T18:00:00Z", progress: 1 },
+        ],
+      }),
+    });
+    vi.spyOn(client, "GET").mockResolvedValue(ok(shown));
+    render(<QuestsPanel />);
+    await settle();
+    const today = screen.getByRole("region", { name: "Today's quests" });
+    const cards = within(today).getAllByRole("listitem");
+    expect(cards.map((card) => card.hasAttribute("data-done"))).toEqual([
+      false,
+      false,
+      false,
+      false,
+      true,
+    ]);
+    expect(within(cards[4]!).getByText("Complete, paid")).toBeTruthy();
+    expect(today.textContent).toContain("1 of 5 done");
   });
 
   it("show nothing to an account given no quests", async () => {

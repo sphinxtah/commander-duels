@@ -5962,6 +5962,12 @@ export interface components {
             tokens?: number | null;
             /** Turn Cap */
             turn_cap: number;
+            /**
+             * Uncounted
+             * @description Whether this game's bots have been passive at any point (v0.9.7), so its end pays nothing and counts for nothing: no win, no tokens, no quest or achievement, and no entry in the history. Told to the game's own player and to a viewer who sees its concealed information; false for everyone else.
+             * @default false
+             */
+            uncounted: boolean;
             /** Your Seat */
             your_seat: number | null;
         };
@@ -7495,7 +7501,7 @@ export interface components {
             slot: number;
             /**
              * Step
-             * @description A daily quest's step, 1 (easiest) to 5 (hardest).
+             * @description A daily quest's difficulty, 1 (easiest) to 5 (hardest), which sets its tokens. No order: the day's five complete in any order, each by itself (v0.9.7).
              */
             step?: number | null;
             /**
@@ -8208,6 +8214,11 @@ export interface components {
             format: "commander" | "legacy" | "two_headed_giant" | "kings_table";
             /** Reason */
             reason: string;
+            /**
+             * Seats
+             * @description A Commander table's seats, 2 to 4 (v0.9.7), so a quest for a four-player game can be tested; the other formats' tables have one size, and take none.
+             */
+            seats?: number | null;
         };
         /** ResultsGranted */
         ResultsGranted: {

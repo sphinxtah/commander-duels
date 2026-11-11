@@ -151,6 +151,8 @@ function GrantResults({ userId, subject, own, onWins, onCancel }: Props) {
   const [colors, setColors] = useState<string[]>([]);
   const [against, setAgainst] = useState<"bots" | "players">("bots");
   const [skill, setSkill] = useState("4");
+  // A Commander table's size (v0.9.7), for the quests that ask for a four-player game.
+  const [seats, setSeats] = useState("2");
   return (
     <Grant
       label={own ? "Grant yourself wins" : `Grant wins to ${subject}`}
@@ -176,6 +178,7 @@ function GrantResults({ userId, subject, own, onWins, onCancel }: Props) {
                 ),
                 against,
                 bot_skill: Number(skill),
+                seats: format === "commander" ? Number(seats) : null,
                 reason,
               },
             },
@@ -204,6 +207,21 @@ function GrantResults({ userId, subject, own, onWins, onCancel }: Props) {
           ))}
         </select>
       </label>
+      {format === "commander" && (
+        <label className={account.field}>
+          <span>Players at the table</span>
+          <select
+            value={seats}
+            onChange={(event) => setSeats(event.target.value)}
+          >
+            {[2, 3, 4].map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label className={account.field}>
         <span>Wins (1–100)</span>
         <input

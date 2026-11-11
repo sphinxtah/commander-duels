@@ -11,6 +11,7 @@ alone; Apex Unbound is the same dual level."""
 import shutil
 import uuid
 from collections.abc import Iterator
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
 
@@ -23,8 +24,8 @@ from catalog_fixtures import bulk, engine_list, import_bulk
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select, update
 from sqlalchemy.orm import Session
-from test_kings_table import KingsEngine
-from test_tables import Account, deck, served, until_finished
+from test_kings_table import KingsEngine, until_left
+from test_tables import Account, concede, deck, left_reason, opened, served, until_finished
 
 from api import campaign
 from api.models import (
@@ -32,6 +33,7 @@ from api.models import (
     CampaignProgress,
     CampaignReward,
     Deck,
+    Game,
     PlayerResult,
     ProgressEntry,
     TokenEntry,
@@ -157,6 +159,10 @@ def campaign_tokens(client: TestClient, account: Account) -> list[int]:
                 )
             )
         )
+
+
+# What winning ward 14 gave while it was the finale: its seal, its spoils and its chapter.
+THRONE = ("seal:14", "spoils:14", "title:concordance-breaker", "card_back:fractured-throne")
 
 
 def befriend(one: Account, other: Account) -> None:
@@ -294,10 +300,21 @@ def test_the_incarnation_takes_the_court_with_the_owners_content(
 
 
 def test_a_player_who_won_ward_14_before_plays_the_court_alone(
-    client: TestClient, engine: CourtEngine
+    client: TestClient, engine: CourtEngine, court_content: Path
 ) -> None:
     ada = Account(client, "ada", admin=True)
     unlock(client, ada, 14, completed=[*range(1, 15)])
+    # Ward 14 was won when it was the finale: its seal, its spoils and the Throne's chapter are
+    # theirs already.
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        progress = db.scalars(
+            select(CampaignProgress).where(CampaignProgress.user_id == ada.id)
+        ).one()
+        installed = campaign.campaign_in(str(court_content))
+        assert installed is not None
+        for name in THRONE:
+            assert campaign.reward(db, ada.id, installed, progress, name, None)
+        db.commit()
     after = state(ada)
     statuses = {e["number"]: e["status"] for e in after["encounters"]}
     assert (statuses[14], statuses[15]) == ("won", "open")
@@ -309,10 +326,14 @@ def test_a_player_who_won_ward_14_before_plays_the_court_alone(
     summary = court(ada)
     engine.win(summary["id"], 0)
     until_finished(ada, summary["id"])
+    # The court's own rewards; nothing of ward 14's is given twice.
     assert rewards(client, ada) == sorted(
-        ["seal:15", "spoils:15", "title:courtbreaker", "card_back:unbound-court"]
+        [*THRONE, "seal:15", "spoils:15", "title:courtbreaker", "card_back:unbound-court"]
     )
     assert campaign_tokens(client, ada) == [16384000]
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        titles = sorted(db.scalars(select(Deck.title).where(Deck.owner_id == ada.id)))
+        assert titles == ["Liliana's Gift", "Nicol Bolas's Gift"]
 
 
 def test_friends_help_at_the_court_and_are_paid_once(
@@ -391,6 +412,105 @@ def test_friends_help_at_the_court_and_are_paid_once(
     engine.win(game_id, 0)
     until_finished(ada, game_id)
     assert campaign_tokens(client, bob) == [10000]
+
+
+def test_spoils_a_court_win_did_not_pay_come_with_the_next_one(
+    client: TestClient, engine: CourtEngine
+) -> None:
+    """v0.9.7: a court first won with passive bots moves the campaign on and pays nothing; the
+    next court won without them pays both wards. Until v0.9.7 ward 14's spoils were then lost for
+    good: the run paid ward 14 only while ward 14 was not yet among the wards won."""
+    ada = Account(client, "ada", admin=True)
+    unlock(client, ada, 14)
+    flee(client, engine, ada)
+    summary = court(ada)
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        db.execute(
+            update(Game).where(Game.id == uuid.UUID(summary["id"])).values(passive_bots_used=True)
+        )
+        db.commit()
+    engine.win(summary["id"], 0)
+    assert until_finished(ada, summary["id"])["uncounted"] is True
+    assert state(ada)["progress"]["completed"] == [14, 15]
+    assert rewards(client, ada) == ["seal:14", "seal:15"]
+    assert campaign_tokens(client, ada) == []
+    spoils = {e["number"]: e["spoils"]["earned"] for e in state(ada)["encounters"]}
+    assert (spoils[14], spoils[15]) == (False, False)
+
+    # Ward 14 again changes nothing: its spoils are the court's to give.
+    replay = start(ada, 14)
+    engine.finish(replay.json()["id"], won(0))
+    until_finished(ada, replay.json()["id"])
+    assert campaign_tokens(client, ada) == []
+
+    again = court(ada)
+    engine.win(again["id"], 0)
+    until_finished(ada, again["id"])
+    assert campaign_tokens(client, ada) == [8192000, 16384000]
+    assert rewards(client, ada) == sorted(
+        [
+            "seal:14",
+            "spoils:14",
+            "title:concordance-breaker",
+            "card_back:fractured-throne",
+            "seal:15",
+            "spoils:15",
+            "title:courtbreaker",
+            "card_back:unbound-court",
+        ]
+    )
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        titles = sorted(db.scalars(select(Deck.title).where(Deck.owner_id == ada.id)))
+        assert titles == ["Liliana's Gift", "Nicol Bolas's Gift", "The Sphinx's Deck"]
+    # And once more: nothing twice.
+    third = court(ada)
+    engine.win(third["id"], 0)
+    until_finished(ada, third["id"])
+    assert campaign_tokens(client, ada) == [8192000, 16384000]
+
+
+def test_a_friend_eliminated_at_a_won_court_is_paid_and_one_who_left_is_not(
+    client: TestClient, engine: CourtEngine
+) -> None:
+    """v0.9.7: at King's Table a team wins together, a General out before the end too, so a
+    friend the court's bots eliminated helped win it and is paid; one who conceded left."""
+    ada, bob, cid = (Account(client, name, admin=True) for name in ("ada", "bob", "cid"))
+    befriend(ada, bob)
+    befriend(ada, cid)
+    unlock(client, ada, 15, completed=[*range(1, 15)])
+    mine = deck(ada, client, "commander", "Ada's Commander")
+    decks = {
+        bob: deck(bob, client, "commander", "Bob's Commander"),
+        cid: deck(cid, client, "commander", "Cid's Commander"),
+    }
+    table = ada.send(
+        "POST",
+        "/api/v1/campaign/encounters/15/court",
+        {"deck_id": mine, "friends": [str(bob.id), str(cid.id)]},
+    )
+    assert table.status_code == 201, table.text
+    code = table.json()["code"]
+    for friend, seat in ((bob, 0), (cid, 2)):
+        joined = friend.send(
+            "POST", f"/api/v1/tables/{code}/join", {"deck_id": decks[friend], "seat": seat}
+        )
+        assert joined.status_code == 200, joined.text
+        friend.send("PATCH", f"/api/v1/tables/{code}/seat", {"ready": True})
+    game_id = ada.send("POST", f"/api/v1/tables/{code}/start", {}).json()["game_id"]
+    # Bob is eliminated in play; Cid concedes. Then King A's team wins.
+    engine.eliminate(game_id, 0)
+    until_left(client, bob)
+    with ExitStack() as stack:
+        assert concede(opened(cid, game_id, [], stack), game_id)["status"] == 200
+    assert left_reason(client, cid) == "conceded"
+    engine.win(game_id, 0)
+    until_finished(ada, game_id)
+    assert campaign_tokens(client, bob) == [10000]
+    assert campaign_tokens(client, cid) == []
+    # The court is the campaign's to play again: no rematch is offered, to its player or a friend.
+    for account in (ada, bob):
+        offer = account.get(f"/api/v1/games/{game_id}/rematch").json()
+        assert offer["can_offer"] is False, offer
 
 
 def test_apex_unbound_is_wards_14_and_15_as_one_run(

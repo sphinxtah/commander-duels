@@ -231,6 +231,9 @@ def view_of(db: Session, game: Game, principal: Principal) -> RematchView:
         and rematch is None
         and not match_goes_on(db, game)
         and (game.settings is not None if game.kind == "practice" else asked and len(seated) > 1)
+        # A campaign game is played again from the campaign (v0.9.7: the court's friends at its
+        # table were offered a rematch the route then refused).
+        and db.get(CampaignGame, game.id) is None
     )
     declined = db.get(User, rematch.declined_by) if rematch and rematch.declined_by else None
     offered = db.get(User, rematch.proposed_by) if rematch else None

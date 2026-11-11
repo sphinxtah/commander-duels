@@ -143,6 +143,32 @@ def test_team_formats_count_the_other_team_as_opponents(client: TestClient, app:
     assert root.post(f"/api/v1/admin/users/{ada.id}/results", bad).status_code == 422
 
 
+def test_a_commander_grant_names_its_tables_size(client: TestClient, app: FastAPI) -> None:
+    """v0.9.7: a granted Commander win may be a three- or four-player game's, so the quests that
+    ask for a four-player game can be tested; the other formats' tables have one size."""
+    root = Account(client, "sysop", kind="sysop")
+    ada = Account(client, "ada")
+    body = {"format": "commander", "count": 1, "bot_skill": 6, "seats": 4, "reason": "A big table"}
+    assert root.post(f"/api/v1/admin/users/{ada.id}/results", body).status_code == 201
+    with Session(app.state.database) as db:
+        row = db.scalars(select(PlayerResult).where(PlayerResult.user_id == ada.id)).one()
+        assert (row.seats, row.bots, row.bot_skill, row.players) == (4, 3, 6, 0)
+    assert audited(app, "testing.results_granted")[0]["seats"] == 4
+    # Two-Headed Giant's four seats are its own; another size is refused, and nothing is written.
+    giants = {"format": "two_headed_giant", "count": 1, "seats": 4, "reason": "Its own size"}
+    assert root.post(f"/api/v1/admin/users/{ada.id}/results", giants).status_code == 201
+    for fmt in ("legacy", "two_headed_giant", "kings_table"):
+        wrong = {"format": fmt, "count": 1, "seats": 3, "reason": "Not that size"}
+        refused = root.post(f"/api/v1/admin/users/{ada.id}/results", wrong)
+        assert (refused.status_code, refused.json()["code"]) == (422, "invalid_seats")
+    assert (
+        root.post(f"/api/v1/admin/users/{ada.id}/results", {**body, "seats": 5}).status_code == 422
+    )
+    with Session(app.state.database) as db:
+        count = select(func.count()).select_from(PlayerResult)
+        assert db.scalar(count.where(PlayerResult.user_id == ada.id)) == 2
+
+
 def test_sysop_grants_cards_to_a_library(
     client: TestClient, app: FastAPI, database: str, tmp_path: Path
 ) -> None:

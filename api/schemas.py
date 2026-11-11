@@ -663,6 +663,13 @@ class GameSummary(Contract):
         "viewer may not switch them: one that is not their own running practice or campaign "
         "game with them its only human seat.",
     )
+    uncounted: bool = Field(
+        default=False,
+        description="Whether this game's bots have been passive at any point (v0.9.7), so its end "
+        "pays nothing and counts for nothing: no win, no tokens, no quest or achievement, and no "
+        "entry in the history. Told to the game's own player and to a viewer who sees its "
+        "concealed information; false for everyone else.",
+    )
     inspectable: bool = Field(
         default=False,
         description="Whether the viewer sees this game's concealed information, every hand and "

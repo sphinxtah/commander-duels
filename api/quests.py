@@ -4,9 +4,11 @@ swap (quests-v1); the owner's decisions for the boards are in docs/plans/0.9.5.m
 docs/quests.md describes them for players and staff.
 
 - **The pools** are in api/quest_pool.py. A daily quest asks for wins (or games played) and its
-  slot is its step: the first is the easiest, the fifth the hardest, each paying its step's
-  tokens. A weekly goal is a family's variant at a tier; a week draws twenty families, six from the
-  games and fourteen from outside them.
+  slot is its difficulty (`step` in the code and the contract): the first is the easiest, the
+  fifth the hardest, each paying its difficulty's tokens. The five are no steps to climb: each is
+  judged by itself, so they complete in any order (v0.9.7: the screens say "Quest 5", not
+  "Step 5"). A weekly goal is a family's variant at a tier; a week draws twenty families, six
+  from the games and fourteen from outside them.
 - **The periods** are Arizona's (api/economy.py): the day from midnight, the week from Sunday's
   midnight (api/sales.py, as the weekly sale's). A board is drawn the first time the account asks
   for its quests in the period, and stays the same all period: there is no swap. What happened
@@ -25,6 +27,9 @@ docs/quests.md describes them for players and staff.
   another account's auction bid on, a pack bought with tokens, a deck legal and complete that
   lasted a day, a sleeve still kept. Nothing a player gives themselves counts.
 - **After a reset** (users.reset_at) the boards are drawn again, and count only what came since.
+- **What never counts.** A game whose bots were passive (an administrator's testing switch,
+  api/games.py) writes no result, so it completes no quest; since v0.9.7 the game says so
+  (GameSummary.uncounted). A campaign duel writes none either: only campaign_wins reads duels.
 """
 
 import random
@@ -128,7 +133,9 @@ class QuestView(Contract):
     progress: int = Field(description="Counted so far, at most the target.")
     completed_at: datetime | None
     step: int | None = Field(
-        default=None, description="A daily quest's step, 1 (easiest) to 5 (hardest)."
+        default=None,
+        description="A daily quest's difficulty, 1 (easiest) to 5 (hardest), which sets its "
+        "tokens. No order: the day's five complete in any order, each by itself (v0.9.7).",
     )
     tier: Literal["easy", "medium", "hard"] | None = Field(
         default=None, description="A weekly goal's tier."

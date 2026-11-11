@@ -28,9 +28,11 @@ export function doneOf(board: BoardView): number {
   return board.quests.filter((quest) => quest.completed_at).length;
 }
 
-/** What a daily step or a weekly tier is called. */
+/** What a daily quest or a weekly tier is called. A daily quest's number is its difficulty, 1 the
+ * easiest; since v0.9.7 it is "Quest 3", never "Step 3", which read as an order to do them in:
+ * the five complete in any order. */
 export function levelOf(quest: QuestView): string {
-  if (quest.step) return `Step ${quest.step}`;
+  if (quest.step) return `Quest ${quest.step}`;
   if (quest.tier) return quest.tier[0]!.toUpperCase() + quest.tier.slice(1);
   return "";
 }
