@@ -22,17 +22,20 @@ export function resetWords(name: string, reset: AccountReset): string {
 }
 
 /**
- * "Reset account…" (v0.4.5): SysOp gives a player a fresh start, so the setup wizard runs again
- * as a new player sees it. The dialog says what is cleared and what stays, and lets the reset
+ * "Reset account…" (v0.4.5): SysOp, and since v0.9.8 an administrator, gives a player a fresh
+ * start, so the setup wizard runs again as a new player sees it. The dialog says what is cleared and what stays, and lets the reset
  * through only once the account's handle (or RESET, when it has none) is typed, whatever its case,
  * as "Delete account…" does, whose look it shares.
  */
 export function ResetAccount({
   user,
+  by = "SysOp",
   onReset,
   onClose,
 }: {
   user: AdminUser;
+  /** Who resets it, as the ledgers will name them: SysOp, or an administrator (v0.9.8). */
+  by?: "SysOp" | "an administrator";
   onReset: (reset: AccountReset) => void;
   onClose: () => void;
 }) {
@@ -93,7 +96,7 @@ export function ResetAccount({
           <li>Unopened packs, and the list of packs opened.</li>
           <li>
             Wins, back to 0, and tokens, back to the 1,000 every new account
-            gets. The ledgers keep their history, with “Account reset by SysOp”.
+            gets. The ledgers keep their history, with “Account reset by {by}”.
           </li>
           <li>
             Its decks go to the trash, from which the player can restore them.

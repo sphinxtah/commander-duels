@@ -143,7 +143,7 @@ Since v0.4.0 the custom cards are playable in every game, practice games and hum
 | `GET /api/v1/planeswalkers/{id}/cards` | any active account | any Planeswalker's own catalog cards in the game, locked ones too, with the library's copies, for the picker's tile (v0.6.2); none for The Sphinx (`custom: true`); 404 for an ID not in the roster |
 | `GET /api/v1/cards?owned=true` | any active account | search within the library |
 | `POST /api/v1/admin/users/{id}/wins` | SysOp (`progress.manage`) | set an account's wins, with a reason |
-| `POST /api/v1/admin/users/{id}/reset` | SysOp (`admin.users.reset`) | reset an account to a new one's state (v0.4.5, [identity](identity.md#resetting-an-account-v045)) |
+| `POST /api/v1/admin/users/{id}/reset` | SysOp, and since v0.9.8 administrators (`admin.users.reset`) | reset an account to a new one's state (v0.4.5, [identity](identity.md#resetting-an-account-v045)) |
 | `GET`, `POST /api/v1/admin/custom-cards`, `DELETE /api/v1/admin/custom-cards/{id}` | SysOp (`custom_cards.manage`) | the custom cards |
 | `GET /api/v1/custom-cards`, `GET /api/v1/custom-cards/{id}/image` | Godlike accounts | the allied Planeswalker's custom cards (v0.4.2), each as decks hold it and with whether the running engine has loaded it (v0.4.0); 404 to everyone else |
 

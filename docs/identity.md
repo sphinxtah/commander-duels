@@ -170,7 +170,7 @@ Every active account is a player. Grants add the other roles. Permissions are ch
 | `reports.manage` (v0.4.1: read [problem reports](reports.md) and set their status) |  |  | ✓ | ✓ |
 | `players.presence` (v0.4.3: every player's real [presence](social.md#presence), appearing offline or not) |  |  | ✓ | ✓ |
 | `chat.read_all` (v0.4.4: read any conversation or table's chat, [SysOp's reader](chat.md#sysops-reader); administrators' since v0.8.9) |  |  | ✓ | ✓ |
-| `admin.users.reset` (v0.4.5: reset an account to a new one's state, [resetting an account](#resetting-an-account-v045)) |  |  |  | ✓ |
+| `admin.users.reset` (v0.4.5: reset an account to a new one's state, [resetting an account](#resetting-an-account-v045); administrators' since v0.9.8) |  |  | ✓ | ✓ |
 | `players.history` (v0.5.0: any player's games one by one, [the match history](quests.md#statistics-and-the-match-history); administrators' since v0.8.9) |  |  | ✓ | ✓ |
 | `economy.grant` (v0.8.9: give and take back tokens, give packs, [tokens](tokens.md)) |  |  | ✓ | ✓ |
 | `economy.manage` (v0.4.0: the economy's limits; cancelling auctions) |  |  |  | ✓ |
@@ -193,7 +193,7 @@ Every active account is a player. Grants add the other roles. Permissions are ch
 **Administrators see the app as SysOp does (v0.8.9).** The owner, 2026-11-06: "Ideally, the Administrator role has all the power of the SysOp, except for the system-level things like custom card adding, and making changes to SysOp account." Settled at the start of v0.8.9 (the owner took the recommended split):
 - **Administrators gain** the eye icon at the table and SysOp's Inspection drawer (every hand and library, audited at each opening) with the passive-bots switch in it, observing and listing every game, reading any chat (`chat.read_all`), any player's history (`players.history`), setting wins and the testing grants (`progress.manage`), and giving tokens and packs (`economy.grant`, split from `economy.manage` in v0.8.9).
 - **Never where it would be cheating.** Concealed information shows to an administrator in a game they do not sit in, or one where they are the only person (against bots); never in a game they play with or against another person (`api/games.py` `concealed_for`): the summary's `inspectable` says which, and the inspection route and socket refuse the rest (403). Their seats are counted for a Two-Headed Giant team's shared cards as any player's.
-- **SysOp's alone, the system-level powers:** custom cards, SysOp's own account, making or removing administrators, the economy's limits and cancelling auctions (`economy.manage`), resetting accounts (`admin.users.reset`), and any card in a deck list or library (`cards.any`, `library.unlimited`: v0.8.8's libraries of their own stay).
+- **SysOp's alone, the system-level powers:** custom cards, SysOp's own account, making or removing administrators, the economy's limits and cancelling auctions (`economy.manage`), and any card in a deck list or library (`cards.any`, `library.unlimited`: v0.8.8's libraries of their own stay).
 - **Print runs.** An administrator's cards come out of a printing's print run as any player's; SysOp's do not ([shop](shop.md#print-runs-v051)).
 - Moderators get none of it.
 
@@ -203,7 +203,7 @@ Every active account is a player. Grants add the other roles. Permissions are ch
   - **Inspection.** SysOp's view of every hand and library, in any running game, audited at every opening.
   - **Any card.** Deck lists naming any card in the engine's card database, on SysOp's practice games.
 - Since v0.4.4 `chat.read_all` is SysOp's alone too: it reads any conversation between friends and any table's chat, allies-only messages included, and every reading is audited ([chat](chat.md#sysops-reader)). Administrators read a chat message only when a player reports it.
-- Since v0.4.5 `admin.users.reset` is SysOp's alone: it resets an account to a new one's state, so the setup wizard runs again ([resetting an account](#resetting-an-account-v045)). Administrators, who delete accounts, cannot reset one.
+- From v0.4.5 to v0.9.7 `admin.users.reset` was SysOp's alone: it resets an account to a new one's state, so the setup wizard runs again ([resetting an account](#resetting-an-account-v045)). Since v0.9.8 administrators reset a player's account too (the owner, 2026-11-11).
 - Since v0.5.0 `players.history` is SysOp's alone: it reads any player's games one by one, which otherwise only their player sees (the owner's decision, [the match history](quests.md#statistics-and-the-match-history)). Every player who may open a profile sees its totals and badges.
 - Administrators and moderators keep SEC05's and NET14's restrictions: there is no "view all live hands" for them.
 
@@ -335,7 +335,9 @@ Decided by the owner at the start of v0.4.1 ([the plan](plans/0.4.1.md#decisions
 Asked for by the owner on 2026-10-22 ([the plan](plans/0.4.5.md#added-during-v045)), for a beta tester who had set up his account and wanted to try the setup wizard. The owner chose a fresh start: SysOp returns an account to a new one's state, and the wizard then runs as a new player sees it. One function does it (`api/resets.py`), in one transaction. Since v0.6.0 it first ends the account's live auctions, the cards back and the leading bids returned to their bidders, and returns the account's own leading bids to it, so its tokens are counted after ([the auction house](auctions.md#accounts-reset-or-deleted)).
 
 **Who may reset.**
-- SysOp alone (`admin.users.reset`, which no role can be granted). Never SysOp's own account or a deleted one; an administrator's account may be reset.
+- SysOp, and since v0.9.8 an administrator (`admin.users.reset`; the owner, 2026-11-11: "administrators should also be able to reset user accounts back to starting"). Moderators and players may not.
+- Never the caller's own account, SysOp's or a deleted one. An administrator's account is SysOp's alone to reset, as every change to an administrator is.
+- The wins and tokens ledgers name who did it: "Account reset by SysOp" or "Account reset by an administrator", and the audit log has the account that did.
 - The sign-in must be at most `CD_REAUTH_MINUTES` old, as for every account change.
 - In the Accounts list, "Reset *handle*'s account…" opens a dialog that says what is cleared and what is kept. Its button works once the account's handle is typed (RESET for an account without one), in any case. The list then says what was cleared, for example "bob's account is new again: 5 decks moved to the trash, 212 cards and 2 unopened packs cleared, 15 wins set back to 0 and 1,134 tokens to 1,000."
 

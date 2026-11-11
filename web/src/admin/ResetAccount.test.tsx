@@ -209,7 +209,7 @@ describe("resetting from the accounts list", () => {
         : reply(200, { items: users, next_cursor: null })) as never);
   }
 
-  it("is SysOp's alone, and shows the account new again", async () => {
+  it("is SysOp's and an administrator's, and shows the account new again", async () => {
     const ann = account("ann");
     const chief = account("chief", { roles: ["player", "administrator"] });
     const earlier = account(null, {
@@ -261,29 +261,48 @@ describe("resetting from the accounts list", () => {
     expect(fresh).toHaveTextContent(/Alliance\s*None/);
     unmount();
 
-    // An administrator, who has every other account permission, is not offered it.
+    // An administrator resets a player's account too (v0.9.8), and the dialog names who the
+    // ledgers will say did it; another administrator's account is SysOp's to reset.
+    serve([ann, chief]);
+    const administrator: Me = {
+      ...sysop,
+      kind: "player",
+      roles: ["player", "administrator"],
+      permissions: sysop.permissions.filter(
+        (permission) => permission !== "admin.roles.administrator",
+      ),
+    };
+    const second = render(<Admin me={administrator} heading={createRef()} />);
+    const theirs = await screen.findByRole("listitem", { name: "ann" });
+    expect(
+      within(screen.getByRole("listitem", { name: "chief" })).queryByRole(
+        "button",
+        { name: /^Reset / },
+      ),
+    ).toBeNull();
+    fireEvent.click(
+      within(theirs).getByRole("button", { name: "Reset ann's account…" }),
+    );
+    expect(
+      screen.getByRole("dialog", { name: "Reset ann's account?" }),
+    ).toHaveTextContent("Account reset by an administrator");
+    second.unmount();
+
+    // A moderator, who approves new accounts, is not offered it.
     serve([ann]);
     render(
       <Admin
         me={{
-          ...sysop,
-          kind: "player",
-          roles: ["player", "administrator"],
-          permissions: sysop.permissions.filter(
-            (permission) =>
-              permission !== "admin.users.reset" &&
-              permission !== "admin.roles.administrator",
-          ),
+          ...administrator,
+          roles: ["player", "moderator"],
+          permissions: ["admin.users.read", "admin.users.approve"],
         }}
         heading={createRef()}
       />,
     );
-    const theirs = await screen.findByRole("listitem", { name: "ann" });
+    const unchanged = await screen.findByRole("listitem", { name: "ann" });
     expect(
-      within(theirs).getByRole("button", { name: "Delete ann's account…" }),
-    ).toBeInTheDocument();
-    expect(
-      within(theirs).queryByRole("button", { name: /^Reset / }),
+      within(unchanged).queryByRole("button", { name: /^Reset / }),
     ).toBeNull();
   });
 });

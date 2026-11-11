@@ -108,7 +108,8 @@ function Users({
   const progress = me.permissions.includes("progress.manage");
   // SysOp gives and takes back tokens (v0.4.0), and since v0.8.9 administrators.
   const economy = me.permissions.includes("economy.grant");
-  // SysOp resets an account to a new one's state, for the setup wizard (v0.4.5).
+  // SysOp resets an account to a new one's state, for the setup wizard (v0.4.5); since v0.9.8
+  // an administrator does too (the owner, 2026-11-11), but never another administrator's.
   const resets = me.permissions.includes("admin.users.reset");
   // SysOp's changes, which any account's row offers, an administrator's too.
   const sysopChanges = progress || economy || resets;
@@ -479,7 +480,7 @@ function Users({
                           </button>
                         )}
                       {/* A fresh start, so the setup wizard runs again (v0.4.5). */}
-                      {resets && user.id !== me.id && (
+                      {resets && !locked && user.id !== me.id && (
                         <button
                           className={styles.danger}
                           onClick={() => setResetting(user)}
@@ -571,6 +572,7 @@ function Users({
       {resetting && (
         <ResetAccount
           user={resetting}
+          by={me.kind === "sysop" ? "SysOp" : "an administrator"}
           onReset={(reset) => {
             replace(reset.account);
             setMessage(
