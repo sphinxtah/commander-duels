@@ -7,6 +7,9 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryPoolMXBean;
+import java.lang.management.MemoryType;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -45,6 +48,16 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
  * numbers; default all), {@code -Dcampaign.budget} (seconds a
  * game, default 300), {@code -Dcampaign.out} (the report's path). The finale plays its public
  * stand-in. Needs ./db.
+ *
+ * <p><b>The court (v0.9.7).</b> Ward 15 is a King's Table game, so it is measured as one: the
+ * reference deck is King A's, at the reference skill, with two bot Generals on the engine's fixture
+ * decks at the ward's skill, as a player who brings no friend gets them; team B is the court as the
+ * API serves it (The Sphinx's deck under its public stand-in commander, and the two gifted decks), at
+ * the ward's skill. A game the reference King's team wins counts for the reference, one the court
+ * wins for the warden. It plays without the owner's incarnation, which only the owner's engine has,
+ * so the court on the live site is harder than this measures. A six-seat game at skill 6 is long
+ * and heavy: give it {@code -Dcampaign.budget=1500}, few games, and a larger heap than the tests'
+ * 2 GB ({@code -Dengine.test.heap=8g}), which one such game ran out of.
  */
 @EnabledIfSystemProperty(named = "campaign.measure", matches = "\\d+")
 class CampaignDifficulty {
@@ -83,12 +96,31 @@ class CampaignDifficulty {
             }
             String commander = encounter.get("commander").isJsonNull()
                 ? encounter.get("fallback_commander").getAsString() : encounter.get("commander").getAsString();
-            var warden = new DeckLists.CustomDeck(entries(encounter.getAsJsonArray("cards")), List.of(commander));
+            // Since v0.9.6 an encounter may play another's 99 (cards_from): The Sphinx keeps his deck.
+            JsonArray cards = encounter.has("cards_from")
+                ? cardsOf(campaign, encounter.get("cards_from").getAsInt()) : encounter.getAsJsonArray("cards");
+            var warden = new DeckLists.CustomDeck(entries(cards), List.of(commander));
             int wardenSkill = encounter.get("skill").getAsInt();
+            // The court (v0.9.7): its two Generals' decks by seat; null for a duel.
+            Map<Integer, DeckLists.CustomDeck> generals = null;
+            if (encounter.has("court")) {
+                generals = new LinkedHashMap<>();
+                for (JsonElement element2 : encounter.getAsJsonObject("court").getAsJsonArray("generals")) {
+                    JsonObject general = element2.getAsJsonObject();
+                    generals.put(general.get("seat").getAsInt(), new DeckLists.CustomDeck(
+                        entries(general.getAsJsonArray("cards")), List.of(general.get("commander").getAsString())));
+                }
+            }
             for (Contender reference : references) {
                 for (int game = 0; game < games; game++) {
                     long seed = 1_000L * ward + 37L * game + reference.id().hashCode() % 1000;
-                    Played result = play(ward, reference, warden, referenceSkill, wardenSkill, seed, turnCap, budget);
+                    resetHeapPeaks();
+                    Played result = generals != null
+                        ? playCourt(ward, reference, warden, generals, referenceSkill, wardenSkill, seed, turnCap, budget)
+                        : play(ward, reference, warden, referenceSkill, wardenSkill, seed, turnCap, budget);
+                    // What the game needed of the heap (v0.9.7): the court's six seats ran out of 2 GB.
+                    System.out.println("CAMPAIGN heap peak " + heapPeakMegabytes() + " MB of "
+                        + Runtime.getRuntime().maxMemory() / (1024 * 1024) + " MB, ward " + ward);
                     played.add(result);
                     System.out.println("CAMPAIGN " + result);
                     write(out, referenceSkill, played);
@@ -126,6 +158,35 @@ class CampaignDifficulty {
             }
         }
         return found;
+    }
+
+    private static void resetHeapPeaks() {
+        for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans()) {
+            if (pool.getType() == MemoryType.HEAP) {
+                pool.resetPeakUsage();
+            }
+        }
+    }
+
+    /** The heap's pools' peaks since the last reset, summed: an upper bound on the heap in use at once. */
+    private static long heapPeakMegabytes() {
+        long bytes = 0;
+        for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans()) {
+            if (pool.getType() == MemoryType.HEAP && pool.getPeakUsage() != null) {
+                bytes += pool.getPeakUsage().getUsed();
+            }
+        }
+        return bytes / (1024 * 1024);
+    }
+
+    private static JsonArray cardsOf(JsonObject campaign, int number) {
+        for (JsonElement element : campaign.getAsJsonArray("encounters")) {
+            JsonObject encounter = element.getAsJsonObject();
+            if (encounter.get("number").getAsInt() == number) {
+                return encounter.getAsJsonArray("cards");
+            }
+        }
+        throw new IllegalArgumentException("No encounter " + number);
     }
 
     private static List<DeckLists.Entry> entries(JsonArray cards) {
@@ -219,6 +280,106 @@ class CampaignDifficulty {
             BotMatchRunner.stop(thread);
             return new Played(ward, reference.id(), seed, "timeout", lastTurn[0], firstHit[0] == 0 ? null : firstHit[0],
                 firstLethal[0] == 0 ? null : firstLethal[0], 0, 0, millis);
+        }
+        if (failure.get() != null) {
+            System.out.println("CAMPAIGN error " + BotMatchRunner.describe(failure.get()));
+            return new Played(ward, reference.id(), seed, "error", lastTurn[0], null, null, 0, 0, millis);
+        }
+        Played done = result.get();
+        return new Played(done.ward(), done.reference(), done.seed(), done.outcome(), done.turns(), done.firstHit(),
+            done.firstLethal(), done.referenceLife(), done.wardenLife(), millis);
+    }
+
+    /** King A's and King B's seats at King's Table. */
+    private static final int KING_A = 1;
+    private static final int KING_B = 4;
+
+    /**
+     * One game of the court (v0.9.7): King's Table with Commander decks, everyone at 40 life, a King
+     * attacking no one. Seat 1 is the reference, King A, at the reference skill; seats 0 and 2 its bot
+     * Generals on the fixture decks a bot without a deck gets; seats 3, 4 and 5 the court. The first
+     * hit is the reference King's first life lost, by its own turns; no first lethal threat is read,
+     * since a King is attacked only once a General beside it has fallen.
+     */
+    private static Played playCourt(int ward, Contender reference, DeckLists.CustomDeck sphinx,
+                                    Map<Integer, DeckLists.CustomDeck> generals, int referenceSkill, int wardenSkill,
+                                    long seed, int turnCap, long budgetSeconds) throws Exception {
+        AtomicReference<Played> result = new AtomicReference<>();
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        int[] firstHit = {0};
+        int[] ownTurns = {0};
+        int[] lastTurn = {0};
+        long started = System.nanoTime();
+        Thread thread = new Thread(() -> {
+            try {
+                RandomUtil.setSeed(seed);
+                GameFormat format = GameFormat.KINGS_TABLE_COMMANDER;
+                List<String> fixtures = format.decks();
+                List<Deck> decks = new ArrayList<>();
+                List<Player> players = new ArrayList<>();
+                int fixture = 0;
+                for (int seat = 0; seat < KingsTableRules.SEATS; seat++) {
+                    if (seat == KING_A) {
+                        decks.add(DeckLists.load(reference.deck()));
+                    } else if (seat == KING_B) {
+                        decks.add(DeckLists.load(sphinx));
+                    } else if (generals.containsKey(seat)) {
+                        decks.add(DeckLists.load(generals.get(seat)));
+                    } else {
+                        decks.add(format.loadDeck(SeatChecks.DECKS, fixtures.get(fixture++ % fixtures.size())));
+                    }
+                    String name = seat == KING_A ? NAMES[0] : seat == KING_B ? NAMES[1] : "Seat " + (seat + 1);
+                    players.add(new FairBot(name, format.range(seat), seat == KING_A ? referenceSkill : wardenSkill,
+                        FairBot.seedFor(seed, seat)));
+                }
+                Game game = format.newGame(KingsTableRules.SEATS, turnCap,
+                    new KingsTableRules(true, KingsTableRules.ALL_40, false));
+                Match match = format.newMatch("Campaign difficulty", KingsTableRules.SEATS);
+                for (int index : HumanGame.additionOrder(KingsTableRules.SEATS)) {
+                    LegacyDuel.seat(game, match, players.get(index), decks.get(index));
+                }
+                List<UUID> ids = players.stream().map(Player::getId).toList();
+                format.seatTeams(game, ids);
+                game.addTableEventListener(event -> {
+                    if (TRACE && event.getMessage() != null && !event.getMessage().isBlank()) {
+                        System.out.println("TRACE " + ward + " T" + game.getTurnNum() + " " + event.getMessage()
+                            .replaceAll("<[^>]+>", ""));
+                    }
+                    if (game.getTurnNum() != lastTurn[0]) {
+                        lastTurn[0] = game.getTurnNum();
+                        if (ids.get(KING_A).equals(game.getActivePlayerId())) {
+                            ownTurns[0]++;
+                        }
+                    }
+                    Player you = game.getPlayer(ids.get(KING_A));
+                    if (you != null && ownTurns[0] > 0 && firstHit[0] == 0 && you.getLife() < 40) {
+                        firstHit[0] = ownTurns[0];
+                    }
+                });
+                // A King chosen at random takes the first turn, as in a game the engine serves.
+                UUID first = ids.get(RandomUtil.nextBoolean() ? KING_A : KING_B);
+                game.setStartingPlayerId(first);
+                game.start(first);
+                Player you = game.getPlayer(ids.get(KING_A));
+                Player them = game.getPlayer(ids.get(KING_B));
+                // 809.5: a King out loses their team the game; both at once is a draw.
+                String outcome = !game.hasEnded() || game.getTurnNum() > turnCap ? "turn_cap"
+                    : you.hasLost() && them.hasLost() ? "draw"
+                    : them.hasLost() ? "reference" : you.hasLost() ? "warden" : "none";
+                result.set(new Played(ward, reference.id(), seed, outcome, game.getTurnNum(),
+                    firstHit[0] == 0 ? null : firstHit[0], null, you.getLife(), them.getLife(), 0));
+            } catch (Throwable t) {
+                failure.set(t);
+            }
+        }, ThreadUtils.THREAD_PREFIX_GAME + " campaign difficulty " + ward);
+        thread.setDaemon(true);
+        thread.start();
+        boolean finished = BotMatchRunner.join(thread, TimeUnit.SECONDS.toMillis(budgetSeconds));
+        long millis = (System.nanoTime() - started) / 1_000_000;
+        if (!finished) {
+            BotMatchRunner.stop(thread);
+            return new Played(ward, reference.id(), seed, "timeout", lastTurn[0], firstHit[0] == 0 ? null : firstHit[0],
+                null, 0, 0, millis);
         }
         if (failure.get() != null) {
             System.out.println("CAMPAIGN error " + BotMatchRunner.describe(failure.get()));

@@ -28,6 +28,8 @@ Since v0.8.9 players sleeve their decks: up to 20 uploaded pictures, three defau
 
 Since v0.9.0 a deck's sleeve covers its library too, a removed sleeve can be restored, Weathered Sentinels plays as printed, unlimited auctions' prices change in place, basic land packs sum up by land and edition, and King's Table's bot Generals fight ([release notes](docs/releases/0.9.0.md)).
 
+Since v0.9.7 the quest boards ask only for what a player can do with their own decks and the auction house as it stands, the day's five quests read "Quest 1" to "Quest 5" and complete in any order, and a game played with passive bots says it counts for nothing ([release notes](docs/releases/0.9.7.md)).
+
 Since v0.9.5 every player has a daily board of five quests and a weekly board of twenty goals, mostly outside the games, with bonuses that grow with a streak ([quests](docs/quests.md#quest-boards-v095)); achievements pay four times as much; and a warden's first defeat opens their deck as a 100-card pack ([release notes](docs/releases/0.9.5.md)).
 
 ## Start with Docker

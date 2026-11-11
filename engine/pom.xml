@@ -14,6 +14,9 @@
         <!-- Must equal xmage.version in xmage/pin.properties; XmagePinTest checks it. -->
         <xmage.version>1.4.63</xmage.version>
         <junit.version>5.13.4</junit.version>
+        <!-- The test JVM's heap. The court's difficulty run (six bots at skill 6, v0.9.7) asks for
+             more: -Dengine.test.heap=8g. -->
+        <engine.test.heap>2g</engine.test.heap>
     </properties>
 
     <dependencies>
@@ -115,7 +118,7 @@
                 <configuration>
                     <!-- Tests open ./db (the card database) and ./decks, like the runtime image. -->
                     <workingDirectory>${project.basedir}</workingDirectory>
-                    <argLine>-Xmx2g</argLine>
+                    <argLine>-Xmx${engine.test.heap}</argLine>
                     <systemPropertyVariables>
                         <xmage.version>${xmage.version}</xmage.version>
                     </systemPropertyVariables>

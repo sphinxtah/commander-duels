@@ -1,8 +1,10 @@
 name: Campaign difficulty
 # The campaign's difficulty measured on GitHub's runners (v0.9.4): one job a ward, in parallel, each
 # playing the reference deck suite against that ward's deck (CampaignDifficulty, engine tests), then
-# one summary of all fourteen. Too long for CI on every push, so it runs on demand: from Actions ›
+# one summary of them all. Too long for CI on every push, so it runs on demand: from Actions ›
 # Campaign difficulty › Run workflow, or by pushing a branch named difficulty/<anything>.
+# Since v0.9.7 ward 15, the court, is measured too: a King's Table game of six bots at skill 6 is
+# long, so it plays at most three games a reference deck, each with a longer budget.
 on:
   workflow_dispatch:
     inputs:
@@ -11,7 +13,7 @@ on:
         default: '10'
       wards:
         description: Wards to measure, as a JSON list
-        default: '[1,2,3,4,5,6,7,8,9,10,11,12,13,14]'
+        default: '[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]'
   push:
     branches: ['difficulty/**']
 permissions:
@@ -24,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ward: ${{ fromJSON(inputs.wards || '[1,2,3,4,5,6,7,8,9,10,11,12,13,14]') }}
+        ward: ${{ fromJSON(inputs.wards || '[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -44,11 +46,21 @@ jobs:
           WARD: ${{ matrix.ward }}
         run: |
           mkdir -p out
+          budget=900
+          heap=2g
+          if [ "$WARD" = 15 ]; then
+            # The court: nine games of up to 25 minutes fit the job's five hours. Six bots at
+            # skill 6 ran out of a 2 GB heap; the runner has 16 GB.
+            budget=1500
+            heap=10g
+            if [ "$GAMES" -gt 3 ]; then GAMES=3; fi
+          fi
           docker run --rm -v "$PWD:/src:ro" -v "$PWD/out:/out" commander-duels-carddb:latest sh -c "
             cp -r /src /build && cd /build/engine && ln -s /xmage/carddb/db db &&
             mvn -B -ntp -q -Dmaven.repo.local.tail=/xmage/m2 test -Dtest=CampaignDifficulty \
               -Dsurefire.failIfNoSpecifiedTests=false \
-              -Dcampaign.measure=$GAMES -Dcampaign.wards=$WARD -Dcampaign.budget=900 \
+              -Dcampaign.measure=$GAMES -Dcampaign.wards=$WARD -Dcampaign.budget=$budget \
+              -Dengine.test.heap=$heap \
               -Dcampaign.out=/out/ward-$WARD.json"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
