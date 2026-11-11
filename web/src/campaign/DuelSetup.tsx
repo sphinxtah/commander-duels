@@ -31,6 +31,14 @@ type Court = NonNullable<CampaignEncounter["court"]>;
 /** The court's rules in two sentences (v0.9.7), from its settings as the API gives them: whom a
  * King may attack, the starting life, and the turn limit, 40 turns for each of the six players.
  * Until v0.9.7 this said "Kings cannot attack", which the court's settings then were. */
+/** What the player's bot Generals play (v0.9.8): the decks won from wardens already beaten.
+ * Until v0.9.8 they played the engine's fixture decks against the court's power decks. */
+function allyDecks(court: Court): string {
+  const wardens = (court.ally_decks ?? []).map((deck) => deck.name);
+  if (!wardens.length) return "";
+  return `Your bot Generals play the decks you won from ${wardens.join(" and ")}.`;
+}
+
 function courtRules(court: Court): string {
   const { kings_table: rules, turn_cap: turns } = court;
   const life = LIFE_DETAIL[rules.life];
@@ -299,6 +307,10 @@ export function DuelSetup({
         )}
       </div>
 
+      {court && allyDecks(court) && (
+        <p className={styles.quiet}>{allyDecks(court)}</p>
+      )}
+
       {court && canUseOwnDecks && (
         <div className={styles.choice}>
           <strong>Bring friends as your Generals</strong>
@@ -350,8 +362,9 @@ export function DuelSetup({
         <p className={styles.warning}>
           The Sphinx is King B, with Nicol Bolas and Liliana as his Generals,
           all at full strength. His incarnation starts on the battlefield and
-          returns at each of his upkeeps. {courtRules(court)} Lose the court and
-          you return to the throne&rsquo;s ward.
+          returns at each of his upkeeps. {courtRules(court)} Lose the court,
+          close it or leave it idle for an hour, and you return to the
+          throne&rsquo;s ward.
         </p>
       )}
 

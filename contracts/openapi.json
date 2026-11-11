@@ -3801,6 +3801,49 @@
         "title": "CosmeticsChange",
         "type": "object"
       },
+      "CourtAllyDeck": {
+        "additionalProperties": false,
+        "description": "What a bot General of yours plays at the court (v0.9.8): a beaten warden's deck.",
+        "properties": {
+          "commander": {
+            "title": "Commander",
+            "type": "string"
+          },
+          "deck_title": {
+            "title": "Deck Title",
+            "type": "string"
+          },
+          "name": {
+            "description": "That warden's name.",
+            "title": "Name",
+            "type": "string"
+          },
+          "opponent": {
+            "description": "That warden's roster ID, naming their portrait.",
+            "title": "Opponent",
+            "type": "string"
+          },
+          "seat": {
+            "title": "Seat",
+            "type": "integer"
+          },
+          "ward": {
+            "description": "The ward whose warden played it.",
+            "title": "Ward",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seat",
+          "ward",
+          "opponent",
+          "name",
+          "deck_title",
+          "commander"
+        ],
+        "title": "CourtAllyDeck",
+        "type": "object"
+      },
       "CourtSeat": {
         "additionalProperties": false,
         "properties": {
@@ -3887,6 +3930,14 @@
         "additionalProperties": false,
         "description": "Ward 15, The Unbound Court (v0.9.6): a King's Table game against The Sphinx's court.",
         "properties": {
+          "ally_decks": {
+            "description": "The decks your bot Generals play (v0.9.8), by seat: those of wardens you have beaten. A friend in a General's seat plays their own.",
+            "items": {
+              "$ref": "#/components/schemas/CourtAllyDeck"
+            },
+            "title": "Ally Decks",
+            "type": "array"
+          },
           "ally_seats": {
             "description": "Your Generals' seats: friends or bots.",
             "items": {

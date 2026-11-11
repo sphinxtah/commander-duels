@@ -32,6 +32,7 @@ import org.junit.jupiter.api.condition.EnabledIf;
 class CourtDecksTest {
     private static final Path CONTENT = Path.of("..", "content", "campaign.json");
     private static JsonObject court;
+    private static JsonArray wards;
 
     static boolean contentHere() {
         return Files.isRegularFile(CONTENT);
@@ -58,6 +59,7 @@ class CourtDecksTest {
         assertTrue(sphinx != null && found != null, "ward 14 and the court");
         found.add("cards", sphinx.getAsJsonArray("cards"));
         court = found;
+        wards = encounters;
     }
 
     private static DeckLists.CustomDeck deck(JsonArray cards, String commander) throws Exception {
@@ -77,6 +79,33 @@ class CourtDecksTest {
             assertTrue(DeckLists.unknown(parsed).isEmpty(), general.get("name") + ": " + DeckLists.unknown(parsed));
             assertEquals(99, parsed.cards().stream().mapToInt(DeckLists.Entry::count).sum());
         }
+    }
+
+    /**
+     * The player's bot Generals (v0.9.8) play beaten wardens' own decks, one in each General's seat
+     * of team A: wards before the throne's, whose decks the engine knows card for card.
+     */
+    @Test
+    void thePlayersBotGeneralsPlayBeatenWardensDecks() throws Exception {
+        JsonArray allies = court.getAsJsonObject("court").getAsJsonArray("allies");
+        Set<Integer> seats = new java.util.TreeSet<>();
+        for (JsonElement element : allies) {
+            JsonObject ally = element.getAsJsonObject();
+            int from = ally.get("deck_from").getAsInt();
+            assertTrue(from >= 1 && from <= 13, "a warden's ward: " + from);
+            JsonObject ward = null;
+            for (JsonElement each : wards) {
+                if (each.getAsJsonObject().get("number").getAsInt() == from) {
+                    ward = each.getAsJsonObject();
+                }
+            }
+            assertTrue(ward != null, "ward " + from);
+            DeckLists.CustomDeck parsed = deck(ward.getAsJsonArray("cards"), ward.get("commander").getAsString());
+            assertTrue(DeckLists.unknown(parsed).isEmpty(), ward.get("name") + ": " + DeckLists.unknown(parsed));
+            assertEquals(99, parsed.cards().stream().mapToInt(DeckLists.Entry::count).sum());
+            seats.add(ally.get("seat").getAsInt());
+        }
+        assertEquals(Set.of(0, 2), seats);
     }
 
     @Test

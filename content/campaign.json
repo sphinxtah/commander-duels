@@ -1493,6 +1493,10 @@
     "player_seat": 1,
     "king_seat": 4,
     "helper_tokens": 10000,
+    "allies": [
+     {"seat": 0, "deck_from": 13},
+     {"seat": 2, "deck_from": 12}
+    ],
     "generals": [
      {
       "seat": 3,

@@ -215,13 +215,36 @@ def test_the_sphinx_flees_and_the_court_pays_both_wards(
         "bot",
         "bot",
     ]
-    assert "deck_list" not in body["seats"][0] and "deck_list" not in body["seats"][2]
+    # The player's bot Generals play beaten wardens' decks (v0.9.8), each facing the warden it
+    # was won from: Liliana's from ward 13 beside her, Nicol Bolas's from ward 12 beside him.
+    # Until v0.9.8 they played the engine's fixture decks against the court's power decks.
+    assert body["seats"][0]["deck_list"]["commanders"] == ["Yawgmoth, Thran Physician"]
+    assert body["seats"][2]["deck_list"]["commanders"] == ["Kess, Dissident Mage"]
+    wards = {ward["number"]: ward for ward in state(ada)["encounters"]}
+    assert wards[15]["court"]["ally_decks"] == [
+        {
+            "seat": 0,
+            "ward": 13,
+            "opponent": "liliana",
+            "name": "Liliana",
+            "deck_title": "Liliana's Deck",
+            "commander": "Yawgmoth, Thran Physician",
+        },
+        {
+            "seat": 2,
+            "ward": 12,
+            "opponent": "nicol-bolas",
+            "name": "Nicol Bolas",
+            "deck_title": "Nicol Bolas's Deck",
+            "commander": "Kess, Dissident Mage",
+        },
+    ]
     assert body["seats"][3]["deck_list"]["commanders"] == ["Nicol Bolas, the Ravager"]
     assert body["seats"][5]["deck_list"]["commanders"] == ["Liliana, Heretical Healer"]
     # Without the owner's content the public stand-in leads The Sphinx's deck, with no reserve.
     sphinx = body["seats"][4]["deck_list"]
     assert sphinx["commanders"] == ["Morophon, the Boundless"] and "reserve" not in sphinx
-    for seat in (3, 4, 5):
+    for seat in (0, 2, 3, 4, 5):
         assert sum(card["count"] for card in body["seats"][seat]["deck_list"]["cards"]) == 99
     named = {seat["seat"]: (seat["handle"], seat["portrait"]) for seat in summary["seats"]}
     assert named[3] == ("Nicol Bolas", "nicol-bolas")
@@ -480,6 +503,10 @@ def test_friends_help_at_the_court_and_are_paid_once(
         "bot",
     ]
     assert body["seats"][4]["deck_list"]["commanders"] == ["Morophon, the Boundless"]
+    # Bob plays his own deck in his General's seat; the other General, a bot, plays the warden's
+    # deck that seat is given (v0.9.8).
+    assert body["seats"][0]["deck_list"]["commanders"] == ["Kenrith, the Returned King"]
+    assert body["seats"][2]["deck_list"]["commanders"] == ["Kess, Dissident Mage"]
     # Bob sees a table's game; the campaign's reference is Ada's.
     assert bob.get(f"/api/v1/games/{game_id}").json()["game"]["campaign"] is None
     assert ada.get(f"/api/v1/games/{game_id}").json()["game"]["campaign"]["encounter"] == 15

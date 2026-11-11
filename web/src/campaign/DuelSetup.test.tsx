@@ -111,6 +111,24 @@ describe("the court's setup (v0.9.6)", () => {
     court: {
       player_seat: 1,
       ally_seats: [0, 2],
+      ally_decks: [
+        {
+          seat: 0,
+          ward: 13,
+          opponent: "liliana",
+          name: "Liliana",
+          deck_title: "Liliana's Deck",
+          commander: "Yawgmoth, Thran Physician",
+        },
+        {
+          seat: 2,
+          ward: 12,
+          opponent: "nicol-bolas",
+          name: "Nicol Bolas",
+          deck_title: "Nicol Bolas's Deck",
+          commander: "Kess, Dissident Mage",
+        },
+      ],
       opponents: [],
       helper_tokens: 10000,
       kings_table: {
@@ -168,8 +186,14 @@ describe("the court's setup (v0.9.6)", () => {
     // The court's rules as its settings give them (v0.9.7): the house rule with its guard, and
     // 40 turns for each of the six players.
     expect(screen.getByText(/^The Sphinx is King B/)).toHaveTextContent(
-      "A King's creatures may attack any opposing General, and the other King once one of that King's Generals is defeated; every player starts at 40 life. The court ends with no result after 240 turns, 40 for each player. Lose the court and you return to the throne’s ward.",
+      "A King's creatures may attack any opposing General, and the other King once one of that King's Generals is defeated; every player starts at 40 life. The court ends with no result after 240 turns, 40 for each player. Lose the court, close it or leave it idle for an hour, and you return to the throne’s ward.",
     );
+    // The player's bot Generals play beaten wardens' decks (v0.9.8), not the engine's own.
+    expect(
+      screen.getByText(
+        "Your bot Generals play the decks you won from Liliana and Nicol Bolas.",
+      ),
+    ).toBeInTheDocument();
     expect(
       screen.getByText("Nicol Bolas's Gift and Liliana's Gift"),
     ).toBeInTheDocument();

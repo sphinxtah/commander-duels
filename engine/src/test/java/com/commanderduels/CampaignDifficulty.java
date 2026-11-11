@@ -50,10 +50,11 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
  * stand-in. Needs ./db.
  *
  * <p><b>The court (v0.9.7).</b> Ward 15 is a King's Table game, so it is measured as one: the
- * reference deck is King A's, at the reference skill, with two bot Generals on the engine's fixture
- * decks at the ward's skill, as a player who brings no friend gets them; team B is the court as the
- * API serves it (The Sphinx's deck under its public stand-in commander, and the two gifted decks), at
- * the ward's skill. A game the reference King's team wins counts for the reference, one the court
+ * reference deck is King A's, at the reference skill, with two bot Generals at the ward's skill, as
+ * a player who brings no friend gets them: since v0.9.8 on the beaten wardens' decks the content
+ * names for them ({@code court.allies}), until then on the engine's fixture decks; team B is the
+ * court as the API serves it (The Sphinx's deck under its public stand-in commander, and the two
+ * gifted decks), at the ward's skill. A game the reference King's team wins counts for the reference, one the court
  * wins for the warden. It plays without the owner's incarnation, which only the owner's engine has,
  * so the court on the live site is harder than this measures. A six-seat game at skill 6 is long
  * and heavy: give it {@code -Dcampaign.budget=1500}, few games, and a larger heap than the tests'
@@ -110,10 +111,20 @@ class CampaignDifficulty {
             // The court (v0.9.7): its two Generals' decks by seat, and its King's Table settings as
             // the content names them; null for a duel.
             Map<Integer, DeckLists.CustomDeck> generals = null;
+            Map<Integer, DeckLists.CustomDeck> allies = new LinkedHashMap<>();
             KingsTableRules courtRules = null;
             if (encounter.has("court")) {
                 courtRules = KingsTableRules.parse(encounter.getAsJsonObject("court").get("kings_table"));
                 System.out.println("CAMPAIGN court " + courtRules + ", " + courtTurns + " turns");
+                // The player's bot Generals (v0.9.8): each plays a beaten warden's own deck.
+                if (encounter.getAsJsonObject("court").has("allies")) {
+                    for (JsonElement ally : encounter.getAsJsonObject("court").getAsJsonArray("allies")) {
+                        int from = ally.getAsJsonObject().get("deck_from").getAsInt();
+                        allies.put(ally.getAsJsonObject().get("seat").getAsInt(), new DeckLists.CustomDeck(
+                            entries(cardsOf(campaign, from)), List.of(commanderOf(campaign, from))));
+                    }
+                    System.out.println("CAMPAIGN court allies " + allies.keySet());
+                }
                 generals = new LinkedHashMap<>();
                 for (JsonElement element2 : encounter.getAsJsonObject("court").getAsJsonArray("generals")) {
                     JsonObject general = element2.getAsJsonObject();
@@ -126,8 +137,8 @@ class CampaignDifficulty {
                     long seed = 1_000L * ward + 37L * game + reference.id().hashCode() % 1000;
                     resetHeapPeaks();
                     Played result = generals != null
-                        ? playCourt(ward, reference, warden, generals, courtRules, referenceSkill, wardenSkill, seed,
-                            courtTurns, budget)
+                        ? playCourt(ward, reference, warden, generals, allies, courtRules, referenceSkill, wardenSkill,
+                            seed, courtTurns, budget)
                         : play(ward, reference, warden, referenceSkill, wardenSkill, seed, duelTurns, budget);
                     // What the game needed of the heap (v0.9.7): the court's six seats ran out of 2 GB.
                     System.out.println("CAMPAIGN heap peak " + heapPeakMegabytes() + " MB of "
@@ -206,10 +217,18 @@ class CampaignDifficulty {
     }
 
     private static JsonArray cardsOf(JsonObject campaign, int number) {
+        return encounterOf(campaign, number).getAsJsonArray("cards");
+    }
+
+    private static String commanderOf(JsonObject campaign, int number) {
+        return encounterOf(campaign, number).get("commander").getAsString();
+    }
+
+    private static JsonObject encounterOf(JsonObject campaign, int number) {
         for (JsonElement element : campaign.getAsJsonArray("encounters")) {
             JsonObject encounter = element.getAsJsonObject();
             if (encounter.get("number").getAsInt() == number) {
-                return encounter.getAsJsonArray("cards");
+                return encounter;
             }
         }
         throw new IllegalArgumentException("No encounter " + number);
@@ -324,13 +343,15 @@ class CampaignDifficulty {
      * One game of the court (v0.9.7): King's Table under the court's own settings (Commander decks,
      * everyone at 40 life, and since v0.9.7 the house rule with its guard: a King attacks any
      * opposing General, and the other King once one of that King's Generals is out). Seat 1 is the
-     * reference, King A, at the reference skill; seats 0 and 2 its bot Generals on the fixture decks
-     * a bot without a deck gets; seats 3, 4 and 5 the court. The first hit is the reference King's
+     * reference, King A, at the reference skill; seats 0 and 2 its bot Generals, on the beaten
+     * wardens' decks the content gives them (v0.9.8), or the fixture decks a bot without a deck
+     * gets; seats 3, 4 and 5 the court. The first hit is the reference King's
      * first life lost, by its own turns; no first lethal threat is read, since a King is attacked
      * only once one of its Generals has fallen.
      */
     private static Played playCourt(int ward, Contender reference, DeckLists.CustomDeck sphinx,
-                                    Map<Integer, DeckLists.CustomDeck> generals, KingsTableRules rules,
+                                    Map<Integer, DeckLists.CustomDeck> generals,
+                                    Map<Integer, DeckLists.CustomDeck> allies, KingsTableRules rules,
                                     int referenceSkill, int wardenSkill, long seed, int turnCap,
                                     long budgetSeconds) throws Exception {
         AtomicReference<Played> result = new AtomicReference<>();
@@ -354,6 +375,8 @@ class CampaignDifficulty {
                         decks.add(DeckLists.load(sphinx));
                     } else if (generals.containsKey(seat)) {
                         decks.add(DeckLists.load(generals.get(seat)));
+                    } else if (allies.containsKey(seat)) {
+                        decks.add(DeckLists.load(allies.get(seat)));
                     } else {
                         decks.add(format.loadDeck(SeatChecks.DECKS, fixtures.get(fixture++ % fixtures.size())));
                     }

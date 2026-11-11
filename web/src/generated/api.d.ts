@@ -5014,6 +5014,33 @@ export interface components {
             /** Title */
             title?: string | null;
         };
+        /**
+         * CourtAllyDeck
+         * @description What a bot General of yours plays at the court (v0.9.8): a beaten warden's deck.
+         */
+        CourtAllyDeck: {
+            /** Commander */
+            commander: string;
+            /** Deck Title */
+            deck_title: string;
+            /**
+             * Name
+             * @description That warden's name.
+             */
+            name: string;
+            /**
+             * Opponent
+             * @description That warden's roster ID, naming their portrait.
+             */
+            opponent: string;
+            /** Seat */
+            seat: number;
+            /**
+             * Ward
+             * @description The ward whose warden played it.
+             */
+            ward: number;
+        };
         /** CourtSeat */
         CourtSeat: {
             /**
@@ -5065,6 +5092,11 @@ export interface components {
          * @description Ward 15, The Unbound Court (v0.9.6): a King's Table game against The Sphinx's court.
          */
         CourtView: {
+            /**
+             * Ally Decks
+             * @description The decks your bot Generals play (v0.9.8), by seat: those of wardens you have beaten. A friend in a General's seat plays their own.
+             */
+            ally_decks?: components["schemas"]["CourtAllyDeck"][];
             /**
              * Ally Seats
              * @description Your Generals' seats: friends or bots.

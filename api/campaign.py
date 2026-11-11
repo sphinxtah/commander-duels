@@ -152,6 +152,31 @@ class CourtGeneral:
 
 
 @dataclass(frozen=True)
+class CourtAlly:
+    """One of the player's bot Generals at the court (v0.9.8): it plays the deck of a warden the
+    player has beaten, the one that warden played in their ward (deck_from in the content). Until
+    v0.9.8 the player's bot Generals played the engine's fixture decks against the court's."""
+
+    seat: int
+    ward: int
+    # The warden whose deck it is: their roster ID and name.
+    opponent: str
+    name: str
+    commander: str
+    cards: tuple[tuple[str, int], ...]
+
+    @property
+    def deck_title(self) -> str:
+        return f"{self.name}'s Deck"
+
+    def deck_list(self) -> dict[str, object]:
+        return {
+            "cards": [{"name": name, "count": count} for name, count in self.cards],
+            "commanders": [self.commander],
+        }
+
+
+@dataclass(frozen=True)
 class Court:
     """Ward 15, The Unbound Court (v0.9.6): a King's Table game. The player is King A, their two
     Generals friends or bots; team B is The Sphinx as King with his two recalled Generals, every
@@ -163,6 +188,8 @@ class Court:
     generals: tuple[CourtGeneral, ...]
     # Tokens a friend who helps win the court is paid, once per player and friend, ever.
     helper_tokens: int
+    # The decks the player's bot Generals play (v0.9.8), by seat: beaten wardens' own.
+    allies: tuple[CourtAlly, ...] = ()
 
     @property
     def ally_seats(self) -> tuple[int, ...]:
@@ -269,7 +296,21 @@ def cards_of(entries: list[dict[str, Any]]) -> tuple[tuple[str, int], ...]:
     return tuple((str(entry["name"]), int(entry["count"])) for entry in entries)
 
 
-def court_of(raw: dict[str, Any] | None) -> Court | None:
+def ally_of(data: dict[str, Any], raw: dict[str, Any]) -> CourtAlly:
+    """A bot General of the player's and the ward whose deck it plays: a warden's own, with the
+    commander the content names for it."""
+    ward = next(found for found in data["encounters"] if found["number"] == int(raw["deck_from"]))
+    return CourtAlly(
+        seat=int(raw["seat"]),
+        ward=int(ward["number"]),
+        opponent=ward["opponent"],
+        name=ward["name"],
+        commander=str(ward["commander"]),
+        cards=encounter_cards(data, ward),
+    )
+
+
+def court_of(data: dict[str, Any], raw: dict[str, Any] | None) -> Court | None:
     if raw is None:
         return None
     return Court(
@@ -288,6 +329,7 @@ def court_of(raw: dict[str, Any] | None) -> Court | None:
             for general in raw["generals"]
         ),
         helper_tokens=int(raw.get("helper_tokens", 0)),
+        allies=tuple(ally_of(data, ally) for ally in raw.get("allies", [])),
     )
 
 
@@ -339,7 +381,7 @@ def campaign_in(folder: str) -> Campaign | None:
                 private=encounter.get("private"),
                 tokens=int(encounter.get("tokens", 0)),
                 private_commander_title=encounter.get("private_commander_title"),
-                court=court_of(encounter.get("court")),
+                court=court_of(data, encounter.get("court")),
             )
             for encounter in data["encounters"]
         ),
@@ -382,11 +424,27 @@ class CourtSeat(Contract):
     commander: str | None = Field(description="Null for The Sphinx's, the owner's own.")
 
 
+class CourtAllyDeck(Contract):
+    """What a bot General of yours plays at the court (v0.9.8): a beaten warden's deck."""
+
+    seat: int
+    ward: int = Field(description="The ward whose warden played it.")
+    opponent: str = Field(description="That warden's roster ID, naming their portrait.")
+    name: str = Field(description="That warden's name.")
+    deck_title: str
+    commander: str
+
+
 class CourtView(Contract):
     """Ward 15, The Unbound Court (v0.9.6): a King's Table game against The Sphinx's court."""
 
     player_seat: int = Field(description="Your seat: King A's.")
     ally_seats: list[int] = Field(description="Your Generals' seats: friends or bots.")
+    ally_decks: list[CourtAllyDeck] = Field(
+        default_factory=list,
+        description="The decks your bot Generals play (v0.9.8), by seat: those of wardens you "
+        "have beaten. A friend in a General's seat plays their own.",
+    )
     opponents: list[CourtSeat] = Field(description="Team B: The Sphinx as King, two Generals.")
     helper_tokens: int = Field(description="What a friend who helps win it is paid, once.")
     kings_table: KingsTableSettings = Field(
@@ -692,6 +750,17 @@ def court_view(encounter: Encounter) -> CourtView | None:
     return CourtView(
         player_seat=court.player_seat,
         ally_seats=list(court.ally_seats),
+        ally_decks=[
+            CourtAllyDeck(
+                seat=ally.seat,
+                ward=ally.ward,
+                opponent=ally.opponent,
+                name=ally.name,
+                deck_title=ally.deck_title,
+                commander=ally.commander,
+            )
+            for ally in sorted(court.allies, key=lambda ally: ally.seat)
+        ],
         opponents=sorted(seats, key=lambda seat: seat.seat),
         helper_tokens=court.helper_tokens,
         kings_table=kings_table.config_of(court.kings_table),
@@ -1357,17 +1426,17 @@ def finale_seat(
 
 
 def court_seats(
-    encounter: Encounter,
-    sphinx: dict[str, object],
-    players: dict[int, SeatPlan],
-    allies: dict[int, SeatPlan],
+    encounter: Encounter, sphinx: dict[str, object], players: dict[int, SeatPlan]
 ) -> list[SeatPlan]:
     """The court's six seats in King's Table order (v0.9.6): the players' (the King's and any
     friends'), the player's bot Generals, and team B, each of its three a named bot with its own
-    deck: The Sphinx's (finale_seat) as King, and the two he gifted."""
+    deck: The Sphinx's (finale_seat) as King, and the two he gifted. Since v0.9.8 a bot General of
+    the player's plays a beaten warden's deck (court.allies), not the engine's fixture deck: the
+    court's are power decks."""
     court = encounter.court
     assert court is not None
     generals = {general.seat: general for general in court.generals}
+    allies = {ally.seat: ally for ally in court.allies}
     plans: list[SeatPlan] = []
     for seat in range(kings_table.SEATS):
         if seat in players:
@@ -1389,8 +1458,17 @@ def court_seats(
                     starter=True,
                 )
             )
+        elif seat in allies:
+            ally = allies[seat]
+            plans.append(
+                SeatPlan(
+                    {"player": "bot", "deck_list": ally.deck_list()},
+                    title=ally.deck_title,
+                    starter=True,
+                )
+            )
         else:
-            plans.append(allies.get(seat) or SeatPlan({"player": "bot"}))
+            plans.append(SeatPlan({"player": "bot"}))
     return plans
 
 
@@ -1530,7 +1608,7 @@ async def start_encounter(
     opponents: dict[str, list[str]] | None = None
     if court is not None:
         sphinx, finale, prize_card = await court_finale(request, engine, encounter, db)
-        plans = court_seats(encounter, sphinx, {mine: human}, {})
+        plans = court_seats(encounter, sphinx, {mine: human})
         opponents = court_opponents(encounter)
         # A court left idle is a court lost (v0.9.8), so a player alone at it gets the hour a
         # table gets before the engine closes it, where a duel gets the engine's quarter hour.
@@ -1714,8 +1792,7 @@ async def court_table(
     await run_in_threadpool(check)
     sphinx, finale, prize_card = await court_finale(request, engine, encounter, db)
     players = {seat: plan for seat, plan in enumerate(plans) if users[seat] is not None}
-    allies = {seat: plans[seat] for seat in court.ally_seats if users[seat] is None}
-    seated = court_seats(encounter, sphinx, players, allies)
+    seated = court_seats(encounter, sphinx, players)
     body = court_body(campaign, encounter, seated, TABLE_IDLE_SECONDS)
     opponents = court_opponents(encounter)
     host_id = table.host_id
