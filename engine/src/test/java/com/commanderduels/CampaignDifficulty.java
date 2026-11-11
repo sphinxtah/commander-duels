@@ -110,6 +110,7 @@ class CampaignDifficulty {
             KingsTableRules courtRules = null;
             if (encounter.has("court")) {
                 courtRules = KingsTableRules.parse(encounter.getAsJsonObject("court").get("kings_table"));
+                System.out.println("CAMPAIGN court " + courtRules + ", " + courtTurns + " turns");
                 generals = new LinkedHashMap<>();
                 for (JsonElement element2 : encounter.getAsJsonObject("court").getAsJsonArray("generals")) {
                     JsonObject general = element2.getAsJsonObject();
@@ -131,10 +132,25 @@ class CampaignDifficulty {
                     played.add(result);
                     System.out.println("CAMPAIGN " + result);
                     write(out, referenceSkill, played);
+                    if (result.outcome().equals("error")) {
+                        settleHeap();
+                    }
                 }
             }
         }
         write(out, referenceSkill, played);
+    }
+
+    /**
+     * After a game that failed (v0.9.7): a court game that ran out of heap (two of six did here, in
+     * 4 GB) leaves its searches' threads holding what they held for a moment, and the next game,
+     * started at once, failed at its first turn. The collector gets the time before the next game.
+     */
+    private static void settleHeap() throws InterruptedException {
+        for (int pass = 0; pass < 3; pass++) {
+            System.gc();
+            Thread.sleep(5_000);
+        }
     }
 
     private static void write(Path out, int referenceSkill, List<Played> played) throws Exception {
