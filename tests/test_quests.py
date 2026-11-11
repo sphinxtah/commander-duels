@@ -612,9 +612,9 @@ def test_the_days_quests_complete_in_any_order(client, monkeypatch):
     assert [quest["progress"] for quest in shown["quests"]] == [0, 0, 1, 1, 1]
     assert shown["completed_at"] is None
     name = "Win a four-player Commander game against skill-6 bots"
-    assert entries(client, ada.id, "quest") == [
-        (750, f"daily:{ada.id}:{day}:d5-four-players", name)
-    ]
+    # The day's payments alone: the week's board is drawn at random, and may count the game too.
+    paid = [entry for entry in entries(client, ada.id, "quest") if entry[1].startswith("daily:")]
+    assert paid == [(750, f"daily:{ada.id}:{day}:d5-four-players", name)]
     # The third after the fifth, the second and the first still open.
     for _ in range(4):
         played(client, [ada.id, None], completed(1))

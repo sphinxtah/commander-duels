@@ -110,6 +110,25 @@
 .perPage select {
   min-height: 32px;
 }
+/* The lobby's own controls wear the app's fields (v0.9.7): they showed the browser's. */
+.perPage select,
+.hostSearch {
+  background: #0d1415;
+  border: 1px solid #ffffff22;
+  border-radius: 5px;
+  padding: 5px 10px;
+  color: #ebece6;
+  font: inherit;
+  font-size: 0.86rem;
+}
+.hostSearch::placeholder {
+  color: #7d8a85;
+}
+.perPage select:focus-visible,
+.hostSearch:focus-visible {
+  outline: 2px solid #d4b47a;
+  outline-offset: 1px;
+}
 .cards {
   list-style: none;
   margin: 0;

@@ -217,7 +217,7 @@ export function HomeHub({
           icon="play"
           title="Play"
           tour="play"
-          lead="Battle the bots in Legacy, Commander or Two-Headed Giant."
+          lead="Battle the bots in Legacy, Commander, Two-Headed Giant or King's Table."
           meta={data.game ? "A game is waiting for you" : undefined}
           action={data.game ? "Resume your game" : "Play now"}
           index={0}

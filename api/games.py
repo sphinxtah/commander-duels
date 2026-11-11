@@ -2508,8 +2508,11 @@ def origin_refused(websocket: WebSocket) -> bool:
 
 
 async def refuse(websocket: WebSocket, code: int, reason: str) -> None:
-    await websocket.send_json({"type": "error", "code": reason})
-    await websocket.close(code, reason)
+    """Tells the client why, and closes. A client already gone (a tab closed before its hello) is
+    told nothing: sending to it raised, and every such close logged a server error (v0.9.7)."""
+    with suppress(WebSocketDisconnect, RuntimeError):
+        await websocket.send_json({"type": "error", "code": reason})
+        await websocket.close(code, reason)
 
 
 def crowded(game: LiveGame, user_id: UUID) -> bool:

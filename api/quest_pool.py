@@ -253,6 +253,8 @@ GOAL_ERAS = (
     ("mythic", "a set from the Mythic rare era"),
 )
 CARD_TYPES = ("creature", "instant", "sorcery", "artifact", "enchantment", "land", "planeswalker")
+# The card types whose plural is not the word with an s.
+CARD_TYPE_PLURALS = {"sorcery": "sorceries"}
 
 
 def weekly_pool() -> tuple[WeeklyGoal, ...]:
@@ -448,11 +450,15 @@ def weekly_pool() -> tuple[WeeklyGoal, ...]:
         )
     for card_type in CARD_TYPES:
         targets = (1, 2, 4) if card_type == "planeswalker" else (5, 12, 25)
+        # "sorceries", not "sorcerys" (v0.9.7).
+        many = CARD_TYPE_PLURALS.get(card_type)
         tiered(
             f"pull-{card_type}",
             "pulls",
             targets,
-            lambda n, card_type=card_type: f"Pull {number(n, card_type)} from packs",
+            lambda n,
+            card_type=card_type,
+            many=many: f"Pull {number(n, card_type, many)} from packs",
             params=Params(card_type=card_type),
         )
 

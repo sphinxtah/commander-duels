@@ -630,6 +630,25 @@ def test_one_tab_controls_the_seat_and_resends_run_once(
     assert fake.token not in text and SERVICE_TOKEN not in text
 
 
+def test_a_refusal_to_a_client_already_gone_raises_nothing() -> None:
+    """v0.9.7: a tab that closes before its hello has gone when the socket refuses it. Sending
+    the refusal then raised, and every such close logged a server error with its traceback."""
+
+    class Gone:
+        sent: list[str] = []
+
+        async def send_json(self, message: dict[str, str]) -> None:
+            self.sent.append(message["code"])
+            raise WebSocketDisconnect(1006)
+
+        async def close(self, code: int, reason: str) -> None:
+            raise RuntimeError('Cannot call "send" once a close message has been sent.')
+
+    gone = Gone()
+    asyncio.run(games.refuse(gone, games.CLOSE_BAD_MESSAGE, "hello_required"))  # type: ignore[arg-type]
+    assert gone.sent == ["hello_required"]
+
+
 def test_the_websocket_refuses_strangers(
     client: TestClient, app: FastAPI, engine: FakeEngine
 ) -> None:

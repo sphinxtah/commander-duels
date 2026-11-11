@@ -262,7 +262,7 @@ The owner, 2026-11-06: "I want the SysOp account to be able to give itself coins
 
 - **Give tokens** (v0.4.0) and **set wins** (v0.3.1), as before.
 - **Testing grants…** ([api/testing.py](../api/testing.py)):
-  - **Wins by format.** Granted results with no game, marked with SysOp as their granter, counted by the day's quests and the achievements (settled and paid at once), and as many wins as a setting of wins. The profile's statistics and the match history never count them, and no win pays tokens.
+  - **Wins by format.** Granted results with no game, marked with SysOp as their granter, counted by the day's quests and the achievements (settled and paid at once), and as many wins as a setting of wins. The profile's statistics and the match history never count them, and no win pays tokens. A grant names the deck's colours, bots or players as opponents and the bots' skill, and since v0.9.7 a Commander table's size (`seats`, 2 to 4; the other formats' tables have one size), so the quests for a four-player game can be tested too.
   - **Packs**, any product with booster data (the v0.4.0 API, given a form).
   - **Cards**: copies of a card's default edition, nonfoil or foil, granted for good (source `grant`) and sellable.
   - **Campaign progress**: encounters won through a number, with their seals, the next one open and the chapters' card backs and titles, never the spoils; a lower number starts the campaign over first.
