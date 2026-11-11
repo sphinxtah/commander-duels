@@ -453,6 +453,8 @@ class LiveGame:
     # King's Table's teams of three (groups), each two of a team's players allied.
     teams: bool = False
     groups: tuple[tuple[int, ...], ...] = TEAMS
+    # Its own player closed it (v0.9.8): the campaign's court counts that as the court lost.
+    owner_closed: bool = False
     # King's Table (v0.8.7): the live result names its winning team as the recorded one does
     # (v0.8.8), whether the game is a table's or the practice table's.
     kings: bool = False
@@ -793,7 +795,16 @@ class GameHub:
         content_dir = self.settings.content_dir
         try:
             await retried(
-                partial(record_end, self.database, game.id, status, result, content_dir), what
+                partial(
+                    record_end,
+                    self.database,
+                    game.id,
+                    status,
+                    result,
+                    content_dir,
+                    game.owner_closed,
+                ),
+                what,
             )
             return
         except Exception:
@@ -1181,6 +1192,7 @@ def record_end(
     status: str,
     result: dict[str, Any] | None,
     content_dir: str | None = None,
+    owner_closed: bool = False,
 ) -> None:
     """Records how the game ended and, in the same transaction, the win of a player's seat that
     won it (api/progression.py), the tokens it pays (api/economy.py), and since v0.5.0 the
@@ -1189,7 +1201,8 @@ def record_end(
     game also counts in its match (api/matches.py), which ends or goes on to its next game.
     Since v0.8.0 a campaign duel's end is the campaign's instead (api/campaign.py): no win and no
     quests, and for a win the encounter and its rewards (a first win's spoils: the warden's deck
-    and tokens), in this same transaction."""
+    and tokens), in this same transaction. owner_closed says the game's own player closed it
+    (v0.9.8), which the campaign's court counts as the court lost."""
     # Imported here, as above; api.matches and api.campaign import this module.
     from api import campaign, matches
     from api.awards import settle
@@ -1211,7 +1224,7 @@ def record_end(
             # nothing out. games.passive_bots_used still records that the switch was used.
             if link is not None:
                 content = campaign.campaign_in(content_dir) if content_dir else None
-                campaign.game_ended(db, game, link, content, content_dir)
+                campaign.game_ended(db, game, link, content, content_dir, owner_closed)
             else:
                 count_win(db, game)
                 pay_game(db, game)
@@ -2269,7 +2282,9 @@ def observed(
 async def close_game(game_id: UUID, request: Request, principal: Player, db: Db) -> GameSummary:
     """Ends the game for every seat: its owner's choice, or SysOp's. The reply shows the game
     as it ended. A table's game goes on for the other players, so its players concede their own
-    seat instead; only SysOp closes it while it runs."""
+    seat instead; only SysOp closes it while it runs. A game closed counts for nothing, with one
+    exception since v0.9.8: the campaign's court closed by its own player is the court lost
+    (campaign.game_ended), as conceding it would be."""
     game, owner = await run_in_threadpool(visible_game, db, game_id, principal)
     hub = hub_of(request)
     live = hub.games.get(game_id)
@@ -2283,9 +2298,15 @@ async def close_game(game_id: UUID, request: Request, principal: Player, db: Db)
     # No pooled connection is held while the engine closes the game.
     await run_in_threadpool(db.commit)
     if live is not None and not live.finished:
+        # Said before the engine is asked: the result may be recorded before its answer returns.
+        closing_own = owner and not live.owner_closed
+        if closing_own:
+            live.owner_closed = True
         try:
             await hub.require_engine().request("POST", f"{live.path}/close", body={})
         except EngineUnavailable as error:
+            if closing_own:
+                live.owner_closed = False
             raise unavailable() from error
         if not owner:
             await run_in_threadpool(observed, db, request, principal, game_id, "game.closed")

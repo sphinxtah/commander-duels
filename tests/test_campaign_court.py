@@ -58,11 +58,15 @@ class CourtEngine(KingsEngine):
             return httpx.Response(200, json=self.finale)
         return await super().__call__(request)
 
-    def finish(self, game_id: str, result: dict[str, Any]) -> None:
+    def finish(self, game: Any, result: dict[str, Any] | None = None) -> None:
+        """A game's end as the test names it; with a game alone, the engine's own close."""
+        if result is None:
+            super().finish(game)
+            return
         with self.lock:
-            game = self.games[game_id]
-            game.result = result
-            game.revision += 1
+            found = self.games[game]
+            found.result = result
+            found.revision += 1
 
 
 @pytest.fixture
@@ -191,6 +195,8 @@ def test_the_sphinx_flees_and_the_court_pays_both_wards(
     summary = court(ada)
     body = engine.created[-1]
     assert body["format"] == "kings_table" and body["skill"] == 6
+    # Left idle it is lost (v0.9.8), so it waits an hour for its player, as a table does.
+    assert body["idle_timeout_seconds"] == 3600
     # The owner's rule for the court (v0.9.7): a King attacks any General, and the other King once
     # one of that King's Generals is defeated; and 40 turns for each of the six players.
     assert body["kings_table"] == {
@@ -278,6 +284,79 @@ def test_the_sphinx_flees_and_the_court_pays_both_wards(
     until_finished(ada, again["id"])
     assert campaign_tokens(client, ada) == [8192000, 16384000]
     assert state(ada)["challenge"]["open"] is True
+
+
+def ended(kind: str) -> dict[str, Any]:
+    """A court that ended without a winner: closed, left idle or at its turn limit."""
+    return {
+        "kind": kind,
+        "winner_seat": None,
+        "winner_seats": [],
+        "draw": False,
+        "turns": 9,
+        "conceded_seats": [],
+        "error": None,
+    }
+
+
+def at_court(account: Account) -> tuple[str, str]:
+    """The statuses of ward 14 and the court on the account's map."""
+    statuses = {e["number"]: e["status"] for e in state(account)["encounters"]}
+    return statuses[14], statuses[15]
+
+
+def test_a_court_its_player_closes_or_leaves_idle_is_lost(
+    client: TestClient, engine: CourtEngine
+) -> None:
+    """v0.9.8, the owner's decision: wards 14 and 15 are one run, and until then a player losing
+    the court closed the game and kept their place at it."""
+    ada = Account(client, "ada")
+    unlock(client, ada, 14)
+
+    # Closed by its own player: the court is lost, and the player is back at ward 14.
+    flee(client, engine, ada)
+    assert at_court(ada) == ("fled", "open")
+    summary = court(ada)
+    assert ada.send("POST", f"/api/v1/games/{summary['id']}/close").status_code == 200
+    closed = until_finished(ada, summary["id"])
+    assert closed["result"]["kind"] == "closed"
+    assert closed["campaign"]["outcome"] == "lost"
+    assert at_court(ada) == ("open", "locked")
+    assert start(ada, 15).json()["code"] == "encounter_locked"
+    assert rewards(client, ada) == []
+
+    # Left idle until the engine closed it: lost as well.
+    flee(client, engine, ada)
+    summary = court(ada)
+    engine.finish(summary["id"], ended("idle_timeout"))
+    assert until_finished(ada, summary["id"])["campaign"]["outcome"] == "lost"
+    assert at_court(ada) == ("open", "locked")
+
+    # The turn limit is nobody walking away: nothing changes, and the court is still open.
+    flee(client, engine, ada)
+    summary = court(ada)
+    engine.finish(summary["id"], ended("turn_limit"))
+    assert until_finished(ada, summary["id"])["campaign"]["outcome"] == "unfinished"
+    assert at_court(ada) == ("fled", "open")
+
+    # Closed by SysOp, not by its player: nothing changes either.
+    root = Account(client, "sysop", kind="sysop")
+    summary = court(ada)
+    assert root.send("POST", f"/api/v1/games/{summary['id']}/close").status_code == 200
+    assert until_finished(ada, summary["id"])["campaign"]["outcome"] == "unfinished"
+    assert at_court(ada) == ("fled", "open")
+
+    # A duel closed is still a duel unfinished: only the court counts it.
+    summary = start(ada, 14).json()
+    assert ada.send("POST", f"/api/v1/games/{summary['id']}/close").status_code == 200
+    assert until_finished(ada, summary["id"])["campaign"]["outcome"] == "unfinished"
+    assert at_court(ada) == ("fled", "open")
+
+    # And the court can still be won after all of it.
+    summary = court(ada)
+    engine.win(summary["id"], 0)
+    assert until_finished(ada, summary["id"])["campaign"]["outcome"] == "won"
+    assert state(ada)["progress"]["completed"] == [14, 15]
 
 
 def test_the_incarnation_takes_the_court_with_the_owners_content(

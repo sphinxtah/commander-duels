@@ -846,3 +846,116 @@ describe("King's Table at the practice table (v0.8.7)", () => {
     ]);
   });
 });
+
+describe("closing the campaign's court (v0.9.8)", () => {
+  type GameSummary = components["schemas"]["GameSummary"];
+  const player = {
+    ...sysop,
+    kind: "player",
+    handle: "pat",
+    permissions: ["games.play", "decks.edit", "profile.edit"],
+    roles: ["player"],
+  } as unknown as Me;
+
+  function running(id: string, encounter: number): GameSummary {
+    return {
+      id,
+      status: "active",
+      kind: "practice",
+      format: encounter === 15 ? "kings_table" : "commander",
+      your_seat: encounter === 15 ? 1 : 0,
+      seats: [
+        { seat: 0, player: "bot", handle: null, deck: null, left: null },
+        { seat: 1, player: "human", handle: "pat", deck: null, left: null },
+      ],
+      campaign: {
+        encounter,
+        opponent: "sphinx",
+        name: "The Sphinx",
+        title: encounter === 15 ? "The Unbound Court" : "The Fractured Throne",
+        hints: false,
+        deck: "own",
+        finale: "public",
+        outcome: null,
+        challenge: false,
+      },
+      match: null,
+      kings_table: null,
+      result: null,
+      created_at: new Date().toISOString(),
+    } as unknown as GameSummary;
+  }
+
+  async function open(games: GameSummary[]) {
+    await navigate("#play");
+    const api = mockApi();
+    api.on("GET /api/v1/practice-games/options", () =>
+      reply(200, structuredClone(options)),
+    );
+    api.on("GET /api/v1/decks", () => reply(200, []));
+    api.on("GET /api/v1/games", () => reply(200, games));
+    api.on("POST /api/v1/games/{game_id}/close", () => reply(200, {}));
+    const dialogs = HTMLDialogElement.prototype;
+    dialogs.showModal ??= function (this: HTMLDialogElement) {
+      this.setAttribute("open", "");
+    };
+    dialogs.close ??= function (this: HTMLDialogElement) {
+      this.removeAttribute("open");
+      this.dispatchEvent(new Event("close"));
+    };
+    render(
+      <StrictMode>
+        <PracticeTable me={player} />
+      </StrictMode>,
+    );
+    await settle();
+    return api;
+  }
+
+  const closes = (api: ReturnType<typeof mockApi>) =>
+    api.calls.filter((call) => call.route.endsWith("/close")).length;
+
+  it("asks first, since a court its player closes is a court lost", async () => {
+    const api = await open([running("00000000-0000-4000-8000-00000000c015", 15)]);
+    await act(async () =>
+      screen.getByRole("button", { name: "Close" }).click(),
+    );
+    const dialog = screen.getByRole("dialog", {
+      name: "Close the court and lose it?",
+    });
+    expect(dialog).toHaveTextContent("you go back to ward 14");
+    expect(dialog).toHaveTextContent("for an hour is lost the same way");
+    expect(closes(api)).toBe(0);
+    // Keeping the court sends nothing.
+    await act(async () =>
+      within(dialog).getByRole("button", { name: "Keep the court" }).click(),
+    );
+    await settle();
+    expect(closes(api)).toBe(0);
+    // Closing it is said once more on the button, and then sent.
+    await act(async () =>
+      screen.getByRole("button", { name: "Close" }).click(),
+    );
+    await act(async () =>
+      within(
+        screen.getByRole("dialog", { name: "Close the court and lose it?" }),
+      )
+        .getByRole("button", { name: "Close and lose it" })
+        .click(),
+    );
+    await settle();
+    expect(closes(api)).toBe(1);
+  });
+
+  it("closes any other game at once, a ward's duel included", async () => {
+    const api = await open([running("00000000-0000-4000-8000-00000000c014", 14)]);
+    await act(async () =>
+      screen.getByRole("button", { name: "Close" }).click(),
+    );
+    await settle();
+    expect(closes(api)).toBe(1);
+    expect(
+      screen.queryByRole("dialog", { name: "Close the court and lose it?" }),
+    ).toBeNull();
+  });
+});

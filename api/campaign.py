@@ -784,11 +784,28 @@ def state_of(
 # A duel's end.
 
 
-def outcome_of(game: Game, seat: int = 0) -> Outcome:
+# How the engine names a game it ended because its player closed it, and one nobody played for
+# the idle timeout: at the court (v0.9.8) each is the court lost.
+CLOSED, IDLE = "closed", "idle_timeout"
+
+
+def outcome_of(
+    game: Game, seat: int = 0, court: bool = False, owner_closed: bool = False
+) -> Outcome:
     """The campaign's word for how the game ended, for the player's seat (seat 0 in a duel, King
     A's at the court, v0.9.6). Only a completed game the player's side won is a win; a turn limit,
-    a closed or idle game and an engine error are unfinished."""
+    a closed or idle game and an engine error are unfinished.
+
+    The court is the exception (v0.9.8, the owner's decision of 2026-11-11): a court its own
+    player closed, or one left idle until the engine closed it, is lost. Wards 14 and 15 are one
+    run, and until then a player losing the court closed the game and kept their place at it. A
+    court closed by SysOp or an administrator, one that reached its turn limit and one an engine
+    restart interrupted are still unfinished: none of those is the player walking away."""
     result = game.result or {}
+    if court and game.status == "finished":
+        kind = result.get("kind")
+        if kind == IDLE or (kind == CLOSED and owner_closed):
+            return "lost"
     if game.status != "finished" or result.get("kind") != "completed":
         return "unfinished"
     if result.get("draw"):
@@ -802,6 +819,7 @@ def game_ended(
     link: CampaignGame,
     campaign: Campaign | None,
     content_dir: str | None = None,
+    owner_closed: bool = False,
 ) -> None:
     """In the transaction recording the game's end: its outcome, and for a win the encounter, its
     seal and spoils, the next encounter and a chapter's rewards, once. Called by
@@ -815,9 +833,16 @@ def game_ended(
     it: the win records the flight (fled_at) and opens the court, and pays nothing yet. Winning the
     court then wins both: ward 14's seal, spoils and chapter, and ward 15's, with the friends who
     helped paid once each. Losing the court (or a draw) ends the run: the player is back at ward
-    14. An account that won ward 14 before the court existed plays the court alone: nothing sends
+    14. Since v0.9.8 closing the court (owner_closed) or leaving it idle loses it too (outcome_of).
+    An account that won ward 14 before the court existed plays the court alone: nothing sends
     it back. Apex Unbound runs the same way, for its badge alone."""
-    outcome = outcome_of(game, link.seat)
+    at_court = (
+        campaign is not None
+        and link.campaign_id == campaign.id
+        and campaign.court is not None
+        and link.encounter == campaign.court
+    )
+    outcome = outcome_of(game, link.seat, at_court, owner_closed)
     link.outcome = outcome
     link.finished_at = utcnow()
     if outcome == "unfinished" or campaign is None or link.campaign_id != campaign.id:
@@ -1507,7 +1532,9 @@ async def start_encounter(
         sphinx, finale, prize_card = await court_finale(request, engine, encounter, db)
         plans = court_seats(encounter, sphinx, {mine: human}, {})
         opponents = court_opponents(encounter)
-        engine_body = court_body(campaign, encounter, plans)
+        # A court left idle is a court lost (v0.9.8), so a player alone at it gets the hour a
+        # table gets before the engine closes it, where a duel gets the engine's quarter hour.
+        engine_body = court_body(campaign, encounter, plans, TABLE_IDLE_SECONDS)
     else:
         if encounter.private:
             deck_list, finale = finale_seat(encounter, await finale_content(request, engine))

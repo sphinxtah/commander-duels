@@ -12,6 +12,7 @@ import {
   exitTableFullscreen,
 } from "../app/fullscreen";
 import { readTableSettings } from "../app/tableSettings";
+import { COURT } from "../campaign/campaign";
 import { RunningMatches } from "../matches/RunningMatches";
 import {
   PRACTICE_KINGS_TABLE,
@@ -273,6 +274,9 @@ function Table({ me }: { me: Me }) {
   const [everyone, setEveryone] = useState(false);
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
+  // The campaign's court closed by its own player is the court lost (v0.9.8): closing it asks first.
+  const [closingCourt, setClosingCourt] = useState<GameSummary | null>(null);
+  const courtDialog = useRef<HTMLDialogElement>(null);
   const [format, setFormat] = useState<Request["format"]>("legacy");
   const [deck, setDeck] = useState<string>("");
   const [bots, setBots] = useState(1);
@@ -830,7 +834,15 @@ function Table({ me }: { me: Me }) {
                       <button
                         type="button"
                         className={styles.secondaryButton}
-                        onClick={() => void close(game)}
+                        onClick={() => {
+                          if (
+                            game.campaign?.encounter === COURT &&
+                            game.your_seat !== null
+                          ) {
+                            setClosingCourt(game);
+                            courtDialog.current?.showModal();
+                          } else void close(game);
+                        }}
                       >
                         Close
                       </button>
@@ -842,6 +854,32 @@ function Table({ me }: { me: Me }) {
           })}
         </ul>
       )}
+      <dialog
+        ref={courtDialog}
+        className={styles.confirm}
+        aria-labelledby="close-court-title"
+        onClose={() => setClosingCourt(null)}
+      >
+        <h2 id="close-court-title">Close the court and lose it?</h2>
+        <p>
+          Closing the court counts as losing it: you go back to ward 14 and must
+          make The Sphinx flee again to return. A court nobody plays for an
+          hour is lost the same way. To take a break, leave it open and resume
+          it here within the hour.
+        </p>
+        <form method="dialog" className={styles.confirmButtons}>
+          <button type="submit" className={styles.secondaryButton} autoFocus>
+            Keep the court
+          </button>
+          <button
+            type="submit"
+            className={styles.dangerButton}
+            onClick={() => closingCourt && void close(closingCourt)}
+          >
+            Close and lose it
+          </button>
+        </form>
+      </dialog>
     </section>
   );
 }
