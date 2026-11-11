@@ -82,6 +82,29 @@ class CourtDecksTest {
     }
 
     /**
+     * Every ward's deck (v0.9.8): 99 cards the engine knows, under the ward's commander, or for the
+     * throne's ward its public stand-in. A tuned deck that names a card the engine lacks would
+     * otherwise fail only when its ward is played.
+     */
+    @Test
+    void everyWardsDeckNamesOnlyCardsTheEngineKnows() throws Exception {
+        int checked = 0;
+        for (JsonElement element : wards) {
+            JsonObject ward = element.getAsJsonObject();
+            if (!ward.has("cards") || ward.has("cards_from")) {
+                continue;
+            }
+            String commander = ward.get("commander").isJsonNull()
+                ? ward.get("fallback_commander").getAsString() : ward.get("commander").getAsString();
+            DeckLists.CustomDeck parsed = deck(ward.getAsJsonArray("cards"), commander);
+            assertTrue(DeckLists.unknown(parsed).isEmpty(), ward.get("name") + ": " + DeckLists.unknown(parsed));
+            assertEquals(99, parsed.cards().stream().mapToInt(DeckLists.Entry::count).sum(), ward.get("name").toString());
+            checked++;
+        }
+        assertEquals(14, checked);
+    }
+
+    /**
      * The player's bot Generals (v0.9.8) play beaten wardens' own decks, one in each General's seat
      * of team A: wards before the throne's, whose decks the engine knows card for card.
      */
