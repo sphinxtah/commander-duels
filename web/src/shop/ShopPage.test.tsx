@@ -16,6 +16,7 @@ import {
   vi,
 } from "vitest";
 import { client } from "../api";
+import { lockScrollUnderModals, MODAL_ATTRIBUTE } from "../app/scrollLock";
 import {
   card,
   deckOffer,
@@ -335,6 +336,67 @@ describe("Leng's card shop", () => {
         { params: { path: { opening_id: "opening-0" } } },
       ),
     );
+  });
+
+  // v0.9.9, the owner: "it doesn't also scroll the Leng's shop area underneath … That layer
+  // should lock while the new card view window is up."
+  it("opens a pack in a window over the shop, which is locked under it", async () => {
+    document.documentElement.dataset.reducedMotion = "true";
+    const stop = lockScrollUnderModals();
+    const html = document.documentElement;
+    on("POST /api/v1/shop/packs/{pack_id}/open", () => reply(200, opening));
+    const heading = createRef<HTMLHeadingElement>();
+    render(<ShopPage me={player} heading={heading} onSetup={vi.fn()} />);
+    const opener = await screen.findByRole("button", {
+      name: "Open a pack of Zendikar Rising Draft Booster",
+    });
+    expect(html).not.toHaveAttribute(MODAL_ATTRIBUTE);
+    fireEvent.click(opener);
+    const window_ = await screen.findByRole("dialog", {
+      name: "Zendikar Rising Draft Booster: your pack",
+    });
+    // The pack is in the window; the shop is still on the page, under it, and does not scroll.
+    expect(window_).toContainElement(
+      screen.getByRole("button", { name: /Tear open the/ }),
+    );
+    const shelves = screen.getByRole("heading", { name: "On the shelves" });
+    expect(window_).not.toContainElement(shelves);
+    await waitFor(() => expect(html).toHaveAttribute(MODAL_ATTRIBUTE));
+    // Through to the summary: the same window all the way.
+    fireEvent.click(screen.getByRole("button", { name: /Tear open the/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Reveal all" }));
+    expect(window_).toContainElement(
+      screen.getByRole("list", { name: "Cards in the pack" }),
+    );
+    expect(html).toHaveAttribute(MODAL_ATTRIBUTE);
+    // Closing it gives the page back.
+    fireEvent.click(screen.getByRole("button", { name: "Back to the shop" }));
+    await waitFor(() => expect(html).not.toHaveAttribute(MODAL_ATTRIBUTE));
+    expect(screen.queryByRole("dialog", { name: /your pack/ })).toBeNull();
+    expect(shelves).toBeInTheDocument();
+    stop();
+  });
+
+  it("closes the pack's window on Escape", async () => {
+    document.documentElement.dataset.reducedMotion = "true";
+    on("POST /api/v1/shop/packs/{pack_id}/open", () => reply(200, opening));
+    render(<ShopPage me={player} heading={createRef()} onSetup={vi.fn()} />);
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Open a pack of Zendikar Rising Draft Booster",
+      }),
+    );
+    const window_ = await screen.findByRole("dialog", { name: /your pack/ });
+    fireEvent(window_, new Event("cancel", { cancelable: true }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: /your pack/ })).toBeNull(),
+    );
+    // The shop reads its packs again: the opened one has left the inventory.
+    const reads = () =>
+      (vi.mocked(client.GET).mock.calls as unknown as [string][]).filter(
+        ([path]) => path === "/api/v1/shop",
+      ).length;
+    await waitFor(() => expect(reads()).toBeGreaterThan(1));
   });
 
   it("asks whether to keep a deck pack together as a Legacy deck (v0.9.8)", async () => {

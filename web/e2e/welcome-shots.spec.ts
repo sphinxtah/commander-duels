@@ -170,11 +170,8 @@ test.describe("the welcome's screenshots", () => {
       await cards.nth(n).click();
       await page.waitForTimeout(250);
     }
-    await hideChatBar(page);
-    await page
-      .locator('[data-tour="pack-opening"]')
-      .evaluate((node) => node.scrollIntoView({ block: "start" }));
-    await page.evaluate(() => window.scrollBy(0, -80));
+    // The pack's window fills the screen (v0.9.9): nothing to scroll to, and the chat bar is
+    // under it.
     await page.waitForTimeout(2_000);
     await picturesSettled(page);
     await page.screenshot({ path: `${OUT}/shop.png` });

@@ -133,10 +133,8 @@ test.describe("Leng's card shop", () => {
     await expect(
       page.getByText(/15 cards · \d+ new to your library/),
     ).toBeVisible();
-    await page.screenshot({
-      path: testInfo.outputPath("shop-opened.png"),
-      fullPage: true,
-    });
+    // The pack's window is the screen (v0.9.9): the page under it is not part of the picture.
+    await page.screenshot({ path: testInfo.outputPath("shop-opened.png") });
     const first = summary.getByRole("listitem").first();
     // The last name in the item is the summary's; the first is the card frame's, under its image.
     const name = (await first.locator("strong").last().innerText()).trim();
@@ -172,7 +170,6 @@ test.describe("Leng's card shop", () => {
     expect(await fits()).toBe(true);
     await page.screenshot({
       path: testInfo.outputPath("shop-summary-390.png"),
-      fullPage: true,
     });
     expect(errors).toEqual([]);
   });

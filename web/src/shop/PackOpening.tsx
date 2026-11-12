@@ -5,6 +5,8 @@ import {
   useState,
   type KeyboardEvent,
   type ReactNode,
+  type SyntheticEvent,
+  type WheelEvent,
 } from "react";
 import { useMotionLevel } from "../app/motion";
 import { readTableSettings } from "../app/tableSettings";
@@ -38,11 +40,30 @@ import { signalTutorial } from "../tutorial/tutorial";
 // immediate and nothing moves. Since v0.4.3 the pack is the product's own picture (PackArt), whose
 // top strip tears off, and Leng's counter shows dimly behind it all. Since v0.9.8 a pack that is
 // a deck asks in its summary whether to keep its cards together as one (DeckChoice).
+// Since v0.9.9 it is laid out for a window that does not scroll (OpeningWindow): a head with the
+// title, a body that alone scrolls (the pack, its cards, the summary) and a foot with the
+// buttons, so in a large pack the cards scroll while everything else, Leng's counter behind them
+// included, holds still.
 
 /** How long each step takes, in ms, when motion is allowed. */
 export const TIMING = { tear: 650, deal: 70, settle: 300, revealAll: 140 };
 
 type Stage = "sealed" | "tearing" | "dealing" | "revealing" | "summary";
+
+/** What one press of an arrow key scrolls the window's body by, and the least a page key does. */
+const LINE = 40;
+
+/**
+ * Whether an event in the window came from outside its scrolling body: from the head, the foot
+ * or the bare ground. The body scrolls itself, and a card's details, open over all of it, are
+ * their own pop-up.
+ */
+function outsideBody(event: SyntheticEvent<HTMLElement>): boolean {
+  const from = (event.target as Element | null)?.closest?.(
+    "[data-opening-scroll], dialog",
+  );
+  return !(from && event.currentTarget.contains(from));
+}
 
 function play(cue: Cue, delayMs = 0) {
   getSoundEngine().play(cue, { delayMs });
@@ -155,6 +176,8 @@ export function PackOpening({
   const [byEdition, setByEdition] = useState(lands);
   const timers = useRef<number[]>([]);
   const board = useRef<HTMLDivElement>(null);
+  const pack = useRef<HTMLButtonElement>(null);
+  const body = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
 
@@ -204,9 +227,14 @@ export function PackOpening({
     );
     return () => ids.forEach((id) => window.clearTimeout(id));
   }, [stage, cards, reduced]);
+  // Each stage gives the keyboard to what it is about: the pack to tear, the cards to turn,
+  // the summary's title. In its window (v0.9.9) the pack must be given it: the browser's own
+  // choice as a pop-up opens is the first thing it finds, which may be the scrolling body.
+  // Nothing scrolls for it: the body stays where it is.
   useEffect(() => {
-    if (stage === "revealing") board.current?.focus();
-    if (stage === "summary") heading.current?.focus();
+    if (stage === "sealed") pack.current?.focus({ preventScroll: true });
+    if (stage === "revealing") board.current?.focus({ preventScroll: true });
+    if (stage === "summary") heading.current?.focus({ preventScroll: true });
   }, [stage]);
   // A pack opened here, not one from the history, tells the tutorial's tour (v0.8.4).
   useEffect(() => {
@@ -238,7 +266,16 @@ export function PackOpening({
 
   function flipNext() {
     const next = cards.find((card) => !shown.has(card.position));
-    if (next) flip(next);
+    if (!next) return;
+    flip(next);
+    // Space turns the cards in order: in a large pack the next one may lie outside the window's
+    // view (v0.9.9), so the body scrolls just far enough to show it.
+    board.current
+      ?.querySelector(`[data-position="${next.position}"]`)
+      ?.scrollIntoView?.({
+        block: "nearest",
+        behavior: reduced ? "auto" : "smooth",
+      });
   }
 
   function revealAll() {
@@ -262,6 +299,45 @@ export function PackOpening({
     setAnnounced(`All ${cards.length} cards revealed.`);
   }
 
+  // The window is one scrolling surface (v0.9.9): the wheel over its head or its foot, and the
+  // scrolling keys while the keyboard is there (the summary's title, a button), scroll the
+  // body, as they did when the pack was part of a page that scrolled. Without this the wheel
+  // would do nothing right after a press of Reveal all, with the pointer still on the foot.
+  function onWheel(event: WheelEvent<HTMLElement>) {
+    const area = body.current;
+    if (!area || event.ctrlKey || !outsideBody(event)) return;
+    // A wheel may count in pixels, in lines or in pages.
+    const unit =
+      event.deltaMode === 1
+        ? LINE
+        : event.deltaMode === 2
+          ? area.clientHeight
+          : 1;
+    area.scrollTop += event.deltaY * unit;
+  }
+
+  function onScrollKey(event: KeyboardEvent<HTMLElement>) {
+    const area = body.current;
+    if (!area || event.defaultPrevented || !outsideBody(event)) return;
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const page = Math.max(LINE, area.clientHeight - LINE);
+    let top: number;
+    if (event.key === "ArrowDown") top = area.scrollTop + LINE;
+    else if (event.key === "ArrowUp") top = area.scrollTop - LINE;
+    else if (event.key === "PageDown") top = area.scrollTop + page;
+    else if (event.key === "PageUp") top = area.scrollTop - page;
+    else if (event.key === "Home") top = 0;
+    else if (event.key === "End") top = area.scrollHeight;
+    else if (event.key === " " || event.key === "Spacebar") {
+      // Space presses the button that has it; elsewhere it turns a page, as in any page.
+      const target = event.target as HTMLElement;
+      if (target.closest("button, a, input, select, textarea, summary")) return;
+      top = area.scrollTop + (event.shiftKey ? -page : page);
+    } else return;
+    event.preventDefault();
+    area.scrollTop = top;
+  }
+
   function onKey(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key !== " " && event.key !== "Spacebar") return;
     // A focused button answers Space itself.
@@ -271,6 +347,21 @@ export function PackOpening({
     flipNext();
   }
 
+  // The window's own way out, at every stage (v0.9.9): the page under it cannot be reached
+  // while it is up, and the server gave the cards before any of this. It is drawn in the
+  // window's top corner but comes last in it, so that an opening window gives the keyboard to
+  // the pack, not to the way out.
+  const close = (
+    <button
+      type="button"
+      className={styles.windowClose}
+      aria-label="Close"
+      title="Close. The cards are already in your library."
+      onClick={onDone}
+    >
+      ×
+    </button>
+  );
   const newCards = cards.filter((card) => card.new).length;
   const foils = cards.filter((card) => card.finish !== "nonfoil").length;
   const title = opening.product.name;
@@ -281,95 +372,110 @@ export function PackOpening({
         className={styles.opening}
         aria-labelledby="opening-summary-title"
         data-stage="summary"
+        onWheel={onWheel}
+        onKeyDown={onScrollKey}
       >
         <LengBackdrop />
-        <span className={shell.eyebrow}>{noun.toUpperCase()} OPENED</span>
-        <h2 id="opening-summary-title" ref={heading} tabIndex={-1}>
-          {title}
-        </h2>
-        <p className={styles.note}>
-          {summaryLine ??
-            `${cards.length} cards · ${newCards} new to your library`}
-          {foils ? ` · ${foils} foil${foils === 1 ? "" : "s"}` : ""}. Every card
-          is now in your library for good.
-        </p>
-        {deck && <DeckChoicePanel choice={deck} />}
-        {lands && (
-          <div
-            className={styles.viewSwitch}
-            role="group"
-            aria-label="Show the pack"
-          >
-            <button
-              type="button"
-              className={styles.secondary}
-              aria-pressed={byEdition}
-              onClick={() => setByEdition(true)}
+        <header className={styles.openingHead}>
+          <span className={shell.eyebrow}>{noun.toUpperCase()} OPENED</span>
+          <h2 id="opening-summary-title" ref={heading} tabIndex={-1}>
+            {title}
+          </h2>
+          <p className={styles.note}>
+            {summaryLine ??
+              `${cards.length} cards · ${newCards} new to your library`}
+            {foils ? ` · ${foils} foil${foils === 1 ? "" : "s"}` : ""}. Every
+            card is now in your library for good.
+          </p>
+        </header>
+        {/* Its own key: the summary starts at its top, wherever the cards were scrolled to. */}
+        <div
+          key="summary"
+          ref={body}
+          className={styles.openingBody}
+          data-opening-scroll
+        >
+          {deck && <DeckChoicePanel choice={deck} />}
+          {lands && (
+            <div
+              className={styles.viewSwitch}
+              role="group"
+              aria-label="Show the pack"
             >
-              By land and edition
-            </button>
-            <button
-              type="button"
-              className={styles.secondary}
-              aria-pressed={!byEdition}
-              onClick={() => setByEdition(false)}
-            >
-              Every card
-            </button>
-          </div>
-        )}
-        {lands && byEdition ? (
-          <LandTally cards={cards} />
-        ) : (
-          <ul className={styles.summary} aria-label="Cards in the pack">
-            {cards.map((card) => (
-              <li
-                key={card.position}
-                className={styles.summaryCard}
-                data-glow={glowOf(card) ?? undefined}
-                data-finish={card.finish}
+              <button
+                type="button"
+                className={styles.secondary}
+                aria-pressed={byEdition}
+                onClick={() => setByEdition(true)}
               >
-                {/* The card itself opens its details (v0.9.1, the owner's request). */}
-                <button
-                  type="button"
-                  className={styles.faceButton}
-                  aria-label={`Details of ${card.name}`}
-                  onClick={() => setDetails(card)}
+                By land and edition
+              </button>
+              <button
+                type="button"
+                className={styles.secondary}
+                aria-pressed={!byEdition}
+                onClick={() => setByEdition(false)}
+              >
+                Every card
+              </button>
+            </div>
+          )}
+          {lands && byEdition ? (
+            <LandTally cards={cards} />
+          ) : (
+            <ul className={styles.summary} aria-label="Cards in the pack">
+              {cards.map((card) => (
+                <li
+                  key={card.position}
+                  className={styles.summaryCard}
+                  data-glow={glowOf(card) ?? undefined}
+                  data-finish={card.finish}
                 >
-                  <CardFace card={card} glow />
-                </button>
-                <div className={styles.summaryText}>
-                  <strong>{card.name}</strong>
-                  <span>
-                    {rarityLabels[card.rarity] ?? card.rarity}
-                    {card.finish === "foil" && " · Foil"}
-                    {card.finish === "etched" && " · Etched foil"}
-                  </span>
-                  {/* v0.6.2: the game has no rules for it yet; casual games play it as a stand-in. */}
-                  {card.stand_in && (
-                    <span
-                      className={styles.standIn}
-                      title="The game has no rules for this card yet: in casual games it plays as a stand-in with its cost, types, power and toughness."
-                    >
-                      Stand-in
+                  {/* The card itself opens its details (v0.9.1, the owner's request). */}
+                  <button
+                    type="button"
+                    className={styles.faceButton}
+                    aria-label={`Details of ${card.name}`}
+                    onClick={() => setDetails(card)}
+                  >
+                    <CardFace card={card} glow />
+                  </button>
+                  <div className={styles.summaryText}>
+                    <strong>{card.name}</strong>
+                    <span>
+                      {rarityLabels[card.rarity] ?? card.rarity}
+                      {card.finish === "foil" && " · Foil"}
+                      {card.finish === "etched" && " · Etched foil"}
                     </span>
-                  )}
-                  {/* Before v0.6.2 a card the game could not play gave way to this one; the
+                    {/* v0.6.2: the game has no rules for it yet; casual games play it as a stand-in. */}
+                    {card.stand_in && (
+                      <span
+                        className={styles.standIn}
+                        title="The game has no rules for this card yet: in casual games it plays as a stand-in with its cost, types, power and toughness."
+                      >
+                        Stand-in
+                      </span>
+                    )}
+                    {/* Before v0.6.2 a card the game could not play gave way to this one; the
                     card drawn, listed before it, is now the player's too. */}
-                  {card.extra && (
-                    <span className={styles.extraMark}>
-                      Extra: given in place of the card before it, which is now
-                      yours too
-                    </span>
-                  )}
-                  {/* New: the library held no copy of this edition before (v0.5.0). */}
-                  {card.new && <span className={styles.newMark}>New</span>}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className={styles.actions}>
+                    {card.extra && (
+                      <span className={styles.extraMark}>
+                        Extra: given in place of the card before it, which is
+                        now yours too
+                      </span>
+                    )}
+                    {/* New: the library held no copy of this edition before (v0.5.0). */}
+                    {card.new && <span className={styles.newMark}>New</span>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div
+          className={`${styles.actions} ${styles.openingFoot}`}
+          data-opening-foot
+        >
           {onAnother && remaining > 0 && (
             <button type="button" className={shell.primary} onClick={onAnother}>
               Open another {kindLabels[opening.product.kind] ?? "pack"} (
@@ -406,6 +512,7 @@ export function PackOpening({
             />
           )}
         </dialog>
+        {close}
       </section>
     );
 
@@ -415,41 +522,15 @@ export function PackOpening({
       className={styles.opening}
       aria-labelledby="opening-title"
       data-stage={stage}
-      data-tour="pack-opening"
+      onWheel={onWheel}
+      onKeyDown={onScrollKey}
     >
       <LengBackdrop />
-      <span className={shell.eyebrow}>OPENING A {noun.toUpperCase()}</span>
-      <h2 id="opening-title">{title}</h2>
-      {stage === "sealed" || stage === "tearing" ? (
-        <div className={styles.packStage}>
-          <button
-            type="button"
-            className={styles.pack}
-            data-torn={stage === "tearing" || undefined}
-            onClick={stage === "sealed" ? tear : undefined}
-            aria-label={`Tear open the ${title}`}
-            data-tour="pack-tear"
-          >
-            {/* The same picture twice: the strip that tears off, and the rest of the pack. */}
-            <span className={styles.packTop} aria-hidden="true">
-              {art ?? (
-                <PackArt product={opening.product} size="large" height={20} />
-              )}
-            </span>
-            <span className={styles.packBody} aria-hidden="true">
-              {art ?? (
-                <PackArt product={opening.product} size="large" height={20} />
-              )}
-            </span>
-          </button>
-          <p className={styles.note}>
-            {stage === "sealed"
-              ? `Click the ${noun} to tear it open.`
-              : "Tearing it open…"}
-          </p>
-        </div>
-      ) : (
-        <>
+      {/* The tour points at the head: the whole window would leave its bubble no room. */}
+      <header className={styles.openingHead} data-tour="pack-opening">
+        <span className={shell.eyebrow}>OPENING A {noun.toUpperCase()}</span>
+        <h2 id="opening-title">{title}</h2>
+        {stage !== "sealed" && stage !== "tearing" && (
           <p className={styles.note}>
             {stage === "dealing"
               ? "Dealing the cards…"
@@ -457,6 +538,44 @@ export function PackOpening({
                 ? `Click a card, or press Space, to turn it over. ${left} to go.`
                 : "Every card is revealed."}
           </p>
+        )}
+      </header>
+      <div
+        key="cards"
+        ref={body}
+        className={styles.openingBody}
+        data-opening-scroll
+      >
+        {stage === "sealed" || stage === "tearing" ? (
+          <div className={styles.packStage}>
+            <button
+              ref={pack}
+              type="button"
+              className={styles.pack}
+              data-torn={stage === "tearing" || undefined}
+              onClick={stage === "sealed" ? tear : undefined}
+              aria-label={`Tear open the ${title}`}
+              data-tour="pack-tear"
+            >
+              {/* The same picture twice: the strip that tears off, and the rest of the pack. */}
+              <span className={styles.packTop} aria-hidden="true">
+                {art ?? (
+                  <PackArt product={opening.product} size="large" height={20} />
+                )}
+              </span>
+              <span className={styles.packBody} aria-hidden="true">
+                {art ?? (
+                  <PackArt product={opening.product} size="large" height={20} />
+                )}
+              </span>
+            </button>
+            <p className={styles.note}>
+              {stage === "sealed"
+                ? `Click the ${noun} to tear it open.`
+                : "Tearing it open…"}
+            </p>
+          </div>
+        ) : (
           <div
             ref={board}
             className={styles.board}
@@ -469,7 +588,11 @@ export function PackOpening({
               {cards.slice(0, dealt).map((card, index) => {
                 const up = shown.has(card.position);
                 return (
-                  <li key={card.position} className={styles.slot}>
+                  <li
+                    key={card.position}
+                    className={styles.slot}
+                    data-position={card.position}
+                  >
                     <button
                       type="button"
                       /* A foil turned up glows (v0.6.0): on the button, outside the turning
@@ -506,32 +629,37 @@ export function PackOpening({
               })}
             </ol>
           </div>
-          <div className={styles.actions}>
-            {stage === "revealing" && left > 0 && (
-              <button
-                type="button"
-                className={shell.primary}
-                onClick={revealAll}
-                data-tour="pack-reveal"
-              >
-                Reveal all
-              </button>
-            )}
-            {stage === "revealing" && left === 0 && (
-              <button
-                type="button"
-                className={shell.primary}
-                onClick={() => setStage("summary")}
-              >
-                See the summary
-              </button>
-            )}
-          </div>
-        </>
+        )}
+      </div>
+      {stage === "revealing" && (
+        <div
+          className={`${styles.actions} ${styles.openingFoot}`}
+          data-opening-foot
+        >
+          {left > 0 ? (
+            <button
+              type="button"
+              className={shell.primary}
+              onClick={revealAll}
+              data-tour="pack-reveal"
+            >
+              Reveal all
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={shell.primary}
+              onClick={() => setStage("summary")}
+            >
+              See the summary
+            </button>
+          )}
+        </div>
       )}
       <p className={styles.hidden} role="status" aria-live="polite">
         {announced}
       </p>
+      {close}
     </section>
   );
 }

@@ -1,15 +1,18 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { client, describe } from "../api";
 import { portraitUrl } from "../game/table/portrait";
+import { OpeningWindow } from "../shop/OpeningWindow";
 import { PackOpening } from "../shop/PackOpening";
 import type { Opening } from "../shop/shop";
 import type { components } from "../generated/api";
+import shop from "../shop/shop.module.css";
 import styles from "./cutscene.module.css";
 
 // Opening a warden's deck (v0.9.5, the owner's request): after a warden's first defeat, the deck
 // they played tears open like a 100-card deck from Leng's shop, card by card, commons first and
 // the commander last, the High Priest last of all for The Sphinx. The server gave the cards with
-// the win; this only shows them, and may show them again.
+// the win; this only shows them, and may show them again. Since v0.9.9 it opens in the shop's
+// own window (OpeningWindow): the hundred cards scroll inside it and nothing else moves.
 
 export type WardenOpeningSummary =
   components["schemas"]["WardenOpeningSummary"];
@@ -75,7 +78,6 @@ export function WardenOpening({
 }) {
   const [view, setView] = useState<WardenOpeningView>();
   const [error, setError] = useState("");
-  const dialog = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -99,37 +101,24 @@ export function WardenOpening({
     };
   }, [id]);
 
-  useEffect(() => {
-    const element = dialog.current;
-    if (element && !element.open) {
-      if (typeof element.showModal === "function") element.showModal();
-      else element.setAttribute("open", "");
-    }
-    return () => {
-      if (element?.open && typeof element.close === "function") element.close();
-    };
-  }, []);
-
   const commander = view?.pulled.find((card) => card.commander);
   return (
-    <dialog
-      ref={dialog}
-      className={styles.openingDialog}
-      aria-label={view ? `Open ${view.deck_title}` : "A warden's deck"}
-      onCancel={(event) => {
-        event.preventDefault();
-        onDone();
-      }}
+    <OpeningWindow
+      label={view ? `Open ${view.deck_title}` : "A warden's deck"}
+      onClose={onDone}
+      tone="campaign"
     >
       {error && (
-        <p role="alert">
+        <p role="alert" className={shop.windowNote}>
           {error}{" "}
           <button type="button" onClick={onDone}>
             Close
           </button>
         </p>
       )}
-      {!view && !error && <p>Unsealing the deck…</p>}
+      {!view && !error && (
+        <p className={shop.windowNote}>Unsealing the deck…</p>
+      )}
       {view && (
         <PackOpening
           opening={asOpening(view)}
@@ -144,6 +133,6 @@ export function WardenOpening({
           }. The deck waits among your decks.`}
         />
       )}
-    </dialog>
+    </OpeningWindow>
   );
 }

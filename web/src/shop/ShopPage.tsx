@@ -13,6 +13,7 @@ import { StarterBox, type DeckChoice } from "./DeckChoice";
 import { DeckShelf } from "./DeckShelf";
 import { Leng } from "./Leng";
 import { PackArt } from "./PackArt";
+import { OpeningWindow } from "./OpeningWindow";
 import { PackOpening } from "./PackOpening";
 import { WeeklySale } from "./WeeklySale";
 import {
@@ -265,40 +266,53 @@ export function ShopPage({
     </>
   );
 
-  if (opening) {
-    const next = view?.inventory.find(
+  // A pack opens in a window over the shop (v0.9.9): the shop stays where it was under it,
+  // locked, and is there again, at the same place, when the window closes.
+  function closeOpening() {
+    setOpening(null);
+    void load();
+    // The browser gives the focus back to the button that opened the pack; when that pack was
+    // the last of its kind the button is gone, and the page's title takes it.
+    requestAnimationFrame(() => {
+      const active = document.activeElement;
+      if (!active || active === document.body)
+        heading.current?.focus({ preventScroll: true });
+    });
+  }
+  const next =
+    opening &&
+    view?.inventory.find(
       (item) => item.product.id === opening.opening.product.id,
     );
-    return (
-      <>
-        {intro}
-        <PackOpening
-          key={opening.opening.id}
-          opening={opening.opening}
-          startOpen={opening.startOpen}
-          remaining={next?.count ?? 0}
-          onAnother={next ? () => void open(next.next_pack) : undefined}
-          deck={opening.starter?.choice ?? packChoice(opening.opening)}
-          art={
-            opening.starter ? (
-              <StarterBox deck={opening.starter.deck} />
-            ) : undefined
-          }
-          noun={opening.starter ? "deck" : "pack"}
-          // The tutorial's tour waits for a pack, not a deck.
-          tutorial={!opening.starter}
-          onDone={() => {
-            setOpening(null);
-            void load();
-          }}
-        />
-      </>
-    );
-  }
+  const openingWindow = opening && (
+    <OpeningWindow
+      label={`${opening.opening.product.name}: your ${opening.starter ? "deck" : "pack"}`}
+      onClose={closeOpening}
+    >
+      <PackOpening
+        key={opening.opening.id}
+        opening={opening.opening}
+        startOpen={opening.startOpen}
+        remaining={next ? next.count : 0}
+        onAnother={next ? () => void open(next.next_pack) : undefined}
+        deck={opening.starter?.choice ?? packChoice(opening.opening)}
+        art={
+          opening.starter ? (
+            <StarterBox deck={opening.starter.deck} />
+          ) : undefined
+        }
+        noun={opening.starter ? "deck" : "pack"}
+        // The tutorial's tour waits for a pack, not a deck.
+        tutorial={!opening.starter}
+        onDone={closeOpening}
+      />
+    </OpeningWindow>
+  );
 
   return (
     <>
       {intro}
+      {openingWindow}
       <p className={shell.lead}>
         Tokens from your wins buy booster packs, from Revised to the current
         set. Each pack opens here at the counter, and its cards join your

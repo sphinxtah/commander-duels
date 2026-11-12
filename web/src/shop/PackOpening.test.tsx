@@ -130,6 +130,178 @@ describe("opening a pack", () => {
     vi.useRealTimers();
   });
 
+  // v0.9.9, the owner: scrolling through a large pack's cards scrolled the shop under them.
+  it("keeps its title and buttons out of the one part that scrolls", () => {
+    document.documentElement.dataset.reducedMotion = "true";
+    const { container } = render(
+      <PackOpening opening={opening} onDone={vi.fn()} />,
+    );
+    const scrolls = () => {
+      const found = container.querySelectorAll("[data-opening-scroll]");
+      expect(found).toHaveLength(1);
+      return found[0];
+    };
+    const title = () =>
+      screen.getByRole("heading", { name: "Zendikar Rising Draft Booster" });
+    // Sealed: the pack is in the body, the title above it.
+    expect(scrolls()).toContainElement(
+      screen.getByRole("button", { name: /Tear open the/ }),
+    );
+    expect(scrolls()).not.toContainElement(title());
+    // Turning the cards over: the cards scroll; the count to go and Reveal all do not.
+    fireEvent.click(screen.getByRole("button", { name: /Tear open the/ }));
+    const cardsBody = scrolls();
+    expect(cardsBody).toContainElement(
+      screen.getByRole("group", { name: "The pack's cards" }),
+    );
+    expect(cardsBody).not.toContainElement(title());
+    expect(cardsBody).not.toContainElement(screen.getByText(/6 to go\./));
+    expect(cardsBody).not.toContainElement(
+      screen.getByRole("button", { name: "Reveal all" }),
+    );
+    expect(cardsBody).not.toContainElement(
+      screen.getByRole("button", { name: "Close" }),
+    );
+    // The summary: its cards scroll, in a body of its own that starts at its top.
+    fireEvent.click(screen.getByRole("button", { name: "Reveal all" }));
+    const summaryBody = scrolls();
+    expect(summaryBody).not.toBe(cardsBody);
+    expect(summaryBody).toContainElement(
+      screen.getByRole("list", { name: "Cards in the pack" }),
+    );
+    expect(summaryBody).not.toContainElement(title());
+    expect(summaryBody).not.toContainElement(
+      screen.getByText(/6 cards · \d+ new to your library/),
+    );
+    expect(summaryBody).not.toContainElement(
+      screen.getByRole("button", { name: "Back to the shop" }),
+    );
+  });
+
+  it("has a way out at every stage: the cards are the player's already", () => {
+    document.documentElement.dataset.reducedMotion = "true";
+    const done = vi.fn();
+    render(<PackOpening opening={opening} onDone={done} />);
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(done).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: /Tear open the/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(done).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByRole("button", { name: "Reveal all" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(done).toHaveBeenCalledTimes(3);
+  });
+
+  it("scrolls its body from its head and its foot: the wheel, and the scrolling keys", () => {
+    document.documentElement.dataset.reducedMotion = "true";
+    const { container } = render(
+      <PackOpening opening={opening} onDone={vi.fn()} startOpen />,
+    );
+    const body = container.querySelector<HTMLElement>("[data-opening-scroll]")!;
+    // jsdom lays nothing out: the body's place and size are given, and its scrolling kept.
+    let top = 0;
+    Object.defineProperties(body, {
+      scrollTop: { get: () => top, set: (value: number) => (top = value) },
+      clientHeight: { get: () => 500 },
+      scrollHeight: { get: () => 3000 },
+    });
+    const title = screen.getByRole("heading", {
+      name: "Zendikar Rising Draft Booster",
+    });
+    const back = screen.getByRole("button", { name: "Back to the shop" });
+    // The wheel over the title and over the foot's button scrolls the cards, in pixels, in
+    // lines and in pages.
+    fireEvent.wheel(title, { deltaY: 120 });
+    expect(top).toBe(120);
+    fireEvent.wheel(back, { deltaY: 3, deltaMode: 1 });
+    expect(top).toBe(240);
+    fireEvent.wheel(back, { deltaY: -1, deltaMode: 2 });
+    expect(top).toBe(-260);
+    // Over the cards the body scrolls itself, and a pinch (Ctrl and the wheel) is the browser's.
+    top = 0;
+    fireEvent.wheel(screen.getByRole("list", { name: "Cards in the pack" }), {
+      deltaY: 120,
+    });
+    fireEvent.wheel(title, { deltaY: 120, ctrlKey: true });
+    expect(top).toBe(0);
+    // The keys, from the title: a line, a page less a line, the ends.
+    const key = (target: Element, name: string, more = {}) =>
+      fireEvent.keyDown(target, { key: name, ...more });
+    expect(key(title, "ArrowDown")).toBe(false);
+    expect(top).toBe(40);
+    key(title, "ArrowUp");
+    expect(top).toBe(0);
+    key(title, "PageDown");
+    expect(top).toBe(460);
+    key(title, "PageUp");
+    expect(top).toBe(0);
+    key(title, "End");
+    expect(top).toBe(3000);
+    key(title, "Home");
+    expect(top).toBe(0);
+    // Space turns a page from the title, and back with Shift; on a button it is the button's.
+    key(title, " ");
+    expect(top).toBe(460);
+    key(title, " ", { shiftKey: true });
+    expect(top).toBe(0);
+    expect(key(back, " ")).toBe(true);
+    expect(top).toBe(0);
+    // The other keys, and a key held with Ctrl, are left alone.
+    expect(key(title, "a")).toBe(true);
+    expect(key(title, "End", { ctrlKey: true })).toBe(true);
+    expect(top).toBe(0);
+    // A card's details are a pop-up of their own over the window: nothing under them scrolls.
+    fireEvent.click(screen.getAllByRole("button", { name: /^Details of / })[0]);
+    const details = screen.getByRole("dialog", { name: /card details$/ });
+    fireEvent.wheel(within(details).getByText(/^Details of /), { deltaY: 120 });
+    key(within(details).getByText(/^Details of /), "PageDown");
+    expect(top).toBe(0);
+  });
+
+  it("gives the keyboard to the pack, then the cards, then the summary's title", () => {
+    document.documentElement.dataset.reducedMotion = "true";
+    render(<PackOpening opening={opening} onDone={vi.fn()} />);
+    const pack = screen.getByRole("button", { name: /Tear open the/ });
+    expect(document.activeElement).toBe(pack);
+    fireEvent.click(pack);
+    expect(document.activeElement).toBe(
+      screen.getByRole("group", { name: "The pack's cards" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Reveal all" }));
+    expect(document.activeElement).toBe(
+      screen.getByRole("heading", { name: "Zendikar Rising Draft Booster" }),
+    );
+  });
+
+  it("brings the card Space turns over into the window's view", () => {
+    document.documentElement.dataset.reducedMotion = "true";
+    // jsdom lays nothing out and has no scrollIntoView: the call is what is checked.
+    const into = vi.fn();
+    const before = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = into;
+    try {
+      render(<PackOpening opening={opening} onDone={vi.fn()} />);
+      fireEvent.click(screen.getByRole("button", { name: /Tear open the/ }));
+      const board = screen.getByRole("group", { name: "The pack's cards" });
+      fireEvent.keyDown(board, { key: " " });
+      fireEvent.keyDown(board, { key: " " });
+      expect(into).toHaveBeenCalledTimes(2);
+      // The second press turned the second card, and it is that card's place that is shown.
+      const second = within(board).getAllByRole("listitem")[1];
+      expect(into.mock.contexts[1]).toBe(second);
+      // No more than is needed, and at once when motion is reduced.
+      expect(into).toHaveBeenLastCalledWith({
+        block: "nearest",
+        behavior: "auto",
+      });
+      // A click is on a card already in view: nothing scrolls.
+      fireEvent.click(screen.getByRole("button", { name: /Card 5 of 6/ }));
+      expect(into).toHaveBeenCalledTimes(2);
+    } finally {
+      Element.prototype.scrollIntoView = before;
+    }
+  });
+
   it("reveals the rest at once, with foils' shimmer, then sums the pack up", () => {
     vi.useFakeTimers();
     const done = vi.fn();
