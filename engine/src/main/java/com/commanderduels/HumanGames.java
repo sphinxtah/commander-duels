@@ -156,6 +156,13 @@ final class HumanGames {
     private final AtomicLong removed = new AtomicLong();
     /** Recordings that could not give their game back, by why. Guarded by this. */
     private final Map<String, Long> refused = new LinkedHashMap<>();
+    /**
+     * Since v0.9.10 a game may run in a process of its own ({@link GameProcesses}). The front
+     * process sweeps the recordings and keeps those of games its processes run; a game's own
+     * process sweeps none.
+     */
+    private volatile java.util.function.Predicate<String> runningElsewhere = id -> false;
+    private volatile boolean sweeping = true;
 
     HumanGames(Path deckDirectory, int maxActive) {
         this(deckDirectory, maxActive, null, DEFAULT_RECORDING_RETENTION_MILLIS);
@@ -180,6 +187,44 @@ final class HumanGames {
 
     int maxActive() {
         return maxActive;
+    }
+
+    /** Where service games keep their recordings, or null for none. */
+    Path recordings() {
+        return recordings;
+    }
+
+    /** The front process's registry (v0.9.10): a recording of a game running in another process is kept. */
+    void keepRecordingsOf(java.util.function.Predicate<String> running) {
+        runningElsewhere = running;
+    }
+
+    /** A game's own process (v0.9.10): the front process sweeps the recordings, not this one. */
+    void stopSweepingRecordings() {
+        sweeping = false;
+    }
+
+    /**
+     * What a game's own process reports to the front process (v0.9.10): its games, whether each is
+     * over and for how long, and its bots' numbers. Ids and numbers only, nothing of a game's content.
+     */
+    synchronized List<Map<String, Object>> processStatus() {
+        long now = System.nanoTime();
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (Entry entry : games.values()) {
+            HumanGame game = entry.game;
+            Map<String, Object> status = new LinkedHashMap<>();
+            status.put("game_id", game.id());
+            status.put("format", game.settings().format());
+            status.put("seats", game.settings().seats().size());
+            status.put("finished", game.finished());
+            status.put("finished_millis", entry.finishedAtNanos == 0 ? 0
+                : TimeUnit.NANOSECONDS.toMillis(now - entry.finishedAtNanos));
+            status.put("idle_millis", game.idleMillis());
+            status.put("bots", game.botMetrics());
+            list.add(status);
+        }
+        return list;
     }
 
     /** Starts a development game, or returns empty when {@code maxActive} games are already running. */
@@ -520,7 +565,7 @@ final class HumanGames {
         for (Recording recording : onDisk()) {
             String id = recording.folder().getFileName().toString();
             Entry entry = games.get(id);
-            if (entry != null && !entry.game.finished()) {
+            if (entry != null && !entry.game.finished() || runningElsewhere.test(id)) {
                 continue;
             }
             long changed = recording.lastChanged();
@@ -551,7 +596,7 @@ final class HumanGames {
             synchronized (this) {
                 evict();
             }
-            if (recordings != null && TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - lastRecordingSweepNanos)
+            if (recordings != null && sweeping && TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - lastRecordingSweepNanos)
                     >= RECORDING_SWEEP_MILLIS) {
                 lastRecordingSweepNanos = System.nanoTime();
                 int gone = sweepRecordings();

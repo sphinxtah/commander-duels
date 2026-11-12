@@ -582,6 +582,18 @@ final class HumanGame {
         }
     }
 
+    /** The fair bots' metrics added up (v0.9.10): what the operator reads for this game. */
+    Map<String, Long> botMetrics() {
+        Map<String, Long> total = new LinkedHashMap<>();
+        for (Player player : players) {
+            if (player instanceof FairBot bot) {
+                bot.stats().metrics().forEach((name, value) ->
+                    total.merge(name, value, name.startsWith("longest") ? Math::max : Long::sum));
+            }
+        }
+        return total;
+    }
+
     private void play() throws Exception {
         if (restored != null) {
             resume();

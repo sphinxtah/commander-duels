@@ -91,6 +91,8 @@ class FakeEngine:
         self.lock = threading.Lock()
         self.games: dict[str, FakeGame] = {}
         self.cap = cap
+        # What the engine answers when it runs every game it can (v0.9.10 adds the words).
+        self.busy: dict[str, Any] = {"code": "games_busy"}
         self.closed: list[str] = []
         self.created: list[dict[str, Any]] = []
         self.inspections = 0
@@ -242,7 +244,7 @@ class FakeEngine:
             return httpx.Response(400, json={"code": "unknown_cards", "names": names})
         with self.lock:
             if sum(game.result is None for game in self.games.values()) >= self.cap:
-                return httpx.Response(429, json={"code": "games_busy"})
+                return httpx.Response(429, json=self.busy)
             game = FakeGame(body)
             self.games[game.id] = game
             self.created.append(body)
@@ -1309,6 +1311,24 @@ def test_a_restart_before_the_database_is_up_interrupts_later(
         with Session(restarted.app.state.database) as db:  # type: ignore[attr-defined]
             assert db.get(Game, uuid.UUID(orphan)).status == "interrupted"  # type: ignore[union-attr]
             assert db.get(Game, uuid.UUID(mine)).status == "active"  # type: ignore[union-attr]
+
+
+def test_a_full_engine_tells_the_player_why_in_its_own_words(database: str) -> None:
+    """Since v0.9.10 the engine refuses a game whose process would not fit its memory, and says so;
+    the player reads the engine's words, and is asked to wait a minute."""
+    engine = FakeEngine(cap=0)
+    engine.busy = {"code": "games_busy", "message": games.ENGINE_FULL}
+    with connect(build(database, engine)) as client:
+        reply = Account(client, "ada").post("/api/v1/practice-games", {})
+        assert reply.status_code == 429
+        assert reply.json()["code"] == "games_busy"
+        assert reply.json()["message"] == "The tables are full; try again in a minute."
+        assert reply.headers["retry-after"] == "60"
+        # An engine that gives no words is answered as before.
+        engine.busy = {"code": "games_busy"}
+        reply = Account(client, "bea").post("/api/v1/practice-games", {})
+        assert reply.json()["message"] == "The engine is running every game it can."
+        assert reply.headers["retry-after"] == "30"
 
 
 def test_games_starting_at_once_keep_the_global_limit(database: str) -> None:

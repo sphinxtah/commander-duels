@@ -204,6 +204,8 @@ class FairBot extends ComputerPlayerControllableProxy {
         private final AtomicLong failed = new AtomicLong();
         private final AtomicLong abandoned = new AtomicLong();
         private final AtomicLong longestMillis = new AtomicLong();
+        // Every search's thinking time, added up (v0.9.10): the engine's decision time per game.
+        private final AtomicLong searchMillis = new AtomicLong();
         private final AtomicLong longestWaitMillis = new AtomicLong();
         private final AtomicLong unstarted = new AtomicLong();
         // The weaker player's habits (v0.7.1).
@@ -259,6 +261,33 @@ class FairBot extends ComputerPlayerControllableProxy {
         /** The longest a single search decision took, from start to a usable result. */
         long longestMillis() {
             return longestMillis.get();
+        }
+
+        /** Every search's thinking time, added up (v0.9.10). */
+        long searchMillis() {
+            return searchMillis.get();
+        }
+
+        /**
+         * The numbers an operator reads per game (v0.9.10, the isolated engine's metrics): how long
+         * the bots thought, how many searches the budget or a full heap cut off, and how often a bot
+         * fell back to a legal move without a finished search. Budget fallbacks are counted apart
+         * from a weaker player's habits, which are its skill and not a shortage.
+         */
+        java.util.Map<String, Long> metrics() {
+            java.util.Map<String, Long> metrics = new java.util.LinkedHashMap<>();
+            metrics.put("searches", searches());
+            metrics.put("completed", completed());
+            metrics.put("search_millis", searchMillis());
+            metrics.put("longest_search_millis", longestMillis());
+            metrics.put("cut_off_by_budget", timedOut());
+            metrics.put("cut_off_by_heap", heapStops());
+            metrics.put("kept_shallow", light());
+            metrics.put("passed_unsearched", abandoned() + unstarted());
+            metrics.put("failed", failed());
+            metrics.put("weaker_habits", slips() + naivePlays() + heldBack() + recklessAttacks() + unblocked());
+            metrics.put("passive_decisions", passive());
+            return metrics;
         }
 
         /** The longest a search waited for a free search thread before it started. */
@@ -1194,7 +1223,9 @@ class FairBot extends ComputerPlayerControllableProxy {
         long started = startedAt.get();
         if (started != 0) {
             stats.longestWaitMillis.accumulateAndGet(TimeUnit.NANOSECONDS.toMillis(started - submitted), Math::max);
-            stats.longestMillis.accumulateAndGet(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started), Math::max);
+            long millis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+            stats.longestMillis.accumulateAndGet(millis, Math::max);
+            stats.searchMillis.addAndGet(millis);
         }
         return score == null ? 0 : score;
     }

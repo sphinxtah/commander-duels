@@ -200,6 +200,8 @@ STARTUP_ATTACH_SECONDS = 5.0
 # The WebSocket's close code while a game is being asked for again: the tab reconnects, with its
 # usual backoff, instead of being told the game is gone.
 CLOSE_RECOVERING = 4503
+# The engine's words when its games' memory is spent (v0.9.10, docs/engine/isolation.md).
+ENGINE_FULL = "The tables are full; try again in a minute."
 RETRY_MAX_SECONDS = 30.0
 HELLO_SECONDS = 10.0
 SESSION_CHECK_SECONDS = 60.0
@@ -2394,11 +2396,16 @@ async def engine_game(
     if status == 400:
         raise ApiError(422, "invalid_table", str(created.get("message", "Invalid table.")))
     if status == 429:
+        # Since v0.9.10 the engine says why in words (its games' memory is spent, or every slot is
+        # taken); that is what the player reads.
+        message = created.get("message")
         raise ApiError(
             429,
             "games_busy",
-            "The engine is running every game it can.",
-            {"Retry-After": "30"},
+            message
+            if isinstance(message, str) and message
+            else "The engine is running every game it can.",
+            {"Retry-After": "60" if message == ENGINE_FULL else "30"},
         )
     if status != 201:
         raise unavailable()

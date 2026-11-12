@@ -1,0 +1,93 @@
+A card database other processes read while one serves it (Commander Duels v0.9.10, game isolation).
+Every format.
+
+Reason: since v0.9.10 each game runs in a Java process of its own (docs/engine/isolation.md). The
+engine's front process opens the cards database first; XMage opens it with AUTO_SERVER, so every game
+process started after it reads the cards through it on loopback and holds no copy of its own. But
+opening the repositories writes: CardRepository and ExpansionRepository each check the database's
+version and build (inserting a row when it is not there) and create their table if it does not
+exist. A game process starting while another reads (a deck being imported, a card created by name)
+took the schema's lock, and the other's query failed ("can't find any cards") or waited. A process
+started with -Dxmage.cardsDatabase.shared=true takes the database as the front process opened it:
+no checks, no table created, nothing written. The front process itself, and every engine that is not
+isolated, opens it as before.
+
+Remove when: XMage opens its repositories without writing, or the engine stops sharing one database
+between processes.
+
+diff --git a/Mage/src/main/java/mage/cards/repository/CardRepository.java b/Mage/src/main/java/mage/cards/repository/CardRepository.java
+index 68d564fb..f92ebb62 100644
+--- a/Mage/src/main/java/mage/cards/repository/CardRepository.java
++++ b/Mage/src/main/java/mage/cards/repository/CardRepository.java
+@@ -62,14 +62,16 @@ public enum CardRepository {
+         try {
+             ConnectionSource connectionSource = new JdbcConnectionSource(DatabaseUtils.prepareH2Connection(DatabaseUtils.DB_NAME_CARDS, true));
+ 
+-            boolean isObsolete = RepositoryUtil.isDatabaseObsolete(connectionSource, VERSION_ENTITY_NAME, CARD_DB_VERSION);
+-            boolean isNewBuild = RepositoryUtil.isNewBuildRun(connectionSource, VERSION_ENTITY_NAME, CardRepository.class); // recreate db on new build
+-            if (isObsolete || isNewBuild) {
+-                //System.out.println("Local cards db is outdated, cleaning...");
+-                TableUtils.dropTable(connectionSource, CardInfo.class, true);
+-            }
++            if (!DatabaseUtils.isSharedReadOnly()) { // Commander Duels, patch 0020
++                boolean isObsolete = RepositoryUtil.isDatabaseObsolete(connectionSource, VERSION_ENTITY_NAME, CARD_DB_VERSION);
++                boolean isNewBuild = RepositoryUtil.isNewBuildRun(connectionSource, VERSION_ENTITY_NAME, CardRepository.class); // recreate db on new build
++                if (isObsolete || isNewBuild) {
++                    //System.out.println("Local cards db is outdated, cleaning...");
++                    TableUtils.dropTable(connectionSource, CardInfo.class, true);
++                }
+ 
+-            TableUtils.createTableIfNotExists(connectionSource, CardInfo.class);
++                TableUtils.createTableIfNotExists(connectionSource, CardInfo.class);
++            }
+             cardsDao = DaoManager.createDao(connectionSource, CardInfo.class);
+         } catch (SQLException e) {
+             Logger.getLogger(CardRepository.class).error("Error creating card repository - " + e, e);
+diff --git a/Mage/src/main/java/mage/cards/repository/DatabaseUtils.java b/Mage/src/main/java/mage/cards/repository/DatabaseUtils.java
+index 1c94a2a3..a3005b39 100644
+--- a/Mage/src/main/java/mage/cards/repository/DatabaseUtils.java
++++ b/Mage/src/main/java/mage/cards/repository/DatabaseUtils.java
+@@ -18,6 +18,15 @@ public class DatabaseUtils {
+     public static final String DB_NAME_RECORDS = "table_record.db";
+     public static final String DB_NAME_STATS = "user_stats.db";
+ 
++    /**
++     * Commander Duels (patch 0020): a process that reads the cards database another process has
++     * opened and serves (AUTO_SERVER) takes it as it is, with no version, build or table checks:
++     * each of those writes, and a write while other processes read blocks or fails their reads.
++     */
++    public static boolean isSharedReadOnly() {
++        return Boolean.getBoolean("xmage.cardsDatabase.shared");
++    }
++
+     /**
+      * Prepare JDBC connection string and setup additional params for H2 databases
+      *
+diff --git a/Mage/src/main/java/mage/cards/repository/ExpansionRepository.java b/Mage/src/main/java/mage/cards/repository/ExpansionRepository.java
+index ddee9612..9400faa5 100644
+--- a/Mage/src/main/java/mage/cards/repository/ExpansionRepository.java
++++ b/Mage/src/main/java/mage/cards/repository/ExpansionRepository.java
+@@ -44,14 +44,16 @@ public enum ExpansionRepository {
+         try {
+             ConnectionSource connectionSource = new JdbcConnectionSource(DatabaseUtils.prepareH2Connection(DatabaseUtils.DB_NAME_CARDS, true));
+ 
+-            boolean isObsolete = RepositoryUtil.isDatabaseObsolete(connectionSource, VERSION_ENTITY_NAME, EXPANSION_DB_VERSION);
+-            boolean isNewBuild = RepositoryUtil.isNewBuildRun(connectionSource, VERSION_ENTITY_NAME, ExpansionRepository.class); // recreate db on new build
+-            if (isObsolete || isNewBuild) {
+-                //System.out.println("Local sets db is outdated, cleaning...");
+-                TableUtils.dropTable(connectionSource, ExpansionInfo.class, true);
+-            }
++            if (!DatabaseUtils.isSharedReadOnly()) { // Commander Duels, patch 0020
++                boolean isObsolete = RepositoryUtil.isDatabaseObsolete(connectionSource, VERSION_ENTITY_NAME, EXPANSION_DB_VERSION);
++                boolean isNewBuild = RepositoryUtil.isNewBuildRun(connectionSource, VERSION_ENTITY_NAME, ExpansionRepository.class); // recreate db on new build
++                if (isObsolete || isNewBuild) {
++                    //System.out.println("Local sets db is outdated, cleaning...");
++                    TableUtils.dropTable(connectionSource, ExpansionInfo.class, true);
++                }
+ 
+-            TableUtils.createTableIfNotExists(connectionSource, ExpansionInfo.class);
++                TableUtils.createTableIfNotExists(connectionSource, ExpansionInfo.class);
++            }
+             expansionDao = DaoManager.createDao(connectionSource, ExpansionInfo.class);
+             instanceInitialized = true;
+ 

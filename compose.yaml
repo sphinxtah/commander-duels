@@ -78,14 +78,19 @@ services:
       CD_ENGINE_DEV_ENDPOINTS: "true"
       # The API's games: only requests carrying this token reach them.
       CD_ENGINE_SERVICE_TOKEN: ${CD_ENGINE_SERVICE_TOKEN:-}
-      # One match peaks near 200 MB of heap; the limit leaves room for metaspace and threads.
-      # XMage opens its card database with H2 AUTO_SERVER, which starts a TCP listener; bind it to
-      # loopback so other services cannot reach it.
+      # The front process (v0.9.10: each game runs in a process of its own, docs/engine/isolation.md),
+      # which also plays the development bot matches; one peaks near 200 MB of heap. XMage opens its
+      # card database with H2 AUTO_SERVER, which starts a TCP listener; bind it to loopback so other
+      # services cannot reach it (the games' processes read the cards through it).
       JDK_JAVA_OPTIONS: "-Xms256m -Xmx768m -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError -Dh2.bindAddress=127.0.0.1"
+      # The games' processes together: a duel reserves 2 GB, a table 3 GB, a court 4.5 GB. None is
+      # kept warm here, so a game waits about two seconds for its process to start.
+      CD_ENGINE_GAME_MEMORY_MB: ${CD_ENGINE_GAME_MEMORY_MB:-9216}
+      CD_ENGINE_GAME_WARM: "0"
     # Every service game's recording (v0.9.9, docs/engine/recovery.md): restart the engine, or
     # the API, under a game and the game goes on.
     volumes: ["engine_recordings:/var/lib/commander-duels/recordings"]
-    mem_limit: 1536m
+    mem_limit: ${CD_ENGINE_MEMORY:-10g}
     healthcheck:
       # Ready once the card database is open (about 1 s; a stale database is rebuilt in ~30 s).
       test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8090/ready"]

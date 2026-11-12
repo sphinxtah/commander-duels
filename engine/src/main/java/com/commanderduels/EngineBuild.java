@@ -39,7 +39,12 @@ final class EngineBuild {
             synchronized (EngineBuild.class) {
                 known = key;
                 if (known == null) {
-                    known = of(System.getProperty("java.class.path", ""));
+                    // A game's own process (v0.9.10) runs its front process's class path, whose key
+                    // the front process hands it rather than have each game digest it again.
+                    String given = "game".equals(System.getenv("CD_ENGINE_ROLE"))
+                        ? System.getenv("CD_ENGINE_BUILD_KEY") : null;
+                    known = given != null && !given.isBlank() ? given.strip()
+                        : of(System.getProperty("java.class.path", ""));
                     key = known;
                 }
             }

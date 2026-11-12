@@ -77,7 +77,12 @@ public final class EngineServer {
     }
 
     static HttpServer create(int port, Engine engine, Implementations implementations) throws IOException {
-        var server = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 16);
+        return create(new InetSocketAddress("0.0.0.0", port), engine, implementations);
+    }
+
+    static HttpServer create(InetSocketAddress address, Engine engine, Implementations implementations)
+            throws IOException {
+        var server = HttpServer.create(address, 16);
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         server.createContext("/", exchange -> {
             try (exchange) {
@@ -121,9 +126,17 @@ public final class EngineServer {
         } else if (path.startsWith(SERVICE) && engine.serviceGamesEnabled()) {
             service(exchange, engine, implementations, path.substring(SERVICE.length()));
         } else if (path.equals(GAMES) && engine.devGamesEnabled()) {
-            createGame(exchange, engine, false);
+            if (engine.processes() != null) {
+                isolatedCreate(exchange, engine, false);
+            } else {
+                createGame(exchange, engine, false);
+            }
         } else if (path.startsWith(GAMES + "/") && engine.devGamesEnabled()) {
-            gameRoute(exchange, engine.humanGames(), path.substring(GAMES.length() + 1), false);
+            if (engine.processes() != null) {
+                isolatedGameRoute(exchange, engine, path.substring(GAMES.length() + 1), false);
+            } else {
+                gameRoute(exchange, engine.humanGames(), path.substring(GAMES.length() + 1), false);
+            }
         } else if (path.startsWith("/v1/")) {
             respond(exchange, 503, Map.of("code", "engine_not_integrated", "protocol_version", PROTOCOL_VERSION));
         } else {
@@ -162,8 +175,27 @@ public final class EngineServer {
             return;
         }
         HumanGames games = engine.humanGames();
+        GameProcesses processes = engine.processes();
         if (rest.equals("games")) {
-            createGame(exchange, engine, true);
+            if (processes != null) {
+                isolatedCreate(exchange, engine, true);
+            } else {
+                createGame(exchange, engine, true);
+            }
+        } else if (rest.equals("processes")) {
+            // Each game's process, its memory and its bots, and the engine's numbers in all (v0.9.10).
+            if (!exchange.getRequestMethod().equals("GET")) {
+                methodNotAllowed(exchange, "GET");
+            } else {
+                respond(exchange, 200, processes != null ? processes.metrics() : inlineMetrics(games));
+            }
+        } else if (rest.equals("process") && engine.gameProcess()) {
+            // A game's own process, to its front process (v0.9.10): its game, memory and bots.
+            Map<String, Object> status = new LinkedHashMap<>();
+            status.put("pid", ProcessHandle.current().pid());
+            status.put("games", games.processStatus());
+            status.put("memory", GameProcesses.ownMemory());
+            respond(exchange, 200, status);
         } else if (rest.equals("cards")) {
             cards(exchange, engine);
         } else if (rest.equals("implementations")) {
@@ -177,6 +209,8 @@ public final class EngineServer {
             }
         } else if (rest.startsWith("content/")) {
             content(exchange, rest.substring("content/".length()));
+        } else if (rest.startsWith("games/") && processes != null) {
+            isolatedGameRoute(exchange, engine, rest.substring("games/".length()), true);
         } else if (rest.startsWith("games/")) {
             String gamePath = rest.substring("games/".length());
             Matcher matcher = SERVICE_GAME_PATH.matcher(gamePath);
@@ -264,6 +298,340 @@ public final class EngineServer {
                 }
                 respond(exchange, 200, response);
             }
+        }
+    }
+
+    /** Every route a game's process answers for it, on the front process (v0.9.10). */
+    private static final Pattern ISOLATED_GAME_PATH = Pattern.compile(GAME_ID + "/(view|commands|close|inspection|bots|attach)");
+
+    /**
+     * The engine's numbers when every game runs in this one process (v0.9.10): memory and the bots
+     * of each running game, in the shape of {@link GameProcesses#metrics}'s.
+     */
+    private static Map<String, Object> inlineMetrics(HumanGames games) {
+        Map<String, Object> metrics = new LinkedHashMap<>();
+        metrics.put("isolation", "none");
+        metrics.put("memory", GameProcesses.ownMemory());
+        metrics.put("games", games == null ? List.of() : games.processStatus());
+        return metrics;
+    }
+
+    /**
+     * A game's request, on the front process (v0.9.10): forwarded to the game's process, or 404 when
+     * no process runs the game, which is what the API is answered for a game whose process ended
+     * (it then attaches, and a new process takes the game up from its recording). A service close
+     * for an id no process has is recorded as cancelled, as {@link HumanGames#serviceOrCancel} does.
+     */
+    private static void isolatedGameRoute(HttpExchange exchange, Engine engine, String rest, boolean service)
+            throws IOException {
+        Matcher matcher = ISOLATED_GAME_PATH.matcher(rest);
+        String action = matcher.matches() ? matcher.group(2) : "";
+        boolean serviceOnly = action.equals("inspection") || action.equals("bots") || action.equals("attach");
+        if (action.isEmpty() || serviceOnly && !service) {
+            respond(exchange, 404, Map.of("code", "not_found"));
+            return;
+        }
+        String id = matcher.group(1);
+        if (action.equals("attach")) {
+            isolatedAttach(exchange, engine, id);
+            return;
+        }
+        GameProcesses processes = engine.processes();
+        Optional<GameProcesses.GameProcess> process = processes.of(id);
+        if (process.isEmpty()) {
+            if (service && action.equals("close") && exchange.getRequestMethod().equals("POST")) {
+                engine.humanGames().serviceOrCancel(id);
+            }
+            respond(exchange, 404, Map.of("code", "not_found"));
+            return;
+        }
+        Optional<String> body = exchange.getRequestMethod().equals("POST")
+            ? readBody(exchange, service ? MAX_SERVICE_BODY_BYTES : MAX_BODY_BYTES) : Optional.of("");
+        if (body.isEmpty()) {
+            return;
+        }
+        forwardTo(exchange, processes, process.get(), body.get());
+    }
+
+    /** Forwards the exchange to a game's process and answers with what it answered. */
+    private static void forwardTo(HttpExchange exchange, GameProcesses processes, GameProcesses.GameProcess process,
+                                  String body) throws IOException {
+        Optional<GameProcesses.Forwarded> answer;
+        try {
+            answer = processes.forward(process, exchange.getRequestMethod(), exchange.getRequestURI().getRawPath(),
+                exchange.getRequestURI().getRawQuery(), exchange.getRequestHeaders().getFirst("Authorization"),
+                exchange.getRequestMethod().equals("POST") ? body.getBytes(StandardCharsets.UTF_8) : null,
+                MAX_WAIT_MILLIS + 30_000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            respond(exchange, 503, Map.of("code", "interrupted"));
+            return;
+        }
+        if (answer.isEmpty()) {
+            if (!process.alive()) {
+                respond(exchange, 404, Map.of("code", "not_found"));
+            } else {
+                exchange.getResponseHeaders().set("Retry-After", "5");
+                respond(exchange, 503, Map.of("code", "game_process_unavailable",
+                    "message", "The game's process did not answer; ask again shortly"));
+            }
+            return;
+        }
+        respondRaw(exchange, answer.get());
+    }
+
+    private static void respondRaw(HttpExchange exchange, GameProcesses.Forwarded answer) throws IOException {
+        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        if (answer.retryAfter() != null) {
+            exchange.getResponseHeaders().set("Retry-After", answer.retryAfter());
+        }
+        byte[] bytes = answer.body();
+        exchange.sendResponseHeaders(answer.status(), bytes.length == 0 ? -1 : bytes.length);
+        if (bytes.length > 0) {
+            try (var stream = exchange.getResponseBody()) {
+                stream.write(bytes);
+            }
+        }
+    }
+
+    /** A refusal to admit a game, in words a player understands (v0.9.10). */
+    private static void refuse(HttpExchange exchange, GameProcesses processes, GameProcesses.Refusal refusal)
+            throws IOException {
+        switch (refusal) {
+            case BUSY -> {
+                exchange.getResponseHeaders().set("Retry-After", "30");
+                respond(exchange, 429, Map.of("code", "games_busy",
+                    "message", "At most " + processes.settings().maxGames() + " games run at once; try again in a minute."));
+            }
+            case FULL -> {
+                exchange.getResponseHeaders().set("Retry-After", "60");
+                respond(exchange, 429, Map.of("code", "games_busy",
+                    "message", "The tables are full; try again in a minute."));
+            }
+            default -> {
+                exchange.getResponseHeaders().set("Retry-After", "10");
+                respond(exchange, 503, Map.of("code", "game_process_failed",
+                    "message", "The game could not be started; try again shortly."));
+            }
+        }
+    }
+
+    /**
+     * A create on the front process (v0.9.10): checked as {@link #createGame} checks it, then given
+     * a process of its own, sized for its format, which creates the game.
+     */
+    private static void isolatedCreate(HttpExchange exchange, Engine engine, boolean service) throws IOException {
+        if (!exchange.getRequestMethod().equals("POST")) {
+            methodNotAllowed(exchange, "POST");
+            return;
+        }
+        if (engine.status() != Engine.Status.READY) {
+            respond(exchange, 503, Map.of("code", notReadyCode(engine)));
+            return;
+        }
+        Optional<String> body = readBody(exchange, service ? MAX_SERVICE_BODY_BYTES : MAX_BODY_BYTES);
+        if (body.isEmpty()) {
+            return;
+        }
+        HumanGameRequest request;
+        try {
+            request = HumanGameRequest.parse(body.get(), SEEDS::nextLong, service);
+        } catch (JsonRequest.Invalid e) {
+            respond(exchange, 400, Map.of("code", "invalid_request", "message", e.getMessage()));
+            return;
+        }
+        List<String> unknown = request.unknownCards();
+        if (!unknown.isEmpty()) {
+            Map<String, Object> refusal = new LinkedHashMap<>();
+            refusal.put("code", "unknown_cards");
+            refusal.put("message", "The card database has no card named " + String.join(", ", unknown));
+            refusal.put("names", unknown);
+            respond(exchange, 400, refusal);
+            return;
+        }
+        GameProcesses processes = engine.processes();
+        String id = service ? request.gameId() : null;
+        var lock = id == null ? new java.util.concurrent.locks.ReentrantLock() : processes.lock(id);
+        lock.lock();
+        try {
+            if (id != null) {
+                Path recordings = engine.humanGames().recordings();
+                if (processes.of(id).isPresent() || recordings != null && Recording.of(recordings, id).exists()) {
+                    respond(exchange, 409, Map.of("code", "game_exists",
+                        "message", "A game with this game_id already exists"));
+                    return;
+                }
+                if (engine.humanGames().cancelled(id)) {
+                    respond(exchange, 409, Map.of("code", "game_cancelled",
+                        "message", "This game_id was closed before its game was created"));
+                    return;
+                }
+            }
+            GameProcesses.Claim claim;
+            try {
+                claim = processes.claim(GameProcesses.Size.of(request.format().id(), request.seats().size()));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                respond(exchange, 503, Map.of("code", "interrupted"));
+                return;
+            }
+            if (claim.refusal() != null) {
+                refuse(exchange, processes, claim.refusal());
+                return;
+            }
+            GameProcesses.GameProcess process = claim.process();
+            Optional<GameProcesses.Forwarded> answer;
+            try {
+                answer = processes.forward(process, "POST", exchange.getRequestURI().getRawPath(), null, null,
+                    body.get().getBytes(StandardCharsets.UTF_8), 120_000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                processes.retire(process);
+                respond(exchange, 503, Map.of("code", "interrupted"));
+                return;
+            }
+            String created = answer.filter(forwarded -> forwarded.status() == 201)
+                .map(forwarded -> gameIdOf(forwarded.body())).orElse(null);
+            if (created == null) {
+                processes.retire(process);
+            } else {
+                processes.assign(process, created);
+            }
+            if (answer.isEmpty()) {
+                refuse(exchange, processes, GameProcesses.Refusal.FAILED);
+            } else {
+                respondRaw(exchange, answer.get());
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * An attach on the front process (v0.9.10): forwarded to the game's process when one runs it;
+     * otherwise answered from the recording when the game is over or cannot be given back, and
+     * else a new process, sized for the game, takes the game up from its recording.
+     */
+    private static void isolatedAttach(HttpExchange exchange, Engine engine, String id) throws IOException {
+        if (!exchange.getRequestMethod().equals("POST")) {
+            methodNotAllowed(exchange, "POST");
+            return;
+        }
+        if (engine.status() != Engine.Status.READY) {
+            exchange.getResponseHeaders().set("Retry-After", "5");
+            respond(exchange, 503, Map.of("code", notReadyCode(engine)));
+            return;
+        }
+        Optional<String> body = readBody(exchange);
+        if (body.isEmpty()) {
+            return;
+        }
+        GameProcesses processes = engine.processes();
+        var lock = processes.lock(id);
+        lock.lock();
+        try {
+            Optional<GameProcesses.GameProcess> running = processes.of(id);
+            if (running.isPresent()) {
+                forwardTo(exchange, processes, running.get(), body.get());
+                return;
+            }
+            Path recordings = engine.humanGames().recordings();
+            Recording recording = recordings == null ? null : Recording.of(recordings, id);
+            if (recording == null || !recording.exists()) {
+                respond(exchange, 404, Map.of("code", "not_found"));
+                return;
+            }
+            Optional<com.google.gson.JsonObject> result = recording.result();
+            if (result.isPresent()) {
+                Map<String, Object> response = new LinkedHashMap<>();
+                response.put("game_id", id);
+                response.put("status", "finished");
+                response.put("result", result.get());
+                respond(exchange, 200, response);
+                return;
+            }
+            GameProcesses.Size size;
+            try {
+                Recording.Manifest manifest = recording.manifest();
+                if (!manifest.service()) {
+                    respond(exchange, 404, Map.of("code", "not_found"));
+                    return;
+                }
+                size = GameProcesses.Size.of(formatOf(manifest.request()), manifest.seats().size());
+            } catch (Recording.Unusable e) {
+                Map<String, Object> refusal = new LinkedHashMap<>();
+                refusal.put("code", "recording_" + e.code);
+                refusal.put("message", e.getMessage());
+                respond(exchange, 409, refusal);
+                return;
+            }
+            GameProcesses.Claim claim;
+            try {
+                claim = processes.claim(size);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                respond(exchange, 503, Map.of("code", "interrupted"));
+                return;
+            }
+            if (claim.refusal() != null) {
+                refuse(exchange, processes, claim.refusal());
+                return;
+            }
+            GameProcesses.GameProcess process = claim.process();
+            Optional<GameProcesses.Forwarded> answer;
+            try {
+                answer = processes.forward(process, "POST", exchange.getRequestURI().getRawPath(), null, null,
+                    body.get().getBytes(StandardCharsets.UTF_8), 120_000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                processes.retire(process);
+                respond(exchange, 503, Map.of("code", "interrupted"));
+                return;
+            }
+            boolean taken = answer.filter(forwarded -> forwarded.status() == 200)
+                .map(forwarded -> statusOf(forwarded.body()))
+                .filter(status -> status.equals("recovered") || status.equals("attached")).isPresent();
+            if (taken) {
+                processes.assign(process, id);
+            } else {
+                processes.retire(process);
+            }
+            if (answer.isEmpty()) {
+                refuse(exchange, processes, GameProcesses.Refusal.FAILED);
+            } else {
+                respondRaw(exchange, answer.get());
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private static String gameIdOf(byte[] body) {
+        try {
+            var json = com.google.gson.JsonParser.parseString(new String(body, StandardCharsets.UTF_8)).getAsJsonObject();
+            return json.has("game_id") ? json.get("game_id").getAsString() : null;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static String statusOf(byte[] body) {
+        try {
+            var json = com.google.gson.JsonParser.parseString(new String(body, StandardCharsets.UTF_8)).getAsJsonObject();
+            return json.has("status") ? json.get("status").getAsString() : "";
+        } catch (RuntimeException e) {
+            return "";
+        }
+    }
+
+    /** A recorded request's format, as its create named it; Legacy when it named none. */
+    private static String formatOf(String request) {
+        try {
+            var json = com.google.gson.JsonParser.parseString(request).getAsJsonObject();
+            return json.has("format") ? json.get("format").getAsString() : "legacy";
+        } catch (RuntimeException e) {
+            return "legacy";
         }
     }
 
@@ -694,36 +1062,66 @@ public final class EngineServer {
     }
 
     public static void main(String[] args) throws IOException {
-        int port = Integer.parseInt(System.getenv().getOrDefault("CD_ENGINE_PORT", "8090"));
-        boolean devEndpoints = "true".equalsIgnoreCase(System.getenv("CD_ENGINE_DEV_ENDPOINTS"));
-        Path decks = Path.of(System.getenv().getOrDefault("CD_ENGINE_DECKS", "decks"));
+        Map<String, String> env = System.getenv();
+        // v0.9.10: "game" is one game's own process, started by a front process (GameProcesses).
+        boolean gameProcess = "game".equals(env.getOrDefault("CD_ENGINE_ROLE", "").strip());
+        int port = Integer.parseInt(env.getOrDefault("CD_ENGINE_PORT", "8090"));
+        boolean devEndpoints = "true".equalsIgnoreCase(env.get("CD_ENGINE_DEV_ENDPOINTS"));
+        Path decks = Path.of(env.getOrDefault("CD_ENGINE_DECKS", "decks"));
         XmagePin pin = XmagePin.load();
         var runner = new BotMatchRunner(decks, pin);
-        int maxGames = Integer.parseInt(System.getenv().getOrDefault("CD_ENGINE_MAX_GAMES",
+        int maxGames = Integer.parseInt(env.getOrDefault("CD_ENGINE_MAX_GAMES",
             String.valueOf(HumanGames.DEFAULT_MAX_ACTIVE)));
-        String serviceToken = System.getenv().getOrDefault("CD_ENGINE_SERVICE_TOKEN", "").strip();
+        String serviceToken = env.getOrDefault("CD_ENGINE_SERVICE_TOKEN", "").strip();
         // Recordings (v0.9.9): where service games keep them, and for how long after their last
         // change. Without a folder no game is recorded and none can be taken up again.
-        String recordingsFolder = System.getenv().getOrDefault("CD_ENGINE_RECORDINGS", "").strip();
+        String recordingsFolder = env.getOrDefault("CD_ENGINE_RECORDINGS", "").strip();
         Path recordings = recordingsFolder.isEmpty() ? null : Path.of(recordingsFolder);
-        long retentionHours = Long.parseLong(System.getenv().getOrDefault("CD_ENGINE_RECORDING_RETENTION_HOURS", "24"));
+        long retentionHours = Long.parseLong(env.getOrDefault("CD_ENGINE_RECORDING_RETENTION_HOURS", "24"));
         if (recordings != null) {
             java.nio.file.Files.createDirectories(recordings);
         }
         var games = devEndpoints || !serviceToken.isEmpty()
-            ? new HumanGames(decks, maxGames, recordings, java.util.concurrent.TimeUnit.HOURS.toMillis(retentionHours))
+            ? new HumanGames(decks, gameProcess ? 1 : maxGames, recordings,
+                java.util.concurrent.TimeUnit.HOURS.toMillis(retentionHours))
             : null;
-        var engine = new Engine(pin, devEndpoints, CardDatabase::load, runner::run, games, devEndpoints, serviceToken);
+        // A game's process plays no development bot matches: they are the front process's.
+        var engine = new Engine(pin, devEndpoints && !gameProcess, CardDatabase::load, runner::run, games,
+            devEndpoints, serviceToken);
+        if (gameProcess) {
+            gameProcessMain(engine, games);
+            return;
+        }
+        String isolation = env.getOrDefault("CD_ENGINE_ISOLATION", "process").strip();
+        GameProcesses processes = null;
+        if (games != null && isolation.equals("process")) {
+            processes = new GameProcesses(GameProcesses.Settings.fromEnvironment(env, games.maxActive(), devEndpoints));
+            engine.isolate(processes);
+        }
         var implementations = Implementations.load(
-            Path.of(System.getenv().getOrDefault("CD_ENGINE_IMPLEMENTATIONS", "catalog")));
+            Path.of(env.getOrDefault("CD_ENGINE_IMPLEMENTATIONS", "catalog")));
         var server = create(port, engine, implementations);
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> server.stop(2)));
+        GameProcesses isolated = processes;
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            server.stop(2);
+            if (isolated != null) {
+                isolated.close();
+            }
+        }));
         server.start();
         System.out.printf("Commander Duels engine on port %d: XMage %s (%s); development bot matches and"
             + " games %s; service games %s%s%n", port, pin.version(), pin.commit(),
             devEndpoints ? "enabled" : "disabled", engine.serviceGamesEnabled() ? "enabled" : "disabled",
-            games != null ? " (at most " + games.maxActive() + " games at once, " + FairBot.SEARCH_THREADS
-                + " bot search threads)" : "");
+            games != null ? " (at most " + games.maxActive() + " games at once)" : "");
+        if (processes != null) {
+            GameProcesses.Settings settings = processes.settings();
+            System.out.println("Each game runs in a process of its own: heaps " + settings.heapMegabytes()
+                + " MB and " + settings.overheadMegabytes() + " MB beside each, within "
+                + settings.budgetMegabytes() + " MB; warm " + settings.warm());
+        } else if (games != null) {
+            System.out.println("Every game runs in this process (CD_ENGINE_ISOLATION=" + isolation + "), "
+                + FairBot.SEARCH_THREADS + " bot search threads");
+        }
         System.out.println(recordings == null || games == null ? "Service games keep no recording (CD_ENGINE_RECORDINGS"
                 + " is not set): a game the engine loses is lost"
             : "Service games are recorded in " + recordings.toAbsolutePath() + " (kept " + retentionHours
@@ -731,6 +1129,55 @@ public final class EngineServer {
         System.out.println(implementations.summary() == null ? "No implementation list"
             : "Implementation list " + implementations.summary().build() + ": "
                 + implementations.summary().cards() + " cards");
-        engine.startLoading();
+        Thread loader = engine.startLoading();
+        if (processes != null) {
+            // Game processes read the cards through this process's database: they start once it is open.
+            Thread.ofVirtual().name("game-processes-open").start(() -> {
+                try {
+                    loader.join();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                if (engine.status() == Engine.Status.READY) {
+                    isolated.open();
+                }
+            });
+        }
+    }
+
+    /**
+     * One game's own process (v0.9.10): on loopback, on a port of the system's choosing, which it
+     * prints for its front process with its readiness; it ends when its front process does (its
+     * standard input closes). Its front process sweeps the recordings and ends it when its game is over.
+     */
+    private static void gameProcessMain(Engine engine, HumanGames games) throws IOException {
+        engine.markGameProcess();
+        games.stopSweepingRecordings();
+        var server = create(new InetSocketAddress(java.net.InetAddress.getLoopbackAddress(), 0), engine,
+            Implementations.none());
+        server.start();
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> server.stop(0)));
+        System.out.println(GameProcesses.PORT_LINE + server.getAddress().getPort());
+        try {
+            engine.startLoading().join();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        if (engine.status() != Engine.Status.READY) {
+            System.out.println(GameProcesses.FAILED_LINE);
+            System.exit(1);
+        }
+        System.out.println(GameProcesses.READY_LINE);
+        // The main thread stays, so the process lives (the server's threads are daemons), until its
+        // front process ends: nothing is sent on standard input, which ends with the front process.
+        try {
+            while (System.in.read() != -1) {
+                // nothing is sent
+            }
+        } catch (IOException e) {
+            // the same
+        }
+        System.exit(0);
     }
 }

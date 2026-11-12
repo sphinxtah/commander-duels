@@ -33,6 +33,8 @@ public final class Engine {
     // stop request keeps further matches out instead of piling up.
     private final Semaphore matchSlot = new Semaphore(1);
     private volatile Status status = Status.LOADING;
+    /** Since v0.9.10 each game may run in a process of its own: the front process's processes. */
+    private volatile GameProcesses processes;
     private volatile CardDatabase.Stats cards;
 
     public Engine(XmagePin pin, boolean botMatchEnabled, Supplier<CardDatabase.Stats> loader,
@@ -106,6 +108,30 @@ public final class Engine {
 
     HumanGames humanGames() {
         return humanGames;
+    }
+
+    /** Runs every game in a process of its own (v0.9.10, {@link GameProcesses}). */
+    void isolate(GameProcesses processes) {
+        this.processes = processes;
+        if (humanGames != null) {
+            humanGames.keepRecordingsOf(processes::running);
+        }
+    }
+
+    private volatile boolean gameProcess;
+
+    /** This engine is one game's own process (v0.9.10), started by a front process. */
+    void markGameProcess() {
+        gameProcess = true;
+    }
+
+    boolean gameProcess() {
+        return gameProcess;
+    }
+
+    /** The game processes, or null when games run in this process. */
+    GameProcesses processes() {
+        return processes;
     }
 
     boolean devGamesEnabled() {
