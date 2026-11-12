@@ -276,6 +276,67 @@ class ServiceRecoveryHttpTest {
         assertEquals(1, status.getAsJsonObject("on_disk").get("recordings").getAsInt(), status.toString());
     }
 
+
+    /** A game's events (v0.9.10) as the API reads them. */
+    private JsonObject events(String id, long since) throws Exception {
+        var response = service("GET", GAMES + "/" + id + "/events?since=" + since, null, null);
+        assertEquals(200, response.statusCode(), response.body());
+        return json(response);
+    }
+
+    private static JsonObject withoutEpoch(com.google.gson.JsonElement event) {
+        JsonObject copy = event.getAsJsonObject().deepCopy();
+        copy.remove("epoch");
+        return copy;
+    }
+
+    @Test
+    void aGamesEventsGoOnAcrossARecoveryUnderTheNextEpoch() throws Exception {
+        start(4, TimeUnit.HOURS.toMillis(24));
+        String id = UUID.randomUUID().toString();
+        var createdResponse = service("POST", GAMES, null, duel(53L, id));
+        assertEquals(201, createdResponse.statusCode(), createdResponse.body());
+        JsonObject created = json(createdResponse);
+        var player = new ScriptedPlayer(53);
+        play(id, player, 30, token(created, 0), token(created, 1));
+        JsonObject before = events(id, 0);
+        assertEquals(0, before.get("epoch").getAsInt());
+        JsonArray played = before.getAsJsonArray("events");
+        assertTrue(played.size() > 10, before.toString());
+        assertEquals(played.size(), before.get("next").getAsLong(), "numbered from one, without a gap");
+        // Asked after a number, only what came later.
+        assertEquals(played.size() - 5, events(id, 5).getAsJsonArray("events").size());
+
+        die(id);
+        start(4, TimeUnit.HOURS.toMillis(24));
+        // No engine runs the game: its events are read from its recording, as they were written.
+        // (The test's engine "dies" by interrupting its games, and XMage ends a game it is
+        // interrupted in: what it wrote then follows. A process that is killed writes nothing more.)
+        JsonArray recorded = events(id, 0).getAsJsonArray("events");
+        for (int index = 0; index < played.size(); index++) {
+            assertEquals(played.get(index), recorded.get(index));
+        }
+
+        var attached = service("POST", GAMES + "/" + id + "/attach", null, "");
+        assertEquals(200, attached.statusCode(), attached.body());
+        JsonObject again = json(attached);
+        untilAsked(id, token(again, 0), token(again, 1));
+        JsonObject after = events(id, 0);
+        assertEquals(1, after.get("epoch").getAsInt());
+        JsonArray now = after.getAsJsonArray("events");
+        // The events up to the checkpoint stand as they were; the rest were made again as the journal
+        // was played, under the next epoch, and, two people having played, they are the same events.
+        assertEquals(played.size(), now.size(), now.toString());
+        boolean remade = false;
+        for (int index = 0; index < now.size(); index++) {
+            JsonObject event = now.get(index).getAsJsonObject();
+            assertEquals(index + 1, event.get("seq").getAsLong());
+            remade |= event.get("epoch").getAsInt() == 1;
+            assertEquals(withoutEpoch(played.get(index)), withoutEpoch(event));
+        }
+        assertTrue(remade || now.size() == played.size(), "the journal's records were played again");
+    }
+
     @Test
     void whatCannotBeGivenBackIsRefusedInWords() throws Exception {
         start(1, TimeUnit.HOURS.toMillis(24));

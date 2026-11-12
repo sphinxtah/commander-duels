@@ -294,6 +294,8 @@ final class HumanGame {
     private final Thread thread;
     /** The game's recording (v0.9.9); null for a game that keeps none. */
     private final Recorder recorder;
+    /** The game's structured events (v0.9.10, {@link GameEvents}). */
+    private final GameEvents events;
     /** The checkpoint this game goes on from (v0.9.9); null for a game played from its start. */
     private final Checkpoint restored;
     /** The checkpoint's number in the recording, for the recording's own notes; 0 without one. */
@@ -380,6 +382,11 @@ final class HumanGame {
         this.hooks = hooks;
         this.request = request;
         this.recorder = recorder;
+        this.events = new GameEvents(id, recorder == null ? null : recorder.recording().folder());
+        if (takenUp) {
+            // The events up to the checkpoint stand; the journal's records make the rest again.
+            events.takeUp(restored == null ? 0 : restored.eventSeq());
+        }
         this.takenUp = takenUp;
         this.restored = restored;
         this.restoredSeq = restoredSeq;
@@ -568,6 +575,7 @@ final class HumanGame {
             t.printStackTrace();
         } finally {
             finish(failure);
+            events.detach();
             onFinished.accept(this);
             logBots();
         }
@@ -580,6 +588,11 @@ final class HumanGame {
                 System.out.println("Human game " + id + " bot " + bot.getName() + ": " + bot.stats());
             }
         }
+    }
+
+    /** The game's structured events (v0.9.10). */
+    GameEvents events() {
+        return events;
     }
 
     /** The fair bots' metrics added up (v0.9.10): what the operator reads for this game. */
@@ -638,6 +651,7 @@ final class HumanGame {
         });
         created.addPlayerQueryEventListener(this::onQuery);
         created.watchResumable(this::atResumable);
+        events.attach(created, seatIds, refs);
         game = created;
         hooks.beforeStart(created, seatIds);
         refresh();
@@ -682,6 +696,7 @@ final class HumanGame {
         });
         current.addPlayerQueryEventListener(this::onQuery);
         current.watchResumable(this::atResumable);
+        events.attach(current, seatIds, refs);
         game = current;
         hooks.resumed(current, seatIds);
         // A concession XMage had been handed and had yet to apply is not in its state (XMage keeps
@@ -756,7 +771,7 @@ final class HumanGame {
                 // gives nobody priority while it waits for an answer.
                 checkpoint = new Checkpoint(copy, random, seatIds, refs.copy(), log.save(), states, conceded,
                     passiveBots.get(), spectatorRevision, version, recorder.journalSeq(), current.getTurnNum(),
-                    step == null ? null : step.name(), digest);
+                    step == null ? null : step.name(), digest, events.seq());
             }
             recorder.captured(checkpoint, System.nanoTime() - started);
         } catch (RuntimeException | IOException | ClassNotFoundException e) {

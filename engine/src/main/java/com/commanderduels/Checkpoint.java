@@ -39,7 +39,8 @@ import mage.players.Player;
  */
 record Checkpoint(Game game, Random random, List<UUID> seatIds, ObjectRefs refs, MatchLog.Saved log,
                   List<SeatState> seats, List<Integer> conceded, boolean passiveBots, long spectatorRevision,
-                  long version, long journalSeq, int turn, String step, String stateDigest)
+                  long version, long journalSeq, int turn, String step, String stateDigest,
+                  long eventSeq)
         implements Serializable {
 
     /** What one human seat's snapshots go on from. */

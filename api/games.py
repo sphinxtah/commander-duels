@@ -61,6 +61,7 @@ from sqlalchemy.exc import InterfaceError, OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
+from api import events as events_module
 from api import kings_table
 from api.auth import INPUT_ERRORS
 from api.config import Settings
@@ -200,6 +201,8 @@ STARTUP_ATTACH_SECONDS = 5.0
 # The WebSocket's close code while a game is being asked for again: the tab reconnects, with its
 # usual backoff, instead of being told the game is gone.
 CLOSE_RECOVERING = 4503
+# How often a running game's events are read from the engine (v0.9.10), at most, in seconds.
+EVENTS_EVERY = 5.0
 # The engine's words when its games' memory is spent (v0.9.10, docs/engine/isolation.md).
 ENGINE_FULL = "The tables are full; try again in a minute."
 RETRY_MAX_SECONDS = 30.0
@@ -478,6 +481,10 @@ class LiveGame:
     # King's Table (v0.8.7): the live result names its winning team as the recorded one does
     # (v0.8.8), whether the game is a table's or the practice table's.
     kings: bool = False
+    # Its structured events (v0.9.10, api/events.py): read to here, and when last read.
+    events: events_module.Cursor = field(default_factory=events_module.Cursor)
+    events_read_at: float = 0.0
+    events_reading: bool = False
 
     def __post_init__(self) -> None:
         if self.teams:
@@ -906,6 +913,7 @@ class GameHub:
                 await asyncio.sleep(min(30.0, 0.5 * 2 ** min(failures, 6)))
                 continue
             failures = 0
+            self.events_soon(game)
             finished = snapshot.get("result") is not None
             if finished and game.kings and isinstance(snapshot["result"], dict):
                 # The winning team made whole, as the recorded result names it (v0.8.8).
@@ -924,6 +932,36 @@ class GameHub:
                 await self.end(game, snapshot["result"])
                 return
 
+    def events_soon(self, game: LiveGame) -> None:
+        """Reads the game's new events from the engine (v0.9.10, api/events.py), at most every
+        EVENTS_EVERY seconds a game, on a task of its own: a seat's view never waits for it."""
+        now = time.monotonic()
+        if game.events_reading or now - game.events_read_at < EVENTS_EVERY or self.engine is None:
+            return
+        game.events_reading = True
+        self.spawn(self.read_events(game))
+
+    async def read_events(self, game: LiveGame) -> None:
+        """Reads and keeps the game's new events. Never fails the game: an engine that cannot
+        answer is asked again later, and the events are the engine's to give again."""
+        game.events_reading = True
+        try:
+            if self.engine is not None:
+                if game.events.next == 0 and game.events.epoch == 0:
+                    game.events = await run_in_threadpool(self.events_cursor, game.id)
+                await events_module.sync(self.engine, self.database, game.id, game.events)
+        except (EngineUnavailable, SQLAlchemyError):
+            pass
+        except Exception:
+            log.exception("The events of game %s could not be read", game.id)
+        finally:
+            game.events_read_at = time.monotonic()
+            game.events_reading = False
+
+    def events_cursor(self, game_id: UUID) -> events_module.Cursor:
+        with Session(self.database) as db:
+            return events_module.cursor_of(db, game_id)
+
     async def end(self, game: LiveGame, result: dict[str, Any] | None) -> None:
         """Records how the game ended (a missing game was interrupted), then keeps it readable
         for a while before forgetting its tokens. Until the end is recorded the game counts
@@ -939,6 +977,8 @@ class GameHub:
         await self.record(game, status, result)
         game.recorded.set()
         self.presence_changed(game)
+        # The game's last events, kept past it (v0.9.10). A game the engine lost has none to give.
+        await self.read_events(game)
         # A match's game (v0.5.0): sideboarding for the next one starts its clock. Imported here:
         # api.matches imports this module.
         from api import matches

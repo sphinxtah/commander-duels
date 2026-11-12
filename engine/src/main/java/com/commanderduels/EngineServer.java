@@ -49,7 +49,7 @@ public final class EngineServer {
     private static final String SERVICE = "/v1/service/";
     private static final String GAME_ID = "([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})";
     private static final Pattern GAME_PATH = Pattern.compile(GAME_ID + "/(view|commands|close)");
-    private static final Pattern SERVICE_GAME_PATH = Pattern.compile(GAME_ID + "/(close|inspection|bots|attach)");
+    private static final Pattern SERVICE_GAME_PATH = Pattern.compile(GAME_ID + "/(close|inspection|bots|attach|events)");
     /** The body of a request to the passive bot switch (v0.8.6). */
     private static final Set<String> BOTS_FIELDS = Set.of("passive");
     /** Content a plugin carries for the API (v0.8.0): {@code /v1/service/content/<name>}. */
@@ -222,6 +222,11 @@ public final class EngineServer {
                 attach(exchange, engine, matcher.group(1));
                 return;
             }
+            if (matcher.group(2).equals("events")) {
+                Optional<HumanGame> running = games.service(matcher.group(1));
+                events(exchange, running.map(HumanGame::events).orElse(null), games.recordings(), matcher.group(1));
+                return;
+            }
             // A close for an id no game has records it as cancelled (v0.8.3): the API gave up on a
             // create whose game it never heard of, and a late create with that id is refused.
             boolean close = matcher.group(2).equals("close") && exchange.getRequestMethod().equals("POST");
@@ -302,7 +307,7 @@ public final class EngineServer {
     }
 
     /** Every route a game's process answers for it, on the front process (v0.9.10). */
-    private static final Pattern ISOLATED_GAME_PATH = Pattern.compile(GAME_ID + "/(view|commands|close|inspection|bots|attach)");
+    private static final Pattern ISOLATED_GAME_PATH = Pattern.compile(GAME_ID + "/(view|commands|close|inspection|bots|attach|events)");
 
     /**
      * The engine's numbers when every game runs in this one process (v0.9.10): memory and the bots
@@ -326,7 +331,8 @@ public final class EngineServer {
             throws IOException {
         Matcher matcher = ISOLATED_GAME_PATH.matcher(rest);
         String action = matcher.matches() ? matcher.group(2) : "";
-        boolean serviceOnly = action.equals("inspection") || action.equals("bots") || action.equals("attach");
+        boolean serviceOnly = action.equals("inspection") || action.equals("bots") || action.equals("attach")
+            || action.equals("events");
         if (action.isEmpty() || serviceOnly && !service) {
             respond(exchange, 404, Map.of("code", "not_found"));
             return;
@@ -338,6 +344,11 @@ public final class EngineServer {
         }
         GameProcesses processes = engine.processes();
         Optional<GameProcesses.GameProcess> process = processes.of(id);
+        if (process.isEmpty() && action.equals("events")) {
+            // A game no process runs any more: its events are in its recording.
+            events(exchange, null, engine.humanGames().recordings(), id);
+            return;
+        }
         if (process.isEmpty()) {
             if (service && action.equals("close") && exchange.getRequestMethod().equals("POST")) {
                 engine.humanGames().serviceOrCancel(id);
@@ -633,6 +644,62 @@ public final class EngineServer {
         } catch (RuntimeException e) {
             return "legacy";
         }
+    }
+
+    /** At most this many events in one answer. */
+    static final int MAX_EVENTS = 2000;
+
+    /**
+     * A game's structured events (v0.9.10, {@link GameEvents}): {@code GET .../events?since=N&limit=M}
+     * answers the events after {@code since} (0 for all), oldest first, at most {@code limit}, with
+     * {@code next} (the last sequence number given, to ask after) and {@code epoch} (how many times
+     * the game was taken up). Each event carries who may see its objects; the API filters them for
+     * a seat. A game no process runs any more is answered from its recording; one with neither is 404.
+     */
+    private static void events(HttpExchange exchange, GameEvents live, Path recordings, String id) throws IOException {
+        if (!exchange.getRequestMethod().equals("GET")) {
+            methodNotAllowed(exchange, "GET");
+            return;
+        }
+        long since;
+        int limit;
+        try {
+            Map<String, String> query = query(exchange.getRequestURI().getRawQuery());
+            since = longParameter(query, "since", 0, 0, Long.MAX_VALUE);
+            limit = (int) longParameter(query, "limit", MAX_EVENTS, 1, MAX_EVENTS);
+        } catch (JsonRequest.Invalid e) {
+            respond(exchange, 400, Map.of("code", "invalid_request", "message", e.getMessage()));
+            return;
+        }
+        List<com.google.gson.JsonObject> found;
+        int epoch;
+        if (live != null) {
+            found = live.since(since, limit);
+            epoch = live.epoch();
+        } else {
+            Recording recording = recordings == null ? null : Recording.of(recordings, id);
+            if (recording == null || !recording.exists()) {
+                respond(exchange, 404, Map.of("code", "not_found"));
+                return;
+            }
+            found = new ArrayList<>();
+            epoch = 0;
+            for (var event : GameEvents.read(recording.folder().resolve(GameEvents.FILE))) {
+                epoch = Math.max(epoch, event.get("epoch").getAsInt());
+                if (event.get("seq").getAsLong() > since && found.size() < limit) {
+                    found.add(event);
+                }
+            }
+        }
+        com.google.gson.JsonObject answer = new com.google.gson.JsonObject();
+        answer.addProperty("v", GameEvents.VERSION);
+        answer.addProperty("game_id", id);
+        answer.addProperty("epoch", epoch);
+        com.google.gson.JsonArray list = new com.google.gson.JsonArray();
+        found.forEach(list::add);
+        answer.add("events", list);
+        answer.addProperty("next", found.isEmpty() ? since : found.get(found.size() - 1).get("seq").getAsLong());
+        respond(exchange, 200, answer);
     }
 
     /** A game with its tokens, as a create and an attach answer. */

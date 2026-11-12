@@ -5724,6 +5724,57 @@
         "title": "Error",
         "type": "object"
       },
+      "EventsPage": {
+        "description": "A page of a game's events, as the perspective may see them.",
+        "properties": {
+          "events": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "game_id": {
+            "format": "uuid",
+            "title": "Game Id",
+            "type": "string"
+          },
+          "next": {
+            "title": "Next",
+            "type": "integer"
+          },
+          "perspective": {
+            "enum": [
+              "seat",
+              "spectator",
+              "inspection"
+            ],
+            "title": "Perspective",
+            "type": "string"
+          },
+          "seat": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seat"
+          }
+        },
+        "required": [
+          "game_id",
+          "perspective",
+          "seat",
+          "events",
+          "next"
+        ],
+        "title": "EventsPage",
+        "type": "object"
+      },
       "FaceSummary": {
         "additionalProperties": false,
         "properties": {
@@ -30028,6 +30079,131 @@
           }
         },
         "summary": "Decline Rematch"
+      }
+    },
+    "/api/v1/games/{game_id}/timeline": {
+      "get": {
+        "description": "A game's structured events after ``since``, oldest first (v0.9.10), of one ``turn`` or one\n``type`` if asked: a player's own seat's perspective, or with ``view=inspection`` everything,\nfor SysOp (and an administrator outside a game they play against people), each reading\naudited. Anyone else is answered 404.",
+        "operationId": "game_events_api_v1_games__game_id__timeline_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Since",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "required": false,
+            "schema": {
+              "default": "seat",
+              "enum": [
+                "seat",
+                "inspection"
+              ],
+              "title": "View",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "turn",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Turn"
+            }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventsPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Game Events",
+        "tags": [
+          "events"
+        ]
       }
     },
     "/api/v1/health": {

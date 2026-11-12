@@ -377,11 +377,22 @@ def prune_messages(engine: Engine, now: datetime) -> int:
     return removed
 
 
+def prune_events(engine: Engine, now: datetime) -> int:
+    """Games' events past their time (api/events.py sweep), since v0.9.10 in the same run."""
+    from api.events import sweep
+
+    with Session(engine) as db:
+        removed = sweep(db, now)
+        db.commit()
+    return removed
+
+
 def handle(engine: Engine, now: datetime) -> Outcome:
     """One run of the job, as the outcome catalog.sync.settle records on it."""
     try:
         count = remove_unapproved(engine, now)
         messages = prune_messages(engine, now)
+        events = prune_events(engine, now)
     except Exception:
         # Tomorrow's run tries again; the accounts and messages wait one more day.
         log.exception("The daily account cleanup failed")
@@ -390,4 +401,6 @@ def handle(engine: Engine, now: datetime) -> Outcome:
         log.info("Deleted %s accounts never approved in %s days", count, UNAPPROVED_DAYS)
     if messages:
         log.info("Deleted %s chat messages past their time", messages)
-    return Outcome("completed", "deleted" if count or messages else "nothing_due")
+    if events:
+        log.info("Deleted %s game events past their time", events)
+    return Outcome("completed", "deleted" if count or messages or events else "nothing_due")

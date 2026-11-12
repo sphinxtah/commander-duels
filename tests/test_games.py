@@ -59,6 +59,9 @@ class FakeGame:
         self.actions: dict[str, tuple[str, tuple[int, dict[str, Any]]]] = {}
         self.result: dict[str, Any] | None = None
         self.log: list[str] = ["The game begins."]
+        # Its structured events (v0.9.10) and how many times the engine took it up.
+        self.events: list[dict[str, Any]] = []
+        self.epoch = 0
         fixtures = games.FIXTURE_DECKS[body.get("format", "legacy")]
         self.decks = []
         for index, seat in enumerate(body["seats"]):
@@ -136,6 +139,8 @@ class FakeEngine:
             return created
         if len(parts) == 3 and parts[2] == "attach":
             return self.attach(parts[1])
+        if len(parts) == 3 and parts[2] == "events":
+            return self.events(parts[1], request.url.params)
         game = self.games.get(parts[1])
         if game is None:
             return httpx.Response(404, json={"code": "not_found"})
@@ -167,6 +172,27 @@ class FakeEngine:
         if parts[2] == "view":
             return await self.view(game, request.url.params)
         return self.command(game, body)
+
+    def events(self, game_id: str, params: httpx.QueryParams) -> httpx.Response:
+        """GET /games/{id}/events (v0.9.10): the game's structured events after ``since``, of a
+        running game or of a dead engine's (from its recording)."""
+        with self.lock:
+            game = self.games.get(game_id) or self.lost.get(game_id)
+            if game is None:
+                return httpx.Response(404, json={"code": "not_found"})
+            since = int(params.get("since", 0))
+            limit = int(params.get("limit", 2000))
+            found = [event for event in game.events if event["seq"] > since][:limit]
+            return httpx.Response(
+                200,
+                json={
+                    "v": 1,
+                    "game_id": game_id,
+                    "epoch": game.epoch,
+                    "events": found,
+                    "next": found[-1]["seq"] if found else since,
+                },
+            )
 
     def finish(self, game: FakeGame) -> None:
         with self.lock:

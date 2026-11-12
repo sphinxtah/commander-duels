@@ -2206,6 +2206,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/games/{game_id}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Game Events
+         * @description A game's structured events after ``since``, oldest first (v0.9.10), of one ``turn`` or one
+         *     ``type`` if asked: a player's own seat's perspective, or with ``view=inspection`` everything,
+         *     for SysOp (and an administrator outside a game they play against people), each reading
+         *     audited. Anyone else is answered 404.
+         */
+        get: operations["game_events_api_v1_games__game_id__timeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -5837,6 +5860,30 @@ export interface components {
             names?: string[] | null;
             /** Request Id */
             request_id: string;
+        };
+        /**
+         * EventsPage
+         * @description A page of a game's events, as the perspective may see them.
+         */
+        EventsPage: {
+            /** Events */
+            events: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Game Id
+             * Format: uuid
+             */
+            game_id: string;
+            /** Next */
+            next: number;
+            /**
+             * Perspective
+             * @enum {string}
+             */
+            perspective: "seat" | "spectator" | "inspection";
+            /** Seat */
+            seat: number | null;
         };
         /** FaceSummary */
         FaceSummary: {
@@ -21560,6 +21607,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    game_events_api_v1_games__game_id__timeline_get: {
+        parameters: {
+            query?: {
+                since?: number;
+                limit?: number;
+                view?: "seat" | "inspection";
+                turn?: number | null;
+                type?: string | null;
+            };
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventsPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description Service Unavailable */

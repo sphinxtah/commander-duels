@@ -260,6 +260,28 @@ class Game(Base):
     kings_table: Mapped[dict[str, object] | None] = mapped_column(JsonType)
 
 
+class GameEventRow(Base):
+    """A game's structured event (v0.9.10, api/events.py; docs/engine/events.md): what happened, as
+    the engine numbered it, kept for timelines, replays and spectators past the game's recording.
+    The event is stored whole, with who may see each object it names; it is shown only through the
+    perspective filter. Kept EVENT_RETENTION_DAYS after the game, then swept by the daily job.
+    Written by the games' hub as the game goes on; replaced whole when the engine took the game up
+    again (a new epoch) and made its later events anew."""
+
+    __tablename__ = "game_events"
+    __table_args__ = (
+        Index("ix_game_events_game_id_turn", "game_id", "turn"),
+        Index("ix_game_events_game_id_type", "game_id", "type"),
+    )
+    game_id: Mapped[UUID] = mapped_column(ForeignKey("games.id"), primary_key=True)
+    seq: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    # How many times the engine had taken the game up when it made the event.
+    epoch: Mapped[int] = mapped_column(SmallInteger)
+    turn: Mapped[int]
+    type: Mapped[str] = mapped_column(String(32))
+    event: Mapped[dict[str, object]] = mapped_column(JsonType)
+
+
 class GameSeat(Base):
     """A seat in a game: a human seat's owner, or a bot, and its deck."""
 

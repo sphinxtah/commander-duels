@@ -78,6 +78,28 @@ def set_sysop_password(database_url: str, password: str) -> bool:
         engine.dispose()
 
 
+def print_timeline(args: argparse.Namespace) -> None:
+    """A developer's timeline of a game's events (v0.9.10, api/events.py): one line an event,
+    through the same filter the API's readers have. Run where the API's settings are."""
+    from uuid import UUID
+
+    from api.database import build_engine
+    from api.events import Perspective, timeline
+
+    if args.inspection:
+        perspective = Perspective.inspection()
+    elif args.spectator:
+        perspective = Perspective.spectator()
+    else:
+        perspective = Perspective.of_seat(args.seat if args.seat is not None else 0)
+    engine = build_engine(Settings().database_url)
+    try:
+        lines = timeline(engine, UUID(args.game_id), perspective)
+    finally:
+        engine.dispose()
+    print("\n".join(lines) if lines else "No events kept for this game.")
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="python -m api.cli")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -87,7 +109,21 @@ def main(argv: list[str] | None = None) -> None:
     source = password.add_mutually_exclusive_group()
     source.add_argument("--stdin", action="store_true", help="Read the password from stdin.")
     source.add_argument("--password-file", help="Read the password from a file's first line.")
+    timeline = commands.add_parser(
+        "timeline",
+        help="Print a game's events, one a line, as a seat, a spectator or inspection sees them.",
+    )
+    timeline.add_argument("game_id", help="The game's id.")
+    eyes = timeline.add_mutually_exclusive_group()
+    eyes.add_argument("--seat", type=int, help="As this seat sees them (the default: seat 0).")
+    eyes.add_argument("--spectator", action="store_true", help="As a spectator sees them.")
+    eyes.add_argument(
+        "--inspection", action="store_true", help="Everything, with who may see what."
+    )
     args = parser.parse_args(argv)
+    if args.command == "timeline":
+        print_timeline(args)
+        return
     secret = read_password(args)
     if len(secret) < MIN_LENGTH:
         raise SystemExit(f"The password must be at least {MIN_LENGTH} characters.")
