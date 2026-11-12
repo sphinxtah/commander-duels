@@ -128,6 +128,19 @@ class SeatChecks implements HumanGame.Hooks {
 
     @Override
     public void beforeStart(Game game, List<UUID> ids) {
+        watch(game, ids);
+    }
+
+    /**
+     * A game taken up from its recording (v0.9.9) is checked on as it was: by the same checks, which
+     * keep what each seat had been shown before the interruption.
+     */
+    @Override
+    public void resumed(Game game, List<UUID> ids) {
+        watch(game, ids);
+    }
+
+    private void watch(Game game, List<UUID> ids) {
         seatIds = ids;
         game.addTableEventListener(event -> {
             if (event.getEventType() == TableEvent.EventType.ERROR) {

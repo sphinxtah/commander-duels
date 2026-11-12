@@ -49,7 +49,7 @@ public final class EngineServer {
     private static final String SERVICE = "/v1/service/";
     private static final String GAME_ID = "([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})";
     private static final Pattern GAME_PATH = Pattern.compile(GAME_ID + "/(view|commands|close)");
-    private static final Pattern SERVICE_GAME_PATH = Pattern.compile(GAME_ID + "/(close|inspection|bots)");
+    private static final Pattern SERVICE_GAME_PATH = Pattern.compile(GAME_ID + "/(close|inspection|bots|attach)");
     /** The body of a request to the passive bot switch (v0.8.6). */
     private static final Set<String> BOTS_FIELDS = Set.of("passive");
     /** Content a plugin carries for the API (v0.8.0): {@code /v1/service/content/<name>}. */
@@ -168,6 +168,13 @@ public final class EngineServer {
             cards(exchange, engine);
         } else if (rest.equals("implementations")) {
             implementations(exchange, implementations);
+        } else if (rest.equals("recordings")) {
+            // What recording and recovery are doing (v0.9.9): numbers and game ids, for the operator.
+            if (!exchange.getRequestMethod().equals("GET")) {
+                methodNotAllowed(exchange, "GET");
+            } else {
+                respond(exchange, 200, games.recordingStatus());
+            }
         } else if (rest.startsWith("content/")) {
             content(exchange, rest.substring("content/".length()));
         } else if (rest.startsWith("games/")) {
@@ -175,6 +182,10 @@ public final class EngineServer {
             Matcher matcher = SERVICE_GAME_PATH.matcher(gamePath);
             if (!matcher.matches()) {
                 gameRoute(exchange, games, gamePath, true);
+                return;
+            }
+            if (matcher.group(2).equals("attach")) {
+                attach(exchange, engine, matcher.group(1));
                 return;
             }
             // A close for an id no game has records it as cancelled (v0.8.3): the API gave up on a
@@ -194,6 +205,85 @@ public final class EngineServer {
         } else {
             respond(exchange, 404, Map.of("code", "not_found"));
         }
+    }
+
+    /**
+     * The API asks for a game again (v0.9.9, {@link HumanGames#attach}): after the engine's restart,
+     * when the game is taken up from its recording, or after its own, when it has lost the game's
+     * tokens. The answer has the shape of a create's, with a {@code status}: {@code attached} (the
+     * game was running here) or {@code recovered} (it was taken up), each with new seat tokens, the
+     * old ones no longer working; or {@code finished}, with the game's {@code result} and no tokens.
+     * A game that is not here and has no recording is 404; a recording that cannot give its game
+     * back is 409 with a {@code code} ({@code recording_unreadable}, {@code recording_incompatible},
+     * {@code recording_unrecoverable}) and a {@code message} that says why in words.
+     */
+    private static void attach(HttpExchange exchange, Engine engine, String id) throws IOException {
+        if (!exchange.getRequestMethod().equals("POST")) {
+            methodNotAllowed(exchange, "POST");
+            return;
+        }
+        if (engine.status() != Engine.Status.READY) {
+            // The cards are still being loaded: a game cannot be taken up without them.
+            exchange.getResponseHeaders().set("Retry-After", "5");
+            respond(exchange, 503, Map.of("code", notReadyCode(engine)));
+            return;
+        }
+        if (readBody(exchange).isEmpty()) {
+            return;
+        }
+        HumanGames.Attachment attachment = engine.humanGames().attach(id);
+        switch (attachment.status()) {
+            case UNKNOWN -> respond(exchange, 404, Map.of("code", "not_found"));
+            case BUSY -> {
+                exchange.getResponseHeaders().set("Retry-After", "30");
+                respond(exchange, 429, Map.of("code", "games_busy",
+                    "message", "At most " + engine.humanGames().maxActive() + " games run at once"));
+            }
+            case UNUSABLE -> {
+                Map<String, Object> refusal = new LinkedHashMap<>();
+                refusal.put("code", "recording_" + attachment.code());
+                refusal.put("message", attachment.message());
+                respond(exchange, 409, refusal);
+            }
+            case FINISHED -> {
+                Map<String, Object> response = new LinkedHashMap<>();
+                response.put("game_id", id);
+                response.put("status", "finished");
+                response.put("result", attachment.result());
+                respond(exchange, 200, response);
+            }
+            default -> {
+                Map<String, Object> response = created(attachment.created());
+                response.put("status", attachment.status() == HumanGames.Attached.RECOVERED ? "recovered" : "attached");
+                if (attachment.report() != null) {
+                    Map<String, Object> recovery = new LinkedHashMap<>();
+                    recovery.put("checkpoint", attachment.report().checkpoint());
+                    recovery.put("journal_records", attachment.report().records());
+                    recovery.put("passed_over", attachment.report().problems());
+                    response.put("recovery", recovery);
+                }
+                respond(exchange, 200, response);
+            }
+        }
+    }
+
+    /** A game with its tokens, as a create and an attach answer. */
+    private static Map<String, Object> created(HumanGames.Created created) {
+        HumanGame game = created.game();
+        List<Map<String, Object>> seats = new ArrayList<>();
+        for (HumanGame.SeatSettings seat : game.settings().seats()) {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("seat", seat.seat());
+            entry.put("player", seat.player());
+            entry.put("seat_token", created.seatTokens().get(seat.seat()));
+            seats.add(entry);
+        }
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("game_id", game.id());
+        response.put("seats", seats);
+        response.put("spectator_token", created.spectatorToken());
+        response.put("settings", game.settings());
+        return response;
     }
 
     /** The implementation list, gzipped as the image made it. */
@@ -407,7 +497,7 @@ public final class EngineServer {
             return;
         }
         HumanGames games = engine.humanGames();
-        HumanGames.Creation creation = games.start(request, service);
+        HumanGames.Creation creation = games.start(request, service, body.get());
         if (creation.refusal() == HumanGames.Refusal.GAME_EXISTS) {
             respond(exchange, 409, Map.of("code", "game_exists",
                 "message", "A game with this game_id already exists"));
@@ -425,21 +515,7 @@ public final class EngineServer {
                 "message", "At most " + games.maxActive() + " development games run at once"));
             return;
         }
-        HumanGame game = created.get().game();
-        List<Map<String, Object>> seats = new ArrayList<>();
-        for (HumanGame.SeatSettings seat : game.settings().seats()) {
-            Map<String, Object> entry = new LinkedHashMap<>();
-            entry.put("seat", seat.seat());
-            entry.put("player", seat.player());
-            entry.put("seat_token", created.get().seatTokens().get(seat.seat()));
-            seats.add(entry);
-        }
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("game_id", game.id());
-        response.put("seats", seats);
-        response.put("spectator_token", created.get().spectatorToken());
-        response.put("settings", game.settings());
-        respond(exchange, 201, response);
+        respond(exchange, 201, created(created.get()));
     }
 
     private static void gameRoute(HttpExchange exchange, HumanGames games, String rest, boolean service)
@@ -626,7 +702,17 @@ public final class EngineServer {
         int maxGames = Integer.parseInt(System.getenv().getOrDefault("CD_ENGINE_MAX_GAMES",
             String.valueOf(HumanGames.DEFAULT_MAX_ACTIVE)));
         String serviceToken = System.getenv().getOrDefault("CD_ENGINE_SERVICE_TOKEN", "").strip();
-        var games = devEndpoints || !serviceToken.isEmpty() ? new HumanGames(decks, maxGames) : null;
+        // Recordings (v0.9.9): where service games keep them, and for how long after their last
+        // change. Without a folder no game is recorded and none can be taken up again.
+        String recordingsFolder = System.getenv().getOrDefault("CD_ENGINE_RECORDINGS", "").strip();
+        Path recordings = recordingsFolder.isEmpty() ? null : Path.of(recordingsFolder);
+        long retentionHours = Long.parseLong(System.getenv().getOrDefault("CD_ENGINE_RECORDING_RETENTION_HOURS", "24"));
+        if (recordings != null) {
+            java.nio.file.Files.createDirectories(recordings);
+        }
+        var games = devEndpoints || !serviceToken.isEmpty()
+            ? new HumanGames(decks, maxGames, recordings, java.util.concurrent.TimeUnit.HOURS.toMillis(retentionHours))
+            : null;
         var engine = new Engine(pin, devEndpoints, CardDatabase::load, runner::run, games, devEndpoints, serviceToken);
         var implementations = Implementations.load(
             Path.of(System.getenv().getOrDefault("CD_ENGINE_IMPLEMENTATIONS", "catalog")));
@@ -638,6 +724,10 @@ public final class EngineServer {
             devEndpoints ? "enabled" : "disabled", engine.serviceGamesEnabled() ? "enabled" : "disabled",
             games != null ? " (at most " + games.maxActive() + " games at once, " + FairBot.SEARCH_THREADS
                 + " bot search threads)" : "");
+        System.out.println(recordings == null || games == null ? "Service games keep no recording (CD_ENGINE_RECORDINGS"
+                + " is not set): a game the engine loses is lost"
+            : "Service games are recorded in " + recordings.toAbsolutePath() + " (kept " + retentionHours
+                + " hours after their last change); this engine's build is " + EngineBuild.key());
         System.out.println(implementations.summary() == null ? "No implementation list"
             : "Implementation list " + implementations.summary().build() + ": "
                 + implementations.summary().cards() + " cards");

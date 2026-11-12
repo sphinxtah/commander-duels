@@ -165,6 +165,7 @@ Since v0.3.1 the transaction that records a finished game also counts its win, w
 | 4403 | `origin_refused`, `csrf_failed`, `forbidden` | Another site; a wrong CSRF token; no `games.play`, or `inspect` without SysOp's permission |
 | 4404 | `not_found` | Not your game, or no such game |
 | 4410 | `game_not_live` | The API no longer follows the game (finished long ago, or interrupted); read it over HTTP |
+| 4503 | `game_recovering` | Since v0.9.9: the API was restarted and is still asking the engine for this game ([below](#data-and-restarts)). Reconnect, with backoff; the page does |
 | 4429 | `too_many_connections` | The account already holds 4 connections to this game, or the game holds 8 for each player's seat. SysOp's connections are not counted. Close a tab; the page retries with backoff |
 | 4400 | `hello_required` | The first message was not a valid hello |
 | 4408 | (none) | The client stopped reading. Reconnect and resynchronize |
@@ -191,7 +192,7 @@ Since v0.3.1 the transaction that records a finished game also counts its win, w
 | `inspection` | SysOp's inspection view, after each new revision, only to connections that asked to inspect |
 | `presence` | Since v0.4.0, at a table only: `away_after` (120 seconds) and, for each player's seat, `connected`, `away_seconds` (since no tab of theirs has been connected), `left`, `removable`, the seats that voted `yes` and `no`, and the yes votes `needed`. Sent to every connection when it changes, when a seat has been away long enough to be voted on, and after the welcome |
 | `chat_history`, `chat`, `alliances` | Since v0.4.4, at a table only: the table's chat and its alliances, each line only to the connections that may see it ([chat](chat.md#on-the-games-websocket)) |
-| `interrupted` | The engine lost the game |
+| `interrupted` | The engine lost the game and could not give it back (since v0.9.9; before, whenever the engine lost it) |
 | `welcome`, `pong`, `error` | As above |
 
 ### The controller lease (AUTH07)
@@ -248,10 +249,32 @@ The engine serves the API's games under `/v1/service`, only when `CD_ENGINE_SERV
 | `POST /v1/service/games/{id}/close` | Ends the game; the service token alone suffices. Since v0.8.3 a close for an id with no game cancels that id for 15 minutes (still 404 `not_found`), so a create that reaches the engine after it is refused |
 | `GET /v1/service/games/{id}/inspection` | The inspection view; `wait_ms` up to 30 000 |
 | `POST /v1/service/games/{id}/bots` | Since v0.8.6: `{"passive": true}` or `false` switches the game's bots to passive or back, answering `{"passive": …}`; a change adds a line to the game's log. 409 `game_over` once the game has a result |
+| `POST /v1/service/games/{id}/attach` | Since v0.9.9: the API asks for a game again ([below](#recordings-and-attaching-v099)) |
+| `GET /v1/service/recordings` | Since v0.9.9: what recording and recovery are doing, in numbers and game ids ([recovery](engine/recovery.md#for-the-operator)) |
 | `GET /v1/service/cards?q=&limit=` | Card names containing `q`, ignoring case: names starting with it first |
 | `GET /v1/service/implementations` | Since v0.2.0: every card the engine implements, with its gates, gzip-compressed, for [the catalog](catalog.md#the-engines-implementation-list) |
 
 Service games and development games share one registry and the engine's game cap, but each belongs to its own route. A token or game ID from one route finds nothing on the other, and development games cannot be inspected. The development endpoints stay for scripts (`CD_ENGINE_DEV_ENDPOINTS`). The engine's `/health` reports `service_games_enabled`, which says only whether the service routes are on. Since v0.1.1 it also reports `gameplay_available: true` when the engine is ready (its card database is open) and its service routes serve the API's players' games. It is false while the engine loads, after a failed load, and on an engine without service games. The API passes the value through at `/api/v1/engine/status`.
+
+### Recordings and attaching (v0.9.9)
+
+With `CD_ENGINE_RECORDINGS` set to a folder (the engine's image sets it), every service game keeps a recording of itself there, and a game the engine no longer has in memory is taken up again from it ([recording and recovery](engine/recovery.md)). The engine takes nothing up by itself. The API asks:
+
+```
+POST /v1/service/games/{id}/attach
+```
+
+| Answer | When |
+| --- | --- |
+| 200, `"status": "attached"` | The game is running in this engine. The answer has a create's shape (`game_id`, `seats` with a new `seat_token` for each human seat, a new `spectator_token`, `settings`); the tokens handed out before stop working |
+| 200, `"status": "recovered"` | The game was not here and was taken up from its recording. As above, with `recovery`: the `checkpoint` it goes on from (0: dealt again from its seed, in its mulligans), how many `journal_records` are played again, and what was `passed_over` (damaged checkpoints, a damaged journal tail), in words |
+| 200, `"status": "finished"` | The game is over: its `result`, from the game or, once the engine has forgotten it, from its recording. No tokens |
+| 404 `not_found` | No such game, here or among the recordings. An engine that keeps no recordings answers this for every game it does not run |
+| 409 `recording_unreadable`, `recording_incompatible`, `recording_unrecoverable` | The recording cannot give the game back, with a `message` that says why: it is damaged; another engine build made it (after an upgrade); or the game was taken up five times in a row with no seat answering |
+| 429 `games_busy` | Every game slot is in use; `Retry-After: 30` |
+| 503 `engine_loading` | The card database is not open yet; `Retry-After: 5` |
+
+A create that names the id of a recording, finished or not, answers 409 `game_exists`: a game is not started anew over one that was played.
 
 ## Data and restarts
 
@@ -269,9 +292,16 @@ Migration `0024_two_headed_giant` (v0.5.0) lets a game's format be `two_headed_g
 
 Migration `0036_kings_table` (v0.8.7) lets a game's format be `kings_table` and adds `games.kings_table`, the settings it started with (null for every game already there). Since v0.8.7 a King's Table result also keeps `winner_team`. Its downgrade turns those games into games of their decks' format, keeping their wins and tokens, with no practice request to replay ([tables](tables.md#data)).
 
-One API process holds the running games. When it starts, every game still `active` in the database is marked `interrupted` and closed in the engine, because the seat tokens died with the old process. When the engine loses a game (a restart), the API marks it `interrupted` and tells its connections. A finished game stays followable for 10 minutes, then the API forgets its token. Since v0.8.3 the API creates each engine game under an id of its own, with 30 seconds to answer; when no answer comes it closes that id, so a game the engine made anyway (or makes later) is not left running with nothing following it, and a retry starts a new one. An answer the API cannot follow the game from (no game id, a human seat without its token, a seat without its deck) is treated as no answer: the game is closed and nothing is recorded (503 `engine_unavailable`). When recording or registering a created game fails for any reason, the engine game is closed and, if it was recorded, recorded `interrupted`; a close the engine does not answer is logged and never hides the original error. Practice games, tables, queues, rematches and a match's next game start the same way. A game's end that cannot be written for any reason but an unreachable database (which is waited for) is logged and the game recorded `interrupted` instead, so it never stays active holding its players' running game; following a game that fails beyond recovery ends it the same way. Recovery and replay journals (NET08–NET09) remain later work.
+One API process holds the running games, and since v0.9.9 neither its restart nor the engine's ends them ([recording and recovery](engine/recovery.md#what-the-api-does)):
 
-**One process.** The running games, their seat tokens, the queues' claims, the locks and the limits live in the API process's memory, so the API runs as exactly one process: one uvicorn worker, never `--workers` or `WEB_CONCURRENCY` above 1. A second process on the same database would mark the first one's games interrupted as it starts, see the first one's games as orphans when they are closed, and make the queues' places that the first is starting wait again. On PostgreSQL the API therefore takes a session-level advisory lock, one for each database schema, on a connection of its own before that startup check, and holds it until it stops; a process that cannot take it logs that another API process is running and fails to start. Taking the lock comes first: while PostgreSQL cannot be reached at startup, the API waits for it (retrying as below) before it serves, since until then it cannot tell whether another process runs the games. SQLite (the tests) takes no lock.
+- **The API starts.** The seat tokens died with the old process, so it asks the engine for every game still `active` in the database ([attach](#recordings-and-attaching-v099)): a game the engine still runs, or takes up from its recording, is followed again with new tokens; one that ended meanwhile is recorded `finished` with its result, win, pay and rewards; one the engine cannot give back is marked `interrupted` and closed in the engine. Each game is asked for once before the API serves (5 seconds in all); those the engine could not answer for yet are asked for again in the background for 3 minutes, and a tab that connects to one meanwhile is closed with 4503 `game_recovering` and reconnects.
+- **The engine loses a game** (it was restarted, or died): the seat's follower gets 404, and the API asks for the game again, once for all its seats. Given back, the game goes on with new tokens and its connections get its view at a revision far on. Not given back, it is marked `interrupted` and its connections are told. Before v0.9.9 both restarts interrupted every running game.
+
+What only the old process's memory held is gone with it: which tab held each seat's controller lease (the tabs take it again), the votes on an away player, and a table's alliances and offers other than its teams'.
+
+A finished game stays followable for 10 minutes, then the API forgets its token. Since v0.8.3 the API creates each engine game under an id of its own, with 30 seconds to answer; when no answer comes it closes that id, so a game the engine made anyway (or makes later) is not left running with nothing following it, and a retry starts a new one. An answer the API cannot follow the game from (no game id, a human seat without its token, a seat without its deck) is treated as no answer: the game is closed and nothing is recorded (503 `engine_unavailable`). When recording or registering a created game fails for any reason, the engine game is closed and, if it was recorded, recorded `interrupted`; a close the engine does not answer is logged and never hides the original error. Practice games, tables, queues, rematches and a match's next game start the same way. A game's end that cannot be written for any reason but an unreachable database (which is waited for) is logged and the game recorded `interrupted` instead, so it never stays active holding its players' running game; following a game that fails beyond recovery ends it the same way. Since v0.9.9 a game survives a restart of the API or the engine ([above](#data-and-restarts); NET08–NET09); replays remain later work.
+
+**One process.** The running games, their seat tokens, the queues' claims, the locks and the limits live in the API process's memory, so the API runs as exactly one process: one uvicorn worker, never `--workers` or `WEB_CONCURRENCY` above 1. A second process on the same database would take the first one's games from it as it starts (before v0.9.9: mark them interrupted), see the first one's games as orphans when they are closed, and make the queues' places that the first is starting wait again. On PostgreSQL the API therefore takes a session-level advisory lock, one for each database schema, on a connection of its own before that startup check, and holds it until it stops; a process that cannot take it logs that another API process is running and fails to start. Taking the lock comes first: while PostgreSQL cannot be reached at startup, the API waits for it (retrying as below) before it serves, since until then it cannot tell whether another process runs the games. SQLite (the tests) takes no lock.
 
 A short database outage cannot leave a game active and its owner blocked (since v0.1.1):
 - **At startup.** If the database cannot be reached, the check for active games retries in the background, waiting 1 second and doubling up to 30. It spares the games this process started meanwhile.

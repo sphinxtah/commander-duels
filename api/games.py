@@ -22,9 +22,16 @@ Turn control (v0.5.1, rule 723) needs nothing here: the engine puts a controlled
 marked with their seat, in the controlling seat's own views, so the controller's tab answers them
 with its own seat's token and lease, and the controlled player's tab is told who controls its turn.
 
-One API process holds the games: a restart marks the running ones interrupted and closes them in
-the engine, because their seat tokens are gone. On PostgreSQL the process holds an advisory lock
-for its lifetime, so a second API process on the same database fails to start (GameHub.hold).
+One API process holds the games. Since v0.9.9 a restart no longer ends them: the engine keeps a
+recording of every game (docs/engine/recovery.md), and the API asks it for each game it still
+counts as running (attach). After the API's own restart that brings new seat tokens for a game
+that is still running in the engine; after the engine's restart, or its death, the engine takes
+the game up from its recording where it stood. A game that ended meanwhile is answered with its
+result, which is recorded as it would have been. Only a game the engine cannot give back (it has
+no recording of it, or the recording is another engine build's, as after an upgrade) is marked
+interrupted and closed, as every running game was before. On PostgreSQL the process holds an
+advisory lock for its lifetime, so a second API process on the same database fails to start
+(GameHub.hold).
 """
 
 import asyncio
@@ -182,6 +189,17 @@ CLOSE_WAIT_SECONDS = 5.0
 CREATE_TIMEOUT_SECONDS = 30.0
 # Database writes that must land (a game's end, the restart sweep) retry, doubling the wait.
 RETRY_SECONDS = 1.0
+# How long the API goes on asking the engine for a game again (v0.9.9) while the engine does not
+# answer, is still loading its cards or has no free slot, before it gives the game up as
+# interrupted. An engine container restarts in well under a minute.
+REATTACH_SECONDS = 180.0
+# How long the API's start-up waits on the engine for the games an earlier process left running:
+# each is asked for once in that time, and what the engine has not answered for is asked for again
+# in the background while the API serves.
+STARTUP_ATTACH_SECONDS = 5.0
+# The WebSocket's close code while a game is being asked for again: the tab reconnects, with its
+# usual backoff, instead of being told the game is gone.
+CLOSE_RECOVERING = 4503
 RETRY_MAX_SECONDS = 30.0
 HELLO_SECONDS = 10.0
 SESSION_CHECK_SECONDS = 60.0
@@ -571,6 +589,10 @@ class GameHub:
         self.holder: DatabaseConnection | None = None
         # Games being created in the engine: they hold a slot under CD_GAMES_MAX already.
         self.starting = 0
+        # Games an earlier process left running, being asked for again (v0.9.9): not yet in games.
+        self.reviving: set[UUID] = set()
+        # What asking for games again came to, for the logs and the tests.
+        self.attached = {"attached": 0, "recovered": 0, "finished": 0, "interrupted": 0}
 
     def require_engine(self) -> EngineClient:
         if self.engine is None:
@@ -593,30 +615,144 @@ class GameHub:
             log.error("A game task failed", exc_info=error)
 
     def running(self) -> int:
-        return sum(not game.finished for game in self.games.values())
+        return sum(not game.finished for game in self.games.values()) + len(self.reviving)
 
     async def start(self) -> None:
-        """Games left active by an earlier process cannot be played: their tokens are gone. While
-        the database cannot be reached (it may still be starting), the check retries in the
-        background. On PostgreSQL the process first takes the lock on running the games (hold),
-        waiting while the database cannot be reached."""
+        """Games left active by an earlier process have lost their seat tokens, which only that
+        process held. Since v0.9.9 each is asked for again in the engine (revive), in the
+        background: the API serves meanwhile. While the database cannot be reached (it may still
+        be starting), the check retries in the background. On PostgreSQL the process first takes
+        the lock on running the games (hold), waiting while the database cannot be reached."""
         await retried(self.hold, "take the lock on running the games")
         started = utcnow()
         try:
-            orphans = await run_in_threadpool(interrupt_active, self.database)
+            left = await run_in_threadpool(active_games, self.database)
         except SQLAlchemyError:
-            log.warning("Could not check for interrupted games; is the database migrated?")
+            log.warning("Could not check for games left running; is the database migrated?")
             self.spawn(self.sweep(started))
             return
-        await self.close_orphans(orphans)
+        await self.revive_all(left)
 
     async def sweep(self, before: datetime) -> None:
         """The restart's check, retried. It spares the games this process started meanwhile."""
         await asyncio.sleep(RETRY_SECONDS)
-        orphans = await retried(
-            partial(interrupt_active, self.database, before), "check for interrupted games"
+        left = await retried(
+            partial(active_games, self.database, before), "check for games left running"
         )
-        await self.close_orphans(orphans)
+        await self.revive_all(left)
+
+    async def revive_all(self, left: list[UUID]) -> None:
+        """Asks the engine for each game an earlier process left running. Each is asked for once
+        at once, for STARTUP_ATTACH_SECONDS in all: an engine that is up answers in milliseconds,
+        and the API starts with its games followed, ended or given up. Those the engine could not
+        answer for yet (it is not up, is loading its cards or has no free slot) are asked for
+        again in the background, one task for them all, while the API serves."""
+        later: list[UUID] = []
+        deadline = time.monotonic() + STARTUP_ATTACH_SECONDS
+        for game_id in left:
+            if game_id in self.games or game_id in self.reviving:
+                continue
+            if time.monotonic() >= deadline or not await self.revived_or_given_up(game_id, False):
+                later.append(game_id)
+        if later:
+            self.reviving.update(later)
+            self.spawn(self.reviving_all(later))
+        elif left:
+            log.info("After the restart: %s", self.attached)
+
+    async def reviving_all(self, left: list[UUID]) -> None:
+        try:
+            for game_id in left:
+                try:
+                    await self.revived_or_given_up(game_id, True)
+                finally:
+                    self.reviving.discard(game_id)
+        finally:
+            self.reviving.difference_update(left)
+        log.info("After the restart: %s", self.attached)
+
+    async def revived_or_given_up(self, game_id: UUID, wait: bool) -> bool:
+        """revive, with a game that cannot even be asked for given up as interrupted."""
+        try:
+            return await self.revive(game_id, wait)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception("Could not ask for game %s again; it ends interrupted", game_id)
+            await self.give_up([game_id])
+            return True
+
+    async def revive(self, game_id: UUID, wait: bool) -> bool:
+        """One game an earlier process left running: followed again with new tokens, recorded as
+        ended with the result it reached meanwhile, or given up as interrupted. False when the
+        engine could not answer yet and ``wait`` is off: the game is to be asked for again."""
+        if self.engine is None:
+            await self.give_up([game_id])
+            return True
+        answer, body = await attach_in_engine(self.engine, game_id, wait)
+        if answer == "later":
+            return False
+        if answer == "finished":
+            self.attached["finished"] += 1
+            await self.record_revived(game_id, body)
+            return True
+        if answer != "attached" or body is None:
+            await self.give_up([game_id])
+            return True
+        tokens = seat_tokens(body)
+        game = await retried(
+            partial(revived, self.database, game_id, tokens),
+            f"read game {game_id} to follow it again",
+        )
+        if game is None:
+            # No longer active, or a human seat the engine gave no token for: nothing to follow.
+            await close_in_engine(self.engine, str(game_id))
+            await self.give_up([game_id])
+            return True
+        self.attached["recovered" if body.get("status") == "recovered" else "attached"] += 1
+        log.info("Game %s is followed again (%s)", game_id, body.get("status"))
+        self.register(game)
+        return True
+
+    async def record_revived(self, game_id: UUID, result: dict[str, Any] | None) -> None:
+        """A game that ended while nothing followed it: its end is recorded as a follower would
+        have recorded it, with its win, its pay and its rewards, once."""
+        content_dir = self.settings.content_dir
+        try:
+            await retried(
+                partial(
+                    record_end,
+                    self.database,
+                    game_id,
+                    "finished" if result is not None else "interrupted",
+                    result,
+                    content_dir,
+                ),
+                f"record the end of game {game_id}",
+            )
+        except Exception:
+            log.exception("Could not record the end of game %s; it ends interrupted", game_id)
+            await self.give_up([game_id])
+            return
+        from api import matches  # Imported here: api.matches imports this module.
+
+        try:
+            await matches.after_game(self, game_id)
+        except SQLAlchemyError:
+            pass
+        except Exception:
+            log.exception("The match of game %s could not go on", game_id)
+
+    async def give_up(self, lost: list[UUID]) -> None:
+        """Games the engine cannot give back: marked interrupted, as every running game was after
+        a restart before v0.9.9, and closed in the engine should it still have them."""
+        if not lost:
+            return
+        self.attached["interrupted"] += len(lost)
+        await retried(
+            partial(interrupt_active, self.database, None, lost), "mark games interrupted"
+        )
+        await self.close_orphans(lost)
 
     async def close_orphans(self, orphans: list[UUID]) -> None:
         if orphans and self.engine is not None:
@@ -626,6 +762,30 @@ class GameHub:
                 except EngineUnavailable:
                     pass
             log.info("Marked %d games interrupted after a restart", len(orphans))
+
+    async def reattach(self, game: LiveGame, stale: str) -> tuple[str, dict[str, Any] | None]:
+        """The engine no longer knows a game this process follows (v0.9.9): it was restarted, or
+        it died, and has the game's recording. The game is asked for again, once for all of its
+        seats' follow tasks: the first to come asks, and the others find the new tokens. ``stale``
+        is the token the caller's request was refused with. Returns what attach_in_engine
+        returns."""
+        async with self.locks[("attach", game.id)]:
+            if all(seat.token != stale for seat in game.seats.values()):
+                return "attached", None
+            if self.engine is None or game.finished:
+                return "gone", None
+            answer, body = await attach_in_engine(self.engine, game.id)
+            if answer == "attached" and body is not None:
+                tokens = seat_tokens(body)
+                if any(seat.seat not in tokens for seat in game.seats.values()):
+                    log.warning("The engine gave game %s back without every seat's token", game.id)
+                    return "gone", None
+                for seat in game.seats.values():
+                    seat.token = tokens[seat.seat]
+                    seat.page = None
+                self.attached["recovered" if body.get("status") == "recovered" else "attached"] += 1
+                log.info("Game %s was given back by the engine (%s)", game.id, body.get("status"))
+            return answer, body
 
     def hold(self) -> None:
         """Takes PostgreSQL's session-level advisory lock on running the games, on a connection of
@@ -709,18 +869,25 @@ class GameHub:
         engine = self.require_engine()
         since, log_from, failures = -1, 0, 0
         while True:
+            token = seat.token
             try:
                 status, snapshot = await engine.request(
                     "GET",
                     f"{game.path}/view",
-                    seat_token=seat.token,
+                    seat_token=token,
                     params={"since": since, "wait_ms": LONG_POLL_MS, "log_from": log_from},
                     timeout=LONG_POLL_MS / 1000 + 10,
                 )
             except EngineUnavailable:
                 status, snapshot = 0, None
             if status == 404:
-                await self.end(game, None)
+                # The engine does not know the game, or this seat's token (v0.9.9): it was
+                # restarted and has the game's recording, or the tokens were handed out anew.
+                answer, body = await self.reattach(game, token)
+                if answer == "attached":
+                    since, log_from, failures = -1, 0, 0
+                    continue
+                await self.end(game, body if answer == "finished" else None)
                 return
             if status != 200 or not isinstance(snapshot, dict):
                 failures += 1
@@ -1155,7 +1322,97 @@ async def retried[T](work: Callable[[], T], what: str) -> T:
         delay = min(RETRY_MAX_SECONDS, delay * 2)
 
 
-def interrupt_active(database: Engine, before: datetime | None = None) -> list[UUID]:
+def active_games(database: Engine, before: datetime | None = None) -> list[UUID]:
+    """The games recorded as running, oldest first; with ``before``, only those created earlier."""
+    with Session(database) as db:
+        active = select(Game.id).where(Game.status == "active")
+        if before is not None:
+            active = active.where(Game.created_at < before)
+        return list(db.scalars(active.order_by(Game.created_at, Game.id)))
+
+
+def revived(database: Engine, game_id: UUID, tokens: dict[int, str]) -> "LiveGame | None":
+    """A game an earlier process started, as this one follows it (v0.9.9): its players' seats
+    with the engine's new tokens, and what its kind and format fix, as each kind of game sets
+    them when it starts. What that process kept only in memory is gone with it: who held each
+    seat's controller lease (the tabs reconnect and take it again), the votes on an away player,
+    and a table's alliances and offers other than its teams'. None if the game is no longer
+    running or the engine named no token for one of its players' seats."""
+    with Session(database) as db:
+        game = db.get(Game, game_id)
+        if game is None or game.status != "active":
+            return None
+        rows = [row for row in seats_of(db, game_id) if row.user_id is not None]
+        if not rows or any(row.seat not in tokens for row in rows):
+            return None
+        seats = {
+            row.seat: LiveSeat(
+                row.seat, cast(UUID, row.user_id), tokens[row.seat], left=row.left_reason
+            )
+            for row in rows
+        }
+        if game.kind == "table":
+            return LiveGame(id=game.id, kind="table", seats=seats, **team_play(game.format))
+        return LiveGame(id=game.id, seats=seats, kings=game.format == kings_table.FORMAT)
+
+
+async def attach_in_engine(
+    engine: EngineClient, game_id: UUID, wait: bool = True
+) -> tuple[str, dict[str, Any] | None]:
+    """Asks the engine for a game again (v0.9.9, POST /games/{id}/attach). Returns "attached" with
+    the engine's answer (new seat tokens; its status says whether the game was still running
+    there or was taken up from its recording), "finished" with the game's result, or "gone" when
+    the engine cannot give the game back: it has neither the game nor a recording of it (an
+    engine before v0.9.9 has no such route, and answers the same), or the recording is damaged
+    or another engine build's. While the engine does not answer, is loading or is full, it is
+    asked again for REATTACH_SECONDS, and then the game is gone; with ``wait`` off it is asked
+    once, briefly, and the answer is "later"."""
+    deadline = time.monotonic() + REATTACH_SECONDS
+    delay = RETRY_SECONDS
+    while True:
+        try:
+            status, body = await engine.request(
+                "POST",
+                f"/games/{game_id}/attach",
+                body={},
+                timeout=CREATE_TIMEOUT_SECONDS if wait else STARTUP_ATTACH_SECONDS,
+            )
+        except EngineUnavailable:
+            status, body = 0, None
+        if status == 200 and isinstance(body, dict):
+            if body.get("status") == "finished":
+                result = body.get("result")
+                return "finished", result if isinstance(result, dict) else None
+            taken = body.get("status") in ("attached", "recovered")
+            if taken and isinstance(body.get("seats"), list):
+                return "attached", body
+            log.warning("The engine answered an attach for game %s with something else", game_id)
+            return "gone", None
+        if status in (404, 405, 409):
+            if status == 409 and isinstance(body, dict):
+                log.warning(
+                    "The engine cannot give game %s back (%s): %s",
+                    game_id,
+                    body.get("code"),
+                    body.get("message"),
+                )
+            return "gone", None
+        if not wait:
+            return "later", None
+        if time.monotonic() >= deadline:
+            log.warning(
+                "The engine did not give game %s back in time (last status %s)", game_id, status
+            )
+            return "gone", None
+        await asyncio.sleep(delay)
+        delay = min(RETRY_MAX_SECONDS, delay * 2)
+
+
+def interrupt_active(
+    database: Engine, before: datetime | None = None, only: list[UUID] | None = None
+) -> list[UUID]:
+    """Marks running games interrupted, with what follows from that for their players, matches
+    and campaign duels: every one, those created before a time, or (v0.9.9) only those named."""
     # Imported here: api.awards reaches api.social, which imports api.admin, which imports this.
     from api.awards import settle
 
@@ -1163,6 +1420,8 @@ def interrupt_active(database: Engine, before: datetime | None = None) -> list[U
         active = select(Game.id).where(Game.status == "active")
         if before is not None:
             active = active.where(Game.created_at < before)
+        if only is not None:
+            active = active.where(Game.id.in_(only))
         ids = list(db.scalars(active))
         if ids:
             db.execute(
@@ -2575,6 +2834,10 @@ async def game_events(websocket: WebSocket, game_id: UUID) -> None:
         await refuse(websocket, CLOSE_NOT_FOUND, "not_found")
         return
     game = hub.games.get(game_id)
+    if game is None and game_id in hub.reviving:
+        # Asked for again in the engine after a restart (v0.9.9): the tab tries again shortly.
+        await refuse(websocket, CLOSE_RECOVERING, "game_recovering")
+        return
     if game is None:
         await refuse(websocket, CLOSE_GONE, "game_not_live")
         return

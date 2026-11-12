@@ -95,6 +95,15 @@ services:
       # a collection (v0.4.1's load test, docs/deployment.md); 12 GB holds them with room for G1,
       # and the limit adds metaspace, threads and the card database's page cache.
       JDK_JAVA_OPTIONS: "-Xms1g -Xmx12g -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError -Dh2.bindAddress=127.0.0.1"
+      # Recordings (v0.9.9, docs/engine/recovery.md): how long one is kept after its last change,
+      # for a game that is over (its result is there for the API to ask for) and for one nobody
+      # came back for; and how often a game's state is written while only bots play.
+      CD_ENGINE_RECORDING_RETENTION_HOURS: ${CD_ENGINE_RECORDING_RETENTION_HOURS:-24}
+      CD_ENGINE_CHECKPOINT_SECONDS: ${CD_ENGINE_CHECKPOINT_SECONDS:-3}
+    # Every running game's recording: a game the engine loses (it ran out of memory and Docker
+    # restarted it, or the host restarted) is taken up from here. In a volume so that it also
+    # outlives the container; a recording is only ever played on by the engine build that made it.
+    volumes: ["engine_recordings:/var/lib/commander-duels/recordings"]
     mem_limit: 16g
     healthcheck:
       test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8090/ready"]
@@ -126,3 +135,4 @@ volumes:
   postgres_data:
   card_images:
   catalog_data:
+  engine_recordings:

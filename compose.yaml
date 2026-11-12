@@ -82,6 +82,9 @@ services:
       # XMage opens its card database with H2 AUTO_SERVER, which starts a TCP listener; bind it to
       # loopback so other services cannot reach it.
       JDK_JAVA_OPTIONS: "-Xms256m -Xmx768m -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError -Dh2.bindAddress=127.0.0.1"
+    # Every service game's recording (v0.9.9, docs/engine/recovery.md): restart the engine, or
+    # the API, under a game and the game goes on.
+    volumes: ["engine_recordings:/var/lib/commander-duels/recordings"]
     mem_limit: 1536m
     healthcheck:
       # Ready once the card database is open (about 1 s; a stale database is rebuilt in ~30 s).
@@ -118,3 +121,4 @@ volumes:
   postgres_data:
   card_images:
   catalog_data:
+  engine_recordings:

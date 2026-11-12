@@ -53,9 +53,15 @@ COPY --from=engine-build /build/engine/target/engine.jar ./engine.jar
 # Plugins (docs/engine/xmage-spike.md): a derived image adds card jars here and rebuilds /app/db
 # with them. This image ships the folder empty.
 RUN mkdir /app/plugins && chown 10001:10001 /app/plugins
+# Recordings (v0.9.9, docs/engine/recovery.md): every service game keeps one here, and a game the
+# engine lost is taken up from it. Owned by the engine's user, so that a volume mounted here for
+# the first time is too. Without a volume they live in the container and survive its restart, not
+# its replacement.
+RUN mkdir -p /var/lib/commander-duels/recordings && chown 10001:10001 /var/lib/commander-duels/recordings
 USER 10001:10001
 # h2.bindAddress keeps the TCP listener that XMage's H2 AUTO_SERVER setting starts on loopback.
 ENV CD_ENGINE_DECKS=/app/decks \
+    CD_ENGINE_RECORDINGS=/var/lib/commander-duels/recordings \
     JDK_JAVA_OPTIONS="-Xms256m -Xmx768m -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError -Dh2.bindAddress=127.0.0.1"
 EXPOSE 8090
 CMD ["java", "-cp", "/app/engine.jar:/app/lib/*:/app/plugins/*", "com.commanderduels.EngineServer"]

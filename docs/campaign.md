@@ -275,7 +275,7 @@ v0.9.8 changed how the bots play twice, so the campaign was measured again on Gi
 | 10 Ob Nixilis (weaker deck) | 27% | 30 | 37%; 23% in run 1, 20% in run 2 | 35% |
 | 11 Geyadrone Dihada | 30% | 60 | 50%; 40% in run 1 | 30% |
 | 12 Nicol Bolas | 22% | 90 | 20% | 25% |
-| 13 Liliana | 28% | 60 | 50% (v0.9.7's run) | 20% |
+| 13 Liliana | 28% | 60 | 50% (v0.9.7's run); 37% in run 1 | 20% |
 | 14 The Sphinx (stand-in) | 39% | 90 | 43% | 10% |
 
 **Tuned in v0.9.8.** The decks are the lever, as before.

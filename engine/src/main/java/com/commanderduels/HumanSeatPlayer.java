@@ -55,8 +55,11 @@ final class HumanSeatPlayer extends HumanPlayer implements OpensResponse {
         void waiting(Player player, boolean waiting);
     }
 
-    /** Shared by every copy: XMage replaces the seat's player with copies when it restores a state. */
-    private final transient Listening listening;
+    /**
+     * Shared by every copy: XMage replaces the seat's player with copies when it restores a state.
+     * Null in a player read back from a checkpoint (v0.9.9) until its game takes it up ({@link #attach}).
+     */
+    private transient Listening listening;
 
     /** The cards to put on top after the game's first shuffle, in draw order (v0.9.1); empty for none. */
     private String[] opening = {};
@@ -73,6 +76,15 @@ final class HumanSeatPlayer extends HumanPlayer implements OpensResponse {
         this.listening = player.listening;
         this.opening = player.opening;
         this.shuffled = player.shuffled;
+    }
+
+    /**
+     * The game takes up a player read back from a checkpoint (v0.9.9): XMage's wait for its answer
+     * is the game's to hear of again. XMage's own part of the player has a new answer channel
+     * already (patch 0018).
+     */
+    void attach(Listening gameListening) {
+        this.listening = gameListening;
     }
 
     /** Learn Commander's training hand (v0.9.1): these cards top the library after the first shuffle. */
@@ -136,6 +148,11 @@ final class HumanSeatPlayer extends HumanPlayer implements OpensResponse {
     }
 
     private static void await(Player player, Listening listening, Runnable wait) {
+        if (listening == null) {
+            // A copy inside a checkpoint that no game has taken up: nobody to tell.
+            wait.run();
+            return;
+        }
         listening.waiting(player, true);
         try {
             wait.run();

@@ -145,7 +145,7 @@ class FairBot extends ComputerPlayerControllableProxy {
     private static final ThreadPoolExecutor SEARCHES = searchPool();
 
     /** The wall-clock time one decision's search may take. */
-    record Budget(long thinkMillis) {
+    record Budget(long thinkMillis) implements java.io.Serializable {
         Budget {
             if (thinkMillis < 0) {
                 throw new IllegalArgumentException("thinkMillis must not be negative");
@@ -173,7 +173,8 @@ class FairBot extends ComputerPlayerControllableProxy {
      * @param reckless     each creature the AI would keep home attacks anyway (30)
      * @param noBlock      declares no blockers at all, unless the attack would be lethal (45)
      */
-    record Profile(int skill, int passMain, int passResponse, int naive, int timid, int reckless, int noBlock) {
+    record Profile(int skill, int passMain, int passResponse, int naive, int timid, int reckless, int noBlock)
+            implements java.io.Serializable {
         static final int MAX_SKILL = 6;
 
         static Profile forSkill(int skill) {
@@ -194,7 +195,8 @@ class FairBot extends ComputerPlayerControllableProxy {
     }
 
     /** What a bot's searches did, shared with its copies: for tests and diagnostics. */
-    static final class Stats {
+    static final class Stats implements java.io.Serializable {
+        private static final long serialVersionUID = 1L;
         private final AtomicLong samples = new AtomicLong();
         private final AtomicLong searches = new AtomicLong();
         private final AtomicLong completed = new AtomicLong();
@@ -353,11 +355,14 @@ class FairBot extends ComputerPlayerControllableProxy {
         }
     }
 
-    private final Random random;
-    private final transient Budget budget;
+    // Since v0.9.9 a bot's budget, habits, statistics and generator are kept with it in a game's
+    // checkpoint (Checkpoint): a game that goes on after an interruption has the bots it had, and
+    // each draws what it would have drawn.
+    private Random random;
+    private final Budget budget;
     /** The habits of this bot's skill (v0.7.1; before, v0.6.5 let a flat share of priorities pass). */
-    private final transient Profile profile;
-    private final transient Stats stats;
+    private final Profile profile;
+    private final Stats stats;
     /**
      * The game's switch for passive bots (v0.8.6), one object for every bot at the table, shared by
      * reference with every copy XMage makes and every stand-in this bot makes, so a change reaches
@@ -425,6 +430,40 @@ class FairBot extends ComputerPlayerControllableProxy {
      */
     void followPassive(AtomicBoolean gameSwitch) {
         this.passive = gameSwitch;
+    }
+
+    /**
+     * For the copy of this bot in a checkpoint (v0.9.9): gives it what a copy otherwise shares with
+     * its original, as it stands now, since a checkpoint is written, on another thread, after the
+     * game has moved on. The generator: apart from the one the bot at the table goes on drawing
+     * from. XMage's list of the free actions this bot has taken this turn: the bot at the table
+     * adds to its own while this one is being written.
+     */
+    void detach(java.util.Map<Random, Random> made) {
+        this.actionCache = new java.util.HashSet<>(this.actionCache);
+        Random shared = this.random;
+        Random own = made.get(shared);
+        if (own == null) {
+            try {
+                var bytes = new java.io.ByteArrayOutputStream(128);
+                try (var out = new java.io.ObjectOutputStream(bytes)) {
+                    out.writeObject(shared);
+                }
+                try (var in = new java.io.ObjectInputStream(new java.io.ByteArrayInputStream(bytes.toByteArray()))) {
+                    own = (Random) in.readObject();
+                }
+            } catch (java.io.IOException | ClassNotFoundException e) {
+                throw new IllegalStateException(e);
+            }
+            made.put(shared, own);
+        }
+        this.random = own;
+    }
+
+    /** A bot read back from a checkpoint (v0.9.9) follows its own switch until its game gives it one. */
+    private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
+        in.defaultReadObject();
+        this.passive = new AtomicBoolean();
     }
 
     /**

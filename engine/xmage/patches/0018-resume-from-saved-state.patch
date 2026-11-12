@@ -1,0 +1,659 @@
+A game goes on from a state that was saved in the middle of a turn (Commander Duels v0.9.9, recovery).
+Every format.
+
+Reason: Commander Duels keeps a recording of every game people play (docs/engine/recovery.md): the
+game's state is saved at points it can go on from, and a game whose process is gone is made again
+from the newest of them. XMage could not do the second half. Its own resume (Game.resume,
+Turn.resumePlay, Phase.resumePlay) is for a game that was paused and is still in memory: it finds
+its place by "the phase after the current one", fires the step's and the turn's events again, and
+knows nothing of extra steps, extra phases or extra turns. And a game read back from its
+serialized form could not run at all: several fields the game cannot do without are transient and
+final, set only by the constructor.
+
+What the patch adds, all of it unused by a game that is never saved:
+
+1. Game.watchResumable: a watch the game calls, on its own thread, at each point of the real game
+   (never a simulation) from which it can go on: as a player is about to receive priority, before
+   the state-based actions and triggers of 117.5 are handled; once more after them if they changed
+   anything; and as every player has passed in succession, before the stack's top resolves or the
+   step ends. Between two such points lies at most one decision at priority, so a state saved at
+   the last of them before a player is asked something never has a bot's search between it and
+   the question. A copy of the game does not carry the watch.
+
+2. Game.resumeAtPriority, Turn.resumeAtPriority, Phase.resumeAtPriority, Step.resumePriority: the
+   rest of the turn from such a point. Priority goes on in the current step (GameImpl.playPriority
+   with resuming set, which XMage already had), then the step ends, the extra steps that were
+   being played around it are finished, the phase's remaining steps, the extra phases due after it
+   and the turn's remaining phases are played, the turn ends, and the game goes on as play() does
+   after a turn: the extra turns that are due, then the next player. Nothing that began before the
+   state was saved is begun or announced again. For that the turn and the phase keep, in the state,
+   where their loops are (Turn.ownPhase and inExtraPhase, Phase.ownStep and extraStepsAfter): a
+   copied state's current step is a copy, so the loops are found by type, not identity.
+
+3. What a deserialized game and its players need and Java does not restore: GameImpl's rollback
+   map and stack check list, HumanPlayer's answer channel (PlayerResponse) and waiting flags,
+   ComputerPlayer's list of unpaid mana. Each is made anew in readObject, as the constructor makes
+   it; the three fields lose "final" for that and are still set once.
+
+4. What must not be saved with a player's copy, since it is the player at the table itself:
+   MatchPlayer.player (a copy keeps its original's match entry), ComputerPlayerControllableProxy
+   .lastControllingPlayer (the copy constructor sets it to the player copied from) and
+   ComputerPlayer6.root (the search's tree, a copy of the game in every node). All three are now
+   transient. Saved with a game's copy they took the table's own players into the saved state, a
+   bot's whole search with them (a Commander checkpoint was 6 MB instead of 1.5 MB), while the
+   game went on changing them on another thread (ConcurrentModificationException).
+
+5. RandomUtil.setRandom: gives the calling thread a generator as it stood (see 0010), for a game
+   that goes on with the one it had.
+
+Tests: RecoveryTest (all four formats, interrupted hundreds of times), RecoveryStructureTest (a
+game with an extra step, two extra phases and an extra turn, interrupted before every answer, has
+the log of the same game played straight through), RecordingDamageTest.
+Upstream: none.
+Remove when: XMage can go on from a saved state by itself.
+
+diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java
+index 6a8c2a2a..f99bbd2a 100644
+--- a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java
++++ b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java
+@@ -72,7 +72,9 @@ public class ComputerPlayer6 extends ComputerPlayer {
+     protected LinkedList<Ability> actions = new LinkedList<>();
+     protected Combat combat;
+     protected int currentScore;
+-    protected SimulationNode2 root;
++    // Commander Duels (recovery): the search's tree is not saved with a game's state; a bot read back
++    // from one searches anew, as it does whenever the game is not where its last search left it
++    protected transient SimulationNode2 root;
+     List<Permanent> attackersList = new ArrayList<>();
+     List<Permanent> attackersToCheck = new ArrayList<>();
+ 
+diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayerControllableProxy.java b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayerControllableProxy.java
+index d0d1e2db..68b27500 100644
+--- a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayerControllableProxy.java
++++ b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayerControllableProxy.java
+@@ -46,7 +46,11 @@ public class ComputerPlayerControllableProxy extends ComputerPlayer7 {
+ 
+     private static final Logger logger = Logger.getLogger(ComputerPlayerControllableProxy.class);
+ 
+-    Player lastControllingPlayer = null;
++    // Commander Duels (recovery): not saved with a game's state. A copy's is the player it was copied
++    // from (see the copy constructor): saved with a copy, it would take the table's own player into
++    // the saved state while the game goes on changing it. It is set anew for each decision another
++    // player makes for this one.
++    transient Player lastControllingPlayer = null;
+ 
+     /**
+      * For an AI stand-in (see prepareControllableProxy): the player it decides for, whose zones, mana
+diff --git a/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/ComputerPlayer.java b/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/ComputerPlayer.java
+index 32bf12ca..3d6cd6d9 100644
+--- a/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/ComputerPlayer.java
++++ b/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/ComputerPlayer.java
+@@ -69,7 +69,8 @@ public class ComputerPlayer extends PlayerImpl {
+     // keep current paying cost info for choose dialogs
+     // mana abilities must ask payment too, so keep full chain
+     // TODO: make sure it thread safe for AI simulations (all transient fields above and bottom)
+-    private final transient Map<UUID, ManaCost> lastUnpaidMana = new LinkedHashMap<>();
++    // Commander Duels (recovery): not final, so that a player read back from a saved state gets one
++    private transient Map<UUID, ManaCost> lastUnpaidMana = new LinkedHashMap<>();
+ 
+     // For stopping infinite loops when trying to pay Phyrexian mana when the player can't spend life and no other sources are available
+     private transient boolean alreadyTryingToPayPhyrexian;
+@@ -83,6 +84,15 @@ public class ComputerPlayer extends PlayerImpl {
+         userData.setFlagName("computer.png");
+     }
+ 
++    /**
++     * Commander Duels (recovery): a player read back from a saved state gets what is not saved and
++     * it cannot pay mana without.
++     */
++    private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
++        in.defaultReadObject();
++        this.lastUnpaidMana = new LinkedHashMap<>();
++    }
++
+     protected ComputerPlayer(UUID id) {
+         super(id);
+         human = false;
+diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPlayer.java b/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPlayer.java
+index 164c4b06..563266c5 100644
+--- a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPlayer.java
++++ b/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPlayer.java
+@@ -98,7 +98,9 @@ public class HumanPlayer extends PlayerImpl {
+     // It's save in sending player response, but processing by any GAME thread any any player priority
+     private transient Boolean responseOpenedForAnswer = false; // GAME thread waiting new answer
+     private transient long responseLastWaitingThreadId = 0;
+-    private final transient PlayerResponse response; // data receiver from a client side (must be shared for one player between multiple clients)
++    // Commander Duels (recovery): not final, so that a player read back from a saved state can be
++    // given a channel (readObject below); it is still set once, when the object is made
++    private transient PlayerResponse response; // data receiver from a client side (must be shared for one player between multiple clients)
+     private final int RESPONSE_WAITING_TIME_SECS = 30; // waiting time before cancel current response
+     private final int RESPONSE_WAITING_CHECK_MS = 100; // timeout for open status check
+ 
+@@ -137,6 +139,18 @@ public class HumanPlayer extends PlayerImpl {
+         initReplacementDialog();
+     }
+ 
++    /**
++     * Commander Duels (recovery): a player read back from a saved state has nobody listening and no
++     * channel (both are left out of what is saved): it gets a channel of its own, as a new player
++     * does. The copies the game makes of it from then on share that channel, as always.
++     */
++    private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
++        in.defaultReadObject();
++        this.responseOpenedForAnswer = false;
++        this.responseLastWaitingThreadId = 0;
++        this.response = new PlayerResponse();
++    }
++
+     private void initReplacementDialog() {
+         replacementEffectChoice = new ChoiceImpl(true);
+         replacementEffectChoice.setMessage("Choose replacement effect to resolve first");
+diff --git a/Mage/src/main/java/mage/game/Game.java b/Mage/src/main/java/mage/game/Game.java
+index cc6fbfcf..da1f3927 100644
+--- a/Mage/src/main/java/mage/game/Game.java
++++ b/Mage/src/main/java/mage/game/Game.java
+@@ -610,6 +610,23 @@ public interface Game extends MageItem, Serializable, Copyable<Game> {
+ 
+     void resume();
+ 
++    /**
++     * Commander Duels (recovery): goes on with a game restored from a state that was saved at one of
++     * the points {@link #watchResumable} names, from that point.
++     */
++    void resumeAtPriority();
++
++    /**
++     * Commander Duels (recovery): the given watch is called on the game's thread at each point of
++     * the real game from which {@link #resumeAtPriority} can go on: as a player is about to receive
++     * priority (before the state-based actions and triggers of 117.5 are handled, so that whatever
++     * they ask is asked again by a game that goes on from there; and once more after them if they
++     * changed anything, so that what they made is not made again), and as every player has passed
++     * in succession (before the stack's top resolves or the step ends). Between two such points lies
++     * at most one decision at priority. A copy of the game does not carry the watch.
++     */
++    void watchResumable(java.util.function.Consumer<Game> watch);
++
+     void pause();
+ 
+     boolean isPaused();
+diff --git a/Mage/src/main/java/mage/game/GameImpl.java b/Mage/src/main/java/mage/game/GameImpl.java
+index 1dfbc2bd..ccf560a8 100644
+--- a/Mage/src/main/java/mage/game/GameImpl.java
++++ b/Mage/src/main/java/mage/game/GameImpl.java
+@@ -172,7 +172,10 @@ public abstract class GameImpl implements Game {
+     private transient int infiniteLoopCounter; // used to check if the game is in an infinite loop
+     private transient int lastNumberOfAbilitiesOnTheStack; // used to check how long no new ability was put to stack
+     private transient List<Integer> lastPlayersLifes = null; // if life is going down, it's no infinite loop
+-    private transient final LinkedList<UUID> stackObjectsCheck = new LinkedList<>(); // used to check if different sources used the stack
++    // Commander Duels (recovery): not final, so that a game read back from a saved state gets one
++    private transient LinkedList<UUID> stackObjectsCheck = new LinkedList<>(); // used to check if different sources used the stack
++    // Commander Duels (recovery): told at each point the game can later go on from, see Game.watchResumable
++    private transient java.util.function.Consumer<Game> resumableWatch;
+ 
+     // temporary store for income concede commands, don't copy
+     private final LinkedList<UUID> concedingPlayers = new LinkedList<>();
+@@ -1301,6 +1304,61 @@ public abstract class GameImpl implements Game {
+         play(player.getId());
+     }
+ 
++    /**
++     * Commander Duels (recovery): goes on with a game restored from a state that was saved as a
++     * player received priority. The rest of that turn is played from the priority on, and nothing
++     * that began before the state was saved is begun or announced again; then the game goes on as
++     * {@link #play} does after a turn: the turn's end, the extra turns that are due, and the next
++     * player's turn. A turn in progress that was itself an extra turn was one of those
++     * {@code playExtraTurns} plays after a player's own turn: the same follows it.
++     */
++    @Override
++    public void watchResumable(java.util.function.Consumer<Game> watch) {
++        this.resumableWatch = watch;
++    }
++
++    private void atResumable() {
++        if (resumableWatch != null && !simulation) {
++            try {
++                resumableWatch.accept(this);
++            } catch (RuntimeException e) {
++                // the watch only looks at the game: its failure is not the game's
++                logger.error("Game " + getId() + ": the watch of resumable points failed", e);
++            }
++        }
++    }
++
++    @Override
++    public void resumeAtPriority() {
++        playerList = state.getPlayerList(state.getPlayerByOrderId());
++        Player nextPlayer = getPlayer(playerList.get());
++        if (!isPaused() && !checkIfGameIsOver()) {
++            do {
++                if (executingRollback) {
++                    // as playTurn: a rollback takes the turn from its start
++                    rollbackTurnsExecution(turnToGoToForRollback);
++                    state.getTurn().play(this, getPlayer(state.getActivePlayerId()));
++                } else {
++                    state.getTurn().resumeAtPriority(this);
++                }
++            } while (executingRollback);
++            if (!isPaused() && !checkIfGameIsOver()) {
++                // as playTurn after the turn was played
++                endOfTurn();
++                state.setTurnNum(state.getTurnNum() + 1);
++                // as play after a player's turn
++                state.setExtraTurnId(null);
++                if (playExtraTurns()) {
++                    nextPlayer = playerList.getNext(this, true);
++                    if (nextPlayer != null) {
++                        state.setPlayerByOrderId(nextPlayer.getId());
++                    }
++                }
++            }
++        }
++        play(nextPlayer == null ? state.getActivePlayerId() : nextPlayer.getId());
++    }
++
+     private boolean checkStopOnTurnOption() {
+         if (gameOptions.stopOnTurn != null && gameOptions.stopAtStep == PhaseStep.UNTAP) {
+             if (gameOptions.stopOnTurn.equals(state.getTurnNum())) {
+@@ -1888,8 +1946,9 @@ public abstract class GameImpl implements Game {
+                         state.setPriorityPlayerId(player.getId());
+                         while (!player.isPassed() && player.canRespond() && !isPaused() && !checkIfGameIsOver()) {
+                             if (!resuming) {
++                                atResumable(); // Commander Duels (recovery): a player is about to receive priority
+                                 // 603.3. Once an ability has triggered, its controller puts it on the stack as an object that's not a card the next time a player would receive priority
+-                                checkStateAndTriggered();
++                                boolean somethingHappened = checkStateAndTriggered();
+                                 applyEffects();
+                                 if (state.getStack().isEmpty()) {
+                                     resetLKI();
+@@ -1898,6 +1957,11 @@ public abstract class GameImpl implements Game {
+                                 if (isPaused() || checkIfGameIsOver()) {
+                                     return;
+                                 }
++                                if (somethingHappened) {
++                                    // Commander Duels (recovery): and again once what 117.5 asked for is done,
++                                    // so that what it put on the stack is not made a second time
++                                    atResumable();
++                                }
+                                 // resetPassed should be called if player performs any action
+                                 if (player.priority(this)) {
+                                     if (executingRollback()) {
+@@ -1918,6 +1982,7 @@ public abstract class GameImpl implements Game {
+                             return;
+                         }
+                         if (allPassed()) {
++                            atResumable(); // Commander Duels (recovery): every player has passed in succession
+                             if (!state.getStack().isEmpty()) {
+                                 //20091005 - 115.4
+                                 resolve();
+@@ -3865,6 +3930,9 @@ public abstract class GameImpl implements Game {
+         tableEventSource = new TableEventSource();
+         playerQueryEventSource = new PlayerQueryEventSource();
+         gameStates = new GameStates();
++        // Commander Duels (recovery): the rest of what is not saved and the game cannot run without
++        gameStatesRollBack = new HashMap<>();
++        stackObjectsCheck = new LinkedList<>();
+     }
+ 
+     /**
+diff --git a/Mage/src/main/java/mage/game/match/MatchPlayer.java b/Mage/src/main/java/mage/game/match/MatchPlayer.java
+index 7123fb86..78faa3a5 100644
+--- a/Mage/src/main/java/mage/game/match/MatchPlayer.java
++++ b/Mage/src/main/java/mage/game/match/MatchPlayer.java
+@@ -20,7 +20,10 @@ public class MatchPlayer implements Serializable {
+     private boolean matchWinner;
+ 
+     private Deck deck;
+-    private final Player player;
++    // Commander Duels (recovery): not saved with a game's state. A player's copy keeps its original's
++    // match entry, whose player is the one at the table: saved with a copy, it would take the table's
++    // own player, and a bot's whole search with it, into the saved state.
++    private final transient Player player;
+     private final String name;
+ 
+     private boolean quit;
+diff --git a/Mage/src/main/java/mage/game/turn/Phase.java b/Mage/src/main/java/mage/game/turn/Phase.java
+index e6bcba73..769488a6 100644
+--- a/Mage/src/main/java/mage/game/turn/Phase.java
++++ b/Mage/src/main/java/mage/game/turn/Phase.java
+@@ -28,6 +28,12 @@ public abstract class Phase implements Serializable {
+     protected UUID activePlayerId;
+     protected Step currentStep;
+     protected int count;
++    // Commander Duels (recovery): where the phase's loops are, kept with the state so that a game
++    // restored from it can go on from the step it was in: the step of the phase's own that is being
++    // played or was played last, and, innermost last, the steps after which extra steps are being
++    // played. A copied state's current step is a copy, so the loops are found by type, not identity.
++    protected PhaseStep ownStep;
++    protected List<PhaseStep> extraStepsAfter = new ArrayList<>();
+ 
+     public abstract Phase copy();
+ 
+@@ -47,6 +53,8 @@ public abstract class Phase implements Serializable {
+         for (Step step : phase.steps) {
+             this.steps.add(step.copy());
+         }
++        this.ownStep = phase.ownStep;
++        this.extraStepsAfter.addAll(phase.extraStepsAfter);
+     }
+ 
+     public TurnPhase getType() {
+@@ -75,47 +83,95 @@ public abstract class Phase implements Serializable {
+         }
+ 
+         this.activePlayerId = activePlayerId;
++        this.ownStep = null;
++        this.extraStepsAfter.clear();
+ 
+         if (beginPhase(game, activePlayerId)) {
++            return playOwnSteps(game, null);
++        }
++        return false;
++    }
+ 
+-            for (Step step : steps) {
+-                if (game.isPaused() || game.checkIfGameIsOver()) {
+-                    return false;
+-                }
+-                if (game.getTurn().isEndTurnRequested() && step.getType() != PhaseStep.CLEANUP) {
+-                    continue;
+-                }
+-                currentStep = step;
+-                TurnMod skipStepMod = TurnMods.useNextForTeam(game, activePlayerId,
+-                        playerId -> game.getState().getTurnMods().useNextSkipStep(playerId, getStep().getType()));
+-                if (skipStepMod == null) {
+-                    playStep(game);
+-                    if (game.executingRollback()) {
+-                        return true;
+-                    }
+-                } else {
+-                    Player player = game.getPlayer(skipStepMod.getPlayerId());
+-                    if (player != null) {
+-                        game.informPlayers(String.format("%s skips %s step%s",
+-                                player.getLogName(),
+-                                skipStepMod.getSkipStep().toString(),
+-                                skipStepMod.getInfo()
+-                        ));
+-                    }
++    /**
++     * The phase's own steps, in order, and its end: all of them, or (Commander Duels, recovery)
++     * those after the given one, for a phase that is going on from a restored state.
++     */
++    private boolean playOwnSteps(Game game, PhaseStep after) {
++        boolean reached = after == null;
++        for (Step step : steps) {
++            if (!reached) {
++                reached = step.getType() == after;
++                continue;
++            }
++            if (game.isPaused() || game.checkIfGameIsOver()) {
++                return false;
++            }
++            if (game.getTurn().isEndTurnRequested() && step.getType() != PhaseStep.CLEANUP) {
++                continue;
++            }
++            currentStep = step;
++            ownStep = step.getType();
++            TurnMod skipStepMod = TurnMods.useNextForTeam(game, activePlayerId,
++                    playerId -> game.getState().getTurnMods().useNextSkipStep(playerId, getStep().getType()));
++            if (skipStepMod == null) {
++                playStep(game);
++                if (game.executingRollback()) {
++                    return true;
+                 }
+-                if (!game.isSimulation() && checkStopOnStepOption(game)) {
+-                    return false;
++            } else {
++                Player player = game.getPlayer(skipStepMod.getPlayerId());
++                if (player != null) {
++                    game.informPlayers(String.format("%s skips %s step%s",
++                            player.getLogName(),
++                            skipStepMod.getSkipStep().toString(),
++                            skipStepMod.getInfo()
++                    ));
+                 }
+-
+             }
+-            if (game.isPaused() || game.checkIfGameIsOver()) {
++            if (!game.isSimulation() && checkStopOnStepOption(game)) {
+                 return false;
+             }
+-            count++;
+-            endPhase(game, activePlayerId);
++        }
++        if (game.isPaused() || game.checkIfGameIsOver()) {
++            return false;
++        }
++        count++;
++        endPhase(game, activePlayerId);
++        return true;
++    }
++
++    /**
++     * Commander Duels (recovery): plays the rest of a phase restored from a state that was saved as
++     * a player received priority in one of its steps: that step from its priority on, the extra
++     * steps that were being played around it, then the phase's remaining steps and its end, as
++     * {@link #play} does. Nothing that began before the state was saved is begun again.
++     */
++    public boolean resumeAtPriority(Game game) {
++        if (game.isPaused() || game.checkIfGameIsOver() || currentStep == null) {
++            return false;
++        }
++        // as playStep, from the priority (the cleanup step's own playStep ends the same way)
++        currentStep.resumePriority(game, activePlayerId);
++        if (game.executingRollback()) {
+             return true;
+         }
+-        return false;
++        if (!game.isPaused() && !game.checkIfGameIsOver()) {
++            postPriority(game, activePlayerId);
++        }
++        // the extra steps this step was one of, innermost first: each goes on looking for more
++        while (!extraStepsAfter.isEmpty()) {
++            if (game.isPaused() || game.checkIfGameIsOver()) {
++                return false;
++            }
++            playExtraSteps(game, extraStepsAfter.remove(extraStepsAfter.size() - 1));
++            if (game.executingRollback()) {
++                return true;
++            }
++        }
++        if (!game.isSimulation() && checkStopOnStepOption(game)) {
++            return false;
++        }
++        return playOwnSteps(game, ownStep);
+     }
+ 
+     private boolean checkStopOnStepOption(Game game) {
+@@ -266,7 +322,10 @@ public abstract class Phase implements Serializable {
+                         extraStepMod.getExtraStep().toString(),
+                         extraStepMod.getInfo()
+                 ));
++                // Commander Duels (recovery): kept with the state while the extra step is played
++                extraStepsAfter.add(afterStep);
+                 playStep(game);
++                extraStepsAfter.remove(extraStepsAfter.size() - 1);
+             } else {
+                 return;
+             }
+diff --git a/Mage/src/main/java/mage/game/turn/Step.java b/Mage/src/main/java/mage/game/turn/Step.java
+index 9c9ad446..7d6b7d60 100644
+--- a/Mage/src/main/java/mage/game/turn/Step.java
++++ b/Mage/src/main/java/mage/game/turn/Step.java
+@@ -74,6 +74,18 @@ public abstract class Step implements Serializable, Copyable<Step> {
+         }
+     }
+ 
++    /**
++     * Commander Duels (recovery): priority goes on in a step restored from a state that was saved as
++     * a player received priority in it. The step's own event was fired before the state was saved,
++     * and is not fired again.
++     */
++    public void resumePriority(Game game, UUID activePlayerId) {
++        if (hasPriority) {
++            stepPart = StepPart.PRIORITY;
++            game.playPriority(activePlayerId, true);
++        }
++    }
++
+     public void endStep(Game game, UUID activePlayerId) {
+         stepPart = StepPart.POST;
+         game.fireEvent(new GameEvent(postStepEvent, null, null, activePlayerId));
+diff --git a/Mage/src/main/java/mage/game/turn/Turn.java b/Mage/src/main/java/mage/game/turn/Turn.java
+index ea32c437..12480e50 100644
+--- a/Mage/src/main/java/mage/game/turn/Turn.java
++++ b/Mage/src/main/java/mage/game/turn/Turn.java
+@@ -31,6 +31,11 @@ public class Turn implements Serializable {
+     private final List<Phase> phases = new ArrayList<>();
+     private boolean declareAttackersStepStarted = false;
+     private boolean endTurn; // indicates that an end turn effect has resolved.
++    // Commander Duels (recovery): where the turn's loop is, kept with the state so that a game
++    // restored from it can go on from the phase it was in: the phase of the turn's own that is being
++    // played or was played last, and whether the phase being played is an extra one after it.
++    private TurnPhase ownPhase;
++    private boolean inExtraPhase;
+ 
+     public Turn() {
+         endTurn = false;
+@@ -51,7 +56,8 @@ public class Turn implements Serializable {
+         }
+         this.declareAttackersStepStarted = turn.declareAttackersStepStarted;
+         this.endTurn = turn.endTurn;
+-
++        this.ownPhase = turn.ownPhase;
++        this.inExtraPhase = turn.inExtraPhase;
+     }
+ 
+     public Phase getPhase() {
+@@ -103,6 +109,8 @@ public class Turn implements Serializable {
+ 
+         this.activePlayerId = activePlayer.getId();
+         this.currentPhase = null;
++        this.ownPhase = null;
++        this.inExtraPhase = false;
+ 
+         // turn control must be called after potential turn skip due 720.1.
+         checkTurnIsControlledByOtherPlayer(game, activePlayer.getId());
+@@ -119,14 +127,31 @@ public class Turn implements Serializable {
+         }
+         GameEvent event = new GameEvent(GameEvent.EventType.BEGIN_TURN, null, null, activePlayer.getId());
+         game.fireEvent(event);
++        playOwnPhases(game, activePlayer, null);
++        return false;
++    }
++
++    /**
++     * The turn's own phases, in order, each with the extra phases due after it: all of them, or
++     * (Commander Duels, recovery) those after the given one, for a turn that is going on from a
++     * restored state.
++     */
++    private void playOwnPhases(Game game, Player activePlayer, TurnPhase after) {
++        boolean reached = after == null;
+         for (Phase phase : phases) {
++            if (!reached) {
++                reached = phase.getType() == after;
++                continue;
++            }
+             if (game.isPaused() || game.checkIfGameIsOver()) {
+-                return false;
++                return;
+             }
+             if (isEndTurnRequested() && phase.getType() != TurnPhase.END) {
+                 continue;
+             }
+             currentPhase = phase;
++            ownPhase = phase.getType();
++            inExtraPhase = false;
+ 
+             TurnMod skipPhaseMod = TurnMods.useNextForTeam(game, activePlayer.getId(),
+                     playerId -> game.getState().getTurnMods().useNextSkipPhase(playerId, currentPhase.getType()));
+@@ -144,7 +169,7 @@ public class Turn implements Serializable {
+                 continue;
+             }
+             if (game.executingRollback()) {
+-                return false;
++                return;
+             }
+ 
+             //20091005 - 500.4/703.4n
+@@ -159,7 +184,6 @@ public class Turn implements Serializable {
+                 }
+             }
+         }
+-        return false;
+     }
+ 
+     public void resumePlay(Game game, boolean wasPaused) {
+@@ -233,6 +257,38 @@ public class Turn implements Serializable {
+         }
+     }
+ 
++    /**
++     * Commander Duels (recovery): plays the rest of a turn restored from a state that was saved as a
++     * player received priority: the phase in progress from that priority on, the extra phases due
++     * after it, then the turn's remaining phases, as {@link #play} does. Nothing that began before
++     * the state was saved (the turn, the phase, the step) is begun or announced again.
++     */
++    public void resumeAtPriority(Game game) {
++        Player activePlayer = game.getPlayer(activePlayerId);
++        if (currentPhase == null || activePlayer == null || game.isPaused() || game.checkIfGameIsOver()) {
++            return;
++        }
++        Phase phase = currentPhase;
++        boolean extra = inExtraPhase;
++        boolean played = phase.resumeAtPriority(game);
++        if (game.executingRollback()) {
++            return;
++        }
++        if (extra) {
++            // as playExtraPhases after an extra phase: the next is looked for after its type
++            inExtraPhase = false;
++            playExtraPhases(game, phase.getType());
++        } else if (played) {
++            // as play after a phase of the turn's own
++            //20091005 - 500.4/703.4n
++            game.emptyManaPools(null);
++            game.saveState(false);
++            //20091005 - 500.8
++            playExtraPhases(game, phase.getType());
++        }
++        playOwnPhases(game, activePlayer, ownPhase);
++    }
++
+     private void checkTurnIsControlledByOtherPlayer(Game game, UUID activePlayerId) {
+         // 720.1.
+         // Some cards allow a player to control another player during that player’s next turn.
+@@ -338,6 +394,7 @@ public class Turn implements Serializable {
+                 phase.keepOnlyStep(skipAllButExtraStep);
+             }
+             currentPhase = phase;
++            inExtraPhase = true; // Commander Duels (recovery): kept with the state
+             game.fireEvent(new PhaseChangedEvent(activePlayerId, extraPhaseMod));
+             Player activePlayer = game.getPlayer(activePlayerId);
+             if (activePlayer != null) {
+@@ -348,6 +405,7 @@ public class Turn implements Serializable {
+                 ));
+             }
+             phase.play(game, activePlayerId);
++            inExtraPhase = false;
+ 
+             // TODO: is it lost extra phase on multiple phases here?
+             //  example:
+diff --git a/Mage/src/main/java/mage/util/RandomUtil.java b/Mage/src/main/java/mage/util/RandomUtil.java
+index 13f7e2ae..10ea6189 100644
+--- a/Mage/src/main/java/mage/util/RandomUtil.java
++++ b/Mage/src/main/java/mage/util/RandomUtil.java
+@@ -53,6 +53,14 @@ public final class RandomUtil {
+         seeded.set(new Random(newSeed));
+     }
+ 
++    /**
++     * Commander Duels (recovery): makes the given generator the calling thread's own, for a game
++     * that goes on from a saved state with the generator it had then.
++     */
++    public static void setRandom(Random random) {
++        seeded.set(random);
++    }
++
+     /** Returns the calling thread to the shared generator. */
+     public static void clearSeed() {
+         seeded.remove();

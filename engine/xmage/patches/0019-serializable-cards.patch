@@ -1,0 +1,160 @@
+Cards a saved game state could not hold (Commander Duels v0.9.9, recovery). Every format.
+
+Reason: a checkpoint (docs/engine/recovery.md) is the game written down by Java's serialization.
+XMage never serializes a game, it copies its objects, so nothing had ever noticed that a few classes
+its cards use cannot be written: a game with one of those cards in it could not be checkpointed, and
+so could not be taken up after an interruption. Writing every card of the card database once
+(SerializableCardsTest, 33,612 cards) found 37 that could not be, for six reasons, all of them a
+class or a functional interface that is not Serializable:
+
+- BeholdType (20 cards, Lorwyn Eclipsed's "behold a ..."): now Serializable; one read back is the
+  one instance of its subtype (readResolve), as getBeholdType keeps them.
+- FaceVillainousChoice and VillainousChoice (4 cards found, 7 in all): now Serializable.
+- CreateTokenCopyTargetEffect.PermanentModifier (3 cards found; 13 use it, most of them only in
+  an effect made as an ability resolves): now extends Serializable, so the lambdas given to
+  setPermanentModifier are.
+- ModifyObjectAllMultiZoneEffect.ObjectModifier (7 cards: Arcane Adaptation, Maskwood Nexus,
+  Conspiracy, Leyline of Transformation and the like): now extends Serializable.
+- CreateXXTokenExiledEffectManaValueEffect's token maker (Skyclave Apparition, Severance Priest):
+  its Function becomes TokenMaker, a Function that is Serializable.
+- GainAbilityWithAttachmentEffect's Consumer (The Dominion Bracelet): becomes AbilityModifier, a
+  Consumer that is Serializable.
+
+Nothing changes in how any card plays: the types say only that their objects may be written. After
+the patch the same test writes every card.
+Upstream: none.
+Remove when: XMage's game objects are serializable, or Commander Duels' checkpoints no longer use
+Java's serialization.
+
+diff --git a/Mage/src/main/java/mage/abilities/effects/common/CreateTokenCopyTargetEffect.java b/Mage/src/main/java/mage/abilities/effects/common/CreateTokenCopyTargetEffect.java
+index 572901b0..1a34db8e 100644
+--- a/Mage/src/main/java/mage/abilities/effects/common/CreateTokenCopyTargetEffect.java
++++ b/Mage/src/main/java/mage/abilities/effects/common/CreateTokenCopyTargetEffect.java
+@@ -34,7 +34,8 @@ import java.util.stream.Collectors;
+ public class CreateTokenCopyTargetEffect extends OneShotEffect {
+ 
+     @FunctionalInterface
+-    public interface PermanentModifier {
++    // Commander Duels (recovery): serializable, so that a saved game state can hold the cards that use it
++    public interface PermanentModifier extends java.io.Serializable {
+         void apply(Token token);
+     }
+ 
+diff --git a/Mage/src/main/java/mage/abilities/effects/common/CreateXXTokenExiledEffectManaValueEffect.java b/Mage/src/main/java/mage/abilities/effects/common/CreateXXTokenExiledEffectManaValueEffect.java
+index 5166c9e6..95b37dd6 100644
+--- a/Mage/src/main/java/mage/abilities/effects/common/CreateXXTokenExiledEffectManaValueEffect.java
++++ b/Mage/src/main/java/mage/abilities/effects/common/CreateXXTokenExiledEffectManaValueEffect.java
+@@ -21,9 +21,13 @@ import java.util.function.Function;
+  */
+ public class CreateXXTokenExiledEffectManaValueEffect extends OneShotEffect {
+ 
+-    private final Function<Integer, Token> tokenMaker;
++    // Commander Duels (recovery): serializable, so that a saved game state can hold the cards that use it
++    public interface TokenMaker extends Function<Integer, Token>, java.io.Serializable {
++    }
++
++    private final TokenMaker tokenMaker;
+ 
+-    public CreateXXTokenExiledEffectManaValueEffect(Function<Integer, Token> tokenMaker, String description) {
++    public CreateXXTokenExiledEffectManaValueEffect(TokenMaker tokenMaker, String description) {
+         super(Outcome.Benefit);
+         this.tokenMaker = tokenMaker;
+         staticText = "the exiled card's owner creates an X/X " + description +
+diff --git a/Mage/src/main/java/mage/abilities/effects/common/continuous/GainAbilityWithAttachmentEffect.java b/Mage/src/main/java/mage/abilities/effects/common/continuous/GainAbilityWithAttachmentEffect.java
+index 3c84cdc6..4411aca2 100644
+--- a/Mage/src/main/java/mage/abilities/effects/common/continuous/GainAbilityWithAttachmentEffect.java
++++ b/Mage/src/main/java/mage/abilities/effects/common/continuous/GainAbilityWithAttachmentEffect.java
+@@ -32,7 +32,11 @@ public class GainAbilityWithAttachmentEffect extends ContinuousEffectImpl {
+     private final Targets targets = new Targets();
+     private final Costs<Cost> costs = new CostsImpl<>();
+     protected final UseAttachedCost useAttachedCost;
+-    private final Consumer<ActivatedAbility> consumer;
++    // Commander Duels (recovery): serializable, so that a saved game state can hold the cards that use it
++    public interface AbilityModifier extends Consumer<ActivatedAbility>, java.io.Serializable {
++    }
++
++    private final AbilityModifier consumer;
+ 
+     public GainAbilityWithAttachmentEffect(String rule, Effect effect, Target target, UseAttachedCost attachedCost, Cost... costs) {
+         this(rule, new Effects(effect), new Targets(target), attachedCost, costs);
+@@ -42,7 +46,7 @@ public class GainAbilityWithAttachmentEffect extends ContinuousEffectImpl {
+         this(rule, effects, targets, attachedCost, null, costs);
+     }
+ 
+-    public GainAbilityWithAttachmentEffect(String rule, Effects effects, Targets targets, UseAttachedCost attachedCost, Consumer<ActivatedAbility> consumer, Cost... costs) {
++    public GainAbilityWithAttachmentEffect(String rule, Effects effects, Targets targets, UseAttachedCost attachedCost, AbilityModifier consumer, Cost... costs) {
+         super(Duration.WhileOnBattlefield, Layer.AbilityAddingRemovingEffects_6, SubLayer.NA, Outcome.AddAbility);
+         this.staticText = rule;
+         this.effects.addAll(effects);
+diff --git a/Mage/src/main/java/mage/abilities/effects/common/continuous/ModifyObjectAllMultiZoneEffect.java b/Mage/src/main/java/mage/abilities/effects/common/continuous/ModifyObjectAllMultiZoneEffect.java
+index 3555ebe5..2d52a6d2 100644
+--- a/Mage/src/main/java/mage/abilities/effects/common/continuous/ModifyObjectAllMultiZoneEffect.java
++++ b/Mage/src/main/java/mage/abilities/effects/common/continuous/ModifyObjectAllMultiZoneEffect.java
+@@ -25,7 +25,8 @@ import java.util.stream.Collectors;
+ 
+ public class ModifyObjectAllMultiZoneEffect extends ContinuousEffectImpl {
+     @FunctionalInterface
+-    public interface ObjectModifier {
++    // Commander Duels (recovery): serializable, so that a saved game state can hold the cards that use it
++    public interface ObjectModifier extends java.io.Serializable {
+         void modify(MageObject obj, Ability source, Game game);
+     }
+ 
+diff --git a/Mage/src/main/java/mage/choices/FaceVillainousChoice.java b/Mage/src/main/java/mage/choices/FaceVillainousChoice.java
+index 91e70bde..29ac6bd3 100644
+--- a/Mage/src/main/java/mage/choices/FaceVillainousChoice.java
++++ b/Mage/src/main/java/mage/choices/FaceVillainousChoice.java
+@@ -9,7 +9,10 @@ import mage.players.Player;
+ /**
+  * @author TheElk801
+  */
+-public class FaceVillainousChoice {
++// Commander Duels (recovery): serializable, so that a saved game state can hold the cards that use it
++public class FaceVillainousChoice implements java.io.Serializable {
++
++    private static final long serialVersionUID = 1L;
+ 
+     private final Outcome outcome;
+     private final VillainousChoice firstChoice;
+diff --git a/Mage/src/main/java/mage/choices/VillainousChoice.java b/Mage/src/main/java/mage/choices/VillainousChoice.java
+index 393088aa..5cef21d4 100644
+--- a/Mage/src/main/java/mage/choices/VillainousChoice.java
++++ b/Mage/src/main/java/mage/choices/VillainousChoice.java
+@@ -10,7 +10,10 @@ import java.util.Optional;
+ /**
+  * @author TheElk801
+  */
+-public abstract class VillainousChoice {
++// Commander Duels (recovery): serializable, so that a saved game state can hold the cards that use it
++public abstract class VillainousChoice implements java.io.Serializable {
++
++    private static final long serialVersionUID = 1L;
+ 
+     private final String rule;
+     private final String message;
+diff --git a/Mage/src/main/java/mage/constants/BeholdType.java b/Mage/src/main/java/mage/constants/BeholdType.java
+index ad1e9027..303d3055 100644
+--- a/Mage/src/main/java/mage/constants/BeholdType.java
++++ b/Mage/src/main/java/mage/constants/BeholdType.java
+@@ -22,7 +22,10 @@ import java.util.stream.Collectors;
+ /**
+  * @author TheElk801
+  */
+-public class BeholdType {
++// Commander Duels (recovery): serializable, so that a saved game state can hold the cards that use it
++public class BeholdType implements java.io.Serializable {
++
++    private static final long serialVersionUID = 1L;
+ 
+     private static Map<SubType, BeholdType> typeMap = new HashMap<>();
+ 
+@@ -146,4 +149,9 @@ public class BeholdType {
+         player.revealCards(source, new CardsImpl(card), game);
+         return card;
+     }
++
++    /** Commander Duels (recovery): a type read back from a saved state is the one instance of its subtype. */
++    private Object readResolve() {
++        return getBeholdType(subType);
++    }
+ }

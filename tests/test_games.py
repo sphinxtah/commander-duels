@@ -106,6 +106,13 @@ class FakeEngine:
         self.page_at: int | None = None
         # The answer to the next create is changed by this, when set.
         self.mangle: Any = None
+        # Recordings (v0.9.9): whether the engine keeps them, and so answers an attach; the games
+        # of an engine that died (restart), which it gives back from their recordings; every
+        # attach asked for; and how many attaches to answer first as an engine still loading.
+        self.recordings = False
+        self.lost: dict[str, FakeGame] = {}
+        self.attaches: list[str] = []
+        self.attach_failures = 0
 
     def game(self, game_id: str) -> FakeGame:
         return self.games[game_id]
@@ -125,6 +132,8 @@ class FakeEngine:
                 self.mangle(answer)
                 return httpx.Response(201, json=answer)
             return created
+        if len(parts) == 3 and parts[2] == "attach":
+            return self.attach(parts[1])
         game = self.games.get(parts[1])
         if game is None:
             return httpx.Response(404, json={"code": "not_found"})
@@ -162,6 +171,65 @@ class FakeEngine:
             if game.result is None:
                 game.result = closed()
                 game.revision += 1
+
+    def restart(self) -> None:
+        """The engine dies and comes back: it runs no game, and has its recordings if it keeps
+        them."""
+        with self.lock:
+            self.lost.update(self.games)
+            self.games.clear()
+
+    def attach(self, game_id: str) -> httpx.Response:
+        """POST /games/{id}/attach (v0.9.9): a running game gets new tokens; a game of a dead
+        engine is taken up from its recording, its revisions far on; a game that is over is
+        answered with its result. An engine that keeps no recordings knows no such route."""
+        with self.lock:
+            self.attaches.append(game_id)
+            if not self.recordings:
+                return httpx.Response(404, json={"code": "not_found"})
+            if self.attach_failures > 0:
+                self.attach_failures -= 1
+                return httpx.Response(503, json={"code": "engine_loading"})
+            status = "attached"
+            game = self.games.get(game_id)
+            if game is None:
+                game = self.lost.get(game_id)
+                if game is None:
+                    return httpx.Response(404, json={"code": "not_found"})
+                status = "recovered"
+            if game.result is not None:
+                return httpx.Response(
+                    200, json={"game_id": game.id, "status": "finished", "result": game.result}
+                )
+            if status == "recovered":
+                del self.lost[game_id]
+                game.revision += 1_000_000
+                self.games[game_id] = game
+            game.token = secrets.token_urlsafe(32)
+            tokens: dict[int, str] | None = getattr(game, "tokens", None)
+            if tokens is not None:
+                for seat in tokens:
+                    tokens[seat] = secrets.token_urlsafe(32)
+            seats = [
+                {
+                    "seat": i,
+                    "player": seat["player"],
+                    "seat_token": tokens.get(i)
+                    if tokens is not None
+                    else (game.token if i == 0 else None),
+                }
+                for i, seat in enumerate(game.body["seats"])
+            ]
+            return httpx.Response(
+                200,
+                json={
+                    "game_id": game.id,
+                    "status": status,
+                    "seats": seats,
+                    "spectator_token": game.spectator,
+                    "settings": {"format": game.body.get("format", "legacy")},
+                },
+            )
 
     def create(self, body: dict[str, Any]) -> httpx.Response:
         names = [
@@ -1193,15 +1261,15 @@ def test_closing_a_game_nothing_follows_interrupts_it(
         orphan = ada.post("/api/v1/practice-games", {}).json()["id"]
     # The check fails at startup and does not come round again during the test.
     monkeypatch.setattr(games, "RETRY_SECONDS", 60.0)
-    interrupt_active = games.interrupt_active
+    active_games = games.active_games
     failures = [OperationalError("SELECT games", {}, Exception("the database is starting"))]
 
     def flaky(database: Engine, before: datetime | None = None) -> list[uuid.UUID]:
         if failures:
             raise failures.pop()
-        return interrupt_active(database, before)
+        return active_games(database, before)
 
-    monkeypatch.setattr(games, "interrupt_active", flaky)
+    monkeypatch.setattr(games, "active_games", flaky)
     with connect(build(database, engine)) as restarted:
         ada.http = restarted
         assert not failures
@@ -1221,16 +1289,16 @@ def test_a_restart_before_the_database_is_up_interrupts_later(
     monkeypatch.setattr(games, "RETRY_SECONDS", 0.5)
     with connect(build(database, engine)) as first:
         orphan = Account(first, "ada").post("/api/v1/practice-games", {}).json()["id"]
-    interrupt_active = games.interrupt_active
+    active_games = games.active_games
     calls: list[datetime | None] = []
 
     def flaky(database: Engine, before: datetime | None = None) -> list[uuid.UUID]:
         calls.append(before)
         if len(calls) == 1:
             raise OperationalError("SELECT games", {}, Exception("the database is starting"))
-        return interrupt_active(database, before)
+        return active_games(database, before)
 
-    monkeypatch.setattr(games, "interrupt_active", flaky)
+    monkeypatch.setattr(games, "active_games", flaky)
     with connect(build(database, engine)) as restarted:
         mine = Account(restarted, "bea").post("/api/v1/practice-games", {}).json()["id"]
         for _ in range(200):
@@ -1541,13 +1609,15 @@ def test_a_second_api_process_on_postgresql_does_not_start(
     try:
         Base.metadata.create_all(database)
         checked: list[games.GameHub] = []
-        interrupt_active = games.interrupt_active
+        active_games = games.active_games
 
         def checking(hub: games.GameHub) -> None:
+            # Since v0.9.9 the startup check asks the engine for the games left running, which it
+            # finds with active_games (it marked them interrupted before).
             monkeypatch.setattr(
                 games,
-                "interrupt_active",
-                lambda *args: checked.append(hub) or interrupt_active(*args),
+                "active_games",
+                lambda *args: checked.append(hub) or active_games(*args),
             )
 
         async def run() -> None:

@@ -233,7 +233,7 @@ Results:
 ## Open items
 
 - **AI hidden information (AI02).** The bot's search read the human's hand. Fixed in v0.3.1 ([fair bots](fair-bots.md)).
-- **Recovery.** Journals, snapshots, reconnect and worker fencing (NET08–10).
+- **Recovery.** Journals, snapshots, reconnect and worker fencing (NET08–10). Recovery came in v0.9.9 ([recording and recovery](recovery.md)).
 - **Seats.** The human is always seat 0, with no seat ownership, sign-in or controller lease. FastAPI does not route game actions yet.
 - **Timers.** No timers or clocks (NET11–12). Configurable stops and pass modes arrived in v0.2.0 (UI07).
 - **Prompt families.** The unsupported families above, plus multiplayer and watcher views.

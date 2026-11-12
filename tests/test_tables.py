@@ -31,7 +31,7 @@ from test_games import ORIGIN, SERVICE_TOKEN, SYSOP_ADDRESS, FakeEngine, FakeGam
 from api import economy, games
 from api.config import Settings
 from api.main import create_app
-from api.models import AuditEvent, CardConcept, GameSeat, GameTable, TokenEntry, User
+from api.models import AuditEvent, CardConcept, Game, GameSeat, GameTable, TokenEntry, User
 
 content = test_progression.content
 TABLES = (
@@ -106,7 +106,7 @@ class TableEngine(FakeEngine):
         if parts == ["games"]:
             return self.create(json.loads(request.content))
         game = self.games.get(parts[1])
-        if not isinstance(game, TableGame) or parts[2] in ("close", "inspection"):
+        if not isinstance(game, TableGame) or parts[2] in ("close", "inspection", "attach"):
             return await super().__call__(request)
         given = request.headers.get("authorization", "")
         seat = next((s for s, token in game.tokens.items() if given == f"Bearer {token}"), None)
@@ -1059,3 +1059,106 @@ def test_friends_are_invited_to_a_table(client, engine):
     assert (invite["request_pending"], invite["table"]["open"]) == (False, False)
     closed_now = bob.send("POST", f"/api/v1/tables/{code}/invites", {"players": [str(ada.id)]})
     assert (closed_now.status_code, closed_now.json()["code"]) == (409, "table_closed")
+
+
+def test_a_tables_game_outlives_the_engines_restart(client, engine):
+    """The engine dies under a table's game and comes back with its recording (v0.9.9). Each
+    seat's follow task finds the game unknown; the first asks the engine for it again, once for
+    the whole table, and each seat goes on with its own new token and its own view."""
+    engine.recordings = True
+    ada, bob, cara = (Account(client, name, admin=True) for name in ("ada", "bob", "cara"))
+    code = commander_table(client, ada, [bob, cara], bots=1)
+    game_id = ada.send("POST", f"/api/v1/tables/{code}/start").json()["game_id"]
+    fake = engine.games[game_id]
+    old = dict(fake.tokens)
+    ada_seen: list[str] = []
+    bob_seen: list[str] = []
+    with ExitStack() as stack:
+        ada_tab = opened(ada, game_id, ada_seen, stack)
+        bob_tab = opened(bob, game_id, bob_seen, stack)
+        ada_tab.snapshot(1)
+        bob_tab.snapshot(1)
+
+        engine.restart()
+
+        ada_again = ada_tab.snapshot(1_000_000)
+        bob_again = bob_tab.snapshot(1_000_000)
+        assert ada_again["view"]["hand"] == [{"name": "Secret of seat 0"}]
+        assert bob_again["view"]["hand"] == [{"name": "Secret of seat 1"}]
+        # Asked for once, for all three seats; every seat's token is new.
+        assert engine.attaches == [game_id]
+        assert all(fake.tokens[seat] != old[seat] for seat in old)
+        # The game goes on: a seat concedes with its new token, and the others play on.
+        assert concede(bob_tab, game_id)["status"] == 200
+        presence(ada_tab, **{"1": {"left": "conceded"}})
+        assert fake.conceded_by == [f"Bearer {fake.tokens[1]}"] and fake.result is None
+    # No seat was shown another's cards, and no tab any token.
+    assert "Secret of seat 1" not in "\n".join(ada_seen)
+    assert "Secret of seat 0" not in "\n".join(bob_seen)
+    for token in (*old.values(), *fake.tokens.values()):
+        assert token not in "\n".join(ada_seen + bob_seen)
+    with Session(client.app.state.database) as db:
+        assert db.get(Game, uuid.UUID(game_id)).status == "active"  # type: ignore[union-attr]
+
+
+def test_a_tables_game_outlives_the_apis_restart(url, content, engine):
+    """The API restarts under a table's game (v0.9.9). The new process asks the engine for the
+    game, which still runs there, and follows every player's seat with its new token; the players
+    come back to their own seats, a seat that had left is still out, and the game ends with its
+    result."""
+    engine.recordings = True
+    settings = Settings(
+        database_url=url,
+        content_dir=str(content),
+        sysop_networks="10.20.0.0/24",
+        engine_service_token=SERVICE_TOKEN,
+        bot_decks="fixtures",
+    )
+    first_app = create_app(settings)
+    first_app.state.engine_transport = httpx.MockTransport(engine)
+    with TestClient(first_app, base_url="https://testserver", client=SYSOP_ADDRESS) as first:
+        ada, bob, cara = (Account(first, name, admin=True) for name in ("ada", "bob", "cara"))
+        code = commander_table(first, ada, [bob, cara], bots=1)
+        game_id = ada.send("POST", f"/api/v1/tables/{code}/start").json()["game_id"]
+        fake = engine.games[game_id]
+        with ExitStack() as stack:
+            cara_tab = opened(cara, game_id, [], stack)
+            ada_tab = opened(ada, game_id, [], stack)
+            assert concede(cara_tab, game_id)["status"] == 200
+            presence(ada_tab, **{"2": {"left": "conceded"}})
+        assert left_reason(first, cara) == "conceded"
+        old = dict(fake.tokens)
+
+    with served(url, content, engine) as restarted:
+        for account in (ada, bob, cara):
+            account.http = restarted
+        hub = restarted.app.state.games
+        assert uuid.UUID(game_id) in hub.games, hub.attached
+        assert hub.attached == {"attached": 1, "recovered": 0, "finished": 0, "interrupted": 0}
+        assert engine.attaches == [game_id] and game_id not in engine.closed
+        assert all(fake.tokens[seat] != old[seat] for seat in old)
+        live = hub.games[uuid.UUID(game_id)]
+        assert live.kind == "table" and sorted(live.seats) == [0, 1, 2]
+        assert live.seats[2].left == "conceded" and live.seats[0].left is None
+        ada_seen: list[str] = []
+        bob_seen: list[str] = []
+        with ExitStack() as stack:
+            ada_tab = opened(ada, game_id, ada_seen, stack)
+            bob_tab = opened(bob, game_id, bob_seen, stack)
+            mine, shown = snapshot_and_presence(
+                ada_tab, 1, **{"1": {"connected": True}, "2": {"left": "conceded"}}
+            )
+            assert mine["view"]["hand"] == [{"name": "Secret of seat 0"}]
+            assert bob_tab.snapshot(1)["view"]["hand"] == [{"name": "Secret of seat 1"}]
+            # Still each player's running game, and the table is still at play.
+            with Session(restarted.app.state.database) as db:
+                assert games.active_games_of(db, ada.id) == 1
+                assert games.active_games_of(db, cara.id) == 0
+            # Bob concedes: Ada is the last player standing with the bot.
+            assert concede(bob_tab, game_id)["status"] == 200
+            presence(ada_tab, **{"1": {"left": "conceded"}})
+        assert "Secret of seat 1" not in "\n".join(ada_seen)
+        assert "Secret of seat 0" not in "\n".join(bob_seen)
+        engine.finish(fake)
+        finished = until_finished(ada, game_id)
+        assert finished["result"]["kind"] == "closed"

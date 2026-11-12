@@ -1,5 +1,6 @@
 package com.commanderduels;
 
+import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -19,7 +20,19 @@ import mage.game.events.TableEvent;
  * ("Kalonian Tusker [b64]"), which come from random UUIDs, so repeated runs can be compared.
  */
 public final class MatchLog {
-    public record Entry(int turn, Integer activeSeat, String step, String text) {}
+    public record Entry(int turn, Integer activeSeat, String step, String text) implements Serializable {}
+
+    /**
+     * The log as a checkpoint keeps it (v0.9.9): its entries and counts. The digest is not kept: a
+     * restored log's digest covers the entries it was given, which are all of them while the log
+     * holds fewer than {@link #MAX_ENTRIES}.
+     */
+    record Saved(List<Entry> entries, int lines, int engineErrors, String criticalError, int lastTurn)
+            implements Serializable {
+        Saved {
+            entries = List.copyOf(entries);
+        }
+    }
 
     static final int MAX_ENTRIES = 5_000;
     static final int TAIL = 12;
@@ -43,6 +56,23 @@ public final class MatchLog {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    /** A log that goes on from a checkpoint's (v0.9.9). */
+    MatchLog(Saved saved) {
+        this();
+        for (Entry entry : saved.entries()) {
+            append(entry);
+        }
+        lines = saved.lines();
+        engineErrors = saved.engineErrors();
+        criticalError = saved.criticalError();
+        lastTurn = saved.lastTurn();
+    }
+
+    /** The log as it is now, for a checkpoint. */
+    synchronized Saved save() {
+        return new Saved(entries, lines, engineErrors, criticalError, lastTurn);
     }
 
     /** Subscribes to the game's table events; call before the game starts. */

@@ -1,10 +1,14 @@
 package com.commanderduels;
 
 import java.io.Serializable;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -85,6 +89,72 @@ final class Prompts {
             return !view.kind().equals("unsupported");
         }
 
+        /**
+         * What the prompt asks, apart from how it is worded, ordered or numbered (v0.9.9): its kind,
+         * whose decision it is, every answer it takes ({@link #code(String)}), its
+         * amounts' limits and how many names it accepts. Two prompts with the same print ask the
+         * same question of the same game: an answer the journal holds for one is an answer to the
+         * other. The prompt's id is new each time, option ids follow the options' order, and labels
+         * may be drawn another way, so none of them is part of it.
+         */
+        String print() {
+            List<String> codes = codes();
+            StringBuilder text = new StringBuilder(view.kind()).append('|').append(view.forSeat()).append('|')
+                .append(codes).append('|');
+            if (view.amounts() != null) {
+                text.append(view.amounts().totalMin()).append('-').append(view.amounts().totalMax());
+                for (PromptView.AmountEntry entry : view.amounts().entries()) {
+                    text.append(',').append(entry.min()).append('-').append(entry.max());
+                }
+            }
+            text.append('|').append(names == null ? 0 : names.size());
+            try {
+                byte[] hash = MessageDigest.getInstance("SHA-256")
+                    .digest(text.toString().getBytes(StandardCharsets.UTF_8));
+                return HexFormat.of().formatHex(hash, 0, 16);
+            } catch (NoSuchAlgorithmException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+
+        /** Every answer this prompt takes, as the journal would keep it ({@link #code(String)}), sorted. */
+        List<String> codes() {
+            List<String> codes = new ArrayList<>();
+            view.options().forEach(option -> codes.add(option.action() + " " + code(option.id())));
+            codes.sort(null);
+            return codes;
+        }
+
+        /**
+         * An option's answer as the journal keeps it (v0.9.9): a player by their seat, which a game
+         * dealt again from its seed keeps, and anything else in XMage's terms
+         * ({@link Prompts#code(Answer)}). Null for an option the prompt does not have.
+         */
+        String code(String optionId) {
+            Answer answer = answers.get(optionId);
+            if (answer == null) {
+                return null;
+            }
+            for (PromptView.Option option : view.options()) {
+                // A player, not an ability its controller's seat is given for (put_first, 805.7).
+                if (option.id().equals(optionId) && option.seat() != null && option.objectId() == null
+                        && answer instanceof UuidAnswer && !option.action().equals("put_first")) {
+                    return "seat:" + option.seat();
+                }
+            }
+            return Prompts.code(answer);
+        }
+
+        /** The option's answer for a code the journal kept ({@link #code(String)}), or null. */
+        Answer coded(String code) {
+            for (PromptView.Option option : view.options()) {
+                if (code.equals(code(option.id()))) {
+                    return answers.get(option.id());
+                }
+            }
+            return null;
+        }
+
         /** The answer for a typed name, or null when this prompt takes none or the list lacks it. */
         Answer name(String text) {
             String found = names == null ? null : names.get(fold(text));
@@ -149,7 +219,39 @@ final class Prompts {
         void apply(Player player);
     }
 
+    /**
+     * An answer as the journal keeps it (v0.9.9): its kind and its value, in XMage's own terms (an
+     * object's or a player's id, a yes or no, a text, a number, a kind of mana, a way of passing),
+     * never the option's id, which is only a number in one prompt.
+     */
+    static String code(Answer answer) {
+        return switch (answer) {
+            case UuidAnswer uuid -> "u:" + uuid.id();
+            case AbilityAnswer ability -> "a:" + ability.stable();
+            case PassAnswer pass -> "p:" + pass.action().name();
+            case BooleanAnswer flag -> "b:" + flag.value();
+            case StringAnswer text -> "s:" + text.value();
+            case IntegerAnswer number -> "i:" + number.value();
+            case ManaAnswer mana -> "m:" + mana.poolOwner() + ":" + mana.type().name();
+        };
+    }
+
     record UuidAnswer(UUID id) implements Answer {
+        @Override
+        public void apply(Player player) {
+            player.setResponseUUID(id);
+        }
+    }
+
+    /**
+     * One of several abilities, answered by its id as any object is (v0.9.9). The journal keeps
+     * {@code stable} instead of the id: which object's ability it is, what it says, and which of
+     * the like ones in the question. An ability's id does not last: XMage gives an ability that a
+     * permanent gains from an effect a new one each time it applies its effects (King's Table's
+     * Deploy on every creature, an Equipment's activated ability), so the question a game asks
+     * again after an interruption would never be the one its journal answered.
+     */
+    record AbilityAnswer(UUID id, String stable) implements Answer {
         @Override
         public void apply(Player player) {
             player.setResponseUUID(id);
@@ -210,6 +312,8 @@ final class Prompts {
     private final boolean controlled;
     private final List<PromptView.Option> options = new ArrayList<>();
     private final Map<String, Answer> answers = new LinkedHashMap<>();
+    /** How many abilities alike (same object, same words, same controller) this prompt has offered. */
+    private final Map<String, Integer> alike = new HashMap<>();
 
     private Prompts(Game game, Player player, SeatViews views, boolean controlled) {
         this.game = game;
@@ -430,7 +534,7 @@ final class Prompts {
             add("put_first", rule.isEmpty() ? ability.toString() : rule,
                 visible ? views.objectRef(ability.getSourceId()) : null,
                 team ? Integer.valueOf(views.seatOf(ability.getControllerId())) : null, false,
-                new UuidAnswer(ability.getId()));
+                answerFor(ability, rule));
         }
     }
 
@@ -467,7 +571,7 @@ final class Prompts {
             String rule = SeatViews.plain(source == null ? ability.getRule() : ability.getRule(source));
             // King's Table's Deploy (804) is marked as such (v0.8.8), not told apart by its words.
             add(ability instanceof KingsTable.DeployAbility ? "deploy" : "use_ability",
-                rule.isEmpty() ? ability.toString() : rule, null, null, false, new UuidAnswer(ability.getId()));
+                rule.isEmpty() ? ability.toString() : rule, null, null, false, answerFor(ability, rule));
         }
         add("cancel", "Cancel", null, null, false, new BooleanAnswer(false));
     }
@@ -908,6 +1012,15 @@ final class Prompts {
             return 0;
         }
         return zone == Zone.BATTLEFIELD ? 1 : 2;
+    }
+
+    /** The answer that picks an ability, with what the journal keeps of it ({@link AbilityAnswer}). */
+    private Answer answerFor(Ability ability, String rule) {
+        String what = ability.getSourceId() + "|" + ability.getControllerId() + "|" + ability.getClass().getName()
+            + "|" + rule;
+        int nth = alike.merge(what, 1, Integer::sum);
+        return new AbilityAnswer(ability.getId(), ability.getSourceId() + ":" + Integer.toHexString(what.hashCode())
+            + ":" + nth);
     }
 
     private void add(String action, String label, String objectId, Integer seat, boolean selected, Answer answer) {

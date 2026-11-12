@@ -247,7 +247,21 @@ The site stays down until you run those commands or deploy a fixed tag.
 
 **The card catalog (since v0.2.0).** The worker keeps Scryfall's bulk files in the `catalog_data` volume, which the first deploy of v0.2.0 creates; nothing in `.env` changes. Its first sync is due as soon as it starts: it downloads about 115 MB and takes about two minutes, during which the Cards page says the catalog is not imported yet and the deck builder finds no cards. If the engine is still loading, the sync waits for it and retries. The database grows by about 450 MB. After that the sync runs daily at 10:00 UTC (plus up to 30 minutes), and an unchanged day downloads nothing. Administration → Card catalog shows each run, and "Run the catalog sync now" queues one.
 
-**Running games end.** Restarting the API interrupts every running game (recovery journals, NET08–NET09, are later work). Deploy when no one is playing.
+**Running games end on an upgrade.** A new version is a new engine build, and a game's recording is played on only by the build that made it, so a deploy that replaces the engine ends every running game as interrupted, as before. Deploy when no one is playing. A restart that keeps the version (`docker compose restart api` or `engine`, the engine restarted by Docker after running out of memory, the VM rebooted) no longer ends them since v0.9.9 ([below](#recordings-v099)).
+
+<a id="recordings-v099"></a>**Recordings (v0.9.9).** The engine keeps a recording of every running game in the `engine_recordings` volume (`/var/lib/commander-duels/recordings` in the container; [recording and recovery](engine/recovery.md)), and takes a game up from it when the API asks for it again after either restart. Nothing in `.env` needs setting; the first deploy of v0.9.9 creates the volume.
+- `CD_ENGINE_RECORDING_RETENTION_HOURS` (24): a recording is removed once nothing in it has changed for this long; a running game's never.
+- `CD_ENGINE_CHECKPOINT_SECONDS` (3): how often a game's state reaches the disk while only bots play. When a person is asked something it is written at once.
+- **Size.** Under 1 MiB for a running game, a few KiB for a finished one: 64 games at once keep under 100 MiB.
+- **Not in the backups.** A recording holds every hand and library of a game, and is of use only to the engine build that made it: the nightly dumps do not hold it, and nothing needs restoring after a restore. Treat the volume as you treat the database.
+- **Looking.** The service route `GET /v1/service/recordings` gives the numbers, and `RecordingTool` says whether each recording is whole, without showing any game:
+
+  ```sh
+  cd /srv/commander-duels
+  docker compose exec engine java -cp '/app/engine.jar:/app/lib/*:/app/plugins/*' \
+    com.commanderduels.RecordingTool /var/lib/commander-duels/recordings
+  ```
+- **A full disk** stops the recording of the games running then: they play on, but a restart then ends them interrupted ([what is not supported](engine/recovery.md#what-is-not-supported)).
 
 **Rolling back.** A version runs only on a database at its own last migration. Its migrate step cannot find a newer revision, and its API reports ready only at its own. So:
 - If the version you are leaving added no migration (compare `api/migrations/versions` between the two tags), deploy the previous tag: on the VM `cd /srv/commander-duels && ./deploy.sh <previous tag>`, or `deploy/push.sh <previous tag>` from the deploying computer. Either way it runs with the previous tag's own kit from `kits/` (since v0.8.3; `push.sh` brings it from the tag again). A tag whose kit is no longer in `kits/` comes back with `bash deploy/upgrade.sh <previous tag>` in the clone.

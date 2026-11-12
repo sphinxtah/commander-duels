@@ -1,20 +1,35 @@
 package com.commanderduels;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.ToNumberPolicy;
+import com.google.gson.reflect.TypeToken;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import mage.cards.decks.Deck;
+import mage.constants.PhaseStep;
 import mage.constants.RangeOfInfluence;
 import mage.game.Game;
 import mage.game.events.PlayerQueryEvent;
@@ -39,8 +54,24 @@ import mage.util.ThreadUtils;
  * choices. A seat's log stops at the entries that existed when its view was built, so it does not
  * run ahead of the board. An answer is accepted only for the seat's open prompt at its current
  * revision. Views and prompts are built on the game thread, the only place XMage's state is
- * consistent; request threads read the published snapshots. Games live in memory only: there is no
- * journal or recovery yet.
+ * consistent; request threads read the published snapshots.
+ *
+ * <p>Recording and recovery (v0.9.9). A game given a {@link Recorder} keeps a recording of itself
+ * ({@link Recording}): every answer and command a seat sends is journalled, on disk, before it is
+ * acted on, and at each point XMage can later go on from (a player about to receive priority, every
+ * player having passed; patch 0018) the game's state is taken as a checkpoint ({@link Checkpoint}).
+ * A game whose process is gone is taken up again from its recording ({@link #restore}): from the
+ * newest checkpoint, at the point it was taken at, with the journal's later records played again
+ * as the game asks for them ({@link #replayNext}). A seat sees its game as it was: the same objects
+ * under the same ids, its log, its revisions going on from where they were, the prompt that was
+ * open. A bot's search is cut off by the clock and may find something else the second time, so no
+ * search is ever run again to get back to a question a seat was asked: the checkpoint a seat's
+ * question stands on is taken after the last decision at priority before it. Where the game after
+ * an older checkpoint (the newest was unreadable) does not ask what the journal answered, the rest
+ * of the journal is dropped and the game goes on, legally, from there: nothing is ever applied to a
+ * question it was not the answer to. Before its first checkpoint (the mulligans) a game is taken up from its
+ * request and its seed, which deal the same hands. A game with no recorder is played as before
+ * v0.9.9 and lives in memory only.
  *
  * <p>A service game can also be inspected ({@link #inspect}): every hand and library, in order,
  * for SysOp. That view is built only while XMage is waiting for a human seat's answer, when the
@@ -80,6 +111,24 @@ final class HumanGame {
      * not yet parked (v0.8.6): a few lines of XMage's code, so a short poll.
      */
     private static final long PARK_POLL_MILLIS = 2;
+    /**
+     * How far apart the revisions of two recoveries start (v0.9.9): more than a game shows a seat
+     * between a checkpoint and an interruption, and small enough that a browser counts them exactly.
+     */
+    static final long RECOVERY_STRIDE = 1_000_000;
+    /**
+     * Whether an answer's journal record lists every choice its question had
+     * ({@code CD_ENGINE_JOURNAL_CHOICES=1}): for finding out why a game taken up again asked something
+     * else. Off by default: a priority question has dozens of choices, and every record is forced
+     * to disk.
+     */
+    static final boolean JOURNAL_CHOICES = "1".equals(System.getenv("CD_ENGINE_JOURNAL_CHOICES"))
+        || Boolean.getBoolean("cd.engine.journalChoices");
+    /** The journal's record types that are played again (v0.9.9); its other records are notes. */
+    private static final Set<String> REPLAYED = Set.of("answer", "concede", "priority", "bots");
+    /** Reads a journalled reply back as the map it was, whole numbers as whole numbers. */
+    private static final Gson REPLIES = new GsonBuilder().setObjectToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
+        .create();
 
     /** A seat at the table. A seat's snapshot names only its own deck. */
     record SeatSettings(int seat, String player, String deck) {}
@@ -167,6 +216,9 @@ final class HumanGame {
 
         default void beforeStart(Game game, List<UUID> seatIds) {}
 
+        /** A game taken up from a checkpoint (v0.9.9) is about to go on, in place of {@link #beforeStart}. */
+        default void resumed(Game game, List<UUID> seatIds) {}
+
         /** Every view (and prompt, if one opens) published to a human seat. */
         default void published(Game game, ObjectRefs refs, int seat, SeatView view, PromptView prompt) {}
 
@@ -237,9 +289,17 @@ final class HumanGame {
     /** By seat; null for a bot seat. */
     private final List<Seat> seats;
     private final List<Seat> humans;
-    private final ObjectRefs refs = new ObjectRefs();
-    private final MatchLog log = new MatchLog();
+    private final ObjectRefs refs;
+    private final MatchLog log;
     private final Thread thread;
+    /** The game's recording (v0.9.9); null for a game that keeps none. */
+    private final Recorder recorder;
+    /** The checkpoint this game goes on from (v0.9.9); null for a game played from its start. */
+    private final Checkpoint restored;
+    /** The checkpoint's number in the recording, for the recording's own notes; 0 without one. */
+    private final int restoredSeq;
+    /** Whether the game was taken up again from a recording (v0.9.9), with a checkpoint or without. */
+    private final boolean takenUp;
     /** An event fired off the game thread asked for a refresh the game thread has not yet made. */
     private volatile boolean missedRefresh;
     /**
@@ -273,6 +333,18 @@ final class HumanGame {
     private final Deque<Watched> watched = new ArrayDeque<>();
     private SeatView spectatorView;
     private long spectatorRevision;
+    /**
+     * Recovery (v0.9.9): the journal's records after the checkpoint, still to be played again, in
+     * order; and whether any are. While they are, no seat is shown a prompt or may answer one: the
+     * journal answers.
+     */
+    private final Deque<JsonObject> replay = new ArrayDeque<>();
+    private boolean replaying;
+    private int replayed;
+    private int replayDropped;
+    private long replayedSeq;
+    /** Set by {@link #interrupt}: the recording was left as it stood, and takes no result. */
+    private boolean interrupted;
 
     HumanGame(String id, HumanGameRequest request, Path deckDirectory, Consumer<HumanGame> onFinished) {
         this(id, request, deckDirectory, onFinished, Hooks.NONE);
@@ -280,31 +352,76 @@ final class HumanGame {
 
     HumanGame(String id, HumanGameRequest request, Path deckDirectory, Consumer<HumanGame> onFinished,
               Hooks hooks) {
+        this(id, request, deckDirectory, onFinished, hooks, null);
+    }
+
+    /** A game that keeps a recording of itself (v0.9.9). */
+    HumanGame(String id, HumanGameRequest request, Path deckDirectory, Consumer<HumanGame> onFinished,
+              Hooks hooks, Recorder recorder) {
+        this(id, request, deckDirectory, onFinished, hooks, recorder, false, null, 0, List.of());
+    }
+
+    /**
+     * A game taken up again from its recording (v0.9.9): from the checkpoint, or from its request
+     * when it has none yet, with the journal's records after that to be played again. The request
+     * is the one the game was made from, its seed included. Its players are the checkpoint's.
+     */
+    static HumanGame restore(String id, HumanGameRequest request, Path deckDirectory, Consumer<HumanGame> onFinished,
+                             Hooks hooks, Recorder recorder, Recording.Loaded checkpoint, List<JsonObject> journal) {
+        return new HumanGame(id, request, deckDirectory, onFinished, hooks, recorder, true,
+            checkpoint == null ? null : checkpoint.checkpoint(), checkpoint == null ? 0 : checkpoint.header().seq(),
+            journal);
+    }
+
+    private HumanGame(String id, HumanGameRequest request, Path deckDirectory, Consumer<HumanGame> onFinished,
+                      Hooks hooks, Recorder recorder, boolean takenUp, Checkpoint restored, int restoredSeq,
+                      List<JsonObject> journal) {
         this.id = id;
         this.hooks = hooks;
         this.request = request;
+        this.recorder = recorder;
+        this.takenUp = takenUp;
+        this.restored = restored;
+        this.restoredSeq = restoredSeq;
         GameFormat format = request.format();
         List<SeatSettings> seatSettings = new ArrayList<>();
         List<Player> seated = new ArrayList<>();
         List<Seat> bySeat = new ArrayList<>();
+        if (restored != null && restored.seatIds().size() != request.seats().size()) {
+            throw new IllegalArgumentException("The checkpoint seats " + restored.seatIds().size()
+                + " players and the request " + request.seats().size());
+        }
         for (int index = 0; index < request.seats().size(); index++) {
             HumanGameRequest.Seat seat = request.seats().get(index);
             seatSettings.add(new SeatSettings(index, seat.player(), seat.deck()));
+            // A game that goes on from a checkpoint has the checkpoint's players: XMage's state is
+            // theirs, and so is everything each has decided so far.
+            Player saved = restored == null ? null : restored.game().getPlayer(restored.seatIds().get(index));
+            if (restored != null && (saved == null || seat.human() != (saved instanceof HumanSeatPlayer))) {
+                throw new IllegalArgumentException("The checkpoint's seat " + index + " is not the request's");
+            }
             if (seat.human()) {
-                var human = new HumanSeatPlayer(name(seat, index), format.range(index), this::waiting);
-                // XMage's server sets each human's preferences on connect; these are its defaults (stop in
-                // both main phases, at declare attackers and blockers, and whenever something new is on
-                // the stack).
-                human.setUserData(UserData.getDefaultUserDataView());
-                // Learn Commander's training hand (v0.9.1): the deck list's opening, on top after the
-                // game's first shuffle.
-                if (seat.custom() != null) {
-                    human.stackOpening(seat.custom().opening());
+                HumanSeatPlayer human;
+                if (saved != null) {
+                    human = (HumanSeatPlayer) saved;
+                    human.attach(this::waiting);
+                } else {
+                    human = new HumanSeatPlayer(name(seat, index), format.range(index), this::waiting);
+                    // XMage's server sets each human's preferences on connect; these are its defaults (stop
+                    // in both main phases, at declare attackers and blockers, and whenever something new is
+                    // on the stack).
+                    human.setUserData(UserData.getDefaultUserDataView());
+                    // Learn Commander's training hand (v0.9.1): the deck list's opening, on top after the
+                    // game's first shuffle.
+                    if (seat.custom() != null) {
+                        human.stackOpening(seat.custom().opening());
+                    }
                 }
                 seated.add(human);
                 bySeat.add(new Seat(index, human));
             } else {
-                Player bot = hooks.bot(index, name(seat, index), format.range(index), request.skill(), request.seed());
+                Player bot = saved != null ? saved
+                    : hooks.bot(index, name(seat, index), format.range(index), request.skill(), request.seed());
                 if (bot instanceof FairBot fair) {
                     // Every fair bot follows the game's one switch (v0.8.6); a test's other bot ignores it.
                     fair.followPassive(passiveBots);
@@ -325,6 +442,86 @@ final class HumanGame {
         this.onFinished = onFinished;
         this.thread = new Thread(this::run, ThreadUtils.THREAD_PREFIX_GAME + " human_game " + id);
         this.thread.setDaemon(true);
+        if (restored == null) {
+            this.refs = new ObjectRefs();
+            this.log = new MatchLog();
+        } else {
+            // What the seats had been shown and told: the same ids, the same log, revisions that go on.
+            this.refs = restored.refs();
+            this.log = new MatchLog(restored.log());
+            this.passiveBots.set(restored.passiveBots());
+            this.conceded.addAll(restored.conceded());
+            this.spectatorRevision = restored.spectatorRevision();
+            this.version = restored.version();
+            for (Checkpoint.SeatState state : restored.seats()) {
+                Seat seat = bySeat.get(state.index());
+                seat.revision = state.revision();
+                seat.lastAttacker = state.lastAttacker();
+                seat.messages.addAll(state.messages());
+                seat.concedeRequested = state.concedeRequested();
+            }
+        }
+        // The journal. Records an earlier recovery could not play again were dropped by a note that
+        // follows them, and are no part of the game. Of the others, what is already in the
+        // checkpoint's state is remembered as answered (a seat that sends one of those commands
+        // again is told what it was told), and the rest is played again.
+        long base = restored == null ? 0 : restored.journalSeq();
+        this.replayedSeq = base;
+        int recoveries = 0;
+        List<JsonObject> kept = new ArrayList<>();
+        for (JsonObject record : journal) {
+            String type = record.get("type").getAsString();
+            if (type.equals("recovered")) {
+                recoveries++;
+            } else if (type.equals("replayed") && record.has("after")) {
+                long after = record.get("after").getAsLong();
+                kept.removeIf(earlier -> earlier.get("seq").getAsLong() > after);
+            } else if (REPLAYED.contains(type)) {
+                kept.add(record);
+            }
+        }
+        for (JsonObject record : kept) {
+            if (record.get("seq").getAsLong() <= base) {
+                remember(record);
+            } else {
+                this.replay.addLast(record);
+            }
+        }
+        this.replaying = !this.replay.isEmpty();
+        if (takenUp) {
+            // Revisions go on, and past any the seats were shown after the checkpoint and before the
+            // interruption, which nothing kept: each recovery starts a new stretch of them, so a
+            // seat waiting for something newer than what it last saw is always answered.
+            long floor = (recoveries + 1) * RECOVERY_STRIDE;
+            for (Seat seat : this.humans) {
+                seat.revision = Math.max(seat.revision, floor);
+            }
+            this.spectatorRevision = Math.max(this.spectatorRevision, floor);
+            this.version = Math.max(this.version, floor);
+            if (recorder != null) {
+                JsonObject record = new JsonObject();
+                record.addProperty("type", "recovered");
+                record.addProperty("checkpoint", restoredSeq);
+                record.addProperty("to_play", this.replay.size());
+                record.addProperty("engine_build", EngineBuild.key());
+                recorder.journal(record);
+            }
+        }
+    }
+
+    /** Caller holds the lock, or is the constructor. A journalled command's reply, should it come again. */
+    private void remember(JsonObject record) {
+        if (!record.has("action") || !record.has("reply") || !record.has("seat")) {
+            return;
+        }
+        Seat seat = seats == null ? null : seats.get(record.get("seat").getAsInt());
+        if (seat == null) {
+            return;
+        }
+        Map<String, Object> body = REPLIES.fromJson(record.get("reply"),
+            new TypeToken<LinkedHashMap<String, Object>>() {}.getType());
+        seat.actions.put(record.get("action").getAsString(),
+            new Recorded(record.get("fp").getAsString(), new Reply(200, body)));
     }
 
     /** Players are named by kind and seat number (seat + 1), for example "Human 1" or "Bot 2". */
@@ -386,6 +583,10 @@ final class HumanGame {
     }
 
     private void play() throws Exception {
+        if (restored != null) {
+            resume();
+            return;
+        }
         // XMage's only seed control: since v0.8.5 (patch 0010) it seeds this game thread's own generator
         // for shuffles, coin flips and AI ties, which no other game draws from or reseeds.
         RandomUtil.setSeed(request.seed());
@@ -424,6 +625,7 @@ final class HumanGame {
             }
         });
         created.addPlayerQueryEventListener(this::onQuery);
+        created.watchResumable(this::atResumable);
         game = created;
         hooks.beforeStart(created, seatIds);
         refresh();
@@ -446,6 +648,119 @@ final class HumanGame {
             } else {
                 created.start(seatIds.get(RandomUtil.nextInt(seatIds.size())));
             }
+        }
+    }
+
+    /**
+     * Game thread: takes the game up from its checkpoint (v0.9.9). The generator is the one the game
+     * had, as it stood; XMage's state is the checkpoint's, with its players, which the constructor
+     * attached to this game; the listeners are new, as for a new game. XMage then goes on from the
+     * priority the checkpoint was taken at (patch 0018): nothing that began before it is begun or
+     * said again, and the player who had priority is given it.
+     */
+    private void resume() {
+        RandomUtil.setRandom(restored.random());
+        Game current = restored.game();
+        views = new SeatViews(current, seatIds, refs);
+        log.attach(current, seatIds);
+        current.addTableEventListener(event -> {
+            if (event.getEventType() == TableEvent.EventType.UPDATE) {
+                refresh();
+            }
+        });
+        current.addPlayerQueryEventListener(this::onQuery);
+        current.watchResumable(this::atResumable);
+        game = current;
+        hooks.resumed(current, seatIds);
+        // A concession XMage had been handed and had yet to apply is not in its state (XMage keeps
+        // those beside it, and applies one the next time a player would receive priority): a seat
+        // that conceded and is still in the checkpoint's game concedes again, here, before the game
+        // goes on. One the journal holds after the checkpoint is given again as the journal is played.
+        List<UUID> pending = new ArrayList<>();
+        synchronized (this) {
+            for (Seat seat : humans) {
+                HumanPlayer human = current(seat);
+                if (seat.concedeRequested && !human.hasLost() && !human.hasLeft()) {
+                    pending.add(seat.id);
+                }
+            }
+        }
+        pending.forEach(current::setConcedingPlayer);
+        refresh();
+        boolean closing;
+        synchronized (this) {
+            closing = endRequest != null;
+        }
+        if (!closing) {
+            current.resumeAtPriority();
+        }
+    }
+
+    /**
+     * Game thread: the game is at a point it can later go on from (v0.9.9, patch 0018's
+     * {@code watchResumable}): a player is about to receive priority, or every player has passed.
+     * The game's state is whole, and it is taken as a checkpoint: XMage's own copy of the game, the
+     * generators as they stand (the game's, and each bot's own), and what the seats have been shown.
+     * The copy is this thread's only cost; writing it is the recorder's, on its own thread, when a
+     * seat is asked something or bots have played on for a while.
+     *
+     * <p>Between two such points lies at most one decision at priority, so the checkpoint a seat's
+     * question is answered on is never older than the last such decision: what a bot's search found
+     * in the time it had is in the checkpoint, and is not searched for again.
+     *
+     * <p>Nothing is taken while the journal is being played again: the journal is then ahead of the
+     * game.
+     */
+    private void atResumable(Game current) {
+        if (recorder == null || current != game || recorder.failure() != null) {
+            return;
+        }
+        synchronized (this) {
+            if (replaying || result != null || endRequest != null) {
+                return;
+            }
+        }
+        long started = System.nanoTime();
+        try {
+            Game copy = current.copy();
+            Random random = copyOf(RandomUtil.getRandom());
+            Map<Random, Random> bots = new IdentityHashMap<>();
+            for (Player seated : copy.getPlayers().values()) {
+                if (seated instanceof FairBot bot) {
+                    bot.detach(bots);
+                }
+            }
+            String digest = Checkpoint.digest(copy);
+            PhaseStep step = current.getTurnStepType();
+            Checkpoint checkpoint;
+            synchronized (this) {
+                List<Checkpoint.SeatState> states = new ArrayList<>();
+                for (Seat seat : humans) {
+                    states.add(new Checkpoint.SeatState(seat.index, seat.revision, seat.lastAttacker,
+                        List.copyOf(seat.messages), seat.concedeRequested));
+                }
+                // The journal's number is read under the lock every record is written under: each
+                // record up to it has been acted on, since XMage asks one player at a time and
+                // gives nobody priority while it waits for an answer.
+                checkpoint = new Checkpoint(copy, random, seatIds, refs.copy(), log.save(), states, conceded,
+                    passiveBots.get(), spectatorRevision, version, recorder.journalSeq(), current.getTurnNum(),
+                    step == null ? null : step.name(), digest);
+            }
+            recorder.captured(checkpoint, System.nanoTime() - started);
+        } catch (RuntimeException | IOException | ClassNotFoundException e) {
+            // A checkpoint that cannot be taken is not the game's failure: the last one stands.
+            System.err.println("Human game " + id + ": no checkpoint at turn " + current.getTurnNum() + ": " + e);
+        }
+    }
+
+    /** The generator as it stands, apart from the one the game goes on drawing from. */
+    private static Random copyOf(Random random) throws IOException, ClassNotFoundException {
+        var bytes = new ByteArrayOutputStream(128);
+        try (var out = new ObjectOutputStream(bytes)) {
+            out.writeObject(random);
+        }
+        try (var in = new ObjectInputStream(new ByteArrayInputStream(bytes.toByteArray()))) {
+            return (Random) in.readObject();
         }
     }
 
@@ -545,7 +860,167 @@ final class HumanGame {
             publish(askingSeat);
         } else {
             hooks.prompted(seat.index);
+            if (recorder != null) {
+                // The seat's answer will build on the newest checkpoint: it is written now.
+                recorder.want();
+            }
+            replayNext(seat);
         }
+    }
+
+    /**
+     * Game thread, as a prompt has opened (v0.9.9): while the journal is being played again, its
+     * next records are. Commands that are not answers (priority controls, the bots' switch, a
+     * concession) come first, in their order, as they came between the answers around them. Then
+     * the next answer, if it is the answer to this prompt: the same seat, deciding for the same
+     * player, asked the same thing ({@link Prompts.Prompt#print}), with an answer the prompt still
+     * offers. It closes the prompt as the seat's own answer did and reaches XMage the same way. An
+     * answer to anything else is not given: the game after the checkpoint has gone another way (a
+     * bot decided otherwise), so the rest of the journal is dropped (a note in the journal says
+     * from where), and the game goes on from here with the seats asked for themselves.
+     */
+    private void replayNext(Seat asked) {
+        Runnable deliver = null;
+        List<Runnable> concessions = new ArrayList<>();
+        int dropped = -1;
+        synchronized (this) {
+            if (!replaying) {
+                return;
+            }
+            while (!replay.isEmpty() && !replay.peekFirst().get("type").getAsString().equals("answer")) {
+                JsonObject command = replay.pollFirst();
+                Seat seat = command.has("seat") ? seats.get(command.get("seat").getAsInt()) : null;
+                switch (command.get("type").getAsString()) {
+                    case "priority" -> {
+                        if (seat != null) {
+                            Priority.apply(current(seat), game, EngineServer.JSON.fromJson(command.get("settings"),
+                                Priority.Settings.class));
+                        }
+                    }
+                    case "bots" -> {
+                        boolean passive = command.get("passive").getAsBoolean();
+                        if (passiveBots.getAndSet(passive) != passive) {
+                            note(passive ? BOTS_PASSIVE : BOTS_NORMAL);
+                        }
+                    }
+                    default -> {
+                        if (seat != null && !seat.concedeRequested) {
+                            Runnable handover = handOver(seat);
+                            boolean promptOpen = markConcession(seat);
+                            conceded.add(seat.index);
+                            UUID conceding = seat.id;
+                            // As a seat's own concession: from another thread, once this one waits.
+                            concessions.add(() -> {
+                                applyConcession(conceding, promptOpen);
+                                if (handover != null) {
+                                    handover.run();
+                                }
+                            });
+                        }
+                    }
+                }
+                remember(command);
+                replayed++;
+                replayedSeq = command.get("seq").getAsLong();
+            }
+            JsonObject head = replay.peekFirst();
+            Prompts.Prompt prompt = asked.prompt;
+            Prompts.Answer answer = head == null || prompt == null ? null : recorded(head, asked, prompt);
+            if (answer != null) {
+                replay.pollFirst();
+                if (prompt.view().kind().equals("declare_attackers")) {
+                    asked.lastAttacker = head.has("attacker") ? head.get("attacker").getAsString() : null;
+                }
+                int promptFor = asked.promptFor;
+                asked.prompt = null;
+                asked.revision++;
+                asked.status = "waiting";
+                touch();
+                remember(head);
+                replayed++;
+                replayedSeq = head.get("seq").getAsLong();
+                deliver = () -> {
+                    Player answering = answering(promptFor);
+                    if (answering != null) {
+                        answer.apply(answering);
+                    }
+                };
+            } else if (head != null && prompt != null) {
+                // Asked something the journal did not answer: what is left of it was never said here.
+                dropped = replay.size();
+                replayDropped += dropped;
+                System.err.println("Human game " + id + ": taken up again, the game asks seat " + asked.index
+                    + " (for seat " + asked.promptFor + ") a " + prompt.view().kind() + " question with "
+                    + prompt.view().options().size() + " choices at turn " + (game == null ? "?" : game.getTurnNum())
+                    + ", and the journal's record " + head.get("seq") + " answers seat " + head.get("seat")
+                    + " (for seat " + head.get("for") + ") a " + (head.has("kind") ? head.get("kind").getAsString() : "?")
+                    + " question with " + (head.has("options") ? head.get("options") : "?") + " choices; "
+                    + dropped + " records are left unplayed and the game goes on from here"
+                    + differing(head, prompt));
+                replay.clear();
+            }
+            if (replay.isEmpty()) {
+                replaying = false;
+                if (recorder != null) {
+                    // The journal's note of how the playing again went. With records dropped it
+                    // says after which record: they stay in the file, and are no part of the game.
+                    JsonObject record = new JsonObject();
+                    record.addProperty("type", "replayed");
+                    record.addProperty("played", replayed);
+                    record.addProperty("dropped", Math.max(0, dropped));
+                    if (dropped > 0) {
+                        record.addProperty("after", replayedSeq);
+                    }
+                    recorder.journal(record);
+                }
+            }
+            notifyAll();
+        }
+        for (Runnable concession : concessions) {
+            Thread.ofVirtual().name("human-game-replay").start(concession);
+        }
+        if (deliver != null) {
+            // From another thread, as any answer: XMage listens only once this request has been fired.
+            Thread.ofVirtual().name("human-game-replay").start(deliver);
+        }
+    }
+
+    /** With the journal's choices kept ({@link #JOURNAL_CHOICES}): which choices only one of the two questions has. */
+    private static String differing(JsonObject record, Prompts.Prompt prompt) {
+        if (!record.has("choices")) {
+            return "";
+        }
+        List<String> was = new ArrayList<>();
+        record.getAsJsonArray("choices").forEach(choice -> was.add(choice.getAsString()));
+        List<String> is = prompt.codes();
+        List<String> gone = new ArrayList<>(was);
+        gone.removeAll(is);
+        List<String> added = new ArrayList<>(is);
+        added.removeAll(was);
+        return ". Choices only the journal's question had: " + gone + "; only this one has: " + added;
+    }
+
+    /**
+     * Caller holds the lock. The answer a journal record holds, as the open prompt offers it; null
+     * when the record answers another seat, another player's decision or another question, or the
+     * prompt no longer offers that answer.
+     */
+    private Prompts.Answer recorded(JsonObject record, Seat seat, Prompts.Prompt prompt) {
+        if (record.get("seat").getAsInt() != seat.index || record.get("for").getAsInt() != seat.promptFor
+                || !prompt.supported() || !record.get("print").getAsString().equals(prompt.print())) {
+            return null;
+        }
+        if (record.has("amounts")) {
+            List<Integer> amounts = new ArrayList<>();
+            for (JsonElement amount : record.getAsJsonArray("amounts")) {
+                amounts.add(amount.getAsInt());
+            }
+            return prompt.amounts(amounts);
+        }
+        if (record.has("text")) {
+            return prompt.name(record.get("text").getAsString());
+        }
+        return prompt.coded(record.get("code").getAsString());
     }
 
     /**
@@ -810,6 +1285,17 @@ final class HumanGame {
         }
         Inspection lastInspection = inspect && finished != null && views != null
             ? buildInspection(finished, "finished", outcome) : null;
+        boolean left;
+        synchronized (this) {
+            left = interrupted;
+        }
+        if (recorder != null && !left) {
+            // The result is the recording's before any seat hears of it (v0.9.9): a recording with a
+            // result is over, and a game that is over is never taken up again. Were it the other way
+            // round, a process that died in between would leave a game whose result had been told
+            // and which could be played on to another.
+            recorder.finish(EngineServer.JSON.toJsonTree(outcome).getAsJsonObject());
+        }
         synchronized (this) {
             // Spectators learn the result after the same delay as everything else.
             watch(finalPublic != null ? finalPublic : spectatorView, outcome);
@@ -826,6 +1312,8 @@ final class HumanGame {
                 seat.logEntries = Integer.MAX_VALUE;
                 seat.status = "finished";
             }
+            replay.clear();
+            replaying = false;
             touch();
             notifyAll();
         }
@@ -875,6 +1363,12 @@ final class HumanGame {
         Prompts.Answer answer;
         Reply reply;
         int promptFor;
+        if (recorder != null) {
+            // The answer builds on the newest checkpoint (v0.9.9), which is being written since the
+            // prompt opened: the answer is taken once it is on disk, so that what the seat is told
+            // was accepted can be played again whatever happens next.
+            recorder.awaitDurable();
+        }
         synchronized (this) {
             Reply earlier = replay(seat, command);
             if (earlier != null) {
@@ -884,7 +1378,9 @@ final class HumanGame {
                 return reject(seat, 409, "game_over", "The game has finished");
             }
             Prompts.Prompt prompt = seat.prompt;
-            if (prompt == null || !prompt.view().id().equals(command.promptId())) {
+            if (replaying || prompt == null || !prompt.view().id().equals(command.promptId())) {
+                // While the journal is played again after a recovery (v0.9.9) no prompt is the seat's
+                // to answer: it is shown none.
                 return reject(seat, 409, "stale_prompt", "That prompt is no longer open");
             }
             if (command.expectedRevision() != seat.revision) {
@@ -928,6 +1424,34 @@ final class HumanGame {
             seat.status = "waiting";
             touch();
             reply = accepted(seat, command);
+            if (recorder != null) {
+                // On disk before XMage hears of it, and before the seat is told (v0.9.9).
+                JsonObject record = journalled("answer", seat, command, reply);
+                record.addProperty("for", promptFor);
+                record.addProperty("print", prompt.print());
+                // What was asked, for a person reading the journal and for the log should a game
+                // taken up again ask something else; the print alone decides.
+                record.addProperty("kind", prompt.view().kind());
+                record.addProperty("options", prompt.view().options().size());
+                if (JOURNAL_CHOICES) {
+                    JsonArray choices = new JsonArray();
+                    prompt.codes().forEach(choices::add);
+                    record.add("choices", choices);
+                }
+                if (command.amounts() != null) {
+                    JsonArray amounts = new JsonArray();
+                    command.amounts().forEach(amounts::add);
+                    record.add("amounts", amounts);
+                } else if (command.text() != null) {
+                    record.addProperty("text", command.text());
+                } else {
+                    record.addProperty("code", prompt.code(command.optionId()));
+                }
+                if (prompt.view().kind().equals("declare_attackers") && seat.lastAttacker != null) {
+                    record.addProperty("attacker", seat.lastAttacker);
+                }
+                recorder.journal(record);
+            }
             notifyAll();
         }
         // Outside the lock: XMage hands the answer to the waiting game thread. A prompt made for a
@@ -973,9 +1497,27 @@ final class HumanGame {
         synchronized (this) {
             Reply reply = accepted(seat, command);
             reply.body().put("priority", Priority.controls(human));
+            if (recorder != null) {
+                // After it is applied (v0.9.9): a checkpoint taken in between has the controls, and
+                // the journal then sets them again, to the same.
+                JsonObject record = journalled("priority", seat, command, reply);
+                record.add("settings", EngineServer.JSON.toJsonTree(command.priority()));
+                recorder.journal(record);
+            }
             touch();
             return reply;
         }
+    }
+
+    /** Caller holds the lock. A journal record of a seat's command and the reply it was given (v0.9.9). */
+    private static JsonObject journalled(String type, Seat seat, SeatCommand command, Reply reply) {
+        JsonObject record = new JsonObject();
+        record.addProperty("type", type);
+        record.addProperty("seat", seat.index);
+        record.addProperty("action", command.actionId());
+        record.addProperty("fp", command.fingerprint());
+        record.add("reply", EngineServer.JSON.toJsonTree(reply.body()));
+        return record;
     }
 
     /** Request thread: the seat concedes. In a game of three or more the others play on. */
@@ -1000,6 +1542,9 @@ final class HumanGame {
             promptOpen = markConcession(seat);
             conceded.add(seat.index);
             reply = accepted(seat, command);
+            if (recorder != null) {
+                recorder.journal(journalled("concede", seat, command, reply));
+            }
         }
         applyConcession(seat.id, promptOpen);
         if (handover != null) {
@@ -1264,16 +1809,19 @@ final class HumanGame {
         Result resultNow;
         synchronized (this) {
             long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(waitMillis);
-            while (seat.revision <= since && result == null) {
+            // While the journal is played again after a recovery (v0.9.9) the prompts that open are
+            // the journal's to answer: a seat waits it out, and is shown none if it cannot wait.
+            while ((seat.revision <= since || replaying) && result == null) {
                 long remaining = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
                 if (remaining <= 0) {
                     break;
                 }
                 wait(remaining);
             }
+            boolean answeredByJournal = replaying && result == null && seat.prompt != null;
             revisionNow = seat.revision;
-            statusNow = seat.status;
-            promptNow = seat.prompt == null ? null : seat.prompt.view();
+            statusNow = answeredByJournal ? "waiting" : seat.status;
+            promptNow = seat.prompt == null || answeredByJournal ? null : seat.prompt.view();
             viewNow = seat.view;
             logLimit = seat.logEntries;
             resultNow = result;
@@ -1404,6 +1952,12 @@ final class HumanGame {
             }
             if (passiveBots.getAndSet(passive) != passive) {
                 note(passive ? BOTS_PASSIVE : BOTS_NORMAL);
+                if (recorder != null) {
+                    JsonObject record = new JsonObject();
+                    record.addProperty("type", "bots");
+                    record.addProperty("passive", passive);
+                    recorder.journal(record);
+                }
             }
             return passive;
         }
@@ -1546,6 +2100,56 @@ final class HumanGame {
         }
     }
 
+    /**
+     * For tests (v0.9.9): the game is gone as its process would be. Its recording stops here, with
+     * no result, exactly as it stands on disk; then the game's thread is ended and its seats see an
+     * error, which nothing records. The recording is what a recovery finds.
+     */
+    void interrupt() {
+        if (recorder != null) {
+            recorder.close();
+        }
+        synchronized (this) {
+            interrupted = true;
+            if (endRequest == null) {
+                endRequest = "interrupted";
+            }
+        }
+        Game stopping = game;
+        if (stopping != null) {
+            stopping.end();
+        }
+        BotMatchRunner.stop(thread);
+    }
+
+    /** The game's recorder (v0.9.9); null for a game that keeps no recording. */
+    Recorder recorder() {
+        return recorder;
+    }
+
+    /** The game's result as its seats and its recording have it; null while it has none. */
+    synchronized JsonObject resultJson() {
+        return result == null ? null : EngineServer.JSON.toJsonTree(result).getAsJsonObject();
+    }
+
+    /** Whether the journal is still being played again after a recovery (v0.9.9). */
+    synchronized boolean replaying() {
+        return replaying;
+    }
+
+    /** How many of the journal's records were played again after a recovery (v0.9.9). */
+    synchronized int replayed() {
+        return replayed;
+    }
+
+    /**
+     * How many of the journal's records were left unplayed after a recovery (v0.9.9): the game asked
+     * something else than they answered, and went on from there.
+     */
+    synchronized int replayDropped() {
+        return replayDropped;
+    }
+
     // For tests: XMage's state may be read only while a prompt is open (the game thread is waiting).
 
     /** Whether XMage's game thread is parked in its wait for a human seat's answer (v0.8.6). */
@@ -1575,7 +2179,7 @@ final class HumanGame {
         long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(waitMillis);
         while (result == null) {
             for (Seat seat : humans) {
-                if (seat.prompt != null) {
+                if (seat.prompt != null && !replaying) {
                     return seat.index;
                 }
             }
