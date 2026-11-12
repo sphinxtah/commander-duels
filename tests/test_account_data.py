@@ -684,11 +684,11 @@ def representative_account(engine: Engine) -> tuple[UUID, UUID]:
     return player, friend
 
 
-def totals(engine: Engine, player: UUID) -> dict[str, Any]:
+def totals(engine: Engine, player: UUID, queries: dict[str, str] | None = None) -> dict[str, Any]:
     """The account as a player would count it, read in SQL that holds at every schema since
-    v0.9.9's."""
+    v0.9.9's (or, given, the queries of a later migration's tables)."""
     key = player if engine.dialect.name == "postgresql" else player.hex
-    queries = {
+    queries = queries or {
         "tokens": "SELECT SUM(amount) FROM token_ledger WHERE user_id = :u",
         "token_entries": "SELECT kind, COUNT(*), SUM(amount) FROM token_ledger WHERE user_id = :u "
         "GROUP BY kind ORDER BY kind",
@@ -740,6 +740,50 @@ def totals(engine: Engine, player: UUID) -> dict[str, Any]:
         }
 
 
+def lend_a_deck(engine: Engine, player: UUID, friend: UUID) -> None:
+    """v0.9.10's access grants (migration 0046): the player lent a deck to the friend, who took it,
+    and gave a coach's view of a game the friend revoked."""
+    key = player if engine.dialect.name == "postgresql" else player.hex
+    with engine.connect() as connection:
+        deck = connection.execute(
+            text("SELECT id FROM decks WHERE owner_id = :u ORDER BY title"), {"u": key}
+        ).scalar()
+        game = connection.execute(text("SELECT id FROM games WHERE kind = 'table'")).scalar()
+    account = Account(engine)
+    for resource, resource_id, consent, revoked in (
+        ("deck", deck, "accepted", None),
+        ("hand", game, "given", T0 + timedelta(hours=1)),
+    ):
+        account.add(
+            "access_grants",
+            id=uuid4(),
+            grantor_id=player,
+            subject_id=friend,
+            resource_kind=resource,
+            resource_id=UUID(str(resource_id))
+            if not isinstance(resource_id, UUID)
+            else resource_id,
+            scope={"seat": 0} if resource == "hand" else {},
+            consent=consent,
+            created_at=T0,
+            answered_at=T0 if consent == "accepted" else None,
+            expires_at=T0 + timedelta(days=30),
+            revoked_at=revoked,
+            revoked_by=friend if revoked else None,
+        )
+    account.write(engine)
+
+
+GRANT_QUERIES = {
+    "grants": "SELECT resource_kind, consent, scope, revoked_at IS NOT NULL FROM access_grants "
+    "WHERE grantor_id = :u ORDER BY resource_kind",
+}
+
+# The migrations after v0.9.9's that add something an account keeps: each one's rows are written
+# at its own revision, and its totals compared from there on.
+LATER = [("0046_access_grants", lend_a_deck, GRANT_QUERIES)]
+
+
 def tables_referring_to_accounts(engine: Engine) -> set[str]:
     metadata = MetaData()
     metadata.reflect(engine)
@@ -786,7 +830,7 @@ def test_an_account_survives_every_migration_up_and_back(database):
     command.upgrade(config, BASELINE)
     engine = create_engine(database)
     try:
-        player, _ = representative_account(engine)
+        player, friend = representative_account(engine)
         before = totals(engine, player)
         # The account is all there: nothing in the list above went unread.
         assert before["tokens"] == [(4325,)]
@@ -795,14 +839,35 @@ def test_an_account_survives_every_migration_up_and_back(database):
         assert len(before["revisions"]) == 15
         assert all(rows for name, rows in before.items() if name != "custom_cards")
 
+        later: list[tuple[dict[str, str], dict[str, Any]]] = []
+        for revision, write, queries in LATER:
+            command.upgrade(config, revision)
+            write(engine, player, friend)
+            later.append((queries, totals(engine, player, queries)))
+            assert all(rows for rows in later[-1][1].values())
         command.upgrade(config, "head")
         assert totals(engine, player) == before
+        for queries, counted in later:
+            assert totals(engine, player, queries) == counted
         # The API reads the account as the ledgers do, at the newest schema.
         from api import economy, progression
 
         with Session(engine) as db:
             assert economy.balance_of(db, player) == 4325
             assert progression.total_wins(db, player) == 6
+        # v0.9.10's modes, filled for the games and results already there (migration 0045): a
+        # campaign duel's link makes it the campaign's; a granted result is testing's.
+        with engine.connect() as connection:
+            key = player if engine.dialect.name == "postgresql" else player.hex
+            assert sorted(connection.execute(text("SELECT kind, mode FROM games")).all()) == [
+                ("practice", "campaign"),
+                ("table", "table"),
+            ]
+            assert sorted(
+                connection.execute(
+                    text("SELECT kind, mode FROM player_results WHERE user_id = :u"), {"u": key}
+                ).all()
+            ) == [("practice", "campaign"), ("practice", "testing"), ("table", "table")]
 
         command.downgrade(config, BASELINE)
         assert totals(engine, player) == before
@@ -821,7 +886,10 @@ def test_every_table_that_refers_to_an_account_is_in_the_account_or_said_to_hold
     command.upgrade(config, BASELINE)
     engine = create_engine(url)
     try:
-        representative_account(engine)
+        player, friend = representative_account(engine)
+        for revision, write, _ in LATER:
+            command.upgrade(config, revision)
+            write(engine, player, friend)
         with engine.connect() as connection:
             written = {
                 table

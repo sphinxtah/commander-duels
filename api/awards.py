@@ -14,21 +14,26 @@ from api.achievements import BY_ID as ACHIEVEMENTS
 from api.achievements import catch_up
 from api.identity import utcnow
 from api.models import Game, User
+from api.modes import Eligibility, eligibility, mode_of
 from api.quests import award_name, count_game
 from api.social import Award
 from api.stats import record_results
 
 
-def settle(db: Session, game: Game) -> None:
+def settle(db: Session, game: Game, rules: Eligibility | None = None) -> None:
     """After the game's end is recorded, with its win counted and paid (economy.pay_game holds the
     winner's lock): a result for every human seat, then each player's quest boards and the
-    winner's achievements."""
+    winner's achievements, as far as the game's mode lets them (v0.9.10, api/modes.py)."""
+    rules = rules or eligibility(game.mode or mode_of(game.kind, False))
+    if not rules.earns("statistics"):
+        return
     for result in record_results(db, game):
         if result.outcome == "no_result":
             continue
         user = db.get_one(User, result.user_id)
-        count_game(db, user, result.finished_at)
-        if result.outcome == "win":
+        if rules.earns("quests"):
+            count_game(db, user, result.finished_at)
+        if result.outcome == "win" and rules.earns("achievements"):
             catch_up(db, user, utcnow())
 
 

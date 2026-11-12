@@ -67,6 +67,10 @@ class GameProcessesTest {
 
     /** A front process whose games run in processes of their own, within {@code budget} megabytes. */
     private void start(long budget, int warm) throws Exception {
+        start(budget, warm, 3);
+    }
+
+    private void start(long budget, int warm, int finishedGraceSeconds) throws Exception {
         Map<GameProcesses.Size, Integer> heaps = new EnumMap<>(GameProcesses.Size.class);
         heaps.put(GameProcesses.Size.DUEL, 512);
         heaps.put(GameProcesses.Size.TABLE, 768);
@@ -80,7 +84,7 @@ class GameProcessesTest {
             Map.of("CD_ENGINE_DECKS", SeatChecks.DECKS.toAbsolutePath().toString(),
                 "CD_ENGINE_RECORDINGS", recordings.toString(),
                 "CD_ENGINE_AI_THREADS", "2"),
-            TimeUnit.SECONDS.toMillis(3), TimeUnit.SECONDS.toMillis(60));
+            TimeUnit.SECONDS.toMillis(finishedGraceSeconds), TimeUnit.SECONDS.toMillis(60));
         var games = new HumanGames(SeatChecks.DECKS, 8, recordings, TimeUnit.HOURS.toMillis(24));
         var engine = new Engine(PIN, false, () -> CARDS, EngineServerTest::echo, games, false, SERVICE_TOKEN);
         processes = new GameProcesses(settings);
@@ -288,8 +292,9 @@ class GameProcessesTest {
 
     @Test
     void aFullEngineRefusesInWordsAndAdmitsAgainOnceThereIsRoom() throws Exception {
-        // Room for one duel's process (512 MB of heap and 256 beside it), and no warm process.
-        start(1_000, 0);
+        // Room for one duel's process (512 MB of heap and 256 beside it), and no warm process. A
+        // finished game's process would stay a minute: the room is made by ending it at once.
+        start(1_000, 0, 60);
         String admitted = UUID.randomUUID().toString();
         var created = service("POST", GAMES, null, duel(71L, admitted));
         assertEquals(201, created.statusCode(), created.body());
@@ -305,7 +310,7 @@ class GameProcessesTest {
         assertEquals(200, service("GET", GAMES + "/" + admitted + "/view", token(json(created), 0), null).statusCode());
         assertEquals(2, metrics().getAsJsonObject("totals").get("refused_full").getAsInt());
 
-        // The game is closed: once its process ends, there is room again.
+        // The game is closed: its process, kept for its end to be read, is ended for the room.
         assertEquals(200, service("POST", GAMES + "/" + admitted + "/close", null, "{}").statusCode());
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
         HttpResponse<String> again;

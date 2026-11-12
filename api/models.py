@@ -249,6 +249,14 @@ class Game(Base):
     # A practice game's request (v0.5.0, api/rematches.py), for its rematch: the same format, decks,
     # bots, skill, turn cap and rules. Null for a table's game and for games before v0.5.0.
     settings: Mapped[dict[str, object] | None] = mapped_column(JsonType)
+    # Its mode (v0.9.10, api/modes.py): practice or table from its kind when it is made, campaign
+    # once a campaign duel links it. Old games were given theirs by migration 0045.
+    mode: Mapped[str | None] = mapped_column(
+        String(16),
+        default=lambda context: context.get_current_parameters().get("kind") or "practice",
+    )
+    # What it earned its players and what it did not, and why, as it ended (v0.9.10).
+    eligibility: Mapped[dict[str, object] | None] = mapped_column(JsonType)
     # Passive bots for SysOp (v0.8.6) and administrators (v0.8.7): the switch as it stands, and
     # whether it was ever on. Until v0.9.7 that kept the game's end from paying anything out;
     # since then it is a record only, and the game counts as any other.
@@ -258,6 +266,45 @@ class Game(Base):
     # them ({deck_format, life, king_attacks_anyone}, and since v0.9.7 guarded_kings). Null in
     # other formats.
     kings_table: Mapped[dict[str, object] | None] = mapped_column(JsonType)
+
+
+class AccessGrant(Base):
+    """Access one account gives another, for a while (v0.9.10, api/access.py; docs/access.md): to
+    use a deck it owns, to watch or replay a game, to see a seat's hand, to a group or a league's
+    pool, to cards in the sandbox. Never ownership: a grant is read where access is decided, never
+    copied into a library or a game, so a revoked or expired grant takes nothing out of a game
+    that started under it. A grant that needs its subject's consent waits for it; each change is
+    audited."""
+
+    __tablename__ = "access_grants"
+    __table_args__ = (
+        CheckConstraint(
+            "resource_kind IN ('deck', 'spectator', 'replay', 'hand', 'group', 'pool', 'sandbox')",
+            name="ck_access_grants_resource_kind",
+        ),
+        CheckConstraint(
+            "consent IN ('given', 'offered', 'accepted', 'declined')",
+            name="ck_access_grants_consent",
+        ),
+        Index("ix_access_grants_subject", "subject_id", "resource_kind", "resource_id"),
+        Index("ix_access_grants_grantor", "grantor_id", "created_at"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    grantor_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    subject_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    resource_kind: Mapped[str] = mapped_column(String(16))
+    # The deck's, the game's, the group's or the pool's id; none for the sandbox.
+    resource_id: Mapped[UUID | None]
+    # What within it: a seat ({"seat": 2}), the games a deck may be played in, a card list.
+    scope: Mapped[dict[str, object]] = mapped_column(JsonType, default=dict)
+    # given: the grantor's own (a seat's hand shown to a coach); offered, then accepted or
+    # declined: one its subject must take (a deck lent).
+    consent: Mapped[str] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    answered_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    expires_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    revoked_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    revoked_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
 
 
 class GameEventRow(Base):
@@ -1720,6 +1767,8 @@ class PlayerResult(Base):
     finished_at: Mapped[datetime] = mapped_column(UtcDateTime())
     # The rule the outcome was judged under (PROG05).
     policy: Mapped[str] = mapped_column(String(32))
+    # The mode of its game (v0.9.10, api/modes.py); "testing" for a result granted for testing.
+    mode: Mapped[str | None] = mapped_column(String(16))
 
 
 class DailyQuest(Base):

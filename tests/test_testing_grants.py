@@ -120,6 +120,8 @@ def test_granted_wins_count_for_quests_and_achievements_not_statistics(
             (None, root.id, "commander", "R")
         }
         assert {(row.bots, row.bot_skill, row.players) for row in rows} == {(1, 5, 0)}
+        # Their mode (v0.9.10, api/modes.py): staff testing, apart from games played.
+        assert {row.mode for row in rows} == {"testing"}
         # No tokens for the wins themselves: only the achievements' rewards.
         kinds = set(db.scalars(select(TokenEntry.kind).where(TokenEntry.user_id == ada.id)))
         assert "win" not in kinds

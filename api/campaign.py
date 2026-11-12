@@ -1666,6 +1666,8 @@ async def start_encounter(
                 game = record_game(db, request, principal, created, request_body, plans)
                 # A campaign duel is played again from the campaign, not by a rematch.
                 game.settings = None
+                # Its mode (v0.9.10, api/modes.py): the campaign settles it.
+                game.mode = "campaign"
                 db.add(
                     CampaignGame(
                         game_id=game.id,
@@ -1798,6 +1800,8 @@ async def court_table(
     host_id = table.host_id
 
     def link(session: Session, game: Game) -> None:
+        # The court's mode (v0.9.10, api/modes.py): the campaign settles it.
+        game.mode = "campaign"
         session.add(
             CampaignGame(
                 game_id=game.id,

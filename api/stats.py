@@ -42,6 +42,7 @@ from api.decks import identity_of, revision_entries
 from api.identity import Active, ApiError, Db, Principal, utcnow
 from api.library import since_reset
 from api.models import DeckRevision, Game, GameSeat, Match, MatchPlayer, PlayerResult, User
+from api.modes import mode_of
 from api.progression import winning_seats
 from api.schemas import Contract, Error
 from api.social import PlayerRef, player_ref, visible_player
@@ -280,6 +281,7 @@ def record_results(db: Session, game: Game) -> list[PlayerResult]:
             started_at=game.created_at,
             finished_at=finished,
             policy=OUTCOME_POLICY,
+            mode=game.mode or mode_of(game.kind, False),
         )
         db.add(row)
         rows.append(row)

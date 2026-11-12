@@ -249,9 +249,10 @@ class EventsPage(BaseModel):
 def perspective_for(
     db: Session, principal: Principal, game_id: UUID, inspect: bool
 ) -> Perspective | None:
-    """Who may read a game's events, and through whose eyes: a player of the game, their seat; with
-    ``inspect``, SysOp, or an administrator where ``games.concealed_for`` lets them see concealed
-    information. Anyone else nothing (None), so that a game's existence is not told either."""
+    """Who may read a game's events, and through whose eyes: a player of the game, their seat; one
+    given access to it, the access's perspective (api/access.py); with ``inspect``, SysOp, or an
+    administrator where ``games.concealed_for`` lets them see concealed information. Anyone else
+    nothing (None), so that a game's existence is not told either."""
     from api.games import concealed_for  # Imported here: api.games imports this module.
 
     rows = list(db.scalars(select(GameSeat).where(GameSeat.game_id == game_id)))
@@ -262,6 +263,23 @@ def perspective_for(
     for row in rows:
         if row.user_id == principal.user.id:
             return Perspective.of_seat(row.seat)
+    # Access given (v0.9.10, api/access.py), asked now, never kept: a coach shown a seat's hand
+    # sees as that seat does while it plays; a replay given sees as its seat did, once the game
+    # is over; a spectator sees what every seat may.
+    from api import access
+
+    for grant in access.active(db, principal.user.id, "hand", game_id):
+        seat = grant.scope.get("seat")
+        if isinstance(seat, int):
+            return Perspective.of_seat(seat)
+    game = db.get(Game, game_id)
+    if game is not None and game.status != "active":
+        for grant in access.active(db, principal.user.id, "replay", game_id):
+            seat = grant.scope.get("seat")
+            if isinstance(seat, int):
+                return Perspective.of_seat(seat)
+    if access.active(db, principal.user.id, "spectator", game_id):
+        return Perspective.spectator()
     return None
 
 

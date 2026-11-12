@@ -182,6 +182,7 @@ def grant_results(db: Session, user: User, body: ResultsGrant, actor: User) -> t
                 started_at=finished,
                 finished_at=finished,
                 policy=OUTCOME_POLICY,
+                mode="testing",
             )
         )
     db.add(

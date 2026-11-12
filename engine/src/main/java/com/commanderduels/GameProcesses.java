@@ -152,7 +152,7 @@ final class GameProcesses implements AutoCloseable {
                 String.valueOf(Math.max(2, Math.min(4, Runtime.getRuntime().availableProcessors())))));
             return new Settings(launcher(), Path.of("").toAbsolutePath(), heaps,
                 integer(env, "CD_ENGINE_GAME_OVERHEAD_MB", DEFAULT_OVERHEAD_MB), budget, warm, maxGames, devGames,
-                options, environment, TimeUnit.SECONDS.toMillis(integer(env, "CD_ENGINE_GAME_FINISHED_SECONDS", 120)),
+                options, environment, TimeUnit.SECONDS.toMillis(integer(env, "CD_ENGINE_GAME_FINISHED_SECONDS", 30)),
                 TimeUnit.SECONDS.toMillis(60));
         }
 
@@ -308,7 +308,8 @@ final class GameProcesses implements AutoCloseable {
 
     /** What the processes alive now reserve, in megabytes. */
     synchronized long reserved() {
-        return live.stream().mapToLong(process -> settings.reserve(process.size)).sum();
+        return live.stream().filter(process -> !process.retiring)
+            .mapToLong(process -> settings.reserve(process.size)).sum();
     }
 
     /** A process for a game of this size, started and ready; or why there is none. */
@@ -359,29 +360,44 @@ final class GameProcesses implements AutoCloseable {
         return null;
     }
 
-    /** Caller holds the lock. Stops warm processes of other sizes until {@code megabytes} fit, if they can. */
+    /**
+     * Caller holds the lock. Makes room for {@code megabytes}, if it can: first by ending the
+     * processes of games that are over (kept only so the API could read the end; the result is in
+     * the recording), then warm processes. A running game is never touched.
+     */
     private boolean makeRoom(int megabytes) {
         long free = settings.budgetMegabytes - reserved();
         if (free >= megabytes) {
             return true;
         }
-        long warmReserve = 0;
-        for (Deque<GameProcess> queue : warm.values()) {
-            for (GameProcess process : queue) {
-                warmReserve += settings.reserve(process.size);
+        List<GameProcess> spare = new ArrayList<>();
+        for (GameProcess process : live) {
+            if (process.gameId != null && !process.retiring && finished(process)) {
+                spare.add(process);
             }
         }
-        if (free + warmReserve < megabytes) {
+        for (Deque<GameProcess> queue : warm.values()) {
+            spare.addAll(queue);
+        }
+        long spareReserve = spare.stream().mapToLong(process -> settings.reserve(process.size)).sum();
+        if (free + spareReserve < megabytes) {
             return false;
         }
-        for (Deque<GameProcess> queue : warm.values()) {
-            while (free < megabytes && !queue.isEmpty()) {
-                GameProcess process = queue.poll();
-                free += settings.reserve(process.size);
-                retire(process);
+        for (GameProcess process : spare) {
+            if (free >= megabytes) {
+                break;
             }
+            free += settings.reserve(process.size);
+            retire(process);
         }
         return free >= megabytes;
+    }
+
+    /** Whether the process's game is over, by its last report. */
+    private static boolean finished(GameProcess process) {
+        JsonObject status = process.status;
+        var games = status == null ? null : status.getAsJsonArray("games");
+        return games != null && !games.isEmpty() && games.get(0).getAsJsonObject().get("finished").getAsBoolean();
     }
 
     /** Caller holds the lock. Starts a process; its readiness is waited for outside the lock. */

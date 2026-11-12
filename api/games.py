@@ -62,7 +62,7 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from api import events as events_module
-from api import kings_table
+from api import kings_table, modes
 from api.auth import INPUT_ERRORS
 from api.config import Settings
 from api.custom_play import custom_in_seats
@@ -1517,6 +1517,13 @@ def record_end(
             game.result = recorded(result, game.format) if result else None
             db.flush()
             link = db.get(CampaignGame, game.id)
+            # What the game earns its players (v0.9.10, api/modes.py): its mode's policy, asked
+            # here alone and recorded with the game, with why each reward withheld was.
+            if game.mode is None or link is not None:
+                # A campaign duel is the campaign's whatever it was made as.
+                game.mode = modes.mode_of(game.kind, link is not None)
+            rules = modes.eligibility(game.mode, result=game.result is not None)
+            game.eligibility = rules.record()
             # A game played with passive bots (the testing switch of SysOp, v0.8.6, and of
             # administrators, v0.8.7) counts as any other since v0.9.7 (the owner, 2026-11-10:
             # "Administrators should not have this restriction"): its win, tokens, quests and
@@ -1527,9 +1534,11 @@ def record_end(
                 content = campaign.campaign_in(content_dir) if content_dir else None
                 campaign.game_ended(db, game, link, content, content_dir, owner_closed)
             else:
-                count_win(db, game)
-                pay_game(db, game)
-                settle(db, game)
+                if rules.earns("wins"):
+                    count_win(db, game)
+                if rules.earns("tokens"):
+                    pay_game(db, game)
+                settle(db, game, rules)
                 matches.game_ended(db, game)
             db.commit()
 
