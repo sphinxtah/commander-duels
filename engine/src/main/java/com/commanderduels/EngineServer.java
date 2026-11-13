@@ -1214,6 +1214,44 @@ public final class EngineServer {
     }
 
     /**
+     * A game's own process plays a game of its size up to its first question before it says it is
+     * ready (v0.9.10): the first game in a Java process loads XMage's game, rules and AI classes and
+     * compiles their code, which took 7 to 9 seconds before a player's first question (measured on
+     * two cores), against half a second for a game after it. The warm-up game is never registered,
+     * recorded or seen; it is closed at its first question. A process kept warm pays this before any
+     * game is given it.
+     */
+    static void warmUp(String size, Path decks) {
+        long started = System.nanoTime();
+        GameFormat format = "duel".equals(size) ? GameFormat.LEGACY : GameFormat.COMMANDER;
+        List<String> names = format.decks();
+        List<HumanGameRequest.Seat> seats = new ArrayList<>();
+        seats.add(new HumanGameRequest.Seat(HumanGameRequest.HUMAN, names.get(0)));
+        int count = format == GameFormat.LEGACY ? 2 : 4;
+        for (int seat = 1; seat < count; seat++) {
+            seats.add(new HumanGameRequest.Seat(HumanGameRequest.BOT, names.get(seat % names.size())));
+        }
+        var request = new HumanGameRequest(1L, format, seats, 1, 2, 60);
+        var game = new HumanGame("warm-up-" + java.util.UUID.randomUUID(), request, decks, done -> {},
+            HumanGame.Hooks.NONE);
+        try {
+            game.start();
+            long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(60);
+            while (!game.finished() && game.awaitPromptSeat(1_000) < 0 && System.nanoTime() < deadline) {
+                // wait for its first question
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (RuntimeException e) {
+            System.err.println("The game process's warm-up failed (" + e + "); its first game starts cold");
+        } finally {
+            game.close("warm_up");
+        }
+        System.out.println("Warmed up with a " + format.id() + " game in "
+            + java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) + " ms");
+    }
+
+    /**
      * One game's own process (v0.9.10): on loopback, on a port of the system's choosing, which it
      * prints for its front process with its readiness; it ends when its front process does (its
      * standard input closes). Its front process sweeps the recordings and ends it when its game is over.
@@ -1235,6 +1273,8 @@ public final class EngineServer {
             System.out.println(GameProcesses.FAILED_LINE);
             System.exit(1);
         }
+        warmUp(System.getenv().getOrDefault("CD_ENGINE_GAME_SIZE", ""),
+            Path.of(System.getenv().getOrDefault("CD_ENGINE_DECKS", "decks")));
         System.out.println(GameProcesses.READY_LINE);
         // The main thread stays, so the process lives (the server's threads are daemons), until its
         // front process ends: nothing is sent on standard input, which ends with the front process.

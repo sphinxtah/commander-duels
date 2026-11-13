@@ -436,6 +436,7 @@ final class GameProcesses implements AutoCloseable {
         env.remove("JDK_JAVA_OPTIONS");
         env.putAll(settings.environment);
         env.put("CD_ENGINE_ROLE", "game");
+        env.put("CD_ENGINE_GAME_SIZE", size.label());
         env.put("CD_ENGINE_BUILD_KEY", EngineBuild.key());
         env.put("CD_ENGINE_PORT", "0");
         env.put("CD_ENGINE_MAX_GAMES", "1");
