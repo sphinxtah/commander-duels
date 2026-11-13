@@ -194,6 +194,42 @@ final class HumanGames {
         return recordings;
     }
 
+    /**
+     * A game's own process between games (v0.9.11): drops its games that are over, once their
+     * threads have ended, so the process can take its front process's next game with the code its
+     * last games loaded. Refused (false) while a game runs or is still ending. The wait for a
+     * game's thread is outside this registry's lock: a handler waiting on a monitor holds its
+     * virtual thread's carrier.
+     */
+    boolean releaseFinished() {
+        List<Entry> over;
+        synchronized (this) {
+            for (Entry entry : games.values()) {
+                if (!entry.game.finished() || entry.finishedAtNanos == 0) {
+                    return false;
+                }
+            }
+            over = List.copyOf(games.values());
+        }
+        for (Entry entry : over) {
+            try {
+                entry.game.thread().join(5_000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+            if (entry.game.thread().isAlive()) {
+                return false;
+            }
+        }
+        synchronized (this) {
+            // The front process gives a process its next game only once this has answered.
+            over.forEach(entry -> games.remove(entry.game.id(), entry));
+            cancelled.clear();
+        }
+        return true;
+    }
+
     /** The front process's registry (v0.9.10): a recording of a game running in another process is kept. */
     void keepRecordingsOf(java.util.function.Predicate<String> running) {
         runningElsewhere = running;

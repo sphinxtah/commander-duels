@@ -113,7 +113,16 @@ final class GameProcesses implements AutoCloseable {
     record Settings(List<String> command, Path workingDirectory, Map<Size, Integer> heapMegabytes,
                     int overheadMegabytes, long budgetMegabytes, Map<Size, Integer> warm, int maxGames,
                     boolean devGames, List<String> javaOptions, Map<String, String> environment,
-                    long finishedGraceMillis, long startTimeoutMillis) {
+                    long finishedGraceMillis, long startTimeoutMillis, int gamesPerProcess) {
+
+        /** The settings of the tests and of v0.9.10: a process plays one game. */
+        Settings(List<String> command, Path workingDirectory, Map<Size, Integer> heapMegabytes,
+                 int overheadMegabytes, long budgetMegabytes, Map<Size, Integer> warm, int maxGames,
+                 boolean devGames, List<String> javaOptions, Map<String, String> environment,
+                 long finishedGraceMillis, long startTimeoutMillis) {
+            this(command, workingDirectory, heapMegabytes, overheadMegabytes, budgetMegabytes, warm, maxGames,
+                devGames, javaOptions, environment, finishedGraceMillis, startTimeoutMillis, 1);
+        }
 
         int reserve(Size size) {
             return heapMegabytes.get(size) + overheadMegabytes;
@@ -153,7 +162,7 @@ final class GameProcesses implements AutoCloseable {
             return new Settings(launcher(), Path.of("").toAbsolutePath(), heaps,
                 integer(env, "CD_ENGINE_GAME_OVERHEAD_MB", DEFAULT_OVERHEAD_MB), budget, warm, maxGames, devGames,
                 options, environment, TimeUnit.SECONDS.toMillis(integer(env, "CD_ENGINE_GAME_FINISHED_SECONDS", 30)),
-                TimeUnit.SECONDS.toMillis(60));
+                TimeUnit.SECONDS.toMillis(60), Math.max(1, integer(env, "CD_ENGINE_GAME_REUSE", DEFAULT_GAMES_PER_PROCESS)));
         }
 
         /** This JVM's launcher and class path: game processes run the same classes as the front process. */
@@ -185,6 +194,15 @@ final class GameProcesses implements AutoCloseable {
     static final Map<Size, Integer> DEFAULT_HEAPS = Map.of(Size.DUEL, 1536, Size.TABLE, 2560, Size.COURT, 4096);
     /** Measured: classes, code, threads and the collector come to about 350 MB once a game has run. */
     static final int DEFAULT_OVERHEAD_MB = 512;
+    /**
+     * Games a process plays, one after another, before it is ended (v0.9.11's reuse): each game
+     * after its first finds the code its last games loaded and compiled, as every game did in the
+     * one process before v0.9.10. A process is also ended sooner when its heap stays full after a
+     * collection ({@link #REUSE_PRESSURE_PERCENT}) or it has lived {@link #REUSE_HOURS} hours.
+     */
+    static final int DEFAULT_GAMES_PER_PROCESS = 40;
+    static final int REUSE_PRESSURE_PERCENT = 50;
+    static final int REUSE_HOURS = 24;
 
     /** A forwarded answer: the process's status, its Retry-After, and its body as it sent it. */
     record Forwarded(int status, String retryAfter, byte[] body) {}
@@ -208,6 +226,8 @@ final class GameProcesses implements AutoCloseable {
         /** The process's last report: its games, its memory and its bots. */
         volatile JsonObject status;
         volatile long peakHeapUsed;
+        /** Games given to it, its first included (v0.9.11's reuse). */
+        volatile int games;
 
         GameProcess(int number, Size size, Process process, String token) {
             this.number = number;
@@ -245,6 +265,7 @@ final class GameProcesses implements AutoCloseable {
     private final AtomicLong longestStartMillis = new AtomicLong();
     private final AtomicLong startMillis = new AtomicLong();
     private final AtomicLong retired = new AtomicLong();
+    private final AtomicLong reused = new AtomicLong();
     private final AtomicLong refusedFull = new AtomicLong();
     private final AtomicLong refusedBusy = new AtomicLong();
     private final AtomicLong failedToStart = new AtomicLong();
@@ -271,8 +292,44 @@ final class GameProcesses implements AutoCloseable {
         return settings;
     }
 
-    /** Called once the front process has opened the card database: warm processes may start. */
+    /** A read-only copy of the card database the game processes open in their own process. */
+    private volatile Path cards;
+
+    /**
+     * A read-only copy of the card database for the game processes (v0.9.11), made before this
+     * process opens the database, so the copy is the file at rest. Each game process opens the copy in its
+     * own process, with no server (XMage patch 0020): reading the cards through this process's
+     * server took four to five seconds of a Commander table's start on two cores, and three times
+     * that on the live VM. The copy is kept by the engine's build, so a restart in the same
+     * container uses it again. If it cannot be made, game processes read through this process.
+     */
+    void prepareCards() {
+        try {
+            Path source = Path.of("db", "cards.h2.mv.db").toAbsolutePath();
+            String build = Integer.toHexString(EngineBuild.key().hashCode());
+            Path folder = Path.of(System.getProperty("java.io.tmpdir"), "cd-cards-" + build);
+            Path copy = folder.resolve("cards.h2.mv.db");
+            java.nio.file.Files.createDirectories(folder);
+            if (!java.nio.file.Files.exists(copy) || java.nio.file.Files.size(copy) != java.nio.file.Files.size(source)) {
+                Path partial = java.nio.file.Files.createTempFile(folder, "cards", ".partial");
+                java.nio.file.Files.copy(source, partial, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                java.nio.file.Files.move(partial, copy, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                    java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+                copy.toFile().setReadOnly();
+            }
+            cards = folder.toAbsolutePath();
+            System.out.println("Game processes read a copy of the card database: " + copy);
+        } catch (IOException | RuntimeException e) {
+            System.err.println("The card database could not be copied for the game processes (" + e
+                + "); they read it through this process");
+        }
+    }
+
+    /** Called once this process has opened the card database: warm processes may start. */
     void open() {
+        if (cards == null) {
+            prepareCards();
+        }
         opened = true;
         refill();
     }
@@ -357,16 +414,23 @@ final class GameProcesses implements AutoCloseable {
         return live.stream().filter(process -> process.claimedNanos != 0 && process.gameId == null).count();
     }
 
-    /** Caller holds the lock. */
+    /**
+     * Caller holds the lock. A warm process of the size: the ready one that has played the most
+     * games (its code is the most loaded), else one still warming up.
+     */
     private GameProcess takeWarm(Size size) {
         Deque<GameProcess> queue = warm.get(size);
-        GameProcess process;
-        while ((process = queue.poll()) != null) {
-            if (process.alive()) {
-                return process;
+        queue.removeIf(process -> process.retiring || !process.alive());
+        GameProcess best = null;
+        for (GameProcess process : queue) {
+            if (best == null || process.ready && (!best.ready || process.games > best.games)) {
+                best = process;
             }
         }
-        return null;
+        if (best != null) {
+            queue.remove(best);
+        }
+        return best;
     }
 
     /**
@@ -385,9 +449,13 @@ final class GameProcesses implements AutoCloseable {
                 spare.add(process);
             }
         }
+        List<GameProcess> idle = new ArrayList<>();
         for (Deque<GameProcess> queue : warm.values()) {
-            spare.addAll(queue);
+            idle.addAll(queue);
         }
+        // The coldest first: one that has played no game loses the least.
+        idle.sort(java.util.Comparator.comparingInt(process -> process.games));
+        spare.addAll(idle);
         long spareReserve = spare.stream().mapToLong(process -> settings.reserve(process.size)).sum();
         if (free + spareReserve < megabytes) {
             return false;
@@ -424,8 +492,12 @@ final class GameProcesses implements AutoCloseable {
         // A game's heap is given back to the machine while it waits for its players.
         command.add("-XX:G1PeriodicGCInterval=30000");
         command.add("-Dh2.bindAddress=127.0.0.1");
-        // The cards database is the front process's, read as it is (XMage patch 0020).
+        // The cards database is the front process's, read as it is (XMage patch 0020): its copy
+        // in this process when there is one.
         command.add("-Dxmage.cardsDatabase.shared=true");
+        if (cards != null) {
+            command.add("-Dxmage.cardsDatabase.snapshot=" + cards);
+        }
         command.addAll(settings.javaOptions);
         command.add(EngineServer.class.getName());
         ProcessBuilder builder = new ProcessBuilder(command)
@@ -534,7 +606,64 @@ final class GameProcesses implements AutoCloseable {
     /** The game a process now runs: its requests go there. */
     void assign(GameProcess process, String gameId) {
         process.gameId = gameId;
+        process.games++;
         byGame.put(gameId, process);
+    }
+
+    /**
+     * Whether a process whose game is over may take another (v0.9.11's reuse): it has played
+     * fewer than {@link Settings#gamesPerProcess} games, its heap was not full after its last
+     * collection, and it has lived less than {@link #REUSE_HOURS} hours.
+     */
+    private boolean reusable(GameProcess process, JsonObject status) {
+        if (closed || process.retiring || !process.alive() || process.games >= settings.gamesPerProcess) {
+            return false;
+        }
+        if (TimeUnit.NANOSECONDS.toHours(System.nanoTime() - process.startedNanos) >= REUSE_HOURS) {
+            return false;
+        }
+        JsonObject memory = status.getAsJsonObject("memory");
+        return memory == null || !memory.has("pressure_percent")
+            || memory.get("pressure_percent").getAsLong() < REUSE_PRESSURE_PERCENT;
+    }
+
+    /**
+     * Gives a process whose game is over back to the warm processes of its size (v0.9.11's
+     * reuse), the first to be taken: its game is dropped from it (its end is in its recording), and
+     * the next game it takes finds the code its last games loaded and compiled. One more than the
+     * warm processes wanted is kept, the warmest; the coldest is ended.
+     */
+    private void reuse(GameProcess process) throws InterruptedException {
+        Optional<Forwarded> answer = forward(process, "POST", "/v1/service/process/release", null, null,
+            new byte[0], 15_000);
+        if (answer.isEmpty() || answer.get().status() != 200) {
+            retire(process);
+            return;
+        }
+        String gameId = process.gameId;
+        if (gameId != null) {
+            byGame.remove(gameId, process);
+        }
+        GameProcess extra = null;
+        synchronized (this) {
+            process.gameId = null;
+            process.claimedNanos = 0;
+            process.status = null;
+            // Ended meanwhile (its room was needed): never back among the warm.
+            if (closed || process.retiring || !process.alive()) {
+                return;
+            }
+            Deque<GameProcess> queue = warm.get(process.size);
+            queue.addFirst(process);
+            reused.incrementAndGet();
+            if (queue.size() > settings.warm.get(process.size) + 1) {
+                extra = queue.stream().min(java.util.Comparator.comparingInt(other -> other.games)).orElse(null);
+                queue.remove(extra);
+            }
+        }
+        if (extra != null) {
+            retire(extra);
+        }
     }
 
     /** Ends a process on purpose: its game is over, or it never got one. */
@@ -658,7 +787,11 @@ final class GameProcesses implements AutoCloseable {
                 JsonObject game = games.get(0).getAsJsonObject();
                 if (game.get("finished").getAsBoolean()
                         && game.get("finished_millis").getAsLong() >= settings.finishedGraceMillis) {
-                    retire(process);
+                    if (reusable(process, status)) {
+                        reuse(process);
+                    } else {
+                        retire(process);
+                    }
                 }
             }
         } catch (RuntimeException | InterruptedException e) {
@@ -686,6 +819,8 @@ final class GameProcesses implements AutoCloseable {
             entry.put("heap_megabytes", settings.heapMegabytes.get(size));
             entry.put("reserve_megabytes", settings.reserve(size));
             entry.put("warm", warm.get(size).size());
+            // Each warm process's games so far: 0 for one that has only warmed up.
+            entry.put("warm_games", warm.get(size).stream().map(process -> process.games).toList());
             entry.put("warm_wanted", settings.warm.get(size));
             sizes.put(size.label(), entry);
         }
@@ -702,6 +837,7 @@ final class GameProcesses implements AutoCloseable {
             game.put("pid", process.process.pid());
             game.put("uptime_seconds", TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - process.startedNanos));
             game.put("start_millis", process.readyMillis);
+            game.put("games_in_process", process.games);
             game.put("peak_heap_used_megabytes", process.peakHeapUsed);
             JsonObject status = process.status;
             if (status != null) {
@@ -724,6 +860,8 @@ final class GameProcesses implements AutoCloseable {
         totals.put("start_millis_longest", longestStartMillis.get());
         totals.put("failed_to_start", failedToStart.get());
         totals.put("retired", retired.get());
+        totals.put("reused", reused.get());
+        totals.put("games_per_process", settings.gamesPerProcess);
         Map<String, Long> endedUnasked = new LinkedHashMap<>();
         ended.forEach((why, count) -> endedUnasked.put(why, count.get()));
         totals.put("ended_unasked", endedUnasked);

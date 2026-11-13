@@ -118,7 +118,7 @@ def test_every_kind_of_access_is_its_grantors_alone_to_give(client: TestClient) 
         refused("invalid_grant", lambda: access.offer(db, a, b, "nothing", deck.id))
         # The sandbox's cards: SysOp's to give, nobody else's.
         refused("forbidden", lambda: access.offer(db, a, b, "sandbox", None))
-        # Groups and pools come with v0.9.11.
+        # Groups and pools come with v0.9.12.
         refused("not_available", lambda: access.offer(db, a, b, "group", uuid4()))
         refused("not_available", lambda: access.offer(db, a, b, "pool", uuid4()))
         # Never to an account that blocks or is blocked by the grantor.

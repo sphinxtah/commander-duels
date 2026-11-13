@@ -75,6 +75,11 @@ class GameProcessesTest {
     }
 
     private void start(long budget, int warm, int finishedGraceSeconds, int maxGames) throws Exception {
+        start(budget, warm, finishedGraceSeconds, maxGames, 1);
+    }
+
+    private void start(long budget, int warm, int finishedGraceSeconds, int maxGames, int gamesPerProcess)
+            throws Exception {
         Map<GameProcesses.Size, Integer> heaps = new EnumMap<>(GameProcesses.Size.class);
         heaps.put(GameProcesses.Size.DUEL, 512);
         heaps.put(GameProcesses.Size.TABLE, 768);
@@ -88,7 +93,7 @@ class GameProcessesTest {
             Map.of("CD_ENGINE_DECKS", SeatChecks.DECKS.toAbsolutePath().toString(),
                 "CD_ENGINE_RECORDINGS", recordings.toString(),
                 "CD_ENGINE_AI_THREADS", "2"),
-            TimeUnit.SECONDS.toMillis(finishedGraceSeconds), TimeUnit.SECONDS.toMillis(60));
+            TimeUnit.SECONDS.toMillis(finishedGraceSeconds), TimeUnit.SECONDS.toMillis(60), gamesPerProcess);
         var games = new HumanGames(SeatChecks.DECKS, maxGames, recordings, TimeUnit.HOURS.toMillis(24));
         var engine = new Engine(PIN, false, () -> CARDS, EngineServerTest::echo, games, false, SERVICE_TOKEN);
         processes = new GameProcesses(settings);
@@ -344,6 +349,72 @@ class GameProcessesTest {
         }
         assertEquals(201, next.statusCode(), next.body());
         assertTrue(processes.processForTest(first).isPresent(), "its process is still there to read");
+    }
+
+    /** Waits until no process holds the game: its process was given back or ended. */
+    private void untilReleased(String id) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        while (processes.processForTest(id).isPresent()) {
+            assertTrue(System.nanoTime() < deadline, "the finished game's process still holds it");
+            Thread.sleep(200);
+        }
+    }
+
+    /** Waits until the front process's totals count at least {@code value} under {@code key}. */
+    private JsonObject untilTotal(String key, int value) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        while (true) {
+            JsonObject totals = metrics().getAsJsonObject("totals");
+            if (totals.get(key).getAsInt() >= value) {
+                return totals;
+            }
+            assertTrue(System.nanoTime() < deadline, key + " never reached " + value + ": " + totals);
+            Thread.sleep(200);
+        }
+    }
+
+    @Test
+    void aProcessWhoseGameIsOverPlaysTheNextGameUntilItHasPlayedItsShare() throws Exception {
+        // No warm process, two games a process (the live default is forty), a second's grace.
+        start(16_384, 0, 1, 8, 2);
+        String first = UUID.randomUUID().toString();
+        var created = service("POST", GAMES, null, duel(101L, first));
+        assertEquals(201, created.statusCode(), created.body());
+        play(first, new ScriptedPlayer(101), 10, token(json(created), 0), token(json(created), 1));
+        long pid = processes.processForTest(first).orElseThrow().pid();
+        assertEquals(200, service("POST", GAMES + "/" + first + "/close", null, "{}").statusCode());
+        untilReleased(first);
+
+        // Given back, warm, with its game dropped: the game's end is read from its recording.
+        JsonObject totals = untilTotal("reused", 1);
+        assertEquals(1, totals.get("reused").getAsInt(), totals.toString());
+        assertEquals(0, totals.get("retired").getAsInt(), totals.toString());
+        JsonObject duel = metrics().getAsJsonObject("sizes").getAsJsonObject("duel");
+        assertEquals("[1]", duel.getAsJsonArray("warm_games").toString(), duel.toString());
+        var ended = service("POST", GAMES + "/" + first + "/attach", null, "");
+        assertEquals(200, ended.statusCode(), ended.body());
+        assertEquals("finished", json(ended).get("status").getAsString(), "never taken up again");
+        assertEquals(404, service("GET", GAMES + "/" + first + "/view", token(json(created), 0), null).statusCode());
+
+        // The next game is the same process's, and plays as any game does.
+        String second = UUID.randomUUID().toString();
+        var next = service("POST", GAMES, null, duel(102L, second));
+        assertEquals(201, next.statusCode(), next.body());
+        assertEquals(pid, processes.processForTest(second).orElseThrow().pid(), "the same process");
+        // Ten answers taken (each 200, or 409 for a question that moved on), as in any process.
+        JsonObject asked = play(second, new ScriptedPlayer(102), 10, token(json(next), 0), token(json(next), 1));
+        assertTrue(asked.get("revision").getAsLong() >= 10, asked.get("revision").toString());
+        assertEquals(2, gameMetrics(second).get("games_in_process").getAsInt());
+        assertEquals(1, metrics().getAsJsonObject("totals").get("processes_started").getAsInt());
+
+        // Its share played, it is ended when its game is over.
+        assertEquals(200, service("POST", GAMES + "/" + second + "/close", null, "{}").statusCode());
+        untilReleased(second);
+        totals = untilTotal("retired", 1);
+        assertEquals(1, totals.get("reused").getAsInt(), totals.toString());
+        assertEquals(1, totals.get("retired").getAsInt(), totals.toString());
+        assertEquals(0, totals.get("processes_alive").getAsInt(), totals.toString());
+        assertEquals(0, metrics().getAsJsonObject("sizes").getAsJsonObject("duel").get("warm").getAsInt());
     }
 
     @Test

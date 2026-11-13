@@ -19,7 +19,7 @@ for access to end.
 
 v0.9.10 reads grants where a game's events are read (api/events.py): a spectator's grant shows
 the spectator's perspective, a replay's or a coach's (a seat's hand) the seat's. Lending decks,
-the sandbox, groups and pools are v1.0.0's and v0.9.11's workflows; their grants are modelled
+the sandbox, groups and pools are v1.0.0's and v0.9.12's workflows; their grants are modelled
 and checked here, and no route makes them yet.
 """
 
@@ -103,7 +103,7 @@ def _check_resource(
         if resource in ("replay", "hand") and scope.get("seat") != seat:
             raise ApiError(422, "invalid_grant", "A seat's view is its own player's to give.")
         return
-    # Groups and pools come with v0.9.11's playgroups and leagues.
+    # Groups and pools come with v0.9.12's playgroups and leagues.
     raise ApiError(409, "not_available", "Access of this kind cannot be given yet.")
 
 
