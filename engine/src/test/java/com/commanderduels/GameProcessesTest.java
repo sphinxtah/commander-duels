@@ -71,6 +71,10 @@ class GameProcessesTest {
     }
 
     private void start(long budget, int warm, int finishedGraceSeconds) throws Exception {
+        start(budget, warm, finishedGraceSeconds, 8);
+    }
+
+    private void start(long budget, int warm, int finishedGraceSeconds, int maxGames) throws Exception {
         Map<GameProcesses.Size, Integer> heaps = new EnumMap<>(GameProcesses.Size.class);
         heaps.put(GameProcesses.Size.DUEL, 512);
         heaps.put(GameProcesses.Size.TABLE, 768);
@@ -80,12 +84,12 @@ class GameProcessesTest {
             warmEach.put(size, size == GameProcesses.Size.COURT ? 0 : warm);
         }
         var settings = new GameProcesses.Settings(GameProcesses.Settings.launcher(), Path.of("").toAbsolutePath(),
-            heaps, 256, budget, warmEach, 8, false, List.of(),
+            heaps, 256, budget, warmEach, maxGames, false, List.of(),
             Map.of("CD_ENGINE_DECKS", SeatChecks.DECKS.toAbsolutePath().toString(),
                 "CD_ENGINE_RECORDINGS", recordings.toString(),
                 "CD_ENGINE_AI_THREADS", "2"),
             TimeUnit.SECONDS.toMillis(finishedGraceSeconds), TimeUnit.SECONDS.toMillis(60));
-        var games = new HumanGames(SeatChecks.DECKS, 8, recordings, TimeUnit.HOURS.toMillis(24));
+        var games = new HumanGames(SeatChecks.DECKS, maxGames, recordings, TimeUnit.HOURS.toMillis(24));
         var engine = new Engine(PIN, false, () -> CARDS, EngineServerTest::echo, games, false, SERVICE_TOKEN);
         processes = new GameProcesses(settings);
         engine.isolate(processes);
@@ -319,6 +323,27 @@ class GameProcessesTest {
             Thread.sleep(500);
         }
         assertEquals(201, again.statusCode(), again.body());
+    }
+
+    @Test
+    void aGameThatIsOverNoLongerTakesASlot() throws Exception {
+        // Room for many, slots for one: the slot frees as soon as the game is over, though its
+        // process stays a minute for its end to be read.
+        start(16_384, 0, 60, 1);
+        String first = UUID.randomUUID().toString();
+        assertEquals(201, service("POST", GAMES, null, duel(91L, first)).statusCode());
+        var busy = service("POST", GAMES, null, duel(92L, UUID.randomUUID().toString()));
+        assertEquals(429, busy.statusCode(), busy.body());
+        assertTrue(json(busy).get("message").getAsString().startsWith("At most 1 games run at once"));
+        assertEquals(200, service("POST", GAMES + "/" + first + "/close", null, "{}").statusCode());
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+        HttpResponse<String> next;
+        while ((next = service("POST", GAMES, null, duel(93L, UUID.randomUUID().toString()))).statusCode() == 429) {
+            assertTrue(System.nanoTime() < deadline, "the finished game kept its slot");
+            Thread.sleep(500);
+        }
+        assertEquals(201, next.statusCode(), next.body());
+        assertTrue(processes.processForTest(first).isPresent(), "its process is still there to read");
     }
 
     @Test

@@ -318,7 +318,7 @@ final class GameProcesses implements AutoCloseable {
     Claim claim(Size size) throws InterruptedException {
         GameProcess process;
         synchronized (this) {
-            if (byGame.size() + claimedWithoutGame() >= settings.maxGames) {
+            if (running() + claimedWithoutGame() >= settings.maxGames) {
                 refusedBusy.incrementAndGet();
                 return new Claim(null, Refusal.BUSY);
             }
@@ -341,6 +341,15 @@ final class GameProcesses implements AutoCloseable {
             return new Claim(null, Refusal.FAILED);
         }
         return new Claim(process, null);
+    }
+
+    /**
+     * Caller holds the lock. Games running now: a game that is over no longer counts, though its
+     * process stays a while for its end to be read (as {@link HumanGames#active} counts).
+     */
+    private long running() {
+        return live.stream().filter(process -> process.gameId != null && !process.retiring && !finished(process))
+            .count();
     }
 
     /** Caller holds the lock. Claimed processes still waiting for their create or attach to be answered. */

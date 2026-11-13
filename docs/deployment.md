@@ -26,12 +26,12 @@ browser ──HTTPS──▶ public IP 136.63.10.16 ──UniFi forwards 80/443�
 | --- | --- |
 | Host | Hathor (Proxmox VE), VLAN 50 like the other TSH sites |
 | OS | Debian 13 (trixie), netinst with only "SSH server" and "standard system utilities" |
-| Resources | 16 vCPU, 32 GB RAM, 512 GB on one disk (room for Scryfall data and growth), VirtIO NIC, QEMU guest agent |
+| Resources | 32 vCPU, 96 GB RAM (as of 2026-11-12; 16 vCPU and 32 GB when set up), 512 GB on one disk (room for Scryfall data and growth), VirtIO NIC, QEMU guest agent |
 | Hostname and address | `commanderduels`, 10.10.50.57 (fixed in UniFi) |
 | Login | `sphinx`, by SSH key. The deploying computer uses its own key, `~/.ssh/commander_duels_deploy`, through the `duels` entry in its `~/.ssh/config` |
 | Ports forwarded from the internet | None. The proxy reaches port 8080 over the LAN |
 
-Sizing (since v0.4.1, the owner's limit for the beta): the live site runs at most 64 games at once (`CD_GAMES_MAX`, 1–64; the engine's start line says how many, "at most 64 games at once"). The engine gets the same number of slots (`CD_ENGINE_MAX_GAMES` follows `CD_GAMES_MAX` in the production Compose file), a 12 GB heap and a 16 GB container limit. PostgreSQL, the API, the worker and the web container are small. The development Compose file keeps two games and a 1.5 GB limit. From v0.1.1 to v0.4.0 the site ran six games, with a 3 GB heap and a 4 GB limit.
+Sizing (since v0.4.1, the owner's limit for the beta): the live site runs at most 64 games at once (`CD_GAMES_MAX`, 1–64; the engine's start line says how many, "at most 64 games at once"). The engine gets the same number of slots (`CD_ENGINE_MAX_GAMES` follows `CD_GAMES_MAX` in the production Compose file). Since v0.9.10 each game runs in a Java process of its own and the engine admits a game only when its memory fits: the container's limit is 48 GB (`CD_ENGINE_MEMORY`), of which the games may reserve 44 GB (`CD_ENGINE_GAME_MEMORY_MB`), enough for 22 duels or 14 Commander tables at once, and the front process has a 1.5 GB heap ([isolation](engine/isolation.md#memory-and-admission)). The VM has 96 GB (the owner, 2026-11-12). Until v0.9.9 one process had a 12 GB heap and a 16 GB container limit. PostgreSQL, the API, the worker and the web container are small. The development Compose file keeps two games and a 1.5 GB limit. From v0.1.1 to v0.4.0 the site ran six games, with a 3 GB heap and a 4 GB limit.
 
 The sizing comes from a load test on the development machine (v0.4.1, [verification](verification.md#v041)): 64 practice games started together through the API, half Legacy against one bot and half Commander against three, bot skill 1 to 3, with the engine held to 16 CPUs like the VM. The scripted players answer at once, so the bots think nearly all the time: a heavier load than people playing.
 
