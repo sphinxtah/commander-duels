@@ -1232,15 +1232,17 @@ public final class EngineServer {
      * compiles their code, which took 7 to 9 seconds before a player's first question (measured on
      * two cores), against half a second for a game after it. The warm-up game is never registered,
      * recorded or seen; it is closed at its first question. A process kept warm pays this before any
-     * game is given it.
+     * game is given it. Since v0.9.11 it plays a recent game's decks ({@link #recentRequest}).
      */
     static void warmUp(String size, Path decks, Path recordings) {
         long started = System.nanoTime();
-        HumanGameRequest request = recentRequest(size, recordings);
+        // A duel's process warms up with a Legacy duel, any other with a four-seat Commander game:
+        // the formats most of their games are.
+        GameFormat format = "duel".equals(size) ? GameFormat.LEGACY : GameFormat.COMMANDER;
+        HumanGameRequest request = recentRequest(size, format, recordings);
         String source = "the decks of a recent game";
         if (request == null) {
             source = "the engine's own decks";
-            GameFormat format = "duel".equals(size) ? GameFormat.LEGACY : GameFormat.COMMANDER;
             List<String> names = format.decks();
             List<HumanGameRequest.Seat> seats = new ArrayList<>();
             seats.add(new HumanGameRequest.Seat(HumanGameRequest.HUMAN, names.get(0)));
@@ -1270,15 +1272,18 @@ public final class EngineServer {
     }
 
     /**
-     * The request of the newest recorded game of a size, of the last fifty recordings: its decks
-     * warm a process the way the next game will need (the player's own deck, the bots' starter
-     * decks), which the engine's small fixture decks did not (v0.9.11). A four-deck Commander
-     * table's first game, on two cores: 4.2 s in a process warmed with the fixture decks, 2.5 s in
-     * one warmed with a recent game's, 0.5 to 1.3 s in a process that had played a game. Read from
+     * The request of the newest recorded game of a size and format, of the last fifty recordings:
+     * its decks warm a process the way the next game will need (the player's own deck, the bots'
+     * starter decks), which the engine's small fixture decks did not (v0.9.11). Of the format the
+     * fixture game was, never another: a table's process warmed with a Two-Headed Giant game, the
+     * newest of its size, kept a Commander table's first view waiting five to seven seconds in
+     * the hosted browser journeys. A four-deck Commander
+     * table's first game, on two cores: 4.2 s in a process warmed with the fixture decks, 2.5 to
+     * 3.0 s in one warmed with a recent game's, 0.5 to 1.4 s in a process that had played a game. Read from
      * the manifest alone, never shown; null when there is none that parses, is of the size, and
      * names only cards this engine has.
      */
-    static HumanGameRequest recentRequest(String size, Path recordings) {
+    static HumanGameRequest recentRequest(String size, GameFormat format, Path recordings) {
         if (recordings == null || !java.nio.file.Files.isDirectory(recordings)) {
             return null;
         }
@@ -1295,7 +1300,8 @@ public final class EngineServer {
             try {
                 Recording.Manifest manifest = Recording.at(folder).manifest();
                 HumanGameRequest request = HumanGameRequest.parse(manifest.request(), () -> 1L, true);
-                if (!GameProcesses.Size.of(request.format().id(), request.seats().size()).label().equals(size)
+                if (request.format() != format
+                        || !GameProcesses.Size.of(request.format().id(), request.seats().size()).label().equals(size)
                         || request.humanSeats() == 0 || !request.unknownCards().isEmpty()) {
                     continue;
                 }
