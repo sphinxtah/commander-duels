@@ -83,10 +83,10 @@ services:
       # card database with H2 AUTO_SERVER, which starts a TCP listener; bind it to loopback so other
       # services cannot reach it (the games' processes read the cards through it).
       JDK_JAVA_OPTIONS: "-Xms256m -Xmx768m -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError -Dh2.bindAddress=127.0.0.1"
-      # The games' processes together: a duel reserves 2 GB, a table 3 GB, a court 4.5 GB. None is
-      # kept warm here, so a game waits about two seconds for its process to start.
+      # The games' processes together: a duel reserves 2 GB, a table 3 GB, a court 4.5 GB. One
+      # duel's and one table's process are kept started, as on the live site, so a game starts at
+      # once (a cold process takes two seconds or more, which the browser journeys' clocks felt).
       CD_ENGINE_GAME_MEMORY_MB: ${CD_ENGINE_GAME_MEMORY_MB:-9216}
-      CD_ENGINE_GAME_WARM: "0"
     # Every service game's recording (v0.9.9, docs/engine/recovery.md): restart the engine, or
     # the API, under a game and the game goes on.
     volumes: ["engine_recordings:/var/lib/commander-duels/recordings"]

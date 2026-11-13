@@ -37,7 +37,7 @@ Each process has its own heap, so a game that fills it ends its own process (`-X
 
 **Admission.** A game is admitted only when its process's reservation fits what is left of the budget (`CD_ENGINE_GAME_MEMORY_MB`) and fewer than `CD_ENGINE_MAX_GAMES` games run. To make room, the processes of games that are over are ended first, then warm processes; and a game that is over no longer counts against `CD_ENGINE_MAX_GAMES`, though its process stays a moment for its end to be read (`aGameThatIsOverNoLongerTakesASlot`). Otherwise it is refused (429 `games_busy`, "The tables are full; try again in a minute.", `Retry-After: 60`), and nothing that runs is touched. The reservation is the most a process can hold, not what it usually holds, so the budget can never be overrun: the container's memory limit is never reached by games, and so never kills the front process and every game with it.
 
-**On the live site** (`deploy/compose.yaml`): the container's limit is 48 GB of the VM's 96 (`CD_ENGINE_MEMORY`), the front process has a 1.5 GB heap, and the games may reserve 44 GB: 22 duels, or 14 Commander tables, or 9 courts at once, or any mix of them. Each limit is a setting in the VM's `.env`. The development stack (`compose.yaml`) gives the engine 10 GB and its games 9, with no warm process.
+**On the live site** (`deploy/compose.yaml`): the container's limit is 48 GB of the VM's 96 (`CD_ENGINE_MEMORY`), the front process has a 1.5 GB heap, and the games may reserve 44 GB: 22 duels, or 14 Commander tables, or 9 courts at once, or any mix of them. Each limit is a setting in the VM's `.env`. The development stack (`compose.yaml`) gives the engine 10 GB and its games 9, with the same warm processes.
 
 ### Measured (v0.9.10, the cloud workspace: two cores)
 
