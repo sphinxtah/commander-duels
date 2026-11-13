@@ -1,5 +1,5 @@
-A card database other processes read while one serves it (Commander Duels v0.9.10, game isolation).
-Every format.
+A card database other processes read while one serves it, and a read-only copy of it a process opens
+on its own (Commander Duels v0.9.10 and v0.9.11, game isolation). Every format.
 
 Reason: since v0.9.10 each game runs in a Java process of its own (docs/engine/isolation.md). The
 engine's front process opens the cards database first; XMage opens it with AUTO_SERVER, so every game
@@ -11,6 +11,14 @@ took the schema's lock, and the other's query failed ("can't find any cards") or
 started with -Dxmage.cardsDatabase.shared=true takes the database as the front process opened it:
 no checks, no table created, nothing written. The front process itself, and every engine that is not
 isolated, opens it as before.
+
+v0.9.11: reading the cards through the front process cost a four-deck Commander table four to five
+seconds of its start on two cores (each card of each deck looked up over loopback, one query at a
+time), and three times that on the live VM's slower cores. A process started with
+-Dxmage.cardsDatabase.snapshot=<folder> as well opens the cards database in that folder instead: a
+copy the front process made before it opened its own, opened read-only and with no server
+(ACCESS_MODE_DATA=r, FILE_LOCK=NO), so every lookup stays in the process. Other databases, and a
+process without the property, open as before.
 
 Remove when: XMage opens its repositories without writing, or the engine stops sharing one database
 between processes.
@@ -44,7 +52,7 @@ index 68d564fb..f92ebb62 100644
          } catch (SQLException e) {
              Logger.getLogger(CardRepository.class).error("Error creating card repository - " + e, e);
 diff --git a/Mage/src/main/java/mage/cards/repository/DatabaseUtils.java b/Mage/src/main/java/mage/cards/repository/DatabaseUtils.java
-index 1c94a2a3..a3005b39 100644
+index 1c94a2a3..28efe9a2 100644
 --- a/Mage/src/main/java/mage/cards/repository/DatabaseUtils.java
 +++ b/Mage/src/main/java/mage/cards/repository/DatabaseUtils.java
 @@ -18,6 +18,15 @@ public class DatabaseUtils {
@@ -63,6 +71,26 @@ index 1c94a2a3..a3005b39 100644
      /**
       * Prepare JDBC connection string and setup additional params for H2 databases
       *
+@@ -27,9 +36,16 @@ public class DatabaseUtils {
+     public static String prepareH2Connection(String dbName, boolean improveCaches) {
+         // example: jdbc:h2:file:./db/cards.h2;AUTO_SERVER=TRUE;IGNORECASE=TRUE
+         String res = String.format("jdbc:h2:file:./db/%s", dbName);
+-
+-        // shared params
+-        res += ";AUTO_SERVER=TRUE"; // open database in mix mode (first open by new thread, second open by new jvm-process)
++        String snapshot = System.getProperty("xmage.cardsDatabase.snapshot", "");
++        if (isSharedReadOnly() && !snapshot.isEmpty() && DB_NAME_CARDS.equals(dbName)) {
++            // Commander Duels, patch 0020: a read-only copy of the cards database, opened in this
++            // process with no server, so every lookup stays in the process.
++            res = String.format("jdbc:h2:file:%s/%s", snapshot, dbName);
++            res += ";ACCESS_MODE_DATA=r;FILE_LOCK=NO";
++        } else {
++            // shared params
++            res += ";AUTO_SERVER=TRUE"; // open database in mix mode (first open by new thread, second open by new jvm-process)
++        }
+         res += ";IGNORECASE=TRUE"; // ignore char case for text searching
+ 
+         // additional params
 diff --git a/Mage/src/main/java/mage/cards/repository/ExpansionRepository.java b/Mage/src/main/java/mage/cards/repository/ExpansionRepository.java
 index ddee9612..9400faa5 100644
 --- a/Mage/src/main/java/mage/cards/repository/ExpansionRepository.java

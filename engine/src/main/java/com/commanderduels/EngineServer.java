@@ -189,6 +189,15 @@ public final class EngineServer {
             } else {
                 respond(exchange, 200, processes != null ? processes.metrics() : inlineMetrics(games));
             }
+        } else if (rest.equals("process/release") && engine.gameProcess()) {
+            // A game's own process, between games (v0.9.11): its games over, it takes the next.
+            if (!exchange.getRequestMethod().equals("POST")) {
+                methodNotAllowed(exchange, "POST");
+            } else if (games.releaseFinished()) {
+                respond(exchange, 200, Map.of("released", true));
+            } else {
+                respond(exchange, 409, Map.of("code", "game_running"));
+            }
         } else if (rest.equals("process") && engine.gameProcess()) {
             // A game's own process, to its front process (v0.9.10): its game, memory and bots.
             Map<String, Object> status = new LinkedHashMap<>();
@@ -1196,6 +1205,10 @@ public final class EngineServer {
         System.out.println(implementations.summary() == null ? "No implementation list"
             : "Implementation list " + implementations.summary().build() + ": "
                 + implementations.summary().cards() + " cards");
+        if (processes != null) {
+            // The game processes' copy of the card database, made while the file is at rest.
+            processes.prepareCards();
+        }
         Thread loader = engine.startLoading();
         if (processes != null) {
             // Game processes read the cards through this process's database: they start once it is open.
@@ -1219,19 +1232,26 @@ public final class EngineServer {
      * compiles their code, which took 7 to 9 seconds before a player's first question (measured on
      * two cores), against half a second for a game after it. The warm-up game is never registered,
      * recorded or seen; it is closed at its first question. A process kept warm pays this before any
-     * game is given it.
+     * game is given it. Since v0.9.11 it plays a recent game's decks ({@link #recentRequest}).
      */
-    static void warmUp(String size, Path decks) {
+    static void warmUp(String size, Path decks, Path recordings) {
         long started = System.nanoTime();
+        // A duel's process warms up with a Legacy duel, any other with a four-seat Commander game:
+        // the formats most of their games are.
         GameFormat format = "duel".equals(size) ? GameFormat.LEGACY : GameFormat.COMMANDER;
-        List<String> names = format.decks();
-        List<HumanGameRequest.Seat> seats = new ArrayList<>();
-        seats.add(new HumanGameRequest.Seat(HumanGameRequest.HUMAN, names.get(0)));
-        int count = format == GameFormat.LEGACY ? 2 : 4;
-        for (int seat = 1; seat < count; seat++) {
-            seats.add(new HumanGameRequest.Seat(HumanGameRequest.BOT, names.get(seat % names.size())));
+        HumanGameRequest request = recentRequest(size, format, recordings);
+        String source = "the decks of a recent game";
+        if (request == null) {
+            source = "the engine's own decks";
+            List<String> names = format.decks();
+            List<HumanGameRequest.Seat> seats = new ArrayList<>();
+            seats.add(new HumanGameRequest.Seat(HumanGameRequest.HUMAN, names.get(0)));
+            int count = format == GameFormat.LEGACY ? 2 : 4;
+            for (int seat = 1; seat < count; seat++) {
+                seats.add(new HumanGameRequest.Seat(HumanGameRequest.BOT, names.get(seat % names.size())));
+            }
+            request = new HumanGameRequest(1L, format, seats, 1, 2, 60);
         }
-        var request = new HumanGameRequest(1L, format, seats, 1, 2, 60);
         var game = new HumanGame("warm-up-" + java.util.UUID.randomUUID(), request, decks, done -> {},
             HumanGame.Hooks.NONE);
         try {
@@ -1247,8 +1267,50 @@ public final class EngineServer {
         } finally {
             game.close("warm_up");
         }
-        System.out.println("Warmed up with a " + format.id() + " game in "
+        System.out.println("Warmed up with a " + request.format().id() + " game of " + source + " in "
             + java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) + " ms");
+    }
+
+    /**
+     * The request of the newest recorded game of a size and format, of the last fifty recordings:
+     * its decks warm a process the way the next game will need (the player's own deck, the bots'
+     * starter decks), which the engine's small fixture decks did not (v0.9.11). Of the format the
+     * fixture game was, never another: a table's process warmed with a Two-Headed Giant game, the
+     * newest of its size, kept a Commander table's first view waiting five to seven seconds in
+     * the hosted browser journeys. A four-deck Commander
+     * table's first game, on two cores: 4.2 s in a process warmed with the fixture decks, 2.5 to
+     * 3.0 s in one warmed with a recent game's, 0.5 to 1.4 s in a process that had played a game. Read from
+     * the manifest alone, never shown; null when there is none that parses, is of the size, and
+     * names only cards this engine has.
+     */
+    static HumanGameRequest recentRequest(String size, GameFormat format, Path recordings) {
+        if (recordings == null || !java.nio.file.Files.isDirectory(recordings)) {
+            return null;
+        }
+        List<Path> folders;
+        try (var stream = java.nio.file.Files.list(recordings)) {
+            folders = stream.filter(java.nio.file.Files::isDirectory)
+                .sorted(java.util.Comparator.comparingLong((Path folder) -> folder.toFile().lastModified()).reversed())
+                .limit(50)
+                .toList();
+        } catch (IOException | RuntimeException e) {
+            return null;
+        }
+        for (Path folder : folders) {
+            try {
+                Recording.Manifest manifest = Recording.at(folder).manifest();
+                HumanGameRequest request = HumanGameRequest.parse(manifest.request(), () -> 1L, true);
+                if (request.format() != format
+                        || !GameProcesses.Size.of(request.format().id(), request.seats().size()).label().equals(size)
+                        || request.humanSeats() == 0 || !request.unknownCards().isEmpty()) {
+                    continue;
+                }
+                return request;
+            } catch (Recording.Unusable | JsonRequest.Invalid | RuntimeException e) {
+                // the next one
+            }
+        }
+        return null;
     }
 
     /**
@@ -1273,8 +1335,10 @@ public final class EngineServer {
             System.out.println(GameProcesses.FAILED_LINE);
             System.exit(1);
         }
+        String recordingsFolder = System.getenv().getOrDefault("CD_ENGINE_RECORDINGS", "").strip();
         warmUp(System.getenv().getOrDefault("CD_ENGINE_GAME_SIZE", ""),
-            Path.of(System.getenv().getOrDefault("CD_ENGINE_DECKS", "decks")));
+            Path.of(System.getenv().getOrDefault("CD_ENGINE_DECKS", "decks")),
+            recordingsFolder.isEmpty() ? null : Path.of(recordingsFolder));
         System.out.println(GameProcesses.READY_LINE);
         // The main thread stays, so the process lives (the server's threads are daemons), until its
         // front process ends: nothing is sent on standard input, which ends with the front process.

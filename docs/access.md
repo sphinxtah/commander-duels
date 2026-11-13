@@ -1,18 +1,18 @@
 # Access, consent and temporary entitlement (v0.9.10)
 
-One table of grants for every kind of access one account gives another, for a while: the specification's §8, the foundation v1.0.0's deck lending, spectators, coaching, replay sharing and sandbox, and v0.9.11's playgroups and league pools, are built on (`api/access.py`, `access_grants`, migration 0046).
+One table of grants for every kind of access one account gives another, for a while: the specification's §8, the foundation v1.0.0's deck lending, spectators, coaching, replay sharing and sandbox, and v0.9.12's playgroups and league pools, are built on (`api/access.py`, `access_grants`, migration 0046).
 
 ## A grant
 
 | Field | What it holds |
 | --- | --- |
 | `grantor_id`, `subject_id` | Who gives, and to whom: two accounts |
-| `resource_kind`, `resource_id` | What: `deck` (a deck, to play), `spectator` (a game, to watch), `replay` (a finished game, to replay), `hand` (a seat's hand, to coach), `group`, `pool` (v0.9.11), `sandbox` (cards, for testing; no resource) |
+| `resource_kind`, `resource_id` | What: `deck` (a deck, to play), `spectator` (a game, to watch), `replay` (a finished game, to replay), `hand` (a seat's hand, to coach), `group`, `pool` (v0.9.12), `sandbox` (cards, for testing; no resource) |
 | `scope` | What within it: the seat (`{"seat": 0}`) for a replay or a hand |
 | `consent` | `given` (the grantor's own to give: their game, their seat's view); or `offered`, then `accepted` or `declined` by the subject (a deck lent, a group, a pool) |
 | `expires_at`, `revoked_at`, `revoked_by` | When it ends, and who ended it |
 
-Who may give what: a deck, its owner; a game to watch, one of its players; a seat's view (a replay, a hand), that seat's player alone; the sandbox's cards, SysOp alone. Never to oneself, never between two accounts one of which blocks the other, never to or from an account that is not active, never ending before it begins. Groups and pools are refused in words (`not_available`) until v0.9.11 makes them. Every change (given, offered, accepted, declined, revoked) is audited (`access.<change>`).
+Who may give what: a deck, its owner; a game to watch, one of its players; a seat's view (a replay, a hand), that seat's player alone; the sandbox's cards, SysOp alone. Never to oneself, never between two accounts one of which blocks the other, never to or from an account that is not active, never ending before it begins. Groups and pools are refused in words (`not_available`) until v0.9.12 makes them. Every change (given, offered, accepted, declined, revoked) is audited (`access.<change>`).
 
 ## When it works
 
@@ -23,7 +23,7 @@ Who may give what: a deck, its owner; a game to watch, one of its players; a sea
 | Expiry, revocation, a block, an account disabled or deleted | No new access from that moment: the next request is refused |
 | A game already started with a lent deck | Plays on as it started: the game holds the deck revision it started with (`game_seats.deck_revision_id`), so editing the deck or revoking the loan changes nothing in it |
 | A card the sandbox lends | Never a `LibraryGrant`: the library, the shop and the auction house read libraries only, so it can reach neither a collection nor an auction |
-| Group removal, invitation revocation (v0.9.11) | A revocation, as above |
+| Group removal, invitation revocation (v0.9.12) | A revocation, as above |
 
 ## Read where access is decided
 

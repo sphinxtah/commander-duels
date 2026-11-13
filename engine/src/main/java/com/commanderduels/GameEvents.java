@@ -141,10 +141,9 @@ final class GameEvents {
     synchronized void attach(Game game, List<UUID> seatIds, ObjectRefs refs) {
         this.seatIds = List.copyOf(seatIds);
         this.refs = refs;
-        boolean tapped = game.getState().getWatcher(Tap.class) != null;
-        if (!tapped) {
-            game.getState().addWatcher(new Tap(gameId));
-        }
+        // Watchers.add keeps a tap already there (a game restored from a checkpoint carries its own);
+        // looking it up first logged an error with a stack trace at the start of every game.
+        game.getState().addWatcher(new Tap(gameId));
         LIVE.put(gameId, this);
     }
 
