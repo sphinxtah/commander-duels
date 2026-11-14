@@ -303,6 +303,34 @@ Over the three runs the references won 4 of 18 (22%), every one with the loaner 
 
 The court has no target of its own. A player reaches it with thirteen wardens' decks to choose from and not a starter deck, and the live court also plays the owner's incarnation, which this does not measure. Whether it is as hard as it should be is the owner's to say once he has played it with the new allies.
 
+## No Power Nine, no Reserved List (v0.9.12)
+
+The owner, 2026-11-13: "I also want the decks for the campaign opponents to NOT have any copies of the power 9 or other alpha/beta/ultra expensive cards." A warden's deck is won whole, for good and sellable ([the spoils](#the-spoils)), so a deck that held them gave every player who finished the campaign the game's scarcest cards: ward 14's 99 held eight of the Power Nine and all ten original dual lands, and the court's two gifted decks five more of the Nine between them.
+
+**The rule** (his choice among three): no deck a campaign opponent plays holds one of the Power Nine or a card of the Reserved List, Wizards of the Coast's list of cards it has promised never to print again. Strong cards that are not reserved stay ("I still want the higher level wards to produce some awesome rares"): Mana Crypt, Mana Drain, Force of Will, the tutors. It covers every ward's deck with the commanders it may be led by, the two decks the court's Generals play and give, and the owner's private finale.
+
+**The list** is `content/reserved-list.json`: the 571 cards Scryfall marks as reserved (`is:reserved`), read once on 2026-11-13 and committed, with the Power Nine named apart (all nine are reserved). `python scripts/reserved_list.py` reads it again; `python scripts/reserved_list.py --check` names every listed card a deck holds. `tests/test_campaign.py` (`test_no_opponent_plays_a_power_nine_or_reserved_list_card`) fails on a listed card on every push.
+
+**What gave way.** Forty-two cards in eight wards' decks and the court's two gifts. A dual land gives way to the nearest land of its pair the deck does not already hold: the shock land first (the same basic land types, so the fetch lands still find it), then the check land, the pain land, the fast land, the filter land.
+
+| Deck | Out | In |
+|---|---|---|
+| 5 Oko | Tropical Island | Flooded Grove |
+| 6 Xenagos | Taiga | Copperline Gorge |
+| 7 Tezzeret | Underground Sea | Sunken Ruins |
+| 9 Ashiok | Underground Sea | Sunken Ruins |
+| 10 Ob Nixilis | Badlands | Graven Cairns |
+| 11 Geyadrone Dihada | Underground Sea, Volcanic Island, Badlands | Drowned Catacomb, Sulfur Falls, Dragonskull Summit |
+| 12 Nicol Bolas | Underground Sea, Volcanic Island, Badlands | Drowned Catacomb, Sulfur Falls, Dragonskull Summit |
+| 14 The Sphinx | The ten dual lands | The ten shock lands, pair for pair |
+| 14 The Sphinx | Black Lotus; Mox Sapphire, Jet, Pearl, Ruby, Emerald | Jeweled Lotus; Mox Opal, Mox Amber, Lotus Petal, Fellwar Stone, Bloom Tender |
+| 14 The Sphinx | Ancestral Recall, Time Walk, Grim Monolith | Jace, the Mind Sculptor, Time Warp, Coalition Relic |
+| Nicol Bolas's Gift (the court) | Black Lotus; Mox Sapphire, Jet, Ruby; Ancestral Recall, Time Walk | Jeweled Lotus; Mox Amber, Mox Opal, Lotus Petal; Jace, the Mind Sculptor, Time Warp |
+| Nicol Bolas's Gift (the court) | Underground Sea, Volcanic Island, Badlands | Drowned Catacomb, Sulfur Falls, Dragonskull Summit |
+| Liliana's Gift (the court) | Black Lotus, Mox Jet, Grim Monolith | Jeweled Lotus, Mox Amber, Jet Medallion |
+
+Players who already won a deck keep the deck and the cards they won, as in v0.9.3 and v0.9.8; a first win from now on gives the deck as it is now. The starter decks are not an opponent's: each still holds its one Revised dual land, which is most of its price ([the shop](shop.md#starter-decks-v042)).
+
 ## Content
 
 `content/campaign.json`: the campaign's ID and content version (`final_concordance_v1`, 1), the training seed, the training hand (v0.9.1), the loaner deck, the six chapters with their rewards, and the fourteen encounters (number, opponent's roster ID, name, title, tier, place, seal, the bots' skill, commander and 99 cards; the finale's commander null, its stand-in and its private content's name). Every card of the thirteen decks and the loaner was checked against XMage's card classes at the pinned commit (`eb69d05b`) when they were written, and the decks rebuilt in v0.9.3 against XMage's card database and their commanders' colour identities, and on the live site's catalog; the engine refuses a game naming a card it lacks (`unknown_cards`). `tests/test_campaign.py` checks the decks' counts, singletons and commanders, and that neither custom card is named.
