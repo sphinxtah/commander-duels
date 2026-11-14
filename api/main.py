@@ -26,11 +26,13 @@ from api import (
     decks,
     economy,
     engine_cards,
+    entitlements,
     events,
     games,
     how_to_play,
     lobby,
     matches,
+    policies,
     progression,
     quests,
     queues,
@@ -387,6 +389,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(tutorial.router)
     app.include_router(custom_cards.router)
     app.include_router(economy.router)
+    app.include_router(policies.router)
+    app.include_router(entitlements.router)
     app.include_router(shop.router)
     app.include_router(auctions.router)
     app.include_router(reports.router)

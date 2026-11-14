@@ -1808,6 +1808,10 @@ class DailyQuest(Base):
     completed_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     policy: Mapped[str] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    # A second quest that completes the slot as well (v0.9.12, the quest_alternatives policy):
+    # {"quest": its id, "target": its count}, as they were when the board was drawn; none on a
+    # board drawn with the policy off.
+    alternative: Mapped[dict[str, object] | None] = mapped_column(JsonType)
 
 
 class QuestBoard(Base):
@@ -2104,3 +2108,35 @@ class CampaignReward(Base):
     reward: Mapped[str] = mapped_column(String(64))
     game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class Entitlement(Base):
+    """Functional access to a card, bound to an account (v0.9.12, api/entitlements.py;
+    docs/economy.md): the account builds with the card and does not own it. Never a library
+    grant, so it is in no print run, cannot be listed at the auction house and has no edition or
+    finish of its own: a deck holds it in the card's default printing. Its kinds: staple, a card
+    of the starter-staple pool the account claimed with a pick; staff, one SysOp gave. Kept with
+    the account: a reset leaves the rows and the library counts those made after it, as it does
+    grants, and revoked_at ends one."""
+
+    __tablename__ = "entitlements"
+    __table_args__ = (
+        CheckConstraint("kind IN ('staple', 'staff')", name="ck_entitlements_kind"),
+        CheckConstraint("copies > 0", name="ck_entitlements_copies"),
+        Index("ix_entitlements_user_id_kind", "user_id", "kind"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    kind: Mapped[str] = mapped_column(String(16))
+    card_id: Mapped[UUID] = mapped_column(ForeignKey("card_concepts.id"))
+    copies: Mapped[int] = mapped_column(SmallInteger, default=1)
+    # Unique per fact, so a retry claims once: staple:<account>:<card>, staff:<id>; with a
+    # reset's time after one.
+    key: Mapped[str] = mapped_column(String(160), unique=True)
+    # The rule it was made under, recorded with it (PROG05).
+    policy: Mapped[str] = mapped_column(String(32))
+    reason: Mapped[str | None] = mapped_column(Text)
+    actor_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    revoked_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    revoked_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))

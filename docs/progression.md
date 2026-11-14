@@ -43,6 +43,7 @@ A player's library is what they may build from (PROG01's earned policy, DECK08):
 | The two starter decks chosen at onboarding | every copy of every card in both | the printing the owner chose for each card | for good |
 | Decks saved before v0.3.1 (migration 0007) | per card, the most any one of the player's decks held outside its maybeboard | that deck's printings (migration 0025) | for good |
 | The alliance | 4 of each of the Planeswalker's cards | each card's default printing | while allied |
+| Functional access (v0.9.12) | the five basic lands under the `functional_basics` policy; one of each starter staple claimed | each card's default printing | while the policy is on; a staple for good ([the economy](economy.md#functional-access-is-not-ownership)) |
 | Basic lands | without limit until v0.6.0; since then only those granted, by packs and starter decks ([below](#the-library-by-finish-and-basic-lands-v060)) | every edition until v0.6.0; since then the printing granted | always |
 | Packs (v0.4.0) | the cards pulled | the printing pulled (and since v0.6.0 its finish) | for good |
 | Tivit's Auction House (v0.6.0) | the copies bought, less the player's own on live or sold listings | the printing and finish sold | for good |

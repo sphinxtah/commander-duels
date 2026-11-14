@@ -42,7 +42,7 @@ import random
 import secrets
 import time
 from collections import defaultdict
-from collections.abc import AsyncIterator, Callable, Coroutine, Hashable
+from collections.abc import AsyncIterator, Callable, Coroutine, Hashable, Mapping
 from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -62,7 +62,7 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from api import events as events_module
-from api import kings_table, modes
+from api import farming, kings_table, modes
 from api.auth import INPUT_ERRORS
 from api.config import Settings
 from api.custom_play import custom_in_seats
@@ -450,6 +450,9 @@ class LiveSeat:
     # theirs, not a loss.
     conceding: bool = False
     removing: bool = False
+    # Choices the engine took from the seat's player (v0.9.12): none in a game that was played
+    # is the idle signal of api/farming.py.
+    commands: int = 0
 
 
 @dataclass(eq=False)
@@ -1012,6 +1015,7 @@ class GameHub:
                     result,
                     content_dir,
                     game.owner_closed,
+                    {seat.seat: seat.commands for seat in game.seats.values()},
                 ),
                 what,
             )
@@ -1339,6 +1343,8 @@ class GameHub:
             if conceding:
                 seat.conceding = False
         reply(status, body)
+        if status == 200 and not conceding:
+            seat.commands += 1
         if status == 200 and conceding:
             self.seat_left(game, seat, "conceded")
 
@@ -1494,6 +1500,7 @@ def record_end(
     result: dict[str, Any] | None,
     content_dir: str | None = None,
     owner_closed: bool = False,
+    activity: Mapping[int, int] | None = None,
 ) -> None:
     """Records how the game ended and, in the same transaction, the win of a player's seat that
     won it (api/progression.py), the tokens it pays (api/economy.py), and since v0.5.0 the
@@ -1503,7 +1510,10 @@ def record_end(
     Since v0.8.0 a campaign duel's end is the campaign's instead (api/campaign.py): no win and no
     quests, and for a win the encounter and its rewards (a first win's spoils: the warden's deck
     and tokens), in this same transaction. owner_closed says the game's own player closed it
-    (v0.9.8), which the campaign's court counts as the court lost."""
+    (v0.9.8), which the campaign's court counts as the court lost. activity is the choices each
+    seat's player sent, when the API followed the game to its end (v0.9.12): with the result it
+    gives the game's farming signals (api/farming.py), kept with the game, and what the farming
+    policy withholds for them, which is nothing until it is enforced."""
     # Imported here, as above; api.matches and api.campaign import this module.
     from api import campaign, matches
     from api.awards import settle
@@ -1523,7 +1533,8 @@ def record_end(
                 # A campaign duel is the campaign's whatever it was made as.
                 game.mode = modes.mode_of(game.kind, link is not None)
             rules = modes.eligibility(game.mode, result=game.result is not None)
-            game.eligibility = rules.record()
+            observed = farming.observe(db, game, activity)
+            game.eligibility = observed.record(rules.record())
             # A game played with passive bots (the testing switch of SysOp, v0.8.6, and of
             # administrators, v0.8.7) counts as any other since v0.9.7 (the owner, 2026-11-10:
             # "Administrators should not have this restriction"): its win, tokens, quests and
@@ -1537,8 +1548,8 @@ def record_end(
                 if rules.earns("wins"):
                     count_win(db, game)
                 if rules.earns("tokens"):
-                    pay_game(db, game)
-                settle(db, game, rules)
+                    pay_game(db, game, observed.without("tokens"))
+                settle(db, game, rules, observed.without("quests"))
                 matches.game_ended(db, game)
             db.commit()
 

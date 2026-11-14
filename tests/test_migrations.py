@@ -60,6 +60,7 @@ def test_migration_upgrade_and_downgrade(tmp_path, monkeypatch):
         "game_seats",
         "game_events",
         "access_grants",
+        "entitlements",
         "game_tables",
         "table_seats",
         "table_invites",

@@ -45,4 +45,4 @@ The words in the table are the reason codes recorded for a reward withheld. A ga
  "withheld": {"competitive": "not_competitive"}}
 ```
 
-so it can always be told why a game paid what it did. Settling a game twice settles nothing twice: its end is recorded once (`record_end` acts only on an active game), and every grant is keyed by the game and its seats, as before (`test_a_practice_game_pays_counts_and_records_as_before`).
+so it can always be told why a game paid what it did. Since v0.9.12 the record also holds the game's farming signals by seat (`signals`), when it showed any, and what the farming policy withheld from a seat for them (`seats`), which is nothing until that policy is enforced ([the economy](economy.md#f-farming-signals-now-enforcement-when-approved)). Settling a game twice settles nothing twice: its end is recorded once (`record_end` acts only on an active game), and every grant is keyed by the game and its seats, as before (`test_a_practice_game_pays_counts_and_records_as_before`).

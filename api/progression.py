@@ -140,9 +140,22 @@ class LibraryCard(Contract):
     copies: int | None = Field(description="Copies owned of this edition.")
     sources: list[
         Literal[
-            "starter", "grandfathered", "alliance", "pack", "unique", "auction", "campaign", "grant"
+            "starter",
+            "grandfathered",
+            "alliance",
+            "pack",
+            "unique",
+            "auction",
+            "campaign",
+            "grant",
+            "functional",
+            "staple",
         ]
-    ] = Field(description="Where this edition's copies came from; grant: SysOp's (v0.8.8).")
+    ] = Field(
+        description="Where this edition's copies came from; grant: SysOp's (v0.8.8); functional "
+        "and staple (v0.9.12): built with, not owned (a basic land under the functional_basics "
+        "policy, a starter staple claimed), so never sellable."
+    )
     finishes: LibraryFinishes = Field(
         description="The copies held now in each finish (v0.6.0), after the auction house: "
         "those listed or sold are out, those bought are in; an alliance's are nonfoil.",

@@ -8,6 +8,10 @@ the whole catalog (library.unlimited). A library holds:
 - while an alliance lasts, a playset of each of that Planeswalker's cards (api/roster.py);
 - until v0.6.0 basic lands without limit; since then a library holds the basic lands granted to it
   (packs and starter decks give them by printing), like any card.
+- since v0.9.12, functional access (docs/economy.md): cards the account builds with and does
+  not own, each in its default printing; the basic lands when the functional_basics policy is
+  on, and the starter staples the account claimed (api/entitlements.py). Like an alliance's
+  cards they are no grant: nothing is minted, and none can be sold.
 Copies count: a deck may hold no more copies of a card than the library does,
 counting every printing and Oracle version of the card together. Copies are a limit per deck, not
 spent by one: two decks may each hold the same owned card.
@@ -64,6 +68,7 @@ from sqlalchemy import ColumnElement, func, select, true
 from sqlalchemy.orm import InstrumentedAttribute, Session
 from starlette.concurrency import run_in_threadpool
 
+from api import policies
 from api.engine_cards import engine_cards_of
 from api.identity import Active, Db, utcnow
 from api.models import (
@@ -72,6 +77,7 @@ from api.models import (
     CardPrinting,
     CustomCard,
     CustomCardGrant,
+    Entitlement,
     LibraryGrant,
     ProgressEntry,
     User,
@@ -97,6 +103,12 @@ FINISHES = ("nonfoil", "foil", "etched")
 # The grants whose copies may be listed at the auction house (v0.6.0), and the auctions whose copy
 # is out of the seller's library: while it runs, and once it sold.
 SELLABLE_SOURCES = frozenset({"starter", "grandfathered", "pack", "auction", "campaign", "grant"})
+# Functional access (v0.9.12, docs/economy.md): cards an account builds with and does not own.
+# The five basic lands, when the functional_basics policy is on, as many as a deck may hold of
+# one card; and the cards the account is entitled to (the starter-staple pool's claims).
+BASIC_LANDS = ("Plains", "Island", "Swamp", "Mountain", "Forest")
+FUNCTIONAL_BASICS = 250
+FUNCTIONAL_SOURCES = frozenset({"functional", "staple"})
 LISTED = ("active", "sold")
 
 
@@ -325,6 +337,41 @@ def sellable_copies(
     return found
 
 
+def basic_lands(db: Session) -> list[UUID]:
+    """The five basic lands, one card for each (a card's other Oracle versions count as it)."""
+    cards: dict[str, UUID] = {}
+    for card_id, key in db.execute(
+        select(CardConcept.id, CardConcept.construction_key)
+        .where(CardConcept.name.in_(BASIC_LANDS), CardConcept.type_line.like("Basic Land%"))
+        .order_by(
+            CardConcept.default_printing_id.is_(None), CardConcept.normalized_name, CardConcept.id
+        )
+    ):
+        cards.setdefault(key, card_id)
+    return list(cards.values())
+
+
+def functional_cards(db: Session, user: User) -> list[tuple[UUID, int, str]]:
+    """What the account builds with and does not own (v0.9.12): each card, its copies and where
+    the access comes from. Nothing here is a grant: no copy is made, so none can be sold, bid on
+    or counted in a print run, and a deck holds each in the card's default printing; an edition
+    or a finish of its own is still something to own."""
+    found: list[tuple[UUID, int, str]] = []
+    if policies.read(db, policies.FunctionalBasics).enabled:
+        found += [(card_id, FUNCTIONAL_BASICS, "functional") for card_id in basic_lands(db)]
+    entitled = db.execute(
+        select(Entitlement.card_id, func.sum(Entitlement.copies))
+        .where(
+            Entitlement.user_id == user.id,
+            Entitlement.revoked_at.is_(None),
+            since_reset(user, Entitlement.created_at),
+        )
+        .group_by(Entitlement.card_id)
+    )
+    found += [(card_id, int(copies), "staple") for card_id, copies in entitled]
+    return found
+
+
 def library_of(
     db: Session, user: User, permissions: frozenset[str], roster: dict[str, Planeswalker]
 ) -> Library:
@@ -430,6 +477,26 @@ def library_of(
             select(CustomCard.id).where(CustomCard.planeswalker == planeswalker.id)
         ):
             library.custom[custom_key(card_id)] = ALLIANCE_COPIES
+    # Functional access (v0.9.12): each card in its default printing, on top of what is owned.
+    lent: dict[UUID, list[tuple[int, str]]] = defaultdict(list)
+    for card_id, count, source in functional_cards(db, user):
+        lent[card_id].append((count, source))
+    if lent:
+        defaults = default_printings(db, set(lent))
+        of_printing = {printing_id: card_id for card_id, printing_id in defaults.items()}
+        for printing_id, card_id, key, set_name, set_code, number, released in db.execute(
+            select(*columns)
+            .select_from(CardPrinting)
+            .join(CardConcept, CardConcept.id == CardPrinting.concept_id)
+            .where(CardPrinting.id.in_(set(of_printing)))
+        ):
+            for count, source in lent[of_printing[printing_id]]:
+                held[printing_id] += count
+                came[printing_id].add(source)
+                finishes[printing_id]["nonfoil"] += count
+                copies[key] += count
+                sources[key].add(source)
+            printings[printing_id] = (card_id, key, set_name, set_code, number, released)
     # Custom cards won (v0.8.0), on top of an alliance's playset.
     for card_id, quantity in won.items():
         key = custom_key(card_id)

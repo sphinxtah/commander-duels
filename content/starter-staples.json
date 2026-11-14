@@ -1,0 +1,15 @@
+{
+ "about": "The starter-staple pool (v0.9.12, a proposal awaiting the owner's approval; docs/economy.md): cards nearly every Commander deck wants, each one an account may claim with a pick as a functional copy bound to it. Claimed copies are built with, never owned: they cannot be sold and come out of no print run. The pool is off until the starter_staples policy is on. No card here is on the Reserved List; tests/test_entitlements.py checks that.",
+ "policy": "staples-v1",
+ "cards": [
+  "Sol Ring", "Arcane Signet", "Mind Stone", "Commander's Sphere", "Fellwar Stone",
+  "Thought Vessel", "Wayfarer's Bauble", "Swiftfoot Boots", "Lightning Greaves", "Solemn Simulacrum",
+  "Command Tower", "Exotic Orchard", "Evolving Wilds", "Terramorphic Expanse", "Myriad Landscape",
+  "Path of Ancestry", "Reliquary Tower", "Rogue's Passage", "Bojuka Bog", "Temple of the False God",
+  "Swords to Plowshares", "Generous Gift", "Disenchant", "Day of Judgment",
+  "Counterspell", "Negate", "Brainstorm", "Mulldrifter",
+  "Doom Blade", "Sign in Blood", "Read the Bones", "Feed the Swarm",
+  "Lightning Bolt", "Chaos Warp", "Blasphemous Act", "Vandalblast",
+  "Cultivate", "Kodama's Reach", "Rampant Growth", "Beast Within"
+ ]
+}

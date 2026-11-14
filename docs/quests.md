@@ -72,6 +72,16 @@ Until v0.9.4 every player had three daily quests, all wins in games, with one sw
 
 **The old daily quests.** Their rows stay (`daily_quests`, policy `quests-v1`), and what they paid stays in the ledger. The day v0.9.5 reached the live server, the first look drew the new board in their place; quests already paid that day kept their pay.
 
+### Three policies, all off (v0.9.12)
+
+The boards above are as the owner set them in v0.9.5, and stay so. v0.9.12 built three changes behind policies that are off until SysOp sets them ([the economy's foundations](economy.md)):
+
+- **`quest_streaks`**: `forgiving` keeps a streak through up to `grace` periods missed in a row, each costing `penalty` steps (`quests.streak_before`, `carried_streak`). The default, `reset`, is the rule above.
+- **`quest_catch_up`**: a finished daily board also pays for one daily board missed earlier that week, the earliest first, at most `days` a week, each under its own key (`catch-up:<account>:<day>`, a `quest` entry under the rule `quest-catch-up-v1`); the bell says "Daily board caught up".
+- **`quest_alternatives`**: each daily quest is drawn with a second quest of its own step from a family the board does not have (`daily_quests.alternative`, `quests.choose_alternatives`); completing either completes the slot and pays it once. `GET /api/v1/me/quests` gives it as the quest's `alternative`, null on a board drawn without one.
+
+A game the farming policy withholds quest progress from (`api/farming.py`, off by default) is not counted on that seat's boards.
+
 ## Achievements
 
 - **Badges that pay once.** Each achievement earned is a badge on the profile and pays a one-time reward through the economy ledger, kind `achievement`, keyed `achievement:<account>:<achievement>`. The bell tells the player (`achievement_earned`).

@@ -48,6 +48,7 @@ from pydantic import Field
 from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.orm import Session
 
+from api import policies
 from api.auth import INPUT_ERRORS
 from api.economy import ARIZONA, arizona_day, lock_account, reward
 from api.identity import Active, Db, utcnow
@@ -156,12 +157,25 @@ class QuestView(Contract):
         description="A way to do it that its name leaves unsaid (v0.9.8): a game at a table can "
         "be played alone, at a King's Table table of bots.",
     )
+    alternative: "QuestAlternative | None" = Field(
+        default=None,
+        description="A second quest that completes this slot as well (v0.9.12, the "
+        "quest_alternatives policy); none on a board drawn with the policy off.",
+    )
+
+
+class QuestAlternative(Contract):
+    id: str
+    name: str
+    target: int
+    progress: int = Field(description="Counted so far, at most its target.")
 
 
 class Streak(Contract):
     current: int = Field(
         description="Boards finished in a row, up to the last one finished (this period's when "
-        "it is finished, else the previous one's); 0 when the previous period's was not."
+        "it is finished, else the previous one's); 0 when the previous period's was not, unless "
+        "the quest_streaks policy forgives a missed period (v0.9.12)."
     )
     bonus: int = Field(
         description="What finishing this period's board pays (or paid, once finished)."
@@ -275,6 +289,23 @@ def choose_daily(_user: User, reach: Reach = everything) -> list[DailyDef]:
         chosen.append(quest)
         families.add(quest.family)
     return chosen
+
+
+def choose_alternatives(chosen: list[DailyDef], reach: Reach = everything) -> dict[int, DailyDef]:
+    """A second quest for each daily slot (v0.9.12, the quest_alternatives policy): one of the
+    slot's own step, so it is as hard and pays the same, of a family no other quest or alternative
+    of the board has, and within the account's reach. A step with no such quest left gets none."""
+    families = {quest.family for quest in chosen}
+    found: dict[int, DailyDef] = {}
+    for slot, quest in enumerate(chosen):
+        options = [
+            q for q in DAILY if q.step == quest.step and q.family not in families and reach(q.rule)
+        ]
+        if not options:
+            continue
+        found[slot] = RANDOM.choice(options)
+        families.add(found[slot].family)
+    return found
 
 
 def choose_weekly(available: Callable[[WeeklyGoal], bool]) -> list[WeeklyGoal]:
@@ -398,11 +429,17 @@ def drawn(db: Session, user: User, board: Board, now: datetime) -> list[DailyQue
     rows = assigned(db, user, board, period)
     if rows:
         return rows
+    others: dict[int, DailyDef] = {}
     if board == "daily":
-        picks: list[DailyDef | WeeklyGoal] = list(choose_daily(user, reach_of(db, user)))
+        reach = reach_of(db, user)
+        chosen = list(choose_daily(user, reach))
+        picks: list[DailyDef | WeeklyGoal] = list(chosen)
+        if policies.read(db, policies.QuestAlternatives).enabled:
+            others = choose_alternatives(chosen, reach)
     else:
         picks = list(choose_weekly(weekly_available(db, user, now)))
     for slot, quest in enumerate(picks):
+        other = others.get(slot)
         row = DailyQuest(
             user_id=user.id,
             day=period,
@@ -415,6 +452,7 @@ def drawn(db: Session, user: User, board: Board, now: datetime) -> list[DailyQue
             counts_from=start,
             policy=POLICY,
             created_at=now,
+            alternative={"quest": other.id, "target": other.target} if other else None,
         )
         db.add(row)
         rows.append(row)
@@ -681,6 +719,33 @@ def progress_of(db: Session, row: DailyQuest, user: User, now: datetime) -> int:
     return min(row.target, found)
 
 
+def alternative_of(row: DailyQuest) -> tuple[DailyDef, int] | None:
+    """The slot's second quest and its target (v0.9.12), when the board was drawn with one."""
+    kept = row.alternative
+    if not kept:
+        return None
+    quest = DAILY_BY_ID.get(str(kept.get("quest")))
+    target = kept.get("target")
+    return (quest, target) if quest is not None and isinstance(target, int) else None
+
+
+def alternative_progress(db: Session, row: DailyQuest, user: User, now: datetime) -> int | None:
+    other = alternative_of(row)
+    if other is None:
+        return None
+    _, start, end = period_of("daily", row.counts_from)
+    window = Window(user, max(start, row.counts_from), end, now)
+    return min(other[1], measure_daily(other[0], window, db))
+
+
+def complete(db: Session, row: DailyQuest, user: User, now: datetime) -> bool:
+    """Whether the slot's count is in: its quest's, or its alternative's."""
+    if progress_of(db, row, user, now) >= row.target:
+        return True
+    other = alternative_of(row)
+    return other is not None and (alternative_progress(db, row, user, now) or 0) >= other[1]
+
+
 def name_of(row: DailyQuest) -> str:
     found = DAILY_BY_ID.get(row.quest) or WEEKLY_BY_ID.get(row.quest)
     return found.name if found else row.quest
@@ -730,7 +795,7 @@ def settle(
     for row in rows:
         if row.completed_at is not None:
             continue
-        if progress_of(db, row, user, now) < row.target:
+        if not complete(db, row, user, now):
             continue
         row.completed_at = now
         name = name_of(row)
@@ -749,8 +814,7 @@ def settle(
         all(row.completed_at is not None for row in rows)
         and board_row(db, user, board, period) is None
     ):
-        before = board_row(db, user, board, previous(board, period))
-        streak = before.streak + 1 if before is not None else 1
+        streak = streak_before(db, user, board, period) + 1
         bonus = bonus_for(board, streak)
         key = reset_key(user, f"board:{user.id}:{board}:{period.isoformat()}")
         db.add(
@@ -769,8 +833,106 @@ def settle(
         if reward(db, user.id, "quest", bonus, key, reason, POLICY):
             paid += bonus
             notify_award(db, user.id, "quest_completed", f"board-{board}:{bonus}", now)
+        if board == "daily":
+            paid += catch_up(db, user, period)
     db.flush()
     return paid
+
+
+def streak_before(db: Session, user: User, board: Board, period: date) -> int:
+    """The streak a board finished in the period goes on from, by the quest_streaks policy
+    (v0.9.12). reset, as since v0.9.5: the previous period's board's, or none. forgiving: when
+    the previous period's was not finished, the last board finished within `grace` missed
+    periods keeps its streak, less `penalty` steps for each period missed."""
+    before = board_row(db, user, board, previous(board, period))
+    if before is not None:
+        return before.streak
+    policy = policies.read(db, policies.QuestStreaks)
+    if policy.mode != "forgiving":
+        return 0
+    days = 7 if board == "weekly" else 1
+    last = db.scalar(
+        select(QuestBoard)
+        .where(
+            QuestBoard.user_id == user.id,
+            QuestBoard.board == board,
+            QuestBoard.period < period,
+            QuestBoard.period >= period - timedelta(days=days * (policy.grace + 1)),
+            since_reset(user, QuestBoard.completed_at),
+        )
+        .order_by(QuestBoard.period.desc())
+        .limit(1)
+    )
+    if last is None:
+        return 0
+    return carried_streak(policy, last.streak, (period - last.period).days // days - 1)
+
+
+def carried_streak(policy: policies.QuestStreaks, streak: int, missed: int) -> int:
+    """What is left of a streak after `missed` periods in a row with no board finished: all of
+    it after none; under the forgiving policy, the streak less its penalty for each, while no
+    more than `grace` were missed; otherwise nothing."""
+    if missed <= 0:
+        return streak
+    if policy.mode != "forgiving" or missed > policy.grace:
+        return 0
+    return max(0, streak - policy.penalty * missed)
+
+
+CATCH_UP_POLICY = "quest-catch-up-v1"
+
+
+def catch_up_key(user: User, day: date) -> str:
+    return reset_key(user, f"catch-up:{user.id}:{day.isoformat()}")
+
+
+def catch_up(db: Session, user: User, period: date) -> int:
+    """The weekly catch-up (v0.9.12, the quest_catch_up policy), as a daily board is finished:
+    it also pays for one daily board the account missed earlier in the same week, the earliest
+    first, for at most the policy's days a week. A missed day is one that ended with no board
+    finished, from the account's first day (and its last reset's) on; each is paid once, under
+    its own key. Returns the tokens paid."""
+    policy = policies.read(db, policies.QuestCatchUp)
+    if not policy.enabled:
+        return 0
+    sunday = period - timedelta(days=(period.weekday() + 1) % 7)
+    since = max(day_of(user.created_at), day_of(user.reset_at) if user.reset_at else sunday)
+    days = [
+        sunday + timedelta(days=offset)
+        for offset in range((period - sunday).days)
+        if sunday + timedelta(days=offset) >= since
+    ]
+    if not days:
+        return 0
+    finished = set(
+        db.scalars(
+            select(QuestBoard.period).where(
+                QuestBoard.user_id == user.id,
+                QuestBoard.board == "daily",
+                QuestBoard.period.in_(days),
+                since_reset(user, QuestBoard.completed_at),
+            )
+        )
+    )
+    week = [sunday + timedelta(days=offset) for offset in range(7)]
+    caught = set(
+        db.scalars(
+            select(TokenEntry.key).where(
+                TokenEntry.key.in_([catch_up_key(user, day) for day in week])
+            )
+        )
+    )
+    if len(caught) >= policy.days:
+        return 0
+    for day in days:
+        key = catch_up_key(user, day)
+        if day in finished or key in caught:
+            continue
+        reason = f"Catch-up for {day:%A}'s daily board"
+        if reward(db, user.id, "quest", policy.tokens, key, reason, CATCH_UP_POLICY):
+            notify_award(db, user.id, "quest_completed", f"catch-up:{policy.tokens}", utcnow())
+            return policy.tokens
+    return 0
 
 
 def settle_all(db: Session, user: User, now: datetime) -> int:
@@ -814,12 +976,11 @@ def board_view(
 ) -> BoardView:
     period, _, end = period_of(board, now)
     done = board_row(db, user, board, period)
-    before = board_row(db, user, board, previous(board, period))
     if done is not None:
         current, bonus = done.streak, done.bonus
         next_bonus = bonus_for(board, done.streak + 1)
     else:
-        current = before.streak if before is not None else 0
+        current = streak_before(db, user, board, period)
         bonus = bonus_for(board, current + 1)
         next_bonus = bonus_for(board, current + 2)
     quests = []
@@ -839,6 +1000,7 @@ def board_view(
                 tier=weekly.tier if weekly else None,
                 in_game=daily is not None or (weekly is not None and weekly.in_game),
                 hint=HINTS.get(weekly.family) if weekly else None,
+                alternative=alternative_view(db, row, user, now),
             )
         )
     return BoardView(
@@ -856,6 +1018,17 @@ def board_view(
     )
 
 
+def alternative_view(
+    db: Session, row: DailyQuest, user: User, now: datetime
+) -> QuestAlternative | None:
+    other = alternative_of(row)
+    if other is None:
+        return None
+    quest, target = other
+    progress = alternative_progress(db, row, user, now) or 0
+    return QuestAlternative(id=quest.id, name=quest.name, target=target, progress=progress)
+
+
 def boards_of(db: Session, user: User, now: datetime, paid: int) -> QuestBoards:
     return QuestBoards(
         daily=board_view(db, user, "daily", drawn(db, user, "daily", now), now),
@@ -870,6 +1043,9 @@ def award_name(subject: str) -> tuple[str, int] | None:
         board, _, amount = subject.removeprefix("board-").partition(":")
         name = "Daily board complete" if board == "daily" else "Weekly board complete"
         return name, int(amount) if amount.isdigit() else 0
+    if subject.startswith("catch-up:"):
+        amount = subject.removeprefix("catch-up:")
+        return "Daily board caught up", int(amount) if amount.isdigit() else 0
     found = DAILY_BY_ID.get(subject) or WEEKLY_BY_ID.get(subject)
     if found is not None:
         return found.name, found.tokens
