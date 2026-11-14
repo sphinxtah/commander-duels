@@ -42,6 +42,7 @@ from api.models import (
 ACCOUNT_TABLES = (
     "entitlements",
     "wishlist_entries",
+    "table_presets",
     "token_ledger",
     "site_settings",
     "library_grants",

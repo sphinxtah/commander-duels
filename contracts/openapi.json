@@ -5751,6 +5751,40 @@
         "title": "EncounterSpoils",
         "type": "object"
       },
+      "Enforced": {
+        "additionalProperties": false,
+        "description": "What the server checks every deck against, beside the table's rules. The defaults allow\neverything: a profile enforces only what its host turned on.",
+        "properties": {
+          "custom_cards": {
+            "default": true,
+            "description": "Decks may hold the Godlike tier's custom cards.",
+            "title": "Custom Cards",
+            "type": "boolean"
+          },
+          "game_changers": {
+            "anyOf": [
+              {
+                "maximum": 10.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The most Game Changers a deck may hold (the Commander format's own list, as the catalog marks it); null: any number.",
+            "title": "Game Changers"
+          },
+          "reserved_list": {
+            "default": true,
+            "description": "Decks may hold Reserved List cards.",
+            "title": "Reserved List",
+            "type": "boolean"
+          }
+        },
+        "title": "Enforced",
+        "type": "object"
+      },
       "EngineStatus": {
         "additionalProperties": false,
         "description": "Engine /health, passed through. \"unavailable\" means the engine is unreachable or invalid.",
@@ -10011,6 +10045,205 @@
         "title": "Presence",
         "type": "object"
       },
+      "Preset": {
+        "additionalProperties": false,
+        "properties": {
+          "built_in": {
+            "title": "Built In",
+            "type": "boolean"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A saved preset's id; null for a built-in one.",
+            "title": "Id"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ProfileView"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/PresetSettings"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "built_in",
+          "profile",
+          "settings"
+        ],
+        "title": "Preset",
+        "type": "object"
+      },
+      "PresetSave": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 48,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/TableProfile"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/PresetSettings"
+          }
+        },
+        "required": [
+          "name",
+          "profile"
+        ],
+        "title": "PresetSave",
+        "type": "object"
+      },
+      "PresetSettings": {
+        "additionalProperties": false,
+        "description": "The table's other settings a host saves with a profile; each is the table request's own\nfield, and one left out takes the request's default when the table is opened.",
+        "properties": {
+          "best_of": {
+            "anyOf": [
+              {
+                "enum": [
+                  1,
+                  3
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Of"
+          },
+          "bot_skill": {
+            "anyOf": [
+              {
+                "maximum": 6.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bot Skill"
+          },
+          "bots": {
+            "anyOf": [
+              {
+                "maximum": 5.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bots"
+          },
+          "format": {
+            "anyOf": [
+              {
+                "enum": [
+                  "legacy",
+                  "commander",
+                  "two_headed_giant",
+                  "kings_table"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format"
+          },
+          "rules": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableRules"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "seats": {
+            "anyOf": [
+              {
+                "maximum": 6.0,
+                "minimum": 2.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seats"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "enum": [
+                  "public",
+                  "private"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visibility"
+          }
+        },
+        "title": "PresetSettings",
+        "type": "object"
+      },
+      "Presets": {
+        "additionalProperties": false,
+        "properties": {
+          "built_in": {
+            "items": {
+              "$ref": "#/components/schemas/Preset"
+            },
+            "title": "Built In",
+            "type": "array"
+          },
+          "limit": {
+            "description": "The most presets an account saves.",
+            "title": "Limit",
+            "type": "integer"
+          },
+          "saved": {
+            "items": {
+              "$ref": "#/components/schemas/Preset"
+            },
+            "title": "Saved",
+            "type": "array"
+          }
+        },
+        "required": [
+          "built_in",
+          "saved",
+          "limit"
+        ],
+        "title": "Presets",
+        "type": "object"
+      },
       "PriceChange": {
         "additionalProperties": false,
         "properties": {
@@ -10637,6 +10870,108 @@
           }
         },
         "title": "ProfileUpdate",
+        "type": "object"
+      },
+      "ProfileView": {
+        "additionalProperties": false,
+        "description": "A profile as a table shows it: what it describes in words, and every rule the server\nenforces at the table, the table's own rules among them.",
+        "properties": {
+          "duration": {
+            "anyOf": [
+              {
+                "enum": [
+                  30,
+                  60,
+                  90,
+                  120,
+                  180
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The minutes it is expected to take. Described only.",
+            "title": "Duration"
+          },
+          "enforced": {
+            "$ref": "#/components/schemas/Enforced"
+          },
+          "enforced_rules": {
+            "description": "Everything checked on a deck at this table, in words: the table's rules (banned cards, cards not legal, stand-ins) and the profile's restrictions. Empty: any deck its format takes.",
+            "items": {
+              "$ref": "#/components/schemas/Rule"
+            },
+            "title": "Enforced Rules",
+            "type": "array"
+          },
+          "intent": {
+            "description": "What kind of game the table is for. Described only.",
+            "enum": [
+              "learning",
+              "precon",
+              "upgraded",
+              "high_power",
+              "competitive",
+              "custom"
+            ],
+            "title": "Intent",
+            "type": "string"
+          },
+          "intent_name": {
+            "title": "Intent Name",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "description": "The host's own words. Described only.",
+            "maxLength": 280,
+            "title": "Note",
+            "type": "string"
+          },
+          "pace": {
+            "anyOf": [
+              {
+                "enum": [
+                  "relaxed",
+                  "steady",
+                  "brisk"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How fast it is played. Described only.",
+            "title": "Pace"
+          },
+          "pace_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pace Name"
+          },
+          "version": {
+            "const": 1,
+            "default": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "intent",
+          "intent_name",
+          "pace_name",
+          "enforced_rules"
+        ],
+        "title": "ProfileView",
         "type": "object"
       },
       "Progress": {
@@ -13098,6 +13433,25 @@
         "title": "RevisionSummary",
         "type": "object"
       },
+      "Rule": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "text"
+        ],
+        "title": "Rule",
+        "type": "object"
+      },
       "Ruling": {
         "additionalProperties": false,
         "properties": {
@@ -14838,7 +15192,7 @@
       },
       "TableChange": {
         "additionalProperties": false,
-        "description": "The host's changes to a King's Table table before its start (v0.8.7). Anything that\nchanges makes every player not ready again; the host's start is their ready.",
+        "description": "The host's changes to a table before its start: a King's Table table's settings and seats\n(v0.8.7), and since v0.9.12 any table's Rule Zero profile. Anything that changes makes every\nplayer not ready again; the host's start is their ready.",
         "properties": {
           "bot_seats": {
             "anyOf": [
@@ -14879,6 +15233,17 @@
               }
             ],
             "description": "Moves a player to an open seat."
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableProfile"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Since v0.9.12: the table's Rule Zero profile from now on; null removes it, and left out it stays. Any change to it, its note included, makes every player not ready again: getting ready again is how they accept it."
           }
         },
         "title": "TableChange",
@@ -15120,6 +15485,82 @@
         "title": "TablePlayer",
         "type": "object"
       },
+      "TableProfile": {
+        "additionalProperties": false,
+        "description": "A table's Rule Zero profile, as its host writes it.",
+        "properties": {
+          "duration": {
+            "anyOf": [
+              {
+                "enum": [
+                  30,
+                  60,
+                  90,
+                  120,
+                  180
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The minutes it is expected to take. Described only.",
+            "title": "Duration"
+          },
+          "enforced": {
+            "$ref": "#/components/schemas/Enforced"
+          },
+          "intent": {
+            "description": "What kind of game the table is for. Described only.",
+            "enum": [
+              "learning",
+              "precon",
+              "upgraded",
+              "high_power",
+              "competitive",
+              "custom"
+            ],
+            "title": "Intent",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "description": "The host's own words. Described only.",
+            "maxLength": 280,
+            "title": "Note",
+            "type": "string"
+          },
+          "pace": {
+            "anyOf": [
+              {
+                "enum": [
+                  "relaxed",
+                  "steady",
+                  "brisk"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How fast it is played. Described only.",
+            "title": "Pace"
+          },
+          "version": {
+            "const": 1,
+            "default": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "intent"
+        ],
+        "title": "TableProfile",
+        "type": "object"
+      },
       "TableRequest": {
         "additionalProperties": false,
         "description": "A new table: the host takes the first seat with one of their decks.",
@@ -15210,6 +15651,17 @@
               }
             ],
             "description": "King's Table (v0.8.7): its settings, the defaults when left out. Refused at other tables."
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableProfile"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Since v0.9.12: the table's Rule Zero profile (what kind of game it is for, and the restrictions on its decks the server enforces); none when left out."
           },
           "rules": {
             "$ref": "#/components/schemas/TableRules",
@@ -15418,6 +15870,17 @@
             },
             "title": "Players",
             "type": "array"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProfileView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Since v0.9.12: the table's Rule Zero profile: what it describes, and every rule the server enforces on its decks. Null when its host gave none."
           },
           "rules": {
             "$ref": "#/components/schemas/TableRules"
@@ -35968,6 +36431,322 @@
         "summary": "My Stats"
       }
     },
+    "/api/v1/me/table-presets": {
+      "get": {
+        "description": "The built-in profiles to start a table from, and the tables the account saved.",
+        "operationId": "my_presets_api_v1_me_table_presets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Presets"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "My Presets"
+      },
+      "put": {
+        "description": "Saves a table to open again, under a name of the account's own: a name it already has is\nreplaced (case aside).",
+        "operationId": "save_preset_api_v1_me_table_presets_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresetSave"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Presets"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Save Preset"
+      }
+    },
+    "/api/v1/me/table-presets/{preset_id}": {
+      "delete": {
+        "operationId": "remove_preset_api_v1_me_table_presets__preset_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "preset_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Preset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Presets"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Remove Preset"
+      }
+    },
     "/api/v1/me/tokens": {
       "get": {
         "operationId": "my_tokens_api_v1_me_tokens_get",
@@ -40318,6 +41097,81 @@
             }
           },
           {
+            "description": "Since v0.9.12: only tables whose Rule Zero profile says one of these kinds of game; a table with no profile matches none.",
+            "in": "query",
+            "name": "intent",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "learning",
+                      "precon",
+                      "upgraded",
+                      "high_power",
+                      "competitive",
+                      "custom"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Since v0.9.12: only tables whose Rule Zero profile says one of these kinds of game; a table with no profile matches none.",
+              "title": "Intent"
+            }
+          },
+          {
+            "description": "Since v0.9.12: only tables whose profile says one of these paces.",
+            "in": "query",
+            "name": "pace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "relaxed",
+                      "steady",
+                      "brisk"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Since v0.9.12: only tables whose profile says one of these paces.",
+              "title": "Pace"
+            }
+          },
+          {
+            "description": "Since v0.9.12: only tables whose profile expects at most this many minutes; a table that says no length matches none.",
+            "in": "query",
+            "name": "max_duration",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 600,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Since v0.9.12: only tables whose profile expects at most this many minutes; a table that says no length matches none.",
+              "title": "Max Duration"
+            }
+          },
+          {
             "description": "newest (default), players (most seated) or fewest_open (seats).",
             "in": "query",
             "name": "sort",
@@ -40567,7 +41421,7 @@
         "summary": "Get Table"
       },
       "patch": {
-        "description": "The host changes a King's Table table before its start (v0.8.7): its settings, the seats\nits bots fill, or a player's seat (to an open one). Anything that changes makes every player\nnot ready again.",
+        "description": "The host changes a table before its start: a King's Table table's settings, the seats\nits bots fill, or a player's seat (to an open one) (v0.8.7), and since v0.9.12 any table's\nRule Zero profile. Anything that changes makes every player not ready again.",
         "operationId": "change_table_api_v1_tables__code__patch",
         "parameters": [
           {

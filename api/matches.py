@@ -735,6 +735,10 @@ def record_next(db: Session, plan: NextGame, created: dict[str, Any]) -> Game:
         settings=db.scalar(
             select(Game.settings).where(Game.match_id == match.id, Game.match_game == 1)
         ),
+        # A table's match keeps the Rule Zero profile its first game started under (v0.9.12).
+        table_profile=db.scalar(
+            select(Game.table_profile).where(Game.match_id == match.id, Game.match_game == 1)
+        ),
     )
     db.add(game)
     db.flush()

@@ -71,7 +71,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from api import kings_table, matches, teams
+from api import kings_table, matches, table_profiles, teams
 from api.auth import INPUT_ERRORS
 from api.custom_play import custom_in_seats
 from api.decks import entries_of, revision_entries, starters_of
@@ -135,6 +135,7 @@ from api.schemas import (
     casual,
     default_turn_cap,
 )
+from api.table_profiles import Intent, Pace, ProfileView, TableProfile
 from api.validation import DeckEntry
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
@@ -222,6 +223,11 @@ class TableRequest(Contract):
         description="Since v0.9.2: friends to invite, each told in the bell. Every one must be "
         "your friend.",
     )
+    profile: TableProfile | None = Field(
+        default=None,
+        description="Since v0.9.12: the table's Rule Zero profile (what kind of game it is for, "
+        "and the restrictions on its decks the server enforces); none when left out.",
+    )
 
 
 class TableInviting(Contract):
@@ -278,8 +284,16 @@ class SeatMove(Contract):
 
 
 class TableChange(Contract):
-    """The host's changes to a King's Table table before its start (v0.8.7). Anything that
-    changes makes every player not ready again; the host's start is their ready."""
+    """The host's changes to a table before its start: a King's Table table's settings and seats
+    (v0.8.7), and since v0.9.12 any table's Rule Zero profile. Anything that changes makes every
+    player not ready again; the host's start is their ready."""
+
+    profile: TableProfile | None = Field(
+        default=None,
+        description="Since v0.9.12: the table's Rule Zero profile from now on; null removes it, "
+        "and left out it stays. Any change to it, its note included, makes every player not "
+        "ready again: getting ready again is how they accept it.",
+    )
 
     kings_table: KingsTableChange | None = Field(
         default=None, description="Settings to change; one left out stays."
@@ -353,6 +367,11 @@ class TableView(Contract):
         default=None,
         description="Since v0.9.6: the campaign encounter's title when the campaign opened the "
         "table (ward 15's court); null for every other table.",
+    )
+    profile: ProfileView | None = Field(
+        default=None,
+        description="Since v0.9.12: the table's Rule Zero profile: what it describes, and every "
+        "rule the server enforces on its decks. Null when its host gave none.",
     )
 
 
@@ -626,6 +645,7 @@ def view_of(db: Session, table: GameTable, principal: Principal) -> TableView:
         created_at=table.created_at,
         open_seats=sum(1 for player in players if player.player == "human" and not player.taken),
         campaign=str(table.campaign.get("title")) if table.campaign else None,
+        profile=table_profiles.view(table_profiles.profile_of(table), rules_of(table)),
     )
 
 
@@ -712,12 +732,15 @@ def check_deck(
     fmt: str,
     rules: TableRules,
     kings: object = None,
+    profile: TableProfile | None = None,
 ) -> UUID:
     """A deck the player may sit down with: theirs, of the table's format, playable with their
     library now (as at the practice table), and holding no card the table's rules do not allow.
     Two-Headed Giant (v0.5.1) takes a Legacy deck, and refuses its own banned card where banned
-    cards are refused; King's Table (v0.8.7) a deck of its settings' (kings) deck format. Returns
-    the revision the deck is bound to, as checked (v0.5.1)."""
+    cards are refused; King's Table (v0.8.7) a deck of its settings' (kings) deck format. Since
+    v0.9.12 the table's Rule Zero profile's restrictions hold too, for every account (SysOp's
+    included: they are what the table promised its players). Returns the revision the deck is
+    bound to, as checked (v0.5.1)."""
     if "decks.edit" not in permissions:
         raise ApiError(403, "forbidden", "Your account cannot play its own decks.")
     library = library_of(db, user, permissions, roster_of(request))
@@ -727,6 +750,7 @@ def check_deck(
         refused = team_banned(teams.cards_of(seat) or set(), rules, permissions)
         if refused is not None:
             raise refused
+    table_profiles.refuse_revision(db, profile, revision)
     return revision
 
 
@@ -794,6 +818,26 @@ def browse_tables(
         str | None,
         Query(max_length=40, description="Only tables whose host's handle holds this."),
     ] = None,
+    intent: Annotated[
+        list[Intent] | None,
+        Query(
+            description="Since v0.9.12: only tables whose Rule Zero profile says one of these "
+            "kinds of game; a table with no profile matches none."
+        ),
+    ] = None,
+    pace: Annotated[
+        list[Pace] | None,
+        Query(description="Since v0.9.12: only tables whose profile says one of these paces."),
+    ] = None,
+    max_duration: Annotated[
+        int | None,
+        Query(
+            ge=1,
+            le=600,
+            description="Since v0.9.12: only tables whose profile expects at most this many "
+            "minutes; a table that says no length matches none.",
+        ),
+    ] = None,
     sort: Annotated[
         TableSort,
         Query(description="newest (default), players (most seated) or fewest_open (seats)."),
@@ -843,6 +887,13 @@ def browse_tables(
         statement = statement.where(GameTable.host_id.in_(hosts))
     if no_bots:
         statement = statement.where(GameTable.bots == 0)
+    # A table's Rule Zero profile (v0.9.12), by the columns kept beside it.
+    if intent:
+        statement = statement.where(GameTable.intent.in_(set(intent)))
+    if pace:
+        statement = statement.where(GameTable.pace.in_(set(pace)))
+    if max_duration is not None:
+        statement = statement.where(GameTable.duration <= max_duration)
     if best_of_three:
         statement = statement.where(GameTable.best_of == 3)
     known = friends_of(db, you)
@@ -968,7 +1019,15 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
         bot_seats = team_bot_seats(body.bots, body.bot_teammate)
     invitees = friends_to_invite(db, principal.user, body.invite)
     revision = check_deck(
-        db, request, principal.user, principal.permissions, body.deck_id, fmt, body.rules, kings
+        db,
+        request,
+        principal.user,
+        principal.permissions,
+        body.deck_id,
+        fmt,
+        body.rules,
+        kings,
+        body.profile,
     )
     may_sit(db, request, principal)
     now = utcnow()
@@ -993,6 +1052,7 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
         status="open",
         created_at=now,
     )
+    table_profiles.keep(table, body.profile)
     db.add(table)
     db.flush()
     db.add(
@@ -1141,6 +1201,7 @@ def join_table(
         table.format,
         rules_of(table),
         table.kings_table,
+        table_profiles.profile_of(table),
     )
     may_sit(db, request, principal)
     db.add(
@@ -1269,6 +1330,7 @@ def change_seat(
             table.format,
             rules_of(table),
             table.kings_table,
+            table_profiles.profile_of(table),
         )
         row.deck_id = body.deck_id
         row.ready = False
@@ -1276,8 +1338,10 @@ def change_seat(
     if body.ready is not None:
         if body.ready and table.format == TEAM_FORMAT:
             check_team(db, request, principal, table, row)
-        if body.ready and table.format == KINGS:
-            # The settings' deck format may have changed since the deck was chosen.
+        profile = table_profiles.profile_of(table)
+        if body.ready and (table.format == KINGS or profile is not None):
+            # The settings' deck format may have changed since the deck was chosen, and since
+            # v0.9.12 the table's profile: getting ready checks the deck by what stands now.
             row.deck_revision_id = check_deck(
                 db,
                 request,
@@ -1287,6 +1351,7 @@ def change_seat(
                 table.format,
                 rules_of(table),
                 table.kings_table,
+                profile,
             )
         row.ready = body.ready
     db.commit()
@@ -1308,19 +1373,24 @@ def move_player(db: Session, table: GameTable, row: TableSeat, seat: int) -> Non
 
 @router.patch("/tables/{code}", response_model=TableView, responses={409: {"model": Error}})
 def change_table(code: Code, body: TableChange, principal: Player, db: Db) -> TableView:
-    """The host changes a King's Table table before its start (v0.8.7): its settings, the seats
-    its bots fill, or a player's seat (to an open one). Anything that changes makes every player
-    not ready again."""
+    """The host changes a table before its start: a King's Table table's settings, the seats
+    its bots fill, or a player's seat (to an open one) (v0.8.7), and since v0.9.12 any table's
+    Rule Zero profile. Anything that changes makes every player not ready again."""
     table = find(db, code, lock=True)
     if table.host_id != principal.user.id:
         raise ApiError(403, "not_host", "Only the table's host changes the table.")
     if status_of(table) != "open":
         raise ApiError(409, "table_closed", "This table is no longer open.")
-    if table.format != KINGS:
+    profiled = "profile" in body.model_fields_set
+    seating = body.kings_table is not None or body.bot_seats is not None or body.move is not None
+    if table.format != KINGS and (seating or not profiled):
         raise ApiError(422, "invalid_table", "Only King's Table tables have settings to change.")
+    if table.queued and profiled:
+        raise ApiError(409, "queue_table", "A table the queue opened has no profile to change.")
     court = set(campaign_names(table))
     if table.campaign and (
-        body.kings_table is not None
+        profiled
+        or body.kings_table is not None
         or body.move is not None
         or (body.bot_seats is not None and not court <= set(body.bot_seats))
     ):
@@ -1330,7 +1400,7 @@ def change_table(code: Code, body: TableChange, principal: Player, db: Db) -> Ta
             "The court's settings and seats are the campaign's; only your Generals' seats change.",
         )
     rows = seats_of(db, table)
-    changed = False
+    changed = profiled and table_profiles.keep(table, body.profile)
     if body.kings_table is not None:
         before = kings_table.config_of(table.kings_table)
         after = before.model_copy(update=body.kings_table.model_dump(exclude_none=True))
@@ -1498,6 +1568,8 @@ def plan_table(
             # The seat is bound to it now (v0.5.1): a ready check after a refused start compares
             # the decks the start compared.
             row.deck_revision_id = revision
+            # The profile's restrictions (v0.9.12), checked at the start as at getting ready.
+            table_profiles.refuse_revision(db, table_profiles.profile_of(table), revision)
             if table.format == TEAM_FORMAT:
                 # MTR 9.5: Two-Headed Giant Constructed has no sideboards; a deck's stays home.
                 cast(dict[str, object], seat["deck_list"]).pop("sideboard", None)
@@ -1653,6 +1725,8 @@ def add_table_game(
             )
         ),
         kings_table=table.kings_table if table.format == KINGS else None,
+        # The profile the players were ready for (v0.9.12): the game keeps what was agreed.
+        table_profile=table.profile,
     )
     db.add(game)
     db.flush()

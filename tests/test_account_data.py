@@ -853,12 +853,35 @@ WISH_QUERIES = {
 }
 
 
+def save_a_table(engine: Engine, player: UUID, friend: UUID) -> None:
+    """v0.9.12's Rule Zero profiles (migration 0049): the player saved a table to open again."""
+    account = Account(engine)
+    account.add(
+        "table_presets",
+        id=uuid4(),
+        user_id=player,
+        name="Friday night",
+        preset={
+            "profile": {"version": 1, "intent": "upgraded", "enforced": {"game_changers": 3}},
+            "settings": {"format": "commander", "seats": 4},
+        },
+        created_at=T0,
+        updated_at=T0,
+    )
+    account.write(engine)
+
+
+PRESET_QUERIES = {
+    "saved tables": "SELECT name FROM table_presets WHERE user_id = :u ORDER BY name",
+}
+
 # The migrations after v0.9.9's that add something an account keeps: each one's rows are written
 # at its own revision, and its totals compared from there on.
 LATER = [
     ("0046_access_grants", lend_a_deck, GRANT_QUERIES),
     ("0047_economy_foundations", claim_a_staple, ENTITLEMENT_QUERIES),
     ("0048_deck_workshop", wish_for_a_card, WISH_QUERIES),
+    ("0049_table_profiles", save_a_table, PRESET_QUERIES),
 ]
 
 

@@ -278,7 +278,14 @@ def test_a_table_match_won_two_to_one_with_the_losers_choice(client, engine, mon
         bob, client, {"Mountain": 60}, {"Swords to Plowshares": 2}, title="Secret plan"
     )
     made = ada.send(
-        "POST", "/api/v1/tables", {"format": "legacy", "best_of": 3, "deck_id": ada_deck}
+        "POST",
+        "/api/v1/tables",
+        {
+            "format": "legacy",
+            "best_of": 3,
+            "deck_id": ada_deck,
+            "profile": {"intent": "competitive", "pace": "brisk"},
+        },
     )
     assert made.status_code == 201 and made.json()["best_of"] == 3, made.text
     code = made.json()["code"]
@@ -299,6 +306,15 @@ def test_a_table_match_won_two_to_one_with_the_losers_choice(client, engine, mon
     second = ready(ada, match_id)
     assert engine.created[-1]["starting_seat"] == 0
     assert engine.created[-1]["idle_timeout_seconds"] == games.TABLE_IDLE_SECONDS
+    # The match's next game keeps the Rule Zero profile its first started under (v0.9.12).
+    with Session(client.app.state.database) as db:
+        profiles = [
+            game.table_profile
+            for game in (db.get(Game, uuid.UUID(found)) for found in (first, second["game_id"]))
+            if game is not None
+        ]
+    assert len(profiles) == 2 and profiles[0] == profiles[1]
+    assert profiles[0] is not None and profiles[0]["intent"] == "competitive"
 
     # Nothing Ada is sent names Bob's sideboard: not the match, not the game, not its frames.
     secret = card(client, "Swords to Plowshares")

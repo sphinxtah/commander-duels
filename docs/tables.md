@@ -126,6 +126,34 @@ The owner's decisions for v0.8.7: King's Table at human tables and the practice 
 
 The pieces: `web/src/tables/kingsTable.ts` (the seats, the settings' words), `KingsSettingsFields`, `KingsRules` and the tags in `TableParts.tsx`, the circle and the host's changes in `TableLobby.tsx`, the opening in `TablesPage.tsx`, and the practice table's in `web/src/game/PracticeTable.tsx`.
 
+## Rule Zero table profiles (v0.9.12)
+
+Rule Zero is Commander's custom of agreeing, before a game, what kind of game it will be. Since v0.9.12 a table may carry its host's side of that: a **profile** (`api/table_profiles.py`). It is the specification's section 9, without two of its items, by the owner's decision of 2026-11-13: a deck makes **no disclosures** (fast mana, tutors, winning loops and the rest, computed or declared), and decks are **not analysed**. The screens that show and edit a profile are v1.0.0's; this is what they stand on.
+
+A profile has two parts, kept apart in the model and in every answer:
+
+| Part | Fields | Who holds it to |
+| --- | --- | --- |
+| **Described** | `intent` (`learning`, `precon`, `upgraded`, `high_power`, `competitive` or `custom`), `pace` (`relaxed`, `steady` or `brisk`), `duration` (30, 60, 90, 120 or 180 minutes expected), `note` (the host's words, up to 280 characters) | Nobody: it is what the players agree to by getting ready |
+| **Enforced** | `enforced.custom_cards` (decks may hold custom cards), `enforced.reserved_list` (decks may hold Reserved List cards), `enforced.game_changers` (the most Game Changers a deck may hold, 0 to 10, or null for any number) | The server, on every deck |
+
+- **What is enforced is read, never judged.** Each restriction reads a flag the catalog already keeps for the card (`card_concepts.reserved`, `card_concepts.game_changer`, both from Scryfall) or that the card is one of the game's custom cards. Game Changers are counted by the copy. Nothing rates a deck, and a profile promises nothing about balance.
+- **The defaults restrict nothing.** A profile enforces only what its host turned on, and a table with no profile is the table it was before v0.9.12.
+- **Every rule in words.** A table's answer carries `profile.enforced_rules`: every rule checked on a deck at that table, the table's own rules among them ("No cards banned in the format", "No Reserved List cards", "At most 3 Game Changers a deck"). Whatever is not in that list is described only.
+- **Checked where the table's rules are.** As a deck sits down (opening the table, joining, changing deck), as its player gets ready, and at the start, with the deck as it stands then. A deck the profile does not allow is refused (`422 deck_not_allowed`) and its own player is told which cards: "This table allows no Reserved List cards: Black Lotus." The maybeboard is not played and not checked; the sideboard is, so a best-of-three match's sideboarding stays within the profile.
+- **Another player's deck stays private.** At the start the host learns only whose deck stops the game ("bob's deck cannot be played now; they need to choose another"), that player is made not ready, and no answer about the table names a card of a deck to anyone but its player.
+- **For every account.** SysOp's decks pass a table's rules ([above](#decks)); they do not pass a profile's restrictions, which are what the table promised its players.
+- **Any change clears readiness.** The host changes or removes the profile before the start (`PATCH /api/v1/tables/{code}`). Any change, the note included, makes every player not ready again, and getting ready again is how each accepts it. Sending the same profile again changes nothing.
+- **Kept with the game.** When the game starts, the profile is copied to it (`games.table_profile`): the game keeps what was agreed, whatever the table becomes. A best-of-three match's later games keep the first game's, and a rematch's table opens under the same profile and checks its decks by it.
+- **Versioned.** A profile carries `version` (1). One this code does not read, a later version's after a rollback, is no profile: it describes and enforces nothing, and the table's rules still hold.
+- **The lobby searches by it.** `GET /api/v1/tables/browse` takes `intent` and `pace` (each repeated) and `max_duration`; a table with no profile, or a profile that says no pace or length, matches none of them. The three are kept beside the profile (`game_tables.intent`, `pace`, `duration`), with an index on the open tables' intent.
+- **No profile** at a table the queue opened or the campaign's court (`409 queue_table`, `409 campaign_table`).
+
+### Presets
+
+- **Six built in**, the specification's, as starting points a host changes: Learning game (relaxed, two hours, no Game Changers), Preconstructed decks (no Game Changers), Upgraded casual (at most three), High power, Competitive (brisk, one hour) and Custom. The limits on Game Changers follow the Commander format's brackets.
+- **A host's own.** `PUT /api/v1/me/table-presets` saves a profile under a name, with the table's other settings (format, seats, bots, bot skill, visibility, rules, best of) to open the same table again. A name the account already has, whatever its case, is replaced. At most 20 an account (`409 preset_limit`). They are the account's alone and are removed with it.
+
 ## The campaign's court (v0.9.6)
 
 Ward 15 of [the campaign](campaign.md#the-unbound-court-ward-15-v096), with friends as the player's Generals, is a table the campaign opens (`POST /api/v1/campaign/encounters/15/court`): private, King's Table with Commander decks under the court's settings (everyone at 40 life; since v0.9.7 the house rule with its guard, and 240 turns, 40 for each player), casual rules, bots at skill 6. The player hosts it, seated as King A; team B's three seats are the court's bots, named and pictured in the table's view (The Sphinx, Nicol Bolas, Liliana); each friend invited has a General's seat waiting, the other is a bot's. The view says so (`campaign`: the encounter's title), and the page reads "Campaign · King's Table".
@@ -146,7 +174,12 @@ Ward 15 of [the campaign](campaign.md#the-unbound-court-ward-15-v096), with frie
 | `PATCH /api/v1/tables/{code}/seat` | Change `deck_id`, `ready`, or since v0.5.1 `team`, or since v0.8.7 at King's Table `seat` (an open one; every player is made not ready) |
 | `PATCH /api/v1/tables/{code}` | Since v0.8.7, King's Table, the host before the start: `kings_table` (any of its three settings), `bot_seats` (every seat bots fill from now on), `move` (`{"seat": 0, "to": 5}`, a player to an open seat). A change makes every player not ready |
 | `POST /api/v1/tables/{code}/leave` | Leave; the host closes the table |
+| `GET /api/v1/me/table-presets` | Since v0.9.12: the six built-in profiles and the tables the account saved (`built_in`, `saved`, `limit`), each profile with its `enforced_rules` |
+| `PUT /api/v1/me/table-presets` | Since v0.9.12: save `{name, profile, settings}`; a name the account has is replaced |
+| `DELETE /api/v1/me/table-presets/{id}` | Since v0.9.12: remove one of the account's saved tables |
 | `POST /api/v1/tables/{code}/start` | The host starts the game |
+
+Since v0.9.12 `POST /api/v1/tables` takes `profile`, a table's answer carries `profile` (null when it has none), `PATCH /api/v1/tables/{code}` takes `profile` at any table (null removes it; left out, it stays), and `GET /api/v1/tables/browse` takes `intent`, `pace` and `max_duration` ([Rule Zero table profiles](#rule-zero-table-profiles-v0912)).
 
 Every route needs `games.play`, and seats need `decks.edit`. Refusals:
 - 404 for a code no table has.
@@ -179,6 +212,8 @@ Migration `0026_two_headed_giant_tables` (v0.5.1) lets a table's format be `two_
 Migration `0036_kings_table` (v0.8.7) lets a table's and a game's format be `kings_table`, lets such a table seat six with at least one player (other tables keep two to four with at least two), and adds `game_tables.kings_table` and `games.kings_table`, the settings (null for every row already there). A King's Table table's bots sit in `bot_seats`. It only adds. Going back deletes every King's Table table and its seats, ends the rematches of their games (a lapsed one for each finished table game without any), turns every King's Table game into a game of its decks' format with no practice request to replay, and drops the columns.
 
 Migration `0039_table_invites` (v0.9.2) adds **`table_invites`**: a friend invited to a table, who invited them and when, one row per player and table. It also lets a notification be `table_invite`, its subject the table's code. It only adds. Going back deletes the table invitations' notices and drops the table.
+
+Migration `0049_table_profiles` (v0.9.12) adds `game_tables.profile` with `intent`, `pace` and `duration` beside it and the index `ix_game_tables_status_intent`, `games.table_profile`, and **`table_presets`** (an account's saved tables, one row a name). Expand only: nullable columns and a new table. Going back drops them, and tables and games are as they were.
 
 ## Verification
 
@@ -218,3 +253,11 @@ Migration `0039_table_invites` (v0.9.2) adds **`table_invites`**: a friend invit
 - The table journey passed: 3 turns, the player conceded while SysOp held priority, and the game ended at once (55 and 57 frames, no concealed card). With the engine from before the fix, SysOp's game waited for its next answer.
 - The 7 practice game journeys and CI's two scripted games through the API (`scripts/api_practice_game.py`) passed unchanged.
 - An away check with the real engine: the player never connected, SysOp's vote passed 120 seconds after the start, the API conceded the player's seat, and the game ended with SysOp's win, the seat recorded as removed and 50 tokens paid.
+- **API tests (`tests/test_table_profiles.py`, v0.9.12).** At real tables on the tables' fake engine:
+  - a profile made with a table, shown to its host and to another player with every enforced rule in words, removed and set again, searched for in the lobby by intent, pace and length, and kept with the started game;
+  - nine invalid profiles refused (an unknown intent, pace, length or restriction, a later version, a note too long, a limit out of range, no intent), with no table opened;
+  - the restrictions checked as the host opens the table, as a player joins and changes deck (Reserved List cards, Game Changers by the copy, the maybeboard left out), as a player gets ready with a deck edited since, and at the start, where the host learns only whose deck it is and no view of the table names a card; SysOp's deck refused as any other;
+  - any change to the profile, its note alone included, making every player not ready, the same profile again changing nothing, and only the host changing it;
+  - a later version's profile read as none;
+  - the six built-in presets, a saved table replaced by its name whatever the case, another account neither reading nor removing it, and the limit of twenty.
+- **`tests/test_rematches.py` and `tests/test_matches.py`** (v0.9.12): a rematch's table and game under the first table's profile, and a match's second game under its first's.

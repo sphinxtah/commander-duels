@@ -54,6 +54,7 @@ from api.models import (
     MatchPlayer,
     RoleGrant,
     ScheduledJob,
+    TablePreset,
     TableSeat,
     User,
     UserSession,
@@ -298,6 +299,8 @@ def delete_account(
     db.flush()
     # The wishlist is the account's alone, and names its decks (v0.9.12, api/workshop.py).
     db.execute(delete(WishlistEntry).where(WishlistEntry.user_id == user.id))
+    # So are the tables it saved to open again (v0.9.12, api/table_profiles.py).
+    db.execute(delete(TablePreset).where(TablePreset.user_id == user.id))
     remove_decks(db, user.id, now, removed)
     removed.sessions = db.execute(
         delete(UserSession).where(UserSession.user_id == user.id)

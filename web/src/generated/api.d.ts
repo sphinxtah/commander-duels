@@ -2993,6 +2993,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/table-presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Presets
+         * @description The built-in profiles to start a table from, and the tables the account saved.
+         */
+        get: operations["my_presets_api_v1_me_table_presets_get"];
+        /**
+         * Save Preset
+         * @description Saves a table to open again, under a name of the account's own: a name it already has is
+         *     replaced (case aside).
+         */
+        put: operations["save_preset_api_v1_me_table_presets_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/table-presets/{preset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Preset */
+        delete: operations["remove_preset_api_v1_me_table_presets__preset_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/tokens": {
         parameters: {
             query?: never;
@@ -3756,9 +3798,9 @@ export interface paths {
         head?: never;
         /**
          * Change Table
-         * @description The host changes a King's Table table before its start (v0.8.7): its settings, the seats
-         *     its bots fill, or a player's seat (to an open one). Anything that changes makes every player
-         *     not ready again.
+         * @description The host changes a table before its start: a King's Table table's settings, the seats
+         *     its bots fill, or a player's seat (to an open one) (v0.8.7), and since v0.9.12 any table's
+         *     Rule Zero profile. Anything that changes makes every player not ready again.
          */
         patch: operations["change_table_api_v1_tables__code__patch"];
         trace?: never;
@@ -6204,6 +6246,30 @@ export interface components {
             tokens: number;
         };
         /**
+         * Enforced
+         * @description What the server checks every deck against, beside the table's rules. The defaults allow
+         *     everything: a profile enforces only what its host turned on.
+         */
+        Enforced: {
+            /**
+             * Custom Cards
+             * @description Decks may hold the Godlike tier's custom cards.
+             * @default true
+             */
+            custom_cards: boolean;
+            /**
+             * Game Changers
+             * @description The most Game Changers a deck may hold (the Commander format's own list, as the catalog marks it); null: any number.
+             */
+            game_changers?: number | null;
+            /**
+             * Reserved List
+             * @description Decks may hold Reserved List cards.
+             * @default true
+             */
+            reserved_list: boolean;
+        };
+        /**
          * EngineStatus
          * @description Engine /health, passed through. "unavailable" means the engine is unreachable or invalid.
          */
@@ -7979,6 +8045,59 @@ export interface components {
              */
             state: "in_game" | "in_queue" | "online" | "idle" | "offline";
         };
+        /** Preset */
+        Preset: {
+            /** Built In */
+            built_in: boolean;
+            /**
+             * Id
+             * @description A saved preset's id; null for a built-in one.
+             */
+            id: string | null;
+            /** Name */
+            name: string;
+            profile: components["schemas"]["ProfileView"];
+            settings: components["schemas"]["PresetSettings"];
+        };
+        /** PresetSave */
+        PresetSave: {
+            /** Name */
+            name: string;
+            profile: components["schemas"]["TableProfile"];
+            settings?: components["schemas"]["PresetSettings"];
+        };
+        /**
+         * PresetSettings
+         * @description The table's other settings a host saves with a profile; each is the table request's own
+         *     field, and one left out takes the request's default when the table is opened.
+         */
+        PresetSettings: {
+            /** Best Of */
+            best_of?: (1 | 3) | null;
+            /** Bot Skill */
+            bot_skill?: number | null;
+            /** Bots */
+            bots?: number | null;
+            /** Format */
+            format?: ("legacy" | "commander" | "two_headed_giant" | "kings_table") | null;
+            rules?: components["schemas"]["TableRules"] | null;
+            /** Seats */
+            seats?: number | null;
+            /** Visibility */
+            visibility?: ("public" | "private") | null;
+        };
+        /** Presets */
+        Presets: {
+            /** Built In */
+            built_in: components["schemas"]["Preset"][];
+            /**
+             * Limit
+             * @description The most presets an account saves.
+             */
+            limit: number;
+            /** Saved */
+            saved: components["schemas"]["Preset"][];
+        };
         /** PriceChange */
         PriceChange: {
             /** Reason */
@@ -8185,6 +8304,51 @@ export interface components {
             /** Locale */
             locale?: string | null;
             preferences?: components["schemas"]["Preferences"] | null;
+        };
+        /**
+         * ProfileView
+         * @description A profile as a table shows it: what it describes in words, and every rule the server
+         *     enforces at the table, the table's own rules among them.
+         */
+        ProfileView: {
+            /**
+             * Duration
+             * @description The minutes it is expected to take. Described only.
+             */
+            duration?: (30 | 60 | 90 | 120 | 180) | null;
+            enforced?: components["schemas"]["Enforced"];
+            /**
+             * Enforced Rules
+             * @description Everything checked on a deck at this table, in words: the table's rules (banned cards, cards not legal, stand-ins) and the profile's restrictions. Empty: any deck its format takes.
+             */
+            enforced_rules: components["schemas"]["Rule"][];
+            /**
+             * Intent
+             * @description What kind of game the table is for. Described only.
+             * @enum {string}
+             */
+            intent: "learning" | "precon" | "upgraded" | "high_power" | "competitive" | "custom";
+            /** Intent Name */
+            intent_name: string;
+            /**
+             * Note
+             * @description The host's own words. Described only.
+             * @default
+             */
+            note: string;
+            /**
+             * Pace
+             * @description How fast it is played. Described only.
+             */
+            pace?: ("relaxed" | "steady" | "brisk") | null;
+            /** Pace Name */
+            pace_name: string | null;
+            /**
+             * Version
+             * @default 1
+             * @constant
+             */
+            version: 1;
         };
         /** Progress */
         Progress: {
@@ -9237,6 +9401,13 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** Rule */
+        Rule: {
+            /** Code */
+            code: string;
+            /** Text */
+            text: string;
+        };
         /** Ruling */
         Ruling: {
             /** Comment */
@@ -10000,8 +10171,9 @@ export interface components {
         };
         /**
          * TableChange
-         * @description The host's changes to a King's Table table before its start (v0.8.7). Anything that
-         *     changes makes every player not ready again; the host's start is their ready.
+         * @description The host's changes to a table before its start: a King's Table table's settings and seats
+         *     (v0.8.7), and since v0.9.12 any table's Rule Zero profile. Anything that changes makes every
+         *     player not ready again; the host's start is their ready.
          */
         TableChange: {
             /**
@@ -10013,6 +10185,8 @@ export interface components {
             kings_table?: components["schemas"]["KingsTableChange"] | null;
             /** @description Moves a player to an open seat. */
             move?: components["schemas"]["SeatMove"] | null;
+            /** @description Since v0.9.12: the table's Rule Zero profile from now on; null removes it, and left out it stays. Any change to it, its note included, makes every player not ready again: getting ready again is how they accept it. */
+            profile?: components["schemas"]["TableProfile"] | null;
         };
         /**
          * TableInviting
@@ -10119,6 +10293,41 @@ export interface components {
             you: boolean;
         };
         /**
+         * TableProfile
+         * @description A table's Rule Zero profile, as its host writes it.
+         */
+        TableProfile: {
+            /**
+             * Duration
+             * @description The minutes it is expected to take. Described only.
+             */
+            duration?: (30 | 60 | 90 | 120 | 180) | null;
+            enforced?: components["schemas"]["Enforced"];
+            /**
+             * Intent
+             * @description What kind of game the table is for. Described only.
+             * @enum {string}
+             */
+            intent: "learning" | "precon" | "upgraded" | "high_power" | "competitive" | "custom";
+            /**
+             * Note
+             * @description The host's own words. Described only.
+             * @default
+             */
+            note: string;
+            /**
+             * Pace
+             * @description How fast it is played. Described only.
+             */
+            pace?: ("relaxed" | "steady" | "brisk") | null;
+            /**
+             * Version
+             * @default 1
+             * @constant
+             */
+            version: 1;
+        };
+        /**
          * TableRequest
          * @description A new table: the host takes the first seat with one of their decks.
          */
@@ -10171,6 +10380,8 @@ export interface components {
             invite?: string[];
             /** @description King's Table (v0.8.7): its settings, the defaults when left out. Refused at other tables. */
             kings_table?: components["schemas"]["KingsTableSettings"] | null;
+            /** @description Since v0.9.12: the table's Rule Zero profile (what kind of game it is for, and the restrictions on its decks the server enforces); none when left out. */
+            profile?: components["schemas"]["TableProfile"] | null;
             /** @description Which cards its decks may hold by their legality; casual unless told otherwise. */
             rules?: components["schemas"]["TableRules"];
             /**
@@ -10290,6 +10501,8 @@ export interface components {
              * @description Every seat in turn order, bots last (at Two-Headed Giant and King's Table tables, in their own seats).
              */
             players: components["schemas"]["TablePlayer"][];
+            /** @description Since v0.9.12: the table's Rule Zero profile: what it describes, and every rule the server enforces on its decks. Null when its host gave none. */
+            profile?: components["schemas"]["ProfileView"] | null;
             rules: components["schemas"]["TableRules"];
             /** Seats */
             seats: number;
@@ -26531,6 +26744,288 @@ export interface operations {
             };
         };
     };
+    my_presets_api_v1_me_table_presets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Presets"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    save_preset_api_v1_me_table_presets_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PresetSave"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Presets"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    remove_preset_api_v1_me_table_presets__preset_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Presets"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     my_tokens_api_v1_me_tokens_get: {
         parameters: {
             query?: never;
@@ -30163,6 +30658,12 @@ export interface operations {
                 friends?: boolean;
                 /** @description Only tables whose host's handle holds this. */
                 host?: string | null;
+                /** @description Since v0.9.12: only tables whose Rule Zero profile says one of these kinds of game; a table with no profile matches none. */
+                intent?: ("learning" | "precon" | "upgraded" | "high_power" | "competitive" | "custom")[] | null;
+                /** @description Since v0.9.12: only tables whose profile says one of these paces. */
+                pace?: ("relaxed" | "steady" | "brisk")[] | null;
+                /** @description Since v0.9.12: only tables whose profile expects at most this many minutes; a table that says no length matches none. */
+                max_duration?: number | null;
                 /** @description newest (default), players (most seated) or fewest_open (seats). */
                 sort?: "newest" | "players" | "fewest_open";
                 page?: number;

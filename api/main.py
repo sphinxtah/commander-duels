@@ -42,6 +42,7 @@ from api import (
     sleeves,
     social,
     stats,
+    table_profiles,
     tables,
     testing,
     tutorial,
@@ -377,6 +378,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(games.router)
     app.include_router(events.router)
     app.include_router(tables.router)
+    app.include_router(table_profiles.router)
     app.include_router(matches.router)
     app.include_router(queues.router)
     app.include_router(rematches.router)

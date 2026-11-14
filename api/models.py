@@ -266,6 +266,10 @@ class Game(Base):
     # them ({deck_format, life, king_attacks_anyone}, and since v0.9.7 guarded_kings). Null in
     # other formats.
     kings_table: Mapped[dict[str, object] | None] = mapped_column(JsonType)
+    # The Rule Zero profile its table's players were ready under when it started (v0.9.12,
+    # api/table_profiles.py), copied from the table: the game keeps what was agreed, whatever
+    # the table becomes. Null for a game of no table, or of a table with no profile.
+    table_profile: Mapped[dict[str, object] | None] = mapped_column(JsonType)
 
 
 class AccessGrant(Base):
@@ -389,6 +393,8 @@ class GameTable(Base):
             "best_of IN (1, 3) AND (best_of = 1 OR format = 'legacy')",
             name="ck_game_tables_best_of",
         ),
+        # The lobby's search by a table's Rule Zero profile (v0.9.12).
+        Index("ix_game_tables_status_intent", "status", "intent"),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     # Unguessable: the invite link's code.
@@ -431,6 +437,13 @@ class GameTable(Base):
     # Ward 15 (v0.9.6): a table the campaign opened for its player's court with friends as their
     # Generals ({campaign_id, encounter, user_id, challenge}). Null for every other table.
     campaign: Mapped[dict[str, object] | None] = mapped_column(JsonType)
+    # The host's Rule Zero profile (v0.9.12, api/table_profiles.py): what kind of game the table
+    # is for, in the host's words, and the restrictions the server enforces on its decks. Null:
+    # none, as every table before v0.9.12. What the lobby searches by is kept beside it.
+    profile: Mapped[dict[str, object] | None] = mapped_column(JsonType)
+    intent: Mapped[str | None] = mapped_column(String(16))
+    pace: Mapped[str | None] = mapped_column(String(16))
+    duration: Mapped[int | None] = mapped_column(SmallInteger)
 
 
 class TableSeat(Base):
@@ -2164,5 +2177,21 @@ class WishlistEntry(Base):
     card_id: Mapped[UUID] = mapped_column(ForeignKey("card_concepts.id"))
     quantity: Mapped[int] = mapped_column(SmallInteger)
     deck_id: Mapped[UUID | None] = mapped_column(ForeignKey("decks.id"))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class TablePreset(Base):
+    """A table a host saved to open again (v0.9.12, api/table_profiles.py): a name of the host's
+    own, a Rule Zero profile, and the table's other settings. The account's alone: made, changed
+    and removed by it; removed with the account. At most a few an account (PRESET_LIMIT)."""
+
+    __tablename__ = "table_presets"
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_table_presets_name"),)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    name: Mapped[str] = mapped_column(String(48))
+    # {"profile": the profile, "settings": the table's other settings}.
+    preset: Mapped[dict[str, object]] = mapped_column(JsonType)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime())
