@@ -40,7 +40,6 @@ from api.models import (
 
 # Tables a test empties after itself, children first; the catalog stays.
 ACCOUNT_TABLES = (
-    "entitlements",
     "wishlist_entries",
     "table_presets",
     "token_ledger",

@@ -780,39 +780,31 @@ GRANT_QUERIES = {
 }
 
 
-def claim_a_staple(engine: Engine, player: UUID, friend: UUID) -> None:
-    """v0.9.12's entitlements (migration 0047): the player claimed a starter staple, and SysOp's
-    functional access to another card was ended."""
-    with engine.connect() as connection:
-        cards = [
-            UUID(str(found)) if not isinstance(found, UUID) else found
-            for found in connection.execute(
-                text("SELECT id FROM card_concepts ORDER BY name LIMIT 2")
-            ).scalars()
-        ]
+# A game's eligibility as v0.9.12 recorded it: v0.9.10's record, and the farming signals.
+RECORDED = {
+    "mode": "table",
+    "earns": ["tokens", "wins", "quests", "achievements", "statistics"],
+    "withheld": {"competitive": "not_competitive"},
+    "signals": {"0": ["short_game"], "1": ["short_game", "repeat_opponent"]},
+}
+
+
+def play_on_v0_9_12(engine: Engine, player: UUID, friend: UUID) -> None:
+    """v0.9.12 as the live site ran it (migration 0047), with every economy policy off: each
+    quest it drew wrote JSON's null for its alternative, each game's end recorded its farming
+    signals, and a policy SysOp saved as it stood left a setting. v0.9.13's migration 0050 takes
+    all three out (tests/test_economy_removed.py) and leaves the account as it was."""
     account = Account(engine)
-    for kind, card, revoked in (("staple", cards[0], None), ("staff", cards[1], T0)):
-        account.add(
-            "entitlements",
-            id=uuid4(),
-            user_id=player,
-            kind=kind,
-            card_id=card,
-            copies=1,
-            key=f"{kind}:{player}:{card}",
-            policy="staples-v1",
-            reason=None if kind == "staple" else "testing",
-            actor_id=None if kind == "staple" else friend,
-            created_at=T0,
-            revoked_at=revoked,
-            revoked_by=friend if revoked else None,
-        )
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE daily_quests SET alternative = 'null'"))
+        connection.execute(account.metadata.tables["games"].update().values(eligibility=RECORDED))
+    account.add("site_settings", key="policy.farming", value={"enforce": False}, updated_at=T0)
     account.write(engine)
 
 
-ENTITLEMENT_QUERIES = {
-    "entitlements": "SELECT kind, copies, key, revoked_at IS NOT NULL FROM entitlements "
-    "WHERE user_id = :u ORDER BY kind",
+V0_9_12_QUERIES = {
+    "quests drawn": "SELECT COUNT(*) FROM daily_quests WHERE user_id = :u",
+    "games recorded": "SELECT COUNT(*) FROM games WHERE eligibility IS NOT NULL",
 }
 
 
@@ -879,7 +871,7 @@ PRESET_QUERIES = {
 # at its own revision, and its totals compared from there on.
 LATER = [
     ("0046_access_grants", lend_a_deck, GRANT_QUERIES),
-    ("0047_economy_foundations", claim_a_staple, ENTITLEMENT_QUERIES),
+    ("0047_economy_foundations", play_on_v0_9_12, V0_9_12_QUERIES),
     ("0048_deck_workshop", wish_for_a_card, WISH_QUERIES),
     ("0049_table_profiles", save_a_table, PRESET_QUERIES),
 ]
