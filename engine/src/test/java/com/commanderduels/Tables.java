@@ -36,6 +36,8 @@ final class Tables {
     static final String AMOUNTS = "amounts:";
     /** A policy's answer that is a typed name, "text:Black Lotus", rather than an option id. */
     static final String TEXT = "text:";
+    /** A policy's answer that is a batch declaration (v0.9.12), "batch:" and the batch's JSON. */
+    static final String BATCH = "batch:";
 
     /**
      * Chooses a seat's answer: an option id, {@link #AMOUNTS} and a number, {@link #TEXT} and a name,
@@ -98,6 +100,12 @@ final class Tables {
             + "\",\"type\":\"submit_choice\",\"payload\":" + payload + "}", game.id());
     }
 
+    static SeatCommand batch(HumanGame game, long revision, String promptId, String batch) throws JsonRequest.Invalid {
+        return SeatCommand.parse("{\"v\":1,\"game_id\":\"" + game.id() + "\",\"action_id\":\"" + UUID.randomUUID()
+            + "\",\"expected_revision\":" + revision + ",\"prompt_id\":\"" + promptId
+            + "\",\"type\":\"submit_choice\",\"payload\":{\"batch\":" + batch + "}}", game.id());
+    }
+
     static SeatCommand concede(HumanGame game, long revision) throws JsonRequest.Invalid {
         return SeatCommand.parse("{\"v\":1,\"game_id\":\"" + game.id() + "\",\"action_id\":\"" + UUID.randomUUID()
             + "\",\"expected_revision\":" + revision + ",\"type\":\"concede\",\"payload\":{}}", game.id());
@@ -150,6 +158,10 @@ final class Tables {
                 reply = game.submit(seat, text(game, snapshot.revision(), prompt.id(),
                     option.substring(TEXT.length())));
                 coverage.kinds.merge(prompt.kind() + " (typed)", 1, Integer::sum);
+            } else if (option.startsWith(BATCH)) {
+                reply = game.submit(seat, batch(game, snapshot.revision(), prompt.id(),
+                    option.substring(BATCH.length())));
+                coverage.kinds.merge(prompt.kind() + " (batch)", 1, Integer::sum);
             } else {
                 reply = game.submit(seat, answer(game, UUID.randomUUID().toString(), snapshot.revision(), prompt.id(),
                     option));

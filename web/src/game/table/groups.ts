@@ -14,8 +14,77 @@ export function isToken(card: CardView): boolean {
   return !card.mana_cost && !isLand(card) && isCreature(card);
 }
 
-function sortedActions(offered: PromptOption[]): string[] {
-  return offered.map((option) => option.action).sort();
+// What grouping may and may not hide (v0.9.12, the specification's section 14). Every field of a
+// permanent in the seat's view (contracts/engine-seat-view.schema.json) is one of three things:
+//   "which": says which object it is, never what it is like; it is no part of a pile's key;
+//   "alike": two permanents in one pile have the same value;
+//   "alone": a permanent with it set stands on its own.
+// A field the view gains is in none until it is added here: the types refuse to compile, and
+// groups.test.ts reads the contract and fails, so nothing a player could tell two permanents apart
+// by is ever left out of a pile's key by oversight.
+export type Likeness = "which" | "alike" | "alone";
+export const PERMANENT_FIELDS = {
+  id: "which",
+  controller_seat: "alike",
+  owner_seat: "alike",
+  card: "alike",
+  tapped: "alike",
+  summoning_sick: "alike",
+  damage: "alike",
+  counters: "alike",
+  attacking: "alone",
+  blocking: "alone",
+  attached_to: "alone",
+} as const satisfies Record<keyof PermanentView, Likeness>;
+export const CARD_FIELDS = {
+  id: "which",
+  hidden: "alone",
+  name: "alike",
+  mana_cost: "alike",
+  type_line: "alike",
+  power: "alike",
+  toughness: "alike",
+  rules: "alike",
+} as const satisfies Record<keyof CardView, Likeness>;
+
+/** A value as a key holds it: a map by its sorted entries, anything else as it is. */
+function keyed(value: unknown): unknown {
+  if (value && typeof value === "object" && !Array.isArray(value))
+    return Object.entries(value).sort(([a], [b]) => a.localeCompare(b));
+  return value;
+}
+
+function alike(
+  fields: Record<string, Likeness>,
+  of: Record<string, unknown>,
+): unknown[] {
+  return Object.keys(fields)
+    .filter((field) => fields[field] === "alike" && field !== "card")
+    .map((field) => keyed(of[field]));
+}
+
+/** Everything a player could tell two permanents apart by, short of which object each is: every
+ * "alike" field of the permanent and of its card, and what the open prompt offers for it (each
+ * choice and its words). Two permanents share a pile only when all of it is the same. */
+function likeness(p: PermanentView, offered: PromptOption[]): unknown[] {
+  return [
+    ...alike(PERMANENT_FIELDS, p as unknown as Record<string, unknown>),
+    ...alike(CARD_FIELDS, p.card as unknown as Record<string, unknown>),
+    offered
+      .map((option) => [option.action, option.label ?? ""])
+      .sort((a, b) => (a.join("\u0000") < b.join("\u0000") ? -1 : 1)),
+  ];
+}
+
+/** Whether the permanent must stand on its own whatever it is like: attached, fighting, or
+ * chosen in the open prompt. */
+function alone(p: PermanentView, offered: PromptOption[]): boolean {
+  return Boolean(
+    p.attached_to ||
+    p.attacking ||
+    p.blocking ||
+    offered.some((option) => option.selected),
+  );
 }
 
 /** The pile a land joins, or null when it must stand alone. */
@@ -26,23 +95,10 @@ export function landKey(
   const card = p.card;
   if (card.hidden || !card.name || !isLand(card) || isCreature(card))
     return null;
-  if (
-    p.attached_to ||
-    p.attacking ||
-    p.blocking ||
-    p.damage > 0 ||
-    Object.keys(p.counters).length > 0 ||
-    offered.some((option) => option.selected)
-  )
+  // A land that carries anything (damage, a counter) is looked at, so it is not stacked away.
+  if (alone(p, offered) || p.damage > 0 || Object.keys(p.counters).length > 0)
     return null;
-  return JSON.stringify([
-    "lands",
-    p.controller_seat,
-    p.owner_seat,
-    card.name,
-    p.tapped,
-    sortedActions(offered),
-  ]);
+  return JSON.stringify(["lands", ...likeness(p, offered)]);
 }
 
 /** The group a token joins, or null when it must stand alone. */
@@ -50,33 +106,8 @@ export function tokenKey(
   p: PermanentView,
   offered: PromptOption[],
 ): string | null {
-  const card = p.card;
-  if (!isToken(card)) return null;
-  if (
-    p.attached_to ||
-    p.attacking ||
-    p.blocking ||
-    offered.some((option) => option.selected)
-  )
-    return null;
-  return JSON.stringify([
-    "tokens",
-    p.controller_seat,
-    p.owner_seat,
-    card.name,
-    card.mana_cost,
-    card.type_line,
-    card.power,
-    card.toughness,
-    card.rules.join("\n"),
-    p.tapped,
-    p.summoning_sick,
-    p.damage,
-    Object.entries(p.counters).sort(([a], [b]) => a.localeCompare(b)),
-    offered
-      .map((option) => [option.action, option.label ?? ""])
-      .sort((a, b) => (a.join("\u0000") < b.join("\u0000") ? -1 : 1)),
-  ]);
+  if (!isToken(p.card) || alone(p, offered)) return null;
+  return JSON.stringify(["tokens", ...likeness(p, offered)]);
 }
 
 /** Which row a permanent sits on: creatures and their kin nearest the band, lands behind. */

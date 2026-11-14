@@ -313,6 +313,8 @@ final class HumanGame {
 
     // Game thread only.
     private SeatViews views;
+    /** The answers the engine gives on a seat's standing instruction (v0.9.12): batches and yields. */
+    private final Automation automation = new Automation();
 
     private volatile Game game;
 
@@ -643,6 +645,7 @@ final class HumanGame {
             }
         }
         views = new SeatViews(created, seatIds, refs);
+        views.yielding = seat -> automation.yielding(seat, created.getTurnNum());
         log.attach(created, seatIds);
         created.addTableEventListener(event -> {
             if (event.getEventType() == TableEvent.EventType.UPDATE) {
@@ -688,6 +691,7 @@ final class HumanGame {
         RandomUtil.setRandom(restored.random());
         Game current = restored.game();
         views = new SeatViews(current, seatIds, refs);
+        views.yielding = seat -> automation.yielding(seat, current.getTurnNum());
         log.attach(current, seatIds);
         current.addTableEventListener(event -> {
             if (event.getEventType() == TableEvent.EventType.UPDATE) {
@@ -832,14 +836,28 @@ final class HumanGame {
         Integer forSeat = seat == askingSeat ? null : seatIds.indexOf(asking);
         String attacker;
         boolean leaving;
+        boolean automate;
         synchronized (this) {
             attacker = seat.lastAttacker;
             leaving = (askingSeat != null && askingSeat.concedeRequested) || endRequest != null;
+            // While the journal is played again its records answer, the automatic ones among them.
+            automate = !leaving && !replaying;
         }
         // The object XMage waits on: a human seat's player, or the bot whose stand-in asks.
         Player human = askingSeat != null ? current(askingSeat) : game.getPlayer(asking);
         Prompts.Prompt next = Prompts.build(event, game, human, views, UUID.randomUUID().toString(), attacker,
             forSeat);
+        // The seat's batch or yield may answer it (v0.9.12): then the seat is shown no prompt.
+        Automation.Step step = automate && next.supported()
+            ? automation.opened(seat.index, seatIds.indexOf(asking), next, game.getTurnNum(), Automation.offer(game, ""))
+            : Automation.Step.ASK;
+        Prompts.Answer automatic = step.optionId() == null ? null : next.answers().get(step.optionId());
+        if (step.note() != null) {
+            seat.messages.addLast(step.note());
+            while (seat.messages.size() > MAX_MESSAGES) {
+                seat.messages.removeFirst();
+            }
+        }
         SeatView seatView = views.build(seat.index, List.copyOf(seat.messages));
         int logged = log.size();
         // Every other seat sees the game as it is while XMage waits. Their views go out before the
@@ -850,9 +868,10 @@ final class HumanGame {
             }
         }
         publishSpectators();
-        hooks.published(game, refs, seat.index, seatView, leaving ? null : next.view());
+        hooks.published(game, refs, seat.index, seatView, leaving || automatic != null ? null : next.view());
         boolean concede;
         boolean closing;
+        Runnable deliver = null;
         synchronized (this) {
             concede = askingSeat != null && askingSeat.concedeRequested;
             closing = endRequest != null;
@@ -860,11 +879,43 @@ final class HumanGame {
             // concession below makes XMage drop this request, and the seat leaves the game.
             boolean ask = !concede && !closing;
             seat.revision++;
-            seat.prompt = ask ? next : null;
+            seat.prompt = ask && automatic == null ? next : null;
             seat.promptFor = seatIds.indexOf(asking);
             seat.view = seatView;
             seat.logEntries = logged;
-            seat.status = !ask ? "waiting" : next.supported() ? "your_prompt" : "unsupported_prompt";
+            seat.status = !ask || automatic != null ? "waiting"
+                : next.supported() ? "your_prompt" : "unsupported_prompt";
+            if (ask && automatic != null) {
+                // Answered as the seat's own answer is (submit), and kept in the journal as one: a
+                // game taken up again plays it as any other, with no batch or yield to know of.
+                int promptFor = seat.promptFor;
+                PromptView.Option chosen = next.view().options().stream()
+                    .filter(option -> option.id().equals(step.optionId())).findFirst().orElseThrow();
+                if (next.view().kind().equals("declare_attackers")) {
+                    seat.lastAttacker = chosen.label();
+                }
+                if (recorder != null) {
+                    JsonObject record = new JsonObject();
+                    record.addProperty("type", "answer");
+                    record.addProperty("seat", seat.index);
+                    record.addProperty("for", promptFor);
+                    record.addProperty("print", next.print());
+                    record.addProperty("kind", next.view().kind());
+                    record.addProperty("options", next.view().options().size());
+                    record.addProperty("code", next.code(step.optionId()));
+                    record.addProperty("automatic", step.yielded() ? "yield" : "batch");
+                    if (next.view().kind().equals("declare_attackers") && seat.lastAttacker != null) {
+                        record.addProperty("attacker", seat.lastAttacker);
+                    }
+                    recorder.journal(record);
+                }
+                deliver = () -> {
+                    Player answering = answering(promptFor);
+                    if (answering != null) {
+                        automatic.apply(answering);
+                    }
+                };
+            }
             touch();
             notifyAll();
         }
@@ -885,6 +936,9 @@ final class HumanGame {
             human.signalPlayerConcede(true);
             // XMage has removed the seat: its view now says it is out.
             publish(askingSeat);
+        } else if (deliver != null) {
+            // From another thread, as any answer: XMage listens only once this request has been fired.
+            Thread.ofVirtual().name("human-game-automation").start(deliver);
         } else {
             hooks.prompted(seat.index);
             if (recorder != null) {
@@ -1390,6 +1444,8 @@ final class HumanGame {
         Prompts.Answer answer;
         Reply reply;
         int promptFor;
+        // The option answered: the command's own, or the first of its batch.
+        String chosen = command.optionId();
         if (recorder != null) {
             // The answer builds on the newest checkpoint (v0.9.9), which is being written since the
             // prompt opened: the answer is taken once it is on disk, so that what the seat is told
@@ -1432,16 +1488,35 @@ final class HumanGame {
                         : "No card by that name can be chosen here"
                             + (near.isEmpty() ? "." : ". Did you mean " + String.join(", ", near) + "?"));
                 }
+            } else if (command.batch() != null) {
+                // Several attackers or blockers at once (v0.9.12): checked whole against the prompt,
+                // then the first is this command's answer and the rest follow as the prompt opens
+                // again (Automation).
+                try {
+                    chosen = automation.begin(seat.index, seat.promptFor, prompt, command.batch());
+                } catch (Automation.Refused refused) {
+                    return reject(seat, 422, "invalid_batch", refused.getMessage());
+                }
+                answer = prompt.answers().get(chosen);
             } else {
                 answer = prompt.answers().get(command.optionId());
                 if (answer == null) {
                     return reject(seat, 422, "invalid_option", "The prompt has no such option");
                 }
             }
+            if (command.batch() == null) {
+                // The seat's own answer: to the question a batch left it, or the end of the batch.
+                automation.answered(seat.index, prompt.view(), command.optionId());
+            }
+            if (answer instanceof Prompts.YieldAnswer yield) {
+                // Only a priority prompt offers one, and only in a game that is running.
+                automation.yield(seat.index, prompt, yield.offer(), game.getTurnNum());
+            }
+            String answered = chosen;
             if (prompt.view().kind().equals("declare_attackers")) {
                 // XMage's defender choice that may follow does not say which attacker it is for.
                 PromptView.Option option = prompt.view().options().stream()
-                    .filter(candidate -> candidate.id().equals(command.optionId())).findFirst().orElse(null);
+                    .filter(candidate -> candidate.id().equals(answered)).findFirst().orElse(null);
                 seat.lastAttacker = option == null ? null
                     : option.action().equals("all_attack") ? "all attackers" : option.label();
             }
@@ -1472,7 +1547,7 @@ final class HumanGame {
                 } else if (command.text() != null) {
                     record.addProperty("text", command.text());
                 } else {
-                    record.addProperty("code", prompt.code(command.optionId()));
+                    record.addProperty("code", prompt.code(chosen));
                 }
                 if (prompt.view().kind().equals("declare_attackers") && seat.lastAttacker != null) {
                     record.addProperty("attacker", seat.lastAttacker);
@@ -1521,9 +1596,15 @@ final class HumanGame {
         }
         HumanPlayer human = current(seat);
         Priority.apply(human, game, command.priority());
+        if (command.priority().cancelPasses()) {
+            automation.cancel(seatIndex);
+        }
+        // Before the game has started there is no turn, and nothing yielded to.
+        Game running = game;
+        List<String> yields = running == null ? List.of() : automation.yielding(seatIndex, running.getTurnNum());
         synchronized (this) {
             Reply reply = accepted(seat, command);
-            reply.body().put("priority", Priority.controls(human));
+            reply.body().put("priority", Priority.controls(human, yields));
             if (recorder != null) {
                 // After it is applied (v0.9.9): a checkpoint taken in between has the controls, and
                 // the journal then sets them again, to the same.

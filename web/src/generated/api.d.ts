@@ -7543,6 +7543,40 @@ export interface components {
              */
             unfile: boolean;
         };
+        /**
+         * PacePolicy
+         * @description What a pace means in numbers. Described only in v0.9.12: nothing measures or enforces it.
+         */
+        PacePolicy: {
+            /**
+             * Enforced
+             * @description Whether the game holds players to it. Not in v0.9.12.
+             * @default false
+             */
+            enforced: boolean;
+            /**
+             * Extended Factor
+             * @description What a player who asked for more time gets: each of the two, this many times over.
+             */
+            extended_factor: number;
+            /** Name */
+            name: string;
+            /**
+             * Notice Seconds
+             * @description How long a decision stays open before the table says who it waits for; null: it never does.
+             */
+            notice_seconds: number | null;
+            /**
+             * Nudge Seconds
+             * @description How long before the other players may nudge the player it waits for; null: never.
+             */
+            nudge_seconds: number | null;
+            /**
+             * Pace
+             * @enum {string}
+             */
+            pace: "relaxed" | "steady" | "brisk";
+        };
         /** Pack */
         Pack: {
             /** Name */
@@ -8095,6 +8129,11 @@ export interface components {
              * @description The most presets an account saves.
              */
             limit: number;
+            /**
+             * Paces
+             * @description What each pace a profile may name means in numbers (pace policies).
+             */
+            paces: components["schemas"]["PacePolicy"][];
             /** Saved */
             saved: components["schemas"]["Preset"][];
         };

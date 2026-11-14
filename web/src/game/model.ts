@@ -229,6 +229,7 @@ const verbs: Record<PromptOption["action"], string> = {
   pass_until_end_step_before_my_turn:
     "Pass until the end step before your turn",
   pass_until_my_turn: "Pass until your next turn",
+  yield: "Pass, and keep passing for this",
   cast: "Cast",
   play_land: "Play",
   activate: "Activate",

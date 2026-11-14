@@ -16,6 +16,7 @@ import {
 import { CardFace, cardLabel, permanentState } from "./Card";
 import { objectName, optionText, playerName, type Located } from "./model";
 import type {
+  BatchPayload,
   CardView,
   GameView,
   ObjectId,
@@ -51,6 +52,9 @@ export interface GameContextValue {
   /** SysOp watching another player's game: the seat's owner is named, never "You". */
   observing: boolean;
   choose: (option: PromptOption) => void;
+  /** Declares, or withdraws, several attackers or blockers with one command (v0.9.12); absent
+   * where the screen sends none (a watching tab's fixtures). */
+  chooseBatch?: (batch: BatchPayload) => void;
   zoom: (card: CardView, located?: Located) => void;
   preview: (card: CardView | null, located?: Located) => void;
 }

@@ -329,6 +329,20 @@ def test_a_host_saves_tables_to_open_again(client):
     ada, bob = Account(client, "ada", admin=True), Account(client, "bob", admin=True)
     found = ada.get("/api/v1/me/table-presets").json()
     assert found["saved"] == [] and found["limit"] == 20
+    # Pace policies: what each pace means in numbers, defined and not enforced. None of them
+    # passes for a player: that is the response timer's, on the player's own device.
+    assert [
+        (pace["pace"], pace["notice_seconds"], pace["nudge_seconds"]) for pace in found["paces"]
+    ] == [
+        ("relaxed", None, None),
+        ("steady", 60, 120),
+        ("brisk", 30, 60),
+    ]
+    assert not any(pace["enforced"] for pace in found["paces"])
+    assert set(table_profiles.PACE_POLICIES) == set(table_profiles.PACE_NAMES)
+    # A player who asked for more time gets twice as long, and "never" stays never.
+    assert table_profiles.PACE_POLICIES["brisk"].thresholds(extended=True) == (60, 120)
+    assert table_profiles.PACE_POLICIES["relaxed"].thresholds(extended=True) == (None, None)
     # The six built in, each a starting point: the first three limit Game Changers.
     assert [preset["name"] for preset in found["built_in"]] == [
         "Learning game",

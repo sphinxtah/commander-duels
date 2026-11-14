@@ -184,6 +184,38 @@ describe("every object is a button or counted by a “+N”", () => {
     expect(top.badges.find((b) => b.glyph === "count")?.text).toBe("×7");
   });
 
+  it("draws a pile as one card and its count with reduced clutter (v0.9.12)", () => {
+    const m = fixtureModel("tokens");
+    const l = layoutTable(m, { expandedSeat: null, textScale: 1, pileCap: 1 });
+    const soldiers = m.anchored!.units.find(
+      (u) => u.kind === "tokens" && u.cards.length === 7,
+    )!;
+    // One member is drawn; the other six are behind the count, which opens all seven.
+    expect(soldiers.cards.filter((key) => card(l, key).hit)).toHaveLength(1);
+    const plus = more(l, `more:${soldiers.key}`);
+    expect(plus.count).toBe(6);
+    expect(plus.label).toBe("Show all 7 Soldier Token");
+    expect(plus.opens).toEqual({ kind: "pile", unit: soldiers.key });
+    // Still every object a button or counted, with no hit overlapping another.
+    expect(validateHits(l, m)).toEqual([]);
+    // And narrower than the fan it replaces.
+    const fanned = layout(m);
+    const width = (which: TableLayout) =>
+      Math.max(
+        ...soldiers.cards
+          .map((key) => card(which, key).hit)
+          .filter(Boolean)
+          .map((hit) => hit!.x + hit!.w),
+      ) -
+      Math.min(
+        ...soldiers.cards
+          .map((key) => card(which, key).hit)
+          .filter(Boolean)
+          .map((hit) => hit!.x),
+      );
+    expect(width(l)).toBeLessThan(width(fanned));
+  });
+
   it("gives a host its attachments' strips, and a “+N” past four", () => {
     const m = fixtureModel("attachments");
     const l = layout(m);

@@ -55,6 +55,14 @@ describe("the table's device settings", () => {
     });
     expect(sanitizeTableSettings({ musicVolume: 33.6 }).musicVolume).toBe(34);
     expect(sanitizeTableSettings({ musicMuted: true }).musicMuted).toBe(true);
+    // Reduced clutter (v0.9.12): off unless the device said so.
+    expect(sanitizeTableSettings({}).reducedClutter).toBe(false);
+    expect(
+      sanitizeTableSettings({ reducedClutter: "yes" }).reducedClutter,
+    ).toBe(false);
+    expect(sanitizeTableSettings({ reducedClutter: true }).reducedClutter).toBe(
+      true,
+    );
     expect(sanitizeTableSettings({ effects: "subtle" }).effects).toBe("subtle");
     expect(sanitizeTableSettings({ effects: "off" }).effects).toBe("off");
     const timer = (value: unknown) =>

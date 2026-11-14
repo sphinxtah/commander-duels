@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { client } from "../api";
+import { batchGroups } from "./batch";
 import { CardButton, CardRow, useGameContext } from "./Board";
 import type { GameState } from "./connection";
 import {
@@ -54,6 +55,8 @@ const groups: { title: string; actions: PromptOption["action"][] }[] = [
       "pass_until_next_turn",
       "pass_until_end_step_before_my_turn",
       "pass_until_my_turn",
+      // A yield to the source on top of the stack (v0.9.12).
+      "yield",
     ],
   },
 ];
@@ -521,6 +524,7 @@ export function PromptPanel({
             onSubmit={(text) => onAnswer({ text })}
           />
         )}
+        <BatchDeclare prompt={prompt} disabled={disabled} />
         {grouped.map((group) => (
           <div key={group.title} className={styles.optionGroup}>
             <h3>{group.title}</h3>
@@ -713,6 +717,43 @@ function TimerRing() {
         {Math.ceil(timer.remainingMs / 1000)}
       </span>
     </span>
+  );
+}
+
+/**
+ * Several attackers or blockers at once (v0.9.12): one button for each name the declaration
+ * offers two or more of, the declared apart from the undeclared. Each declares, or withdraws,
+ * its creatures with one command; Done stays the player's own, so nothing is confirmed here.
+ */
+function BatchDeclare({
+  prompt,
+  disabled,
+}: {
+  prompt: Prompt;
+  disabled: boolean;
+}) {
+  const game = useGameContext();
+  const send = game.chooseBatch;
+  const groups = send ? batchGroups(prompt) : [];
+  if (!send || groups.length === 0) return null;
+  return (
+    <div className={styles.optionGroup} data-batch>
+      <h3>Several at once</h3>
+      <ul className={styles.options}>
+        {groups.map((group) => (
+          <li key={group.key}>
+            <button
+              type="button"
+              disabled={disabled}
+              data-batch={group.key}
+              onClick={() => send(group.batch)}
+            >
+              {group.text}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

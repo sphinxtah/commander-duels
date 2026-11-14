@@ -8909,6 +8909,69 @@
         "title": "Organize",
         "type": "object"
       },
+      "PacePolicy": {
+        "additionalProperties": false,
+        "description": "What a pace means in numbers. Described only in v0.9.12: nothing measures or enforces it.",
+        "properties": {
+          "enforced": {
+            "default": false,
+            "description": "Whether the game holds players to it. Not in v0.9.12.",
+            "title": "Enforced",
+            "type": "boolean"
+          },
+          "extended_factor": {
+            "description": "What a player who asked for more time gets: each of the two, this many times over.",
+            "title": "Extended Factor",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "notice_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How long a decision stays open before the table says who it waits for; null: it never does.",
+            "title": "Notice Seconds"
+          },
+          "nudge_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How long before the other players may nudge the player it waits for; null: never.",
+            "title": "Nudge Seconds"
+          },
+          "pace": {
+            "enum": [
+              "relaxed",
+              "steady",
+              "brisk"
+            ],
+            "title": "Pace",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pace",
+          "name",
+          "notice_seconds",
+          "nudge_seconds",
+          "extended_factor"
+        ],
+        "title": "PacePolicy",
+        "type": "object"
+      },
       "Pack": {
         "additionalProperties": false,
         "properties": {
@@ -10228,6 +10291,14 @@
             "title": "Limit",
             "type": "integer"
           },
+          "paces": {
+            "description": "What each pace a profile may name means in numbers (pace policies).",
+            "items": {
+              "$ref": "#/components/schemas/PacePolicy"
+            },
+            "title": "Paces",
+            "type": "array"
+          },
           "saved": {
             "items": {
               "$ref": "#/components/schemas/Preset"
@@ -10239,7 +10310,8 @@
         "required": [
           "built_in",
           "saved",
-          "limit"
+          "limit",
+          "paces"
         ],
         "title": "Presets",
         "type": "object"

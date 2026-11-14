@@ -279,6 +279,41 @@ def unavailable() -> ApiError:
 # what a seat may send.
 
 
+class BatchFollow(BaseModel):
+    """The answer to the question the game asks after a declaration: an object, or a player."""
+
+    model_config = ConfigDict(extra="forbid")
+    object_id: str | None = Field(default=None, min_length=1, max_length=64)
+    seat: int | None = Field(default=None, ge=0, le=5)
+
+    @model_validator(mode="after")
+    def one_of_them(self) -> "BatchFollow":
+        if (self.object_id is None) == (self.seat is None):
+            raise ValueError("then needs exactly one of object_id and seat")
+        return self
+
+
+class BatchPayload(BaseModel):
+    """Several attackers or blockers declared with one command (v0.9.12,
+    docs/engine/large-boards.md). The engine checks the whole batch against the open prompt, and
+    declares each as it declares one given alone; this only bounds its shape."""
+
+    model_config = ConfigDict(extra="forbid")
+    objects: list[Annotated[str, Field(min_length=1, max_length=64)]] = Field(
+        min_length=1, max_length=250
+    )
+    declare: bool = True
+    then: BatchFollow | None = None
+
+    @model_validator(mode="after")
+    def well_formed(self) -> "BatchPayload":
+        if len(set(self.objects)) != len(self.objects):
+            raise ValueError("a batch names each object once")
+        if self.then is not None and not self.declare:
+            raise ValueError("then goes with a declaration, not a withdrawal")
+        return self
+
+
 class ChoicePayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
     option_id: str | None = Field(default=None, min_length=1, max_length=16)
@@ -287,6 +322,8 @@ class ChoicePayload(BaseModel):
     )
     # A typed name, for choose_name prompts (naming a card); the engine checks it against its list.
     text: str | None = Field(default=None, min_length=1, max_length=200)
+    # Since v0.9.12: several attackers or blockers at once, at a declaration's prompt.
+    batch: BatchPayload | None = None
 
 
 PriorityStep = Literal[
@@ -335,9 +372,12 @@ class GameCommand(BaseModel):
             (self.payload.option_id is not None)
             + (self.payload.amounts is not None)
             + (self.payload.text is not None)
+            + (self.payload.batch is not None)
         )
         if self.type == "submit_choice" and (self.prompt_id is None or chosen != 1):
-            raise ValueError("submit_choice needs prompt_id and one of option_id, amounts and text")
+            raise ValueError(
+                "submit_choice needs prompt_id and one of option_id, amounts, text and batch"
+            )
         if self.type == "concede" and chosen:
             raise ValueError("concede takes an empty payload")
         return self

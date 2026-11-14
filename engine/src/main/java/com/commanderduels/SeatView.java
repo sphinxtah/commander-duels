@@ -39,10 +39,12 @@ public record SeatView(
      * @param opponentTurn     the steps it stops at in other players' turns
      * @param passAfterCasting it passes as soon as it has cast a spell or activated an ability,
      *                         instead of holding priority
+     * @param yields           since v0.9.12: the sources it yields to this turn, by name (see
+     *                         {@link Automation}); cancel_passes ends them
      */
     public record PriorityControls(String passing, List<String> yourTurn, List<String> opponentTurn,
                                    boolean stopOnNewStackObjects, boolean stopOnAttackers, boolean stopOnBlockers,
-                                   boolean passAfterCasting, boolean fullControl) {}
+                                   boolean passAfterCasting, boolean fullControl, List<String> yields) {}
 
     /**
      * @param team          the player's team in a team game (Two-Headed Giant, since v0.5.0): 0 for

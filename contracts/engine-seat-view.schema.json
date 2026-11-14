@@ -225,7 +225,7 @@
       "properties": {
         "id": {"type": "string", "pattern": "^[0-9]{1,16}$"},
         "action": {
-          "enum": ["pass", "pass_until_stack_resolved", "pass_until_next_main", "pass_until_end_of_turn", "pass_until_next_turn", "pass_until_end_step_before_my_turn", "pass_until_my_turn", "cast", "play_land", "activate", "activate_mana", "mulligan", "keep", "yes", "no", "choose", "done", "tap_source", "use_pool", "special_payment", "cancel", "toggle_attacker", "all_attack", "toggle_blocker", "suggested", "use_ability", "deploy", "choose_mode", "put_first", "choose_pile"]
+          "enum": ["pass", "pass_until_stack_resolved", "pass_until_next_main", "pass_until_end_of_turn", "pass_until_next_turn", "pass_until_end_step_before_my_turn", "pass_until_my_turn", "yield", "cast", "play_land", "activate", "activate_mana", "mulligan", "keep", "yes", "no", "choose", "done", "tap_source", "use_pool", "special_payment", "cancel", "toggle_attacker", "all_attack", "toggle_blocker", "suggested", "use_ability", "deploy", "choose_mode", "put_first", "choose_pile"]
         },
         "label": {"$ref": "#/$defs/nullableString"},
         "object_id": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/objectId"}]},
@@ -299,7 +299,12 @@
         "stop_on_attackers": {"type": "boolean"},
         "stop_on_blockers": {"type": "boolean"},
         "pass_after_casting": {"type": "boolean"},
-        "full_control": {"type": "boolean"}
+        "full_control": {"type": "boolean"},
+        "yields": {
+          "description": "Since v0.9.12: the sources the seat yields to this turn, by the names it reads on the stack. The engine passes for the seat while one of them is on top of the stack and what the seat can do has not changed; the end of the turn ends them, and so does cancel_passes.",
+          "type": "array",
+          "items": {"type": "string"}
+        }
       }
     },
     "player": {

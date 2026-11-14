@@ -35,6 +35,10 @@ export type PassMode =
 export type OptionAction =
   | "pass"
   | PassMode
+  // A yield (v0.9.12): pass now, and keep passing while the same source's same ability is on top
+  // of the stack and what the seat can do has not changed. A choice of the prompt, never of an
+  // object: a click on the stack must not pass.
+  | "yield"
   | "cast"
   | "play_land"
   | "activate"
@@ -264,6 +268,18 @@ export interface PriorityControls {
   stop_on_blockers: boolean;
   pass_after_casting: boolean;
   full_control: boolean;
+  /** Since v0.9.12: the sources the seat yields to this turn, by name; cancel_passes ends them. */
+  yields?: string[];
+}
+
+/** Several attackers or blockers declared, or withdrawn, with one command (v0.9.12): the
+ * creatures by their object ids, in order. `then` answers the question the game asks after each
+ * (which defender, which attacker); left out, the game asks once and uses the answer for the
+ * rest. The batch never confirms the declaration: Done stays the player's own. */
+export interface BatchPayload {
+  objects: ObjectId[];
+  declare?: boolean;
+  then?: { object_id: ObjectId } | { seat: Seat };
 }
 
 /** A change to the priority controls; what is left out stays as it is. */
@@ -379,6 +395,7 @@ export interface CommandEnvelope {
     | { option_id: string }
     | { amounts: number[] }
     | { text: string }
+    | { batch: BatchPayload }
     | PrioritySettings
     | Record<string, never>;
 }

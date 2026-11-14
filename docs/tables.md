@@ -149,6 +149,10 @@ A profile has two parts, kept apart in the model and in every answer:
 - **The lobby searches by it.** `GET /api/v1/tables/browse` takes `intent` and `pace` (each repeated) and `max_duration`; a table with no profile, or a profile that says no pace or length, matches none of them. The three are kept beside the profile (`game_tables.intent`, `pace`, `duration`), with an index on the open tables' intent.
 - **No profile** at a table the queue opened or the campaign's court (`409 queue_table`, `409 campaign_table`).
 
+### Pace policies
+
+A profile's pace is a word. What it means in numbers (how long a decision stays open before the table says who it waits for, and before the others may nudge) is its **pace policy**, listed with the presets (`paces`). They are defined and not enforced in v0.9.12, and are apart from the response timer, which is a player's own device passing for its own player ([large boards](engine/large-boards.md#pace-policies)).
+
 ### Presets
 
 - **Six built in**, the specification's, as starting points a host changes: Learning game (relaxed, two hours, no Game Changers), Preconstructed decks (no Game Changers), Upgraded casual (at most three), High power, Competitive (brisk, one hour) and Custom. The limits on Game Changers follow the Commander format's brackets.
@@ -174,7 +178,7 @@ Ward 15 of [the campaign](campaign.md#the-unbound-court-ward-15-v096), with frie
 | `PATCH /api/v1/tables/{code}/seat` | Change `deck_id`, `ready`, or since v0.5.1 `team`, or since v0.8.7 at King's Table `seat` (an open one; every player is made not ready) |
 | `PATCH /api/v1/tables/{code}` | Since v0.8.7, King's Table, the host before the start: `kings_table` (any of its three settings), `bot_seats` (every seat bots fill from now on), `move` (`{"seat": 0, "to": 5}`, a player to an open seat). A change makes every player not ready |
 | `POST /api/v1/tables/{code}/leave` | Leave; the host closes the table |
-| `GET /api/v1/me/table-presets` | Since v0.9.12: the six built-in profiles and the tables the account saved (`built_in`, `saved`, `limit`), each profile with its `enforced_rules` |
+| `GET /api/v1/me/table-presets` | Since v0.9.12: the six built-in profiles and the tables the account saved (`built_in`, `saved`, `limit`), each profile with its `enforced_rules`, and the pace policies (`paces`) |
 | `PUT /api/v1/me/table-presets` | Since v0.9.12: save `{name, profile, settings}`; a name the account has is replaced |
 | `DELETE /api/v1/me/table-presets/{id}` | Since v0.9.12: remove one of the account's saved tables |
 | `POST /api/v1/tables/{code}/start` | The host starts the game |

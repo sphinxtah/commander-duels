@@ -30,6 +30,7 @@ export const QUIET: TableSettings = {
   // Nor its music (v0.7.2): the fake server has no track, and a muted player asks for none.
   musicVolume: 0,
   musicMuted: true,
+  reducedClutter: false,
 };
 
 export interface FakeTable {

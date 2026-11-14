@@ -1,10 +1,13 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { CardView, PermanentView, PromptOption } from "../types";
 import { CARDS } from "./fixtures";
 import {
+  CARD_FIELDS,
   groupUnits,
   isToken,
   landKey,
+  PERMANENT_FIELDS,
   rowOf,
   tokenKey,
   type GroupContext,
@@ -251,5 +254,109 @@ describe("grouping a battlefield", () => {
       cards: [`battlefield:${a.card.id}`],
       attachments: [`battlefield:${b.card.id}`],
     });
+  });
+});
+
+describe("what a pile may hide (v0.9.12)", () => {
+  // Another value for each field two permanents in one pile must share.
+  const other: Record<string, unknown> = {
+    controller_seat: 1,
+    owner_seat: 1,
+    tapped: true,
+    summoning_sick: true,
+    damage: 1,
+    counters: { "+1/+1": 1 },
+    name: "Another name",
+    mana_cost: "{1}",
+    type_line: "Basic Land — Island",
+    power: "7",
+    toughness: "7",
+    rules: ["Another ability."],
+  };
+  const contract = JSON.parse(
+    readFileSync("../contracts/engine-seat-view.schema.json", "utf8"),
+  ) as { $defs: Record<string, { properties: Record<string, unknown> }> };
+
+  it("classifies every field the engine's view gives a permanent and its card", () => {
+    // A field the contract gains is in no pile's key until it is classified here: this fails.
+    expect(Object.keys(PERMANENT_FIELDS).sort()).toEqual(
+      Object.keys(contract.$defs.permanent.properties).sort(),
+    );
+    expect(Object.keys(CARD_FIELDS).sort()).toEqual(
+      Object.keys(contract.$defs.card.properties).sort(),
+    );
+    // And every field piles must agree on has a second value to be tried with below.
+    const shared = [
+      ...Object.entries(PERMANENT_FIELDS),
+      ...Object.entries(CARD_FIELDS),
+    ]
+      .filter(([field, kind]) => kind === "alike" && field !== "card")
+      .map(([field]) => field);
+    expect(shared.sort()).toEqual(Object.keys(other).sort());
+  });
+
+  it.each(Object.keys(other))(
+    "never piles two tokens or two lands that differ in %s",
+    (field) => {
+      const onCard = field in CARD_FIELDS;
+      for (const [face, key] of [
+        [CARDS.soldier, tokenKey],
+        [CARDS.forest, landKey],
+      ] as const) {
+        const plain = permanent(face);
+        expect(key(plain, [])).not.toBeNull();
+        expect(key(permanent(face), [])).toBe(key(plain, []));
+        const changed = onCard
+          ? permanent({ ...face, [field]: other[field] } as CardView)
+          : permanent(face, { [field]: other[field] });
+        // Either it stands alone, or its pile is another pile.
+        expect(key(changed, [])).not.toBe(key(plain, []));
+      }
+    },
+  );
+
+  it.each(["attacking", "blocking", "attached_to"] as const)(
+    "leaves a token or a land with %s set on its own",
+    (field) => {
+      const value = field === "attached_to" ? "host" : true;
+      expect(
+        tokenKey(permanent(CARDS.soldier, { [field]: value }), []),
+      ).toBeNull();
+      expect(
+        landKey(permanent(CARDS.forest, { [field]: value }), []),
+      ).toBeNull();
+    },
+  );
+
+  it("splits on what the open prompt offers, and on its words", () => {
+    const plain = permanent(CARDS.soldier);
+    const attack = [offer("toggle_attacker", { label: "Soldier" })];
+    expect(tokenKey(permanent(CARDS.soldier), attack)).toBe(
+      tokenKey(permanent(CARDS.soldier), attack),
+    );
+    expect(tokenKey(permanent(CARDS.soldier), attack)).not.toBe(
+      tokenKey(plain, []),
+    );
+    expect(
+      tokenKey(permanent(CARDS.soldier), [
+        offer("toggle_attacker", { label: "Soldier (goaded)" }),
+      ]),
+    ).not.toBe(tokenKey(permanent(CARDS.soldier), attack));
+    // One chosen in the prompt is told apart from those that are not.
+    expect(
+      tokenKey(permanent(CARDS.soldier), [
+        offer("toggle_attacker", { label: "Soldier", selected: true }),
+      ]),
+    ).toBeNull();
+  });
+
+  it("keeps every member of a pile as itself", () => {
+    const tokens = [1, 2, 3].map(() => permanent(CARDS.soldier));
+    const [unit] = groupUnits(tokens, context());
+    expect(unit.kind).toBe("tokens");
+    // Each member is still its own card in the unit, to select and to answer with.
+    expect(unit.cards).toEqual(
+      tokens.map((token) => `battlefield:${token.card.id}`),
+    );
   });
 });

@@ -97,6 +97,28 @@ describe("the priority panel", () => {
     expect(onSet).toHaveBeenLastCalledWith({ opponent_turn: [] });
   });
 
+  it("says what the seat yields to, and stops it (v0.9.12)", () => {
+    const onSet = vi.fn();
+    render(
+      <PriorityPanel
+        state={state({
+          ...defaults,
+          yields: ["Impact Tremors", "Soul Warden"],
+        })}
+        onSet={onSet}
+      />,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Passing for Impact Tremors, Soul Warden until the turn ends, or until you can do something new.",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Stop yielding" }));
+    expect(onSet).toHaveBeenCalledWith({ cancel_passes: true });
+    // Escape stops a yield as it stops a pass.
+    onSet.mockClear();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onSet).toHaveBeenCalledWith({ cancel_passes: true });
+  });
+
   it("shows a pass in progress and stops it", () => {
     const onSet = vi.fn();
     render(

@@ -233,6 +233,8 @@ final class Prompts {
             case StringAnswer text -> "s:" + text.value();
             case IntegerAnswer number -> "i:" + number.value();
             case ManaAnswer mana -> "m:" + mana.poolOwner() + ":" + mana.type().name();
+            case YieldAnswer yield -> "y:" + yield.offer().controller() + ":" + yield.offer().source() + ":"
+                + Integer.toHexString(yield.offer().rule().hashCode());
         };
     }
 
@@ -301,6 +303,17 @@ final class Prompts {
         @Override
         public void apply(Player player) {
             player.setResponseManaType(poolOwner, type);
+        }
+    }
+
+    /**
+     * A yield (v0.9.12, see {@link Automation}): a pass now, which XMage takes as any pass; the
+     * game keeps the yield and passes for the seat while it holds.
+     */
+    record YieldAnswer(Automation.Offer offer) implements Answer {
+        @Override
+        public void apply(Player player) {
+            player.setResponseBoolean(true);
         }
     }
 
@@ -639,6 +652,18 @@ final class Prompts {
             if (mode.xmage() != PlayerAction.PASS_PRIORITY_UNTIL_STACK_RESOLVED || !game.getStack().isEmpty()) {
                 add(mode.action(), mode.label(), null, null, false, new PassAnswer(mode.xmage(), game));
             }
+        }
+        // A yield to the object on top of the stack (v0.9.12): never for a controlled player, whose
+        // decisions the seat answering for them makes one at a time.
+        StackObject top = controlled ? null : game.getStack().getFirstOrNull();
+        if (top != null) {
+            // By the name the seat reads on the stack: a spell or a source hidden from it has none.
+            String name = views.stackName(top, player.getId());
+            Automation.Offer offer = Automation.offer(game,
+                name != null ? name : top instanceof Spell ? "this spell" : "this ability");
+            // A choice of the prompt, not of the object: a client answers an object's only choice
+            // when the object is clicked, and a click on the stack must not pass.
+            add("yield", "Pass, and keep passing for " + offer.label(), null, null, false, new YieldAnswer(offer));
         }
         Map<UUID, List<ActivatedAbility>> byObject = new LinkedHashMap<>();
         // Every seat's player, human or bot, is one of XMage's PlayerImpl.

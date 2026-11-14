@@ -36,7 +36,22 @@ def test_engine_contract_rejects_unsupported_versions_and_client_seats():
     validator.validate(command | {"payload": {"amounts": [2, 0, 3]}})
     validator.validate(command | {"payload": {"text": "Black Lotus"}})
     validator.validate(command | {"type": "concede", "payload": {}})
+    # Since v0.9.12: several attackers or blockers at once.
+    validator.validate(command | {"payload": {"batch": {"objects": ["a1", "b2"]}}})
+    validator.validate(
+        command | {"payload": {"batch": {"objects": ["a1"], "declare": True, "then": {"seat": 2}}}}
+    )
+    validator.validate(
+        command | {"payload": {"batch": {"objects": ["a1"], "then": {"object_id": "w9"}}}}
+    )
     for changes in [
+        {"payload": {"batch": {"objects": []}}},
+        {"payload": {"batch": {"objects": ["a1", "a1"]}}},
+        {"payload": {"batch": {"objects": ["a1"], "confirm": True}}},
+        {"payload": {"batch": {"objects": ["a1"], "then": {}}}},
+        {"payload": {"batch": {"objects": ["a1"], "then": {"seat": 1, "object_id": "w9"}}}},
+        {"payload": {"batch": {"objects": ["a1"]}, "option_id": "1"}},
+        {"payload": {"batch": ["a1"]}},
         {"v": 2},
         {"seat": 1},
         {"game_id": "forged"},

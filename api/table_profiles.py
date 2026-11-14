@@ -31,6 +31,14 @@ a change that leaves it as it was changes nothing.
 **Presets.** The specification's six (learning, preconstructed, upgraded, high power,
 competitive, custom) are built in as starting points; a host saves their own, a name each, with
 the table's other settings, to open the same table again.
+
+**Pace policies** (the specification's section 14). A profile's pace is a word the players agreed
+to; a pace policy says what the word means in numbers: how long a decision may stay open before
+the table says who it waits for, and before the others may nudge that player, with twice as long
+for a player who asked for more time. They are defined here and enforced nowhere yet. They are
+apart from the response timer, which is a player's own device passing for its own player when it
+has nothing to answer (docs/game-screen.md): a pace policy never passes, concedes or moves for
+anyone.
 """
 
 from typing import Annotated, Literal, get_args
@@ -102,6 +110,61 @@ class TableProfile(Contract):
         default="", description="The host's own words. Described only."
     )
     enforced: Enforced = Field(default_factory=Enforced)
+
+
+class PacePolicy(Contract):
+    """What a pace means in numbers. Described only in v0.9.12: nothing measures or enforces it."""
+
+    pace: Pace
+    name: str
+    notice_seconds: int | None = Field(
+        description="How long a decision stays open before the table says who it waits for; "
+        "null: it never does."
+    )
+    nudge_seconds: int | None = Field(
+        description="How long before the other players may nudge the player it waits for; "
+        "null: never."
+    )
+    extended_factor: int = Field(
+        description="What a player who asked for more time gets: each of the two, this many "
+        "times over."
+    )
+    enforced: bool = Field(
+        default=False, description="Whether the game holds players to it. Not in v0.9.12."
+    )
+
+    def thresholds(self, extended: bool = False) -> tuple[int | None, int | None]:
+        """The notice and the nudge, in seconds, for a player; with more time when they asked."""
+        times = self.extended_factor if extended else 1
+        return (
+            self.notice_seconds * times if self.notice_seconds is not None else None,
+            self.nudge_seconds * times if self.nudge_seconds is not None else None,
+        )
+
+
+PACE_POLICIES: dict[str, PacePolicy] = {
+    "relaxed": PacePolicy(
+        pace="relaxed",
+        name=PACE_NAMES["relaxed"],
+        notice_seconds=None,
+        nudge_seconds=None,
+        extended_factor=2,
+    ),
+    "steady": PacePolicy(
+        pace="steady",
+        name=PACE_NAMES["steady"],
+        notice_seconds=60,
+        nudge_seconds=120,
+        extended_factor=2,
+    ),
+    "brisk": PacePolicy(
+        pace="brisk",
+        name=PACE_NAMES["brisk"],
+        notice_seconds=30,
+        nudge_seconds=60,
+        extended_factor=2,
+    ),
+}
 
 
 class Rule(Contract):
@@ -309,6 +372,9 @@ class Presets(Contract):
     built_in: list[Preset]
     saved: list[Preset]
     limit: int = Field(description="The most presets an account saves.")
+    paces: list[PacePolicy] = Field(
+        description="What each pace a profile may name means in numbers (pace policies)."
+    )
 
 
 def casual() -> TableRules:
@@ -347,7 +413,9 @@ def presets_of(db: Session, user_id: UUID) -> Presets:
                 settings=PresetSettings(),
             )
         )
-    return Presets(built_in=built_in, saved=saved, limit=PRESET_LIMIT)
+    return Presets(
+        built_in=built_in, saved=saved, limit=PRESET_LIMIT, paces=list(PACE_POLICIES.values())
+    )
 
 
 @router.get("/me/table-presets", response_model=Presets)
