@@ -17,7 +17,12 @@ import { useImageRetry } from "../game/RetryingImage";
 import { getSoundEngine } from "../game/sound/engine";
 import type { Cue } from "../game/sound/recipes";
 import shell from "../App.module.css";
-import { DeckChoicePanel, type DeckChoice } from "./DeckChoice";
+import {
+  DeckChoiceButtons,
+  DeckChoicePanel,
+  useDeckChoice,
+  type DeckChoice,
+} from "./DeckChoice";
 import { LandTally } from "./LandTally";
 import { LengBackdrop } from "./Leng";
 import { PackArt } from "./PackArt";
@@ -171,6 +176,8 @@ export function PackOpening({
   );
   const [announced, setAnnounced] = useState("");
   const [details, setDetails] = useState<PulledCard | null>(null);
+  // A pack that is a deck: its question above the cards, its buttons on the foot (v0.9.13).
+  const choice = useDeckChoice(deck);
   // A basic land pack's summary opens on its counts by land and edition (v0.9.0).
   const lands = opening.product.kind === "lands";
   const [byEdition, setByEdition] = useState(lands);
@@ -248,6 +255,17 @@ export function PackOpening({
     const id = window.setTimeout(() => setStage("summary"), 900);
     return () => window.clearTimeout(id);
   }, [stage, shown, cards.length, reduced]);
+  // The deck's question is answered on the foot, wherever the cards are scrolled to; what came
+  // of it is said above them, so the body goes back to its top to show it.
+  const answered = choice
+    ? `${choice.saved?.id ?? ""}|${choice.loose}|${choice.error}`
+    : "";
+  const lastAnswer = useRef(answered);
+  useEffect(() => {
+    if (answered === lastAnswer.current) return;
+    lastAnswer.current = answered;
+    body.current?.scrollTo?.({ top: 0 });
+  }, [answered]);
 
   function tear() {
     // The press itself may start audio, as browsers require.
@@ -395,7 +413,7 @@ export function PackOpening({
           className={styles.openingBody}
           data-opening-scroll
         >
-          {deck && <DeckChoicePanel choice={deck} />}
+          {choice && <DeckChoicePanel state={choice} />}
           {lands && (
             <div
               className={styles.viewSwitch}
@@ -485,6 +503,7 @@ export function PackOpening({
           <button type="button" className={styles.secondary} onClick={onDone}>
             {doneLabel}
           </button>
+          {choice && <DeckChoiceButtons state={choice} />}
         </div>
         <dialog
           ref={dialog}

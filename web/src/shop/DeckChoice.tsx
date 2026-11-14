@@ -8,7 +8,8 @@ import styles from "./shop.module.css";
 // A pack that is a deck (v0.9.8, the owner's request): once its cards are revealed, the summary
 // asks whether to keep them together as a deck or as individual cards. They are in the library
 // either way. A Starter Deck or a Tournament Pack is saved as a Legacy deck; one of Leng's ten
-// starter decks is built into a Commander deck.
+// starter decks is built into a Commander deck. Since v0.9.13 the question is asked above the
+// cards and answered on the window's foot, beside "Back to the shop" (the owner's request).
 
 export type SavedDeck = { id: string; title: string };
 
@@ -25,25 +26,35 @@ export type DeckChoice = {
 
 const formats = { legacy: "Legacy", commander: "Commander" };
 
-export function DeckChoicePanel({ choice }: { choice: DeckChoice }) {
-  const [saved, setSaved] = useState(choice.saved);
+/** Where the choice stands: the panel says it, and the buttons on the window's foot make it. */
+export type DeckChoiceState = {
+  choice: DeckChoice;
+  saved: SavedDeck | null;
+  loose: boolean;
+  busy: boolean;
+  error: string;
+  save: () => void;
+  keepLoose: () => void;
+};
+
+/** The choice's state, kept by the window that shows both its halves; none for a pack that is
+no deck. */
+export function useDeckChoice(choice?: DeckChoice): DeckChoiceState | null {
+  const [saved, setSaved] = useState(choice?.saved ?? null);
   const [loose, setLoose] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const format = formats[choice.format];
-  const commander = choice.format === "commander";
-  const make = commander
-    ? "Build it into a Commander deck"
-    : `Save as a ${format} deck`;
+  if (!choice) return null;
+  const made = choice;
 
   async function save() {
     if (busy) return;
     setBusy(true);
     setError("");
     try {
-      const made = await choice.save();
-      if (typeof made === "string") setError(made);
-      else setSaved(made);
+      const deck = await made.save();
+      if (typeof deck === "string") setError(deck);
+      else setSaved(deck);
     } catch {
       setError("That did not go through. Try again.");
     } finally {
@@ -51,6 +62,22 @@ export function DeckChoicePanel({ choice }: { choice: DeckChoice }) {
     }
   }
 
+  return {
+    choice,
+    saved,
+    loose,
+    busy,
+    error,
+    save: () => void save(),
+    keepLoose: () => setLoose(true),
+  };
+}
+
+/** What is asked, and what came of it: at the top of the summary's cards. */
+export function DeckChoicePanel({ state }: { state: DeckChoiceState }) {
+  const { choice, saved, loose, error } = state;
+  const format = formats[choice.format];
+  const commander = choice.format === "commander";
   return (
     <section className={styles.deckChoice} aria-labelledby="deck-choice-title">
       <h3 id="deck-choice-title">
@@ -83,29 +110,45 @@ export function DeckChoicePanel({ choice }: { choice: DeckChoice }) {
           {error}
         </p>
       )}
-      {!saved && (
-        <div className={styles.actions}>
-          <button
-            type="button"
-            className={loose ? styles.secondary : shell.primary}
-            disabled={busy}
-            onClick={() => void save()}
-          >
-            {busy ? "Making the deck…" : loose ? `${make} after all` : make}
-          </button>
-          {!loose && (
-            <button
-              type="button"
-              className={styles.secondary}
-              disabled={busy}
-              onClick={() => setLoose(true)}
-            >
-              Keep as individual cards
-            </button>
-          )}
-        </div>
-      )}
     </section>
+  );
+}
+
+/** The choice's buttons, on the window's foot beside its way out (v0.9.13, the owner's request):
+they stay in reach however far the cards are scrolled. Named as the panel is. None once the deck
+is made. */
+export function DeckChoiceButtons({ state }: { state: DeckChoiceState }) {
+  const { choice, saved, loose, busy } = state;
+  if (saved) return null;
+  const make =
+    choice.format === "commander"
+      ? "Build it into a Commander deck"
+      : `Save as a ${formats[choice.format]} deck`;
+  return (
+    <div
+      className={styles.deckActions}
+      role="group"
+      aria-labelledby="deck-choice-title"
+    >
+      <button
+        type="button"
+        className={loose ? styles.secondary : shell.primary}
+        disabled={busy}
+        onClick={state.save}
+      >
+        {busy ? "Making the deck…" : loose ? `${make} after all` : make}
+      </button>
+      {!loose && (
+        <button
+          type="button"
+          className={styles.secondary}
+          disabled={busy}
+          onClick={state.keepLoose}
+        >
+          Keep as individual cards
+        </button>
+      )}
+    </div>
   );
 }
 

@@ -208,6 +208,15 @@ for (const size of sizes) {
       name: "Keep this deck together?",
     });
     await expect(choice).toBeVisible();
+    // Its buttons are on the window's foot, beside the way out (v0.9.13), not in the question.
+    const foot = page.locator("[data-opening-foot]");
+    await expect(
+      foot.getByRole("button", { name: "Save as a Legacy deck" }),
+    ).toBeVisible();
+    await expect(
+      foot.getByRole("button", { name: "Keep as individual cards" }),
+    ).toBeVisible();
+    await expect(choice.getByRole("button")).toHaveCount(0);
     await expect(
       page
         .getByRole("list", { name: "Cards in the pack" })
@@ -219,7 +228,7 @@ for (const size of sizes) {
     await page.screenshot({
       path: `test-results/deck-packs/legacy-choice-${size.width}.png`,
     });
-    await choice.getByRole("button", { name: "Save as a Legacy deck" }).click();
+    await page.getByRole("button", { name: "Save as a Legacy deck" }).click();
     const kept = page.getByRole("region", {
       name: "Kept together as a Legacy deck",
     });
@@ -282,7 +291,7 @@ for (const size of sizes) {
     await expect(choice).toContainText(
       "Build them into a Commander deck to play it as it came, or keep them as individual cards",
     );
-    await choice
+    await page
       .getByRole("button", { name: "Keep as individual cards" })
       .click();
     const loose = page.getByRole("region", {
@@ -293,7 +302,7 @@ for (const size of sizes) {
     await page.screenshot({
       path: `test-results/deck-packs/commander-loose-${size.width}.png`,
     });
-    await loose
+    await page
       .getByRole("button", { name: "Build it into a Commander deck after all" })
       .click();
     const built = page.getByRole("region", {
