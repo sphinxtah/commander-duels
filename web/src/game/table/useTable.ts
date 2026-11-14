@@ -14,10 +14,13 @@ export function useTableModel({
   input,
   expandedSeat,
   textScale,
+  pileCap,
 }: {
   input: BuildInput | null;
   expandedSeat: Seat | null;
   textScale: 1 | 1.25;
+  /** Reduced clutter's pile cap (v0.9.12); the table's own when left out. */
+  pileCap?: number;
 }): { model: TableModel | null; layout: TableLayout | null } {
   const context = input?.context;
   const model = useMemo(
@@ -41,8 +44,9 @@ export function useTableModel({
     ],
   );
   const layout = useMemo(
-    () => (model ? layoutTable(model, { expandedSeat, textScale }) : null),
-    [model, expandedSeat, textScale],
+    () =>
+      model ? layoutTable(model, { expandedSeat, textScale, pileCap }) : null,
+    [model, expandedSeat, textScale, pileCap],
   );
   return { model, layout };
 }

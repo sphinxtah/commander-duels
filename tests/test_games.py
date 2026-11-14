@@ -1451,6 +1451,57 @@ def test_a_typed_name_goes_to_the_engine_as_text() -> None:
         games.GameCommand.model_validate(base | {"type": "concede", "payload": {"text": "Island"}})
 
 
+def test_a_batch_of_attackers_goes_to_the_engine_whole() -> None:
+    """Several attackers or blockers with one command (v0.9.12): the API bounds the batch's shape
+    and sends it on as it came; the engine checks it against the open prompt."""
+    base = {
+        "v": 1,
+        "game_id": str(uuid.uuid4()),
+        "action_id": str(uuid.uuid4()),
+        "expected_revision": 3,
+        "prompt_id": str(uuid.uuid4()),
+        "type": "submit_choice",
+    }
+    sent = games.GameCommand.model_validate(
+        base | {"payload": {"batch": {"objects": ["a1", "b2"], "then": {"seat": 2}}}}
+    )
+    assert sent.engine_body()["payload"] == {
+        "batch": {"objects": ["a1", "b2"], "declare": True, "then": {"seat": 2}}
+    }
+    withdrawn = games.GameCommand.model_validate(
+        base | {"payload": {"batch": {"objects": ["a1"], "declare": False}}}
+    )
+    assert withdrawn.engine_body()["payload"] == {"batch": {"objects": ["a1"], "declare": False}}
+    blocked = games.GameCommand.model_validate(
+        base | {"payload": {"batch": {"objects": ["a1"], "then": {"object_id": "w9"}}}}
+    )
+    assert blocked.engine_body()["payload"]["batch"]["then"] == {"object_id": "w9"}  # type: ignore[index]
+    for batch in [
+        {"objects": []},
+        {"objects": ["a1", "a1"]},
+        {"objects": [f"o{number}" for number in range(251)]},
+        {"objects": ["a1"], "confirm": True},
+        {"objects": ["a1"], "then": {}},
+        {"objects": ["a1"], "then": {"seat": 6}},
+        {"objects": ["a1"], "then": {"seat": 1, "object_id": "w9"}},
+        {"objects": ["a1"], "declare": False, "then": {"seat": 1}},
+        {"objects": [""]},
+    ]:
+        with pytest.raises(ValidationError):
+            games.GameCommand.model_validate(base | {"payload": {"batch": batch}})
+    # Never beside another answer, and never with a concession.
+    for payload in [
+        {"batch": {"objects": ["a1"]}, "option_id": "1"},
+        {"batch": {"objects": ["a1"]}, "text": "Island"},
+    ]:
+        with pytest.raises(ValidationError):
+            games.GameCommand.model_validate(base | {"payload": payload})
+    with pytest.raises(ValidationError):
+        games.GameCommand.model_validate(
+            base | {"type": "concede", "payload": {"batch": {"objects": ["a1"]}}}
+        )
+
+
 def test_a_new_tab_gets_the_whole_log_while_the_game_moves_on(
     client: TestClient, app: FastAPI, engine: FakeEngine
 ) -> None:

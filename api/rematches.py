@@ -35,7 +35,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from api import kings_table, teams
+from api import kings_table, table_profiles, teams
 from api.auth import INPUT_ERRORS
 from api.custom_play import custom_in_seats
 from api.games import (
@@ -452,6 +452,8 @@ def plan_rematch(
                 banned = team_banned(teams.cards_of(seat) or set(), rules_of(table), permissions)
                 if banned is not None:
                     raise banned
+            # The table's Rule Zero profile holds for its rematch (v0.9.12).
+            table_profiles.refuse_revision(db, table_profiles.profile_of(table), bound)
         except ApiError as refused:
             message = f"{user.handle or 'A player'}'s deck cannot be played now."
             db.rollback()
@@ -560,6 +562,11 @@ def record_rematch(
         queued=old.queued,
         # A best-of-three match's rematch is another match (v0.5.0): add_table_game begins it.
         best_of=old.best_of,
+        # And is played under the same Rule Zero profile (v0.9.12).
+        profile=old.profile,
+        intent=old.intent,
+        pace=old.pace,
+        duration=old.duration,
     )
     db.add(table)
     db.flush()

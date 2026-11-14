@@ -266,6 +266,10 @@ class Game(Base):
     # them ({deck_format, life, king_attacks_anyone}, and since v0.9.7 guarded_kings). Null in
     # other formats.
     kings_table: Mapped[dict[str, object] | None] = mapped_column(JsonType)
+    # The Rule Zero profile its table's players were ready under when it started (v0.9.12,
+    # api/table_profiles.py), copied from the table: the game keeps what was agreed, whatever
+    # the table becomes. Null for a game of no table, or of a table with no profile.
+    table_profile: Mapped[dict[str, object] | None] = mapped_column(JsonType)
 
 
 class AccessGrant(Base):
@@ -389,6 +393,8 @@ class GameTable(Base):
             "best_of IN (1, 3) AND (best_of = 1 OR format = 'legacy')",
             name="ck_game_tables_best_of",
         ),
+        # The lobby's search by a table's Rule Zero profile (v0.9.12).
+        Index("ix_game_tables_status_intent", "status", "intent"),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     # Unguessable: the invite link's code.
@@ -431,6 +437,13 @@ class GameTable(Base):
     # Ward 15 (v0.9.6): a table the campaign opened for its player's court with friends as their
     # Generals ({campaign_id, encounter, user_id, challenge}). Null for every other table.
     campaign: Mapped[dict[str, object] | None] = mapped_column(JsonType)
+    # The host's Rule Zero profile (v0.9.12, api/table_profiles.py): what kind of game the table
+    # is for, in the host's words, and the restrictions the server enforces on its decks. Null:
+    # none, as every table before v0.9.12. What the lobby searches by is kept beside it.
+    profile: Mapped[dict[str, object] | None] = mapped_column(JsonType)
+    intent: Mapped[str | None] = mapped_column(String(16))
+    pace: Mapped[str | None] = mapped_column(String(16))
+    duration: Mapped[int | None] = mapped_column(SmallInteger)
 
 
 class TableSeat(Base):
@@ -1094,6 +1107,10 @@ class Deck(Base):
     # campaign card back; null, the account's
     # campaign back if it chose one, else the official card back.
     sleeve: Mapped[str | None] = mapped_column(String(64))
+    # Where the owner keeps it among their decks (v0.9.12, api/workshop.py): one folder, by its
+    # name, and any tags; null for a deck in no folder, or with no tags.
+    folder: Mapped[str | None] = mapped_column(String(64))
+    tags: Mapped[list[str] | None] = mapped_column(JsonType)
     deleted_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     # Deleted from the trash for good (v0.9.3) while a revision a game, match or table used still
     # refers to it: in no list, and not counted toward the deck limit. Its deleted_at stays set.
@@ -1149,6 +1166,9 @@ class DeckEntryRow(Base):
     printing_id: Mapped[UUID | None] = mapped_column(ForeignKey("card_printings.id"))
     quantity: Mapped[int]
     location: Mapped[str] = mapped_column(String(16))
+    # A choice made as the deck is built (v0.9.12): Cryptic Spires's two circled colours, two of
+    # WUBRG in that order; null for every other card.
+    choice: Mapped[str | None] = mapped_column(String(8))
 
 
 class ProgressEntry(Base):
@@ -1808,6 +1828,10 @@ class DailyQuest(Base):
     completed_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     policy: Mapped[str] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    # A second quest that completes the slot as well (v0.9.12, the quest_alternatives policy):
+    # {"quest": its id, "target": its count}, as they were when the board was drawn; none on a
+    # board drawn with the policy off.
+    alternative: Mapped[dict[str, object] | None] = mapped_column(JsonType)
 
 
 class QuestBoard(Base):
@@ -2104,3 +2128,70 @@ class CampaignReward(Base):
     reward: Mapped[str] = mapped_column(String(64))
     game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class Entitlement(Base):
+    """Functional access to a card, bound to an account (v0.9.12, api/entitlements.py;
+    docs/economy.md): the account builds with the card and does not own it. Never a library
+    grant, so it is in no print run, cannot be listed at the auction house and has no edition or
+    finish of its own: a deck holds it in the card's default printing. Its kinds: staple, a card
+    of the starter-staple pool the account claimed with a pick; staff, one SysOp gave. Kept with
+    the account: a reset leaves the rows and the library counts those made after it, as it does
+    grants, and revoked_at ends one."""
+
+    __tablename__ = "entitlements"
+    __table_args__ = (
+        CheckConstraint("kind IN ('staple', 'staff')", name="ck_entitlements_kind"),
+        CheckConstraint("copies > 0", name="ck_entitlements_copies"),
+        Index("ix_entitlements_user_id_kind", "user_id", "kind"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    kind: Mapped[str] = mapped_column(String(16))
+    card_id: Mapped[UUID] = mapped_column(ForeignKey("card_concepts.id"))
+    copies: Mapped[int] = mapped_column(SmallInteger, default=1)
+    # Unique per fact, so a retry claims once: staple:<account>:<card>, staff:<id>; with a
+    # reset's time after one.
+    key: Mapped[str] = mapped_column(String(160), unique=True)
+    # The rule it was made under, recorded with it (PROG05).
+    policy: Mapped[str] = mapped_column(String(32))
+    reason: Mapped[str | None] = mapped_column(Text)
+    actor_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    revoked_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    revoked_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+
+
+class WishlistEntry(Base):
+    """A card an account wants (v0.9.12, api/workshop.py): how many copies, and the deck it wants
+    them for when it said one. One row a card. The account's own, changed and removed by it
+    alone; a deck's deletion leaves the wish and clears its deck; kept with the account."""
+
+    __tablename__ = "wishlist_entries"
+    __table_args__ = (
+        UniqueConstraint("user_id", "card_id", name="uq_wishlist_entries_card"),
+        CheckConstraint("quantity BETWEEN 1 AND 250", name="ck_wishlist_entries_quantity"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    card_id: Mapped[UUID] = mapped_column(ForeignKey("card_concepts.id"))
+    quantity: Mapped[int] = mapped_column(SmallInteger)
+    deck_id: Mapped[UUID | None] = mapped_column(ForeignKey("decks.id"))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class TablePreset(Base):
+    """A table a host saved to open again (v0.9.12, api/table_profiles.py): a name of the host's
+    own, a Rule Zero profile, and the table's other settings. The account's alone: made, changed
+    and removed by it; removed with the account. At most a few an account (PRESET_LIMIT)."""
+
+    __tablename__ = "table_presets"
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_table_presets_name"),)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    name: Mapped[str] = mapped_column(String(48))
+    # {"profile": the profile, "settings": the table's other settings}.
+    preset: Mapped[dict[str, object]] = mapped_column(JsonType)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime())

@@ -148,7 +148,10 @@ def test_a_practice_game_plays_again_with_the_same_settings(client, engine):
 def test_a_tables_players_accept_a_rematch(client, engine):
     ada, bob = Account(client, "ada", admin=True), Account(client, "bob", admin=True)
     tournament = {"banned": False, "not_legal": False}
-    game_id = lobby_game(client, engine, ada, bob, rules=tournament, visibility="private")
+    profile = {"intent": "upgraded", "enforced": {"game_changers": 3}}
+    game_id = lobby_game(
+        client, engine, ada, bob, rules=tournament, visibility="private", profile=profile
+    )
     before = engine.created[-1]
     assert view(bob, game_id)["can_offer"] is True
 
@@ -188,6 +191,15 @@ def test_a_tables_players_accept_a_rematch(client, engine):
     )
     assert (table.status, table.seats, table.bots, table.queued) == ("started", 2, 0, False)
     assert table.host_id == ada.id
+    # And its Rule Zero profile (v0.9.12), which the new game keeps as the first did.
+    assert table.profile == table_of(client, game_id).profile
+    assert table.profile is not None and (table.intent, table.profile["enforced"]) == (
+        "upgraded",
+        {"custom_cards": True, "reserved_list": True, "game_changers": 3},
+    )
+    with Session(client.app.state.database) as db:
+        kept = [db.get(Game, uuid.UUID(found)) for found in (game_id, new_id)]
+        assert [game.table_profile for game in kept if game] == [table.profile] * 2
     summary = bob.get(f"/api/v1/games/{new_id}").json()["game"]
     assert summary["kind"] == "table" and summary["your_seat"] == 1
     note = bob.get("/api/v1/notifications").json()["items"][0]

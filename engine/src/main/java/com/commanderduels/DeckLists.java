@@ -12,6 +12,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import mage.cards.Card;
+import mage.cards.c.CrypticSpires;
 import mage.cards.decks.Deck;
 import mage.cards.decks.DeckCardInfo;
 import mage.cards.decks.DeckCardLists;
@@ -57,7 +58,9 @@ final class DeckLists {
     private static final Set<String> RESERVE_FIELDS = Set.of("name", "threshold", "mode");
     /** A reserve card's threshold: the life at or below which it first crosses (v0.8.0). */
     static final int MAX_THRESHOLD = 999;
-    private static final Set<String> ENTRY_FIELDS = Set.of("name", "count");
+    private static final Set<String> ENTRY_FIELDS = Set.of("name", "count", "choice");
+    /** The colours a choice is two of, in the order a choice is written (v0.9.12). */
+    private static final String COLORS = "WUBRG";
     private static final Set<String> STAND_IN_FIELDS = Set.of("name", "mana_cost", "types", "subtypes", "supertypes",
         "colors", "power", "toughness", "loyalty", "defense");
     static final int MAX_STAND_IN_TEXT = 64;
@@ -65,7 +68,16 @@ final class DeckLists {
     /** Lower-case name to XMage's spelling, built from the database's names on first use. */
     private static volatile Map<String, String> namesIgnoringCase;
 
-    record Entry(String name, int count) {}
+    /**
+     * A deck list's entry. Since v0.9.12 it may carry a {@code choice} made as the deck was built:
+     * Cryptic Spires's two circled colours, two different letters of WUBRG. Every copy of that
+     * card names one (unless the list describes it as a stand-in), and no other card takes one.
+     */
+    record Entry(String name, int count, String choice) {
+        Entry(String name, int count) {
+            this(name, count, null);
+        }
+    }
 
     /**
      * A campaign finale's incarnation (v0.8.0): its card, and the life at which it first crosses; or since
@@ -186,6 +198,25 @@ final class DeckLists {
             reserve = reserve(json.get("reserve"));
         }
         List<String> opening = json.has("opening") ? opening(json.get("opening"), entries) : List.of();
+        // A card this engine plays as written with a choice is never a stand-in, whatever the list
+        // describes: the catalog may still call it one until it has read this engine's cards.
+        if (standIns.keySet().stream().anyMatch(DeckLists::takesChoice)) {
+            standIns = new HashMap<>(standIns);
+            standIns.keySet().removeIf(DeckLists::takesChoice);
+        }
+        for (List<Entry> list : List.of(entries, sideboard)) {
+            for (Entry entry : list) {
+                boolean spires = takesChoice(entry.name());
+                if (entry.choice() != null && !spires) {
+                    throw new JsonRequest.Invalid(entry.name() + " takes no choice: only Cryptic Spires's two"
+                        + " colours are chosen as a deck is built");
+                }
+                if (entry.choice() == null && spires) {
+                    throw new JsonRequest.Invalid(entry.name() + " needs its two circled colours: name them as"
+                        + " the entry's choice, two different letters of " + COLORS);
+                }
+            }
+        }
         return new CustomDeck(entries, commanders, sideboard, standIns, reserve, opening);
     }
 
@@ -337,9 +368,26 @@ final class DeckLists {
             if (name.isEmpty() || count.signum() <= 0 || count.compareTo(BigDecimal.valueOf(MAX_COUNT)) > 0) {
                 throw new JsonRequest.Invalid("each deck_list entry needs a name and a count from 1 to " + MAX_COUNT);
             }
-            entries.add(new Entry(name, count.intValueExact()));
+            entries.add(new Entry(name, count.intValueExact(), entry.has("choice") ? choice(entry) : null));
         }
         return entries;
+    }
+
+    /** An entry's choice (v0.9.12): two different colours, kept in WUBRG order. */
+    private static String choice(JsonObject entry) throws JsonRequest.Invalid {
+        String letters = JsonRequest.string(entry, "choice", 2).strip().toUpperCase(Locale.ROOT);
+        if (letters.length() != 2 || letters.charAt(0) == letters.charAt(1)
+            || COLORS.indexOf(letters.charAt(0)) < 0 || COLORS.indexOf(letters.charAt(1)) < 0) {
+            throw new JsonRequest.Invalid("a deck_list entry's choice is two different letters of " + COLORS);
+        }
+        return COLORS.indexOf(letters.charAt(0)) < COLORS.indexOf(letters.charAt(1)) ? letters
+            : new StringBuilder(letters).reverse().toString();
+    }
+
+    /** Whether the card with this name takes a choice as a deck is built: Cryptic Spires. */
+    static boolean takesChoice(String name) {
+        CardInfo card = find(name);
+        return card != null && CrypticSpires.class.getName().equals(card.getClassName());
     }
 
     /** The names in {@code deck} that the card database does not know and no stand-in describes. */
@@ -382,9 +430,30 @@ final class DeckLists {
             }
         }
         Deck loaded = Deck.load(lists, false, false);
+        circle(loaded.getCards(), deck.cards());
+        circle(loaded.getSideboard(), deck.sideboard());
         loaded.getCards().addAll(mainStandIns);
         loaded.getSideboard().addAll(sideStandIns);
         return loaded;
+    }
+
+    /**
+     * Circles each copy of Cryptic Spires with the colours its entry chose (v0.9.12): the choice is
+     * made as the deck is built, so the card has it before the game sees it. A copy no entry gave
+     * a choice (a deck made in code, not read from a request) stays a land with no mana ability.
+     */
+    private static void circle(Iterable<Card> cards, List<Entry> entries) {
+        var choices = new java.util.ArrayDeque<String>();
+        for (Entry entry : entries) {
+            for (int copy = 0; entry.choice() != null && copy < entry.count(); copy++) {
+                choices.add(entry.choice());
+            }
+        }
+        for (Card card : cards) {
+            if (card instanceof CrypticSpires spires && spires.getCircled().isEmpty() && !choices.isEmpty()) {
+                spires.circle(choices.poll());
+            }
+        }
     }
 
     /** Makes {@code count} stand-ins when {@code name} names one, into {@code into}. */

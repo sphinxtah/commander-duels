@@ -47,6 +47,8 @@ final class SeatViews {
     /** Commander names and colour identities, kept for commanders that left the game with their owner. */
     private final Map<UUID, String> commanderNames = new HashMap<>();
     private final Map<UUID, String> identities = new HashMap<>();
+    /** What a seat yields to (v0.9.12): the game's {@link Automation}, or nothing where there is none. */
+    java.util.function.IntFunction<List<String>> yielding = seat -> List.of();
 
     SeatViews(Game game, List<UUID> seatIds, ObjectRefs refs) {
         this.game = game;
@@ -56,6 +58,24 @@ final class SeatViews {
 
     SeatView build(int seat, List<String> messages) {
         return build(seatIds.get(seat), messages);
+    }
+
+    /**
+     * The name a viewer reads for an object on the stack, as their view's stack gives it: a spell's
+     * own, an ability's source's; null for one hidden from them (a face-down spell, an ability of
+     * a face-down permanent).
+     */
+    String stackName(StackObject stackObject, UUID viewer) {
+        boolean visible = Visibility.stackObjectVisible(game, stackObject, viewer);
+        if (stackObject instanceof Spell spell) {
+            return visible ? spell.getName() : null;
+        }
+        MageObject source = game.getObject(stackObject.getSourceId());
+        if (source instanceof Permanent permanent && permanent.isFaceDown(game)
+                && !Visibility.seesFor(game, viewer).contains(permanent.getControllerId())) {
+            visible = false;
+        }
+        return !visible ? null : source == null ? stackObject.getName() : source.getName();
     }
 
     /**
@@ -123,7 +143,7 @@ final class SeatViews {
             revealed,
             lookedAt,
             List.copyOf(messages),
-            you == null ? null : Priority.controls(you));
+            you == null ? null : Priority.controls(you, yielding.apply(seatIds.indexOf(viewer))));
     }
 
     private SeatView.PlayerState player(Player player, UUID viewer) {

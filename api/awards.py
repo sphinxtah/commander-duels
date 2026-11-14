@@ -20,10 +20,17 @@ from api.social import Award
 from api.stats import record_results
 
 
-def settle(db: Session, game: Game, rules: Eligibility | None = None) -> None:
+def settle(
+    db: Session,
+    game: Game,
+    rules: Eligibility | None = None,
+    no_quests: frozenset[int] = frozenset(),
+) -> None:
     """After the game's end is recorded, with its win counted and paid (economy.pay_game holds the
     winner's lock): a result for every human seat, then each player's quest boards and the
-    winner's achievements, as far as the game's mode lets them (v0.9.10, api/modes.py)."""
+    winner's achievements, as far as the game's mode lets them (v0.9.10, api/modes.py). no_quests
+    (v0.9.12) is the seats whose quest boards the farming policy keeps this game from
+    (api/farming.py); none unless it is enforced."""
     rules = rules or eligibility(game.mode or mode_of(game.kind, False))
     if not rules.earns("statistics"):
         return
@@ -31,7 +38,7 @@ def settle(db: Session, game: Game, rules: Eligibility | None = None) -> None:
         if result.outcome == "no_result":
             continue
         user = db.get_one(User, result.user_id)
-        if rules.earns("quests"):
+        if rules.earns("quests") and result.seat not in no_quests:
             count_game(db, user, result.finished_at)
         if result.outcome == "win" and rules.earns("achievements"):
             catch_up(db, user, utcnow())

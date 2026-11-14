@@ -50,6 +50,14 @@ const sourceNotes: [Source, string][] = [
     "Every copy of each warden's deck you won in the campaign, yours for good.",
   ],
   ["grant", "Cards SysOp gave your account, for testing, yours for good."],
+  [
+    "functional",
+    "Basic lands every account builds with. They are not copies: an edition or a foil is still something to own.",
+  ],
+  [
+    "staple",
+    "Starter staples you claimed with a pick: one of each to build with, bound to your account and never sold.",
+  ],
 ];
 /** Editions drawn at a time (v0.6.5): a library of thousands drawn whole was slow to scroll, and
  * its pictures, asked for all at once, outran the server's downloads and kept their text frames. */

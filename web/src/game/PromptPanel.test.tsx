@@ -129,12 +129,14 @@ function Panel({
   onStopTimer = vi.fn(),
   onAnswer = vi.fn(),
   choose = vi.fn(),
+  chooseBatch,
 }: {
   game: GameState;
   timer?: TimerView | null;
   onStopTimer?: () => void;
   onAnswer?: (payload: object) => void;
   choose?: (option: PromptOption) => void;
+  chooseBatch?: GameContextValue["chooseBatch"];
 }) {
   const prompt = game.snapshot?.prompt ?? null;
   const context: GameContextValue = {
@@ -146,6 +148,7 @@ function Panel({
     canAnswer: game.pending === null,
     observing: false,
     choose,
+    chooseBatch,
     zoom: vi.fn(),
     preview: vi.fn(),
   };
@@ -201,6 +204,113 @@ describe("the amounts form", () => {
         .getAllByRole("spinbutton")
         .map((input) => (input as HTMLInputElement).value),
     ).toEqual(["3", "1"]);
+  });
+});
+
+describe("large boards (v0.9.12)", () => {
+  const goblin = (id: string, selected = false): PromptOption => ({
+    id,
+    action: "toggle_attacker",
+    label: "Goblin",
+    object_id: `o${id}`,
+    seat: null,
+    selected,
+  });
+  const attack: Prompt = {
+    id: "a",
+    kind: "declare_attackers",
+    message: "Select attackers",
+    detail: null,
+    options: [
+      goblin("1"),
+      goblin("2"),
+      goblin("3", true),
+      goblin("4", true),
+      option("5", "done"),
+    ],
+    amounts: null,
+    piles: null,
+    xmage_query: null,
+  };
+
+  it("declares and withdraws like creatures with one command, by a button the keyboard reaches", () => {
+    const chooseBatch = vi.fn();
+    const choose = vi.fn();
+    render(
+      <Panel
+        game={state(snapshot(5, attack))}
+        choose={choose}
+        chooseBatch={chooseBatch}
+      />,
+    );
+    const several = screen.getByRole("heading", {
+      level: 3,
+      name: "Several at once",
+    }).parentElement!;
+    const all = within(several).getByRole("button", {
+      name: "Attack with all 2 Goblin",
+    });
+    // An ordinary button: in the tab order, pressed with Enter or Space as any other.
+    expect(all.tabIndex).toBe(0);
+    all.focus();
+    expect(document.activeElement).toBe(all);
+    fireEvent.click(all);
+    expect(chooseBatch).toHaveBeenCalledWith({ objects: ["o1", "o2"] });
+    fireEvent.click(
+      within(several).getByRole("button", {
+        name: "Stop attacking with all 2 Goblin",
+      }),
+    );
+    expect(chooseBatch).toHaveBeenLastCalledWith({
+      objects: ["o3", "o4"],
+      declare: false,
+    });
+    // Nothing is confirmed for the player, and each creature keeps its own button.
+    expect(choose).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-action="done"]')).not.toBeNull();
+    expect(
+      screen.getAllByRole("button", { name: /Goblin$/, pressed: false }),
+    ).toHaveLength(2);
+  });
+
+  it("offers none where the screen sends no batch, or while an answer is on its way", () => {
+    const { unmount } = render(<Panel game={state(snapshot(5, attack))} />);
+    expect(
+      screen.queryByRole("heading", { name: "Several at once" }),
+    ).toBeNull();
+    unmount();
+    render(
+      <Panel game={state(snapshot(5, attack), true)} chooseBatch={vi.fn()} />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Attack with all 2 Goblin" }),
+    ).toBeDisabled();
+  });
+
+  it("lists a yield with the passes, never on an object", () => {
+    const prompt: Prompt = {
+      ...priority("y"),
+      options: [
+        option("1", "pass"),
+        option("2", "pass_until_stack_resolved"),
+        {
+          ...option("3", "yield"),
+          label: "Pass, and keep passing for Impact Tremors",
+        },
+      ],
+    };
+    const choose = vi.fn();
+    render(<Panel game={state(snapshot(5, prompt))} choose={choose} />);
+    const passing = screen.getByRole("heading", {
+      level: 3,
+      name: "Keep passing",
+    }).parentElement!;
+    fireEvent.click(
+      within(passing).getByRole("button", {
+        name: "Pass, and keep passing for Impact Tremors",
+      }),
+    );
+    expect(choose).toHaveBeenCalledWith(prompt.options[2]);
   });
 });
 

@@ -192,7 +192,7 @@ final class Priority {
     }
 
     /** The seat's controls as its view shows them. */
-    static SeatView.PriorityControls controls(Player player) {
+    static SeatView.PriorityControls controls(Player player, List<String> yields) {
         String passing = null;
         if (player instanceof PlayerImpl impl) {
             if (impl.getPassedUntilStackResolved()) {
@@ -226,6 +226,7 @@ final class Priority {
             && stops.isStopOnDeclareBlockersWithAnyPermanents() && !data.isPassPriorityCast();
         return new SeatView.PriorityControls(passing, List.copyOf(yours), List.copyOf(theirs),
             stops.isStopOnStackNewObjects(), stops.isStopOnDeclareAttackers(),
-            stops.isStopOnDeclareBlockersWithAnyPermanents(), data.isPassPriorityCast(), full);
+            stops.isStopOnDeclareBlockersWithAnyPermanents(), data.isPassPriorityCast(), full,
+            List.copyOf(yields));
     }
 }

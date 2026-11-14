@@ -8,6 +8,7 @@ import { InstallSettings } from "./InstallSettings";
 import {
   AnimationSpeedField,
   EffectsField,
+  ReducedClutterField,
   TableSettingsForm,
 } from "./TableSettingsForm";
 import styles from "./Settings.module.css";
@@ -69,6 +70,7 @@ export function Settings({
         </label>
         <AnimationSpeedField />
         <EffectsField />
+        <ReducedClutterField />
         <p role="status">
           {saveMessage || "Preferences are stored on this device."}
         </p>

@@ -42,7 +42,7 @@ import random
 import secrets
 import time
 from collections import defaultdict
-from collections.abc import AsyncIterator, Callable, Coroutine, Hashable
+from collections.abc import AsyncIterator, Callable, Coroutine, Hashable, Mapping
 from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -62,7 +62,7 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from api import events as events_module
-from api import kings_table, modes
+from api import farming, kings_table, modes
 from api.auth import INPUT_ERRORS
 from api.config import Settings
 from api.custom_play import custom_in_seats
@@ -279,6 +279,41 @@ def unavailable() -> ApiError:
 # what a seat may send.
 
 
+class BatchFollow(BaseModel):
+    """The answer to the question the game asks after a declaration: an object, or a player."""
+
+    model_config = ConfigDict(extra="forbid")
+    object_id: str | None = Field(default=None, min_length=1, max_length=64)
+    seat: int | None = Field(default=None, ge=0, le=5)
+
+    @model_validator(mode="after")
+    def one_of_them(self) -> "BatchFollow":
+        if (self.object_id is None) == (self.seat is None):
+            raise ValueError("then needs exactly one of object_id and seat")
+        return self
+
+
+class BatchPayload(BaseModel):
+    """Several attackers or blockers declared with one command (v0.9.12,
+    docs/engine/large-boards.md). The engine checks the whole batch against the open prompt, and
+    declares each as it declares one given alone; this only bounds its shape."""
+
+    model_config = ConfigDict(extra="forbid")
+    objects: list[Annotated[str, Field(min_length=1, max_length=64)]] = Field(
+        min_length=1, max_length=250
+    )
+    declare: bool = True
+    then: BatchFollow | None = None
+
+    @model_validator(mode="after")
+    def well_formed(self) -> "BatchPayload":
+        if len(set(self.objects)) != len(self.objects):
+            raise ValueError("a batch names each object once")
+        if self.then is not None and not self.declare:
+            raise ValueError("then goes with a declaration, not a withdrawal")
+        return self
+
+
 class ChoicePayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
     option_id: str | None = Field(default=None, min_length=1, max_length=16)
@@ -287,6 +322,8 @@ class ChoicePayload(BaseModel):
     )
     # A typed name, for choose_name prompts (naming a card); the engine checks it against its list.
     text: str | None = Field(default=None, min_length=1, max_length=200)
+    # Since v0.9.12: several attackers or blockers at once, at a declaration's prompt.
+    batch: BatchPayload | None = None
 
 
 PriorityStep = Literal[
@@ -335,9 +372,12 @@ class GameCommand(BaseModel):
             (self.payload.option_id is not None)
             + (self.payload.amounts is not None)
             + (self.payload.text is not None)
+            + (self.payload.batch is not None)
         )
         if self.type == "submit_choice" and (self.prompt_id is None or chosen != 1):
-            raise ValueError("submit_choice needs prompt_id and one of option_id, amounts and text")
+            raise ValueError(
+                "submit_choice needs prompt_id and one of option_id, amounts, text and batch"
+            )
         if self.type == "concede" and chosen:
             raise ValueError("concede takes an empty payload")
         return self
@@ -450,6 +490,9 @@ class LiveSeat:
     # theirs, not a loss.
     conceding: bool = False
     removing: bool = False
+    # Choices the engine took from the seat's player (v0.9.12): none in a game that was played
+    # is the idle signal of api/farming.py.
+    commands: int = 0
 
 
 @dataclass(eq=False)
@@ -1012,6 +1055,7 @@ class GameHub:
                     result,
                     content_dir,
                     game.owner_closed,
+                    {seat.seat: seat.commands for seat in game.seats.values()},
                 ),
                 what,
             )
@@ -1339,6 +1383,8 @@ class GameHub:
             if conceding:
                 seat.conceding = False
         reply(status, body)
+        if status == 200 and not conceding:
+            seat.commands += 1
         if status == 200 and conceding:
             self.seat_left(game, seat, "conceded")
 
@@ -1494,6 +1540,7 @@ def record_end(
     result: dict[str, Any] | None,
     content_dir: str | None = None,
     owner_closed: bool = False,
+    activity: Mapping[int, int] | None = None,
 ) -> None:
     """Records how the game ended and, in the same transaction, the win of a player's seat that
     won it (api/progression.py), the tokens it pays (api/economy.py), and since v0.5.0 the
@@ -1503,7 +1550,10 @@ def record_end(
     Since v0.8.0 a campaign duel's end is the campaign's instead (api/campaign.py): no win and no
     quests, and for a win the encounter and its rewards (a first win's spoils: the warden's deck
     and tokens), in this same transaction. owner_closed says the game's own player closed it
-    (v0.9.8), which the campaign's court counts as the court lost."""
+    (v0.9.8), which the campaign's court counts as the court lost. activity is the choices each
+    seat's player sent, when the API followed the game to its end (v0.9.12): with the result it
+    gives the game's farming signals (api/farming.py), kept with the game, and what the farming
+    policy withholds for them, which is nothing until it is enforced."""
     # Imported here, as above; api.matches and api.campaign import this module.
     from api import campaign, matches
     from api.awards import settle
@@ -1523,7 +1573,8 @@ def record_end(
                 # A campaign duel is the campaign's whatever it was made as.
                 game.mode = modes.mode_of(game.kind, link is not None)
             rules = modes.eligibility(game.mode, result=game.result is not None)
-            game.eligibility = rules.record()
+            observed = farming.observe(db, game, activity)
+            game.eligibility = observed.record(rules.record())
             # A game played with passive bots (the testing switch of SysOp, v0.8.6, and of
             # administrators, v0.8.7) counts as any other since v0.9.7 (the owner, 2026-11-10:
             # "Administrators should not have this restriction"): its win, tokens, quests and
@@ -1537,8 +1588,8 @@ def record_end(
                 if rules.earns("wins"):
                     count_win(db, game)
                 if rules.earns("tokens"):
-                    pay_game(db, game)
-                settle(db, game, rules)
+                    pay_game(db, game, observed.without("tokens"))
+                settle(db, game, rules, observed.without("quests"))
                 matches.game_ended(db, game)
             db.commit()
 
@@ -2014,8 +2065,9 @@ def engine_deck_list(
     game, where wishes find it (FMT07). Companions stay out of it, as the companion location does,
     since XMage would offer a sideboard's companion as one. Since v0.6.2 the list describes the
     stand-ins it holds (stand_ins), which the engine makes from their description."""
-    counts: dict[str, int] = defaultdict(int)
-    sideboard: dict[str, int] = defaultdict(int)
+    # By name and choice (v0.9.12): a copy of Cryptic Spires goes with its two circled colours.
+    counts: dict[tuple[str, str | None], int] = defaultdict(int)
+    sideboard: dict[tuple[str, str | None], int] = defaultdict(int)
     commanders: list[str] = []
     companions = set(
         db.scalars(
@@ -2031,18 +2083,21 @@ def engine_deck_list(
         if entry.location == "commander":
             commanders.append(name)
         elif entry.location == "main":
-            counts[name] += entry.quantity
+            counts[(name, entry.choice)] += entry.quantity
         elif entry.location == "sideboard" and fmt == "legacy" and entry.card_id not in companions:
-            sideboard[name] += entry.quantity
-    deck_list: dict[str, object] = {
-        "cards": [{"name": name, "count": count} for name, count in counts.items()]
-    }
+            sideboard[(name, entry.choice)] += entry.quantity
+
+    def listed(found: dict[tuple[str, str | None], int]) -> list[dict[str, object]]:
+        return [
+            {"name": name, "count": count, **({"choice": choice} if choice else {})}
+            for (name, choice), count in found.items()
+        ]
+
+    deck_list: dict[str, object] = {"cards": listed(counts)}
     if fmt == "commander":
         deck_list["commanders"] = commanders
     if sideboard:
-        deck_list["sideboard"] = [
-            {"name": name, "count": count} for name, count in sideboard.items()
-        ]
+        deck_list["sideboard"] = listed(sideboard)
     standing_in = stand_ins(db, {entry.card_id for entry in entries})
     if standing_in:
         deck_list["stand_ins"] = list(

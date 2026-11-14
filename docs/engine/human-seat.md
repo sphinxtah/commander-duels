@@ -32,6 +32,8 @@ What it does not prove:
 
 The seat never sends XMage identifiers. Option IDs are numbers scoped to one prompt, and each maps to the exact value `HumanPlayer` expects.
 
+Since v0.9.12 the engine itself may answer a prompt as it opens, on the seat's standing instruction: the rest of a **batch** of attackers or blockers (`payload.batch` instead of `option_id`; a batch that fails its check is `422 invalid_batch`), and a **yield** to a source's repeated triggers (the priority prompt's `yield` option). Each such answer is one the prompt itself offers, reaches XMage as the seat's own would, and is kept in the journal as an ordinary answer. The seat is then shown no prompt for that question ([large boards](large-boards.md)).
+
 ### Prompt kinds
 
 | Kind | XMage request | Options | Answer sent to XMage |
@@ -61,7 +63,7 @@ Since v0.2.0 (UI07), on XMage's own human player, so XMage's rules for when a pa
   - `stop_on_new_stack_objects`, `stop_on_attackers`, `stop_on_blockers`: what ends a pass;
   - `pass_after_casting`: false (the default) holds priority after the seat casts or activates;
   - `full_control`: true stops at every step and every new object and holds priority after casting; false restores XMage's defaults;
-  - `cancel_passes`: true ends a pass in progress.
+  - `cancel_passes`: true ends a pass in progress, and since v0.9.12 the seat's yields and any batch.
 - **The reply** (200) carries the seat's controls as `priority`, the same object as the view's `priority`: the settings above plus `passing`, the pass in progress (`until_my_turn` and the like) or null. A finished game refuses with 409 `game_over`; an unknown step or setting is a 400 `invalid_command`. A repeated action ID returns its first result, as for every command.
 - **Views.** Each seat's view has `priority`; a spectator's view has null. The settings live in the seat's XMage `UserData` and last for the game.
 

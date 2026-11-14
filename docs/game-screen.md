@@ -107,6 +107,7 @@ The engine's open prompt lists every option. The screen offers exactly those opt
 - **Amounts.** Damage assignment and X use a form, filled with the engine's suggestion and checked against each entry's limits and the total.
 - **Piles.** Fact or Fiction shows each pile's cards.
 - **Revealed and looked-at cards** show in the column, with the engine's messages.
+- **Several at once** (v0.9.12). When a declaration offers two or more creatures of one name, the column offers them together: "Attack with all 12 Goblin", "Stop attacking with all 8 Goblin", "Block with all 5 Saproling". One command declares them; Done stays yours, so nothing is confirmed for you ([large boards](engine/large-boards.md#batch-declarations)).
 - **Unsupported choices.** A choice the screen cannot show yet says so and offers to concede.
 
 - **What's this?** (v0.8.6). Under the prompt's question, a small link opens the topic of [How to play](how-to-play.md) that explains that kind of choice, in a new tab, so the game goes on.
@@ -124,6 +125,7 @@ It never runs for a choice of your own (mulligan, targets, modes, amounts, piles
 The rest of UI07: where the game gives the seat priority, and how long it passes for the player. They are in the Priority drawer (the band's third diamond).
 - **Keep passing.** A priority prompt also offers, in its "Keep passing" group: pass until the stack resolves, until the next main phase, until the end of the turn, until the next turn, until the end step before your turn, and until your next turn. Something new on the stack, attackers or blockers stop the pass, as the stops below say, and a choice the player must make is still asked.
 - **A pass in progress** shows at the top of the prompt column ("Passing until your next turn."), with **Stop passing**; Escape does the same anywhere on the table once no menu, drawer or magnified card is open.
+- **Yield** (v0.9.12). With something on top of the stack, "Keep passing" also offers "Pass, and keep passing for" its source: the game passes for you each time the same source's same ability is on top again, until the turn ends or you have something new to do. It shows as "Passing for Impact Tremors." with Stop passing, and Escape stops it too ([large boards](engine/large-boards.md#yields)).
 - **Full control** stops at every step, in every turn, and holds priority after each spell. Turning it off restores the default stops.
 - **Hold priority after casting** (on by default): after casting a spell or activating an ability, the player keeps priority to respond to it.
 - **Stops…** opens the list of steps where the game gives the seat priority with an empty stack, for its own turns and the others', and whether new stack objects, declared attackers and declared blockers stop a pass.
@@ -262,6 +264,8 @@ The owner's six-player mode ([King's Table](kings-table.md)): two teams of three
 - **Focus.** Focus is always visible, at least 3 screen pixels however small the table is drawn.
 - **Live regions.** The turn line, the connection's state, the log (in its drawer, still announced when closed) and one polite announcer for the timer ("Bot 2's Lightning Bolt. Continuing in 8 seconds. Press Space or T to stop the timer.") and refused drops.
 - **Settings.** Larger text enlarges the table's text; Reduce motion stills the animation, turns the special effects off (v0.7.0) and shows the timer as seconds; forced colours keep the diamonds' edges. Since v0.6.5 only the account's Reduce motion does this, everywhere on the site: the system's reduced-motion setting (which Windows reports when its animation effects are off) no longer stills the page, the table, the pack's card flips or the foils' glow.
+
+- **Reduced clutter** (v0.9.12, a device setting beside the animation speed): a pile of like lands or tokens is one card with its count instead of a fan. The count opens every one of them ([large boards](engine/large-boards.md#animation-speed-and-reduced-clutter)).
 
 ## Verification
 

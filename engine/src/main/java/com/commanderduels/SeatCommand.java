@@ -17,7 +17,8 @@ import java.util.Set;
  *                    body is refused instead of being treated as a retry
  */
 public record SeatCommand(String actionId, long expectedRevision, String promptId, String type, String optionId,
-                          List<Integer> amounts, String text, Priority.Settings priority, String fingerprint) {
+                          List<Integer> amounts, String text, Priority.Settings priority, Automation.Batch batch,
+                          String fingerprint) {
     static final int MAX_AMOUNTS = 32;
     static final int MAX_AMOUNT = 10_000;
     /** The longest card name is under 150 characters. */
@@ -66,6 +67,7 @@ public record SeatCommand(String actionId, long expectedRevision, String promptI
         List<Integer> amounts = null;
         String text = null;
         Priority.Settings priority = null;
+        Automation.Batch batch = null;
         if (type.equals(SET_PRIORITY)) {
             if (json.has("prompt_id")) {
                 throw new JsonRequest.Invalid("set_priority takes no prompt_id");
@@ -76,14 +78,17 @@ public record SeatCommand(String actionId, long expectedRevision, String promptI
                 throw new JsonRequest.Invalid("submit_choice needs prompt_id");
             }
             promptId = JsonRequest.uuid(json, "prompt_id");
-            JsonRequest.onlyFields(payload, Set.of("option_id", "amounts", "text"), "payload.");
+            JsonRequest.onlyFields(payload, Set.of("option_id", "amounts", "text", "batch"), "payload.");
             if (payload.size() != 1) {
-                throw new JsonRequest.Invalid("payload needs exactly one of option_id, amounts and text");
+                throw new JsonRequest.Invalid("payload needs exactly one of option_id, amounts, text and batch");
             }
             if (payload.has("option_id")) {
                 optionId = JsonRequest.string(payload, "option_id", 16);
             } else if (payload.has("amounts")) {
                 amounts = amounts(payload.get("amounts"));
+            } else if (payload.has("batch")) {
+                // Several attackers or blockers declared at once (v0.9.12, see Automation).
+                batch = Automation.parse(payload);
             } else {
                 text = JsonRequest.string(payload, "text", MAX_TEXT);
             }
@@ -95,8 +100,9 @@ public record SeatCommand(String actionId, long expectedRevision, String promptI
         }
         String fingerprint = type + "|" + promptId + "|" + optionId + "|" + amounts + "|"
             + (text == null ? "" : text.length() + ":" + text) + "|" + revision + "|"
-            + (priority == null ? "" : priority.fingerprint());
-        return new SeatCommand(actionId, revision, promptId, type, optionId, amounts, text, priority, fingerprint);
+            + (priority == null ? "" : priority.fingerprint()) + "|" + (batch == null ? "" : batch.fingerprint());
+        return new SeatCommand(actionId, revision, promptId, type, optionId, amounts, text, priority, batch,
+            fingerprint);
     }
 
     private static List<Integer> amounts(JsonElement element) throws JsonRequest.Invalid {

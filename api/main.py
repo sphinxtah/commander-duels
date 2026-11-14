@@ -26,11 +26,13 @@ from api import (
     decks,
     economy,
     engine_cards,
+    entitlements,
     events,
     games,
     how_to_play,
     lobby,
     matches,
+    policies,
     progression,
     quests,
     queues,
@@ -40,10 +42,12 @@ from api import (
     sleeves,
     social,
     stats,
+    table_profiles,
     tables,
     testing,
     tutorial,
     warden_openings,
+    workshop,
 )
 from api.config import Settings
 from api.database import build_engine, migration_head
@@ -374,6 +378,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(games.router)
     app.include_router(events.router)
     app.include_router(tables.router)
+    app.include_router(table_profiles.router)
     app.include_router(matches.router)
     app.include_router(queues.router)
     app.include_router(rematches.router)
@@ -382,11 +387,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # How to play's example cards, for anyone (v0.8.6).
     app.include_router(how_to_play.router)
     app.include_router(cards.router)
+    # Before the decks' own routes: /decks/shelves and /decks/organize are not deck ids.
+    app.include_router(workshop.router)
     app.include_router(decks.router)
     app.include_router(progression.router)
     app.include_router(tutorial.router)
     app.include_router(custom_cards.router)
     app.include_router(economy.router)
+    app.include_router(policies.router)
+    app.include_router(entitlements.router)
     app.include_router(shop.router)
     app.include_router(auctions.router)
     app.include_router(reports.router)

@@ -30,6 +30,8 @@ export const MIN_HIT = 36;
 export const MIN_HAND_SLICE = 40;
 /** Cards shown with their own hit in a pile, or attachments beside a host, before a "+N". */
 export const PILE_CAP = 5;
+/** With reduced clutter (v0.9.12) a pile is one card and its count. */
+export const COMPACT_PILE_CAP = 1;
 export const ATTACHMENT_CAP = 4;
 /** The smallest scale a row may shrink its cards to before they overlap. */
 export const MIN_ROW_SCALE = 0.72;

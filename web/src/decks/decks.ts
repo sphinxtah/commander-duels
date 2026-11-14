@@ -69,11 +69,44 @@ export function collectionLocked(
   );
 }
 
-/** A deck entry's card and edition, as the editor tells its rows apart. */
+/** A deck entry's card and edition, as the editor counts its copies against the library. */
 export function entryKey(
   entry: Pick<DeckEntry, "card_id" | "printing_id">,
 ): string {
   return `${entry.card_id}|${entry.printing_id ?? ""}`;
+}
+
+/** A deck entry's card, edition and choice, as the editor tells its rows apart (v0.9.12): two
+ * copies of Cryptic Spires with different colours circled are two rows. */
+export function rowKey(
+  entry: Pick<DeckEntry, "card_id" | "printing_id" | "choice">,
+): string {
+  return `${entryKey(entry)}|${entry.choice ?? ""}`;
+}
+
+/** The colours a choice is two of, in the order a choice is written. */
+export const CHOICE_COLOURS = [
+  ["W", "White"],
+  ["U", "Blue"],
+  ["B", "Black"],
+  ["R", "Red"],
+  ["G", "Green"],
+] as const;
+
+/** Whether a card takes a choice as the deck is built (v0.9.12): Cryptic Spires's two circled
+ * colours. The server's validation names the same card (api/validation.py CHOICE_CARDS). */
+export function takesChoice(card: { name: string }): boolean {
+  return card.name === "Cryptic Spires";
+}
+
+/** A choice in words: "White and Blue". */
+export function choiceWords(choice: string): string {
+  return [...choice]
+    .map(
+      (letter) =>
+        CHOICE_COLOURS.find(([code]) => code === letter)?.[1] ?? letter,
+    )
+    .join(" and ");
 }
 
 /** Why the player's library holds an entry back (v0.5.0): too few copies of the card, or of the
@@ -178,11 +211,11 @@ export function editionFor(
   );
 }
 
-/** One entry per card, printing and location; quantities added. */
+/** One entry per card, printing, choice and location; quantities added. */
 export function merge(entries: DeckEntry[]): DeckEntry[] {
   const totals = new Map<string, DeckEntry>();
   for (const entry of entries) {
-    const key = `${entry.card_id}|${entry.printing_id ?? ""}|${entry.location}`;
+    const key = `${rowKey(entry)}|${entry.location}`;
     const found = totals.get(key);
     totals.set(
       key,
@@ -324,10 +357,7 @@ export function differences(
 ): { key: string; entry: DeckEntry; mine: number; theirs: number }[] {
   const keyed = (list: DeckEntry[]) =>
     new Map(
-      merge(list).map((entry) => [
-        `${entry.card_id}|${entry.printing_id ?? ""}|${entry.location}`,
-        entry,
-      ]),
+      merge(list).map((entry) => [`${rowKey(entry)}|${entry.location}`, entry]),
     );
   const a = keyed(mine);
   const b = keyed(theirs);
@@ -351,7 +381,7 @@ export function differences(
 export function combine(mine: DeckEntry[], theirs: DeckEntry[]): DeckEntry[] {
   const keyed = new Map<string, DeckEntry>();
   for (const entry of [...merge(mine), ...merge(theirs)]) {
-    const key = `${entry.card_id}|${entry.printing_id ?? ""}|${entry.location}`;
+    const key = `${rowKey(entry)}|${entry.location}`;
     const found = keyed.get(key);
     if (!found || found.quantity < entry.quantity) keyed.set(key, entry);
   }

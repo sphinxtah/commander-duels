@@ -285,6 +285,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Policies
+         * @description The economy's policies as they stand, with their defaults (v0.9.12).
+         */
+        get: operations["policies_api_v1_admin_policies_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/policies/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change Policy
+         * @description SysOp sets a policy: the owner's approval of an economy change, audited with what it was
+         *     and what it became. A field left out takes its default.
+         */
+        put: operations["change_policy_api_v1_admin_policies__name__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/reports": {
         parameters: {
             query?: never;
@@ -579,6 +620,49 @@ export interface paths {
          */
         post: operations["delete_user_api_v1_admin_users__user_id__delete_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/entitlements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Account Entitlements */
+        get: operations["account_entitlements_api_v1_admin_users__user_id__entitlements_get"];
+        put?: never;
+        /**
+         * Give Entitlement
+         * @description SysOp lets an account build with a card it does not own, for testing; audited. It is
+         *     functional access, not a card: SysOp's cards for testing are grants (api/testing.py).
+         */
+        post: operations["give_entitlement_api_v1_admin_users__user_id__entitlements_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/entitlements/{entitlement_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * End Entitlement
+         * @description SysOp ends an entitlement; audited. A deck that held the card says so when it is next
+         *     checked, and a game already started plays on with the deck it was given.
+         */
+        delete: operations["end_entitlement_api_v1_admin_users__user_id__entitlements__entitlement_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1642,6 +1726,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/decks/organize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Organize
+         * @description Moves several decks into a folder, or out of theirs, and adds or removes tags on all of
+         *     them: every deck named must be the account's and out of the trash, or nothing changes.
+         */
+        post: operations["organize_api_v1_decks_organize_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decks/shelves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Shelves
+         * @description The account's folders and tags, each with how many of its decks it holds (the trash
+         *     apart).
+         */
+        get: operations["shelves_api_v1_decks_shelves_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/decks/starters": {
         parameters: {
             query?: never;
@@ -1739,6 +1865,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/decks/{deck_id}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Compare
+         * @description Two saved versions of the deck compared, or a version and the draft: `before` and `after`
+         *     are each a version's number or "draft".
+         */
+        get: operations["compare_api_v1_decks__deck_id__diff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/decks/{deck_id}/draft": {
         parameters: {
             query?: never;
@@ -1795,6 +1942,47 @@ export interface paths {
          * @description Deletes a deck in the trash for good (v0.9.3). Games that played it keep their copy.
          */
         delete: operations["delete_forever_api_v1_decks__deck_id__forever_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decks/{deck_id}/missing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Deck Missing
+         * @description The cards of the deck its owner's library lacks, with the auctions open for each and the
+         *     shop's packs that may hold it.
+         */
+        get: operations["deck_missing_api_v1_decks__deck_id__missing_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decks/{deck_id}/performance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Deck Performance
+         * @description The deck's results, in all and by the version played, each with its sample size.
+         */
+        get: operations["deck_performance_api_v1_decks__deck_id__performance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1871,6 +2059,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/decks/{deck_id}/revisions/{number}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Revision
+         * @description Makes a saved version the draft again. The version is copied, never changed: it stays as
+         *     the games that played it knew it, and the draft takes a new version of its own, saved like any
+         *     other (the editions the library holds, the cards the game still plays). Refused, as an
+         *     autosave is, when the draft changed since the request's `version`.
+         */
+        post: operations["restore_revision_api_v1_decks__deck_id__revisions__number__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/decks/{deck_id}/sleeve": {
         parameters: {
             query?: never;
@@ -1884,6 +2095,27 @@ export interface paths {
          * @description Puts a sleeve on one of your decks: one of your own, a campaign back you earned, or none.
          */
         put: operations["choose_sleeve_api_v1_decks__deck_id__sleeve_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decks/{deck_id}/substitutions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Deck Substitutions
+         * @description For a card (in the deck or wanted for it), the cards the library holds that could take its
+         *     place, each with why it is offered.
+         */
+        get: operations["deck_substitutions_api_v1_decks__deck_id__substitutions_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -2680,6 +2912,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/staples": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Staples
+         * @description The starter-staple pool, the account's picks and what it has claimed (v0.9.12). Not found
+         *     while the starter_staples policy is off.
+         */
+        get: operations["my_staples_api_v1_me_staples_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/staples/{card_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Claim Staple
+         * @description Claims a card of the pool with a pick, once: from then on the account builds with one
+         *     copy of it, in its default printing, without owning it. A card already claimed is answered
+         *     as it stands.
+         */
+        post: operations["claim_staple_api_v1_me_staples__card_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/starters": {
         parameters: {
             query?: never;
@@ -2718,6 +2993,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/table-presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Presets
+         * @description The built-in profiles to start a table from, and the tables the account saved.
+         */
+        get: operations["my_presets_api_v1_me_table_presets_get"];
+        /**
+         * Save Preset
+         * @description Saves a table to open again, under a name of the account's own: a name it already has is
+         *     replaced (case aside).
+         */
+        put: operations["save_preset_api_v1_me_table_presets_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/table-presets/{preset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Preset */
+        delete: operations["remove_preset_api_v1_me_table_presets__preset_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/tokens": {
         parameters: {
             query?: never;
@@ -2750,6 +3067,48 @@ export interface paths {
         put: operations["update_tutorial_api_v1_me_tutorial_put"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/wishlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Wishlist
+         * @description The cards the account wants, in the order it wished for them.
+         */
+        get: operations["my_wishlist_api_v1_me_wishlist_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/wishlist/{card_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Wish
+         * @description Wishes for a card, or changes the wish: how many copies, and for which of the account's
+         *     decks. One wish a card.
+         */
+        put: operations["wish_api_v1_me_wishlist__card_id__put"];
+        post?: never;
+        /** Unwish */
+        delete: operations["unwish_api_v1_me_wishlist__card_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3439,9 +3798,9 @@ export interface paths {
         head?: never;
         /**
          * Change Table
-         * @description The host changes a King's Table table before its start (v0.8.7): its settings, the seats
-         *     its bots fill, or a player's seat (to an open one). Anything that changes makes every player
-         *     not ready again.
+         * @description The host changes a table before its start: a King's Table table's settings, the seats
+         *     its bots fill, or a player's seat (to an open one) (v0.8.7), and since v0.9.12 any table's
+         *     Rule Zero profile. Anything that changes makes every player not ready again.
          */
         patch: operations["change_table_api_v1_tables__code__patch"];
         trace?: never;
@@ -4202,7 +4561,7 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.9.11
+             * @default 0.9.12
              */
             version: string;
         };
@@ -5418,6 +5777,11 @@ export interface components {
             deleted_at: string | null;
             draft: components["schemas"]["Draft"];
             /**
+             * Folder
+             * @description The folder the owner keeps it in (v0.9.12); null: none.
+             */
+            folder?: string | null;
+            /**
              * Format
              * @enum {string}
              */
@@ -5463,6 +5827,11 @@ export interface components {
              * @description Copies switched to editions the library holds when v0.5.0 deployed, until the owner dismisses the note; null or empty: none.
              */
             switched_editions?: components["schemas"]["SwitchedEdition"][] | null;
+            /**
+             * Tags
+             * @description The owner's tags on it (v0.9.12).
+             */
+            tags?: string[];
             /** Title */
             title: string;
             /**
@@ -5477,6 +5846,38 @@ export interface components {
              */
             visibility: "private" | "link";
         };
+        /** DeckDiff */
+        DeckDiff: {
+            /**
+             * Added
+             * @description Copies the later side holds that the earlier does not.
+             */
+            added: number;
+            /** After */
+            after: string;
+            /**
+             * Before
+             * @description The earlier side: a version's number, or "draft".
+             */
+            before: string;
+            /**
+             * Deck Id
+             * Format: uuid
+             */
+            deck_id: string;
+            /**
+             * Lines
+             * @description Each card and place whose copies differ, by place then name. Another edition of the same card is no difference.
+             */
+            lines: components["schemas"]["DiffLine"][];
+            /** Removed */
+            removed: number;
+            /**
+             * Same
+             * @description The two hold the same cards in the same places.
+             */
+            same: boolean;
+        };
         /** DeckEntry */
         DeckEntry: {
             /**
@@ -5484,6 +5885,11 @@ export interface components {
              * Format: uuid
              */
             card_id: string;
+            /**
+             * Choice
+             * @description A choice made as the deck is built (v0.9.12): Cryptic Spires's two circled colours, two different letters of WUBRG; null for every other card.
+             */
+            choice?: string | null;
             /**
              * Location
              * @default main
@@ -5607,6 +6013,11 @@ export interface components {
             /** Deleted At */
             deleted_at: string | null;
             /**
+             * Folder
+             * @description The folder the owner keeps it in (v0.9.12); null: none.
+             */
+            folder?: string | null;
+            /**
              * Format
              * @enum {string}
              */
@@ -5646,6 +6057,11 @@ export interface components {
              * @description Copies switched to editions the library holds when v0.5.0 deployed, until the owner dismisses the note; null or empty: none.
              */
             switched_editions?: components["schemas"]["SwitchedEdition"][] | null;
+            /**
+             * Tags
+             * @description The owner's tags on it (v0.9.12).
+             */
+            tags?: string[];
             /** Title */
             title: string;
             /**
@@ -5661,8 +6077,18 @@ export interface components {
         };
         /** DeckUpdate */
         DeckUpdate: {
+            /**
+             * Folder
+             * @description The folder to keep it in (v0.9.12); an empty name, or null sent on purpose, takes it out of its folder; left out, it stays.
+             */
+            folder?: string | null;
             /** Notes */
             notes?: string | null;
+            /**
+             * Tags
+             * @description Its tags (v0.9.12), replacing those it had; left out, they stay.
+             */
+            tags?: string[] | null;
             /** Title */
             title?: string | null;
             /** Visibility */
@@ -5679,6 +6105,28 @@ export interface components {
             name: string;
             /** Url */
             url: string;
+        };
+        /** DiffLine */
+        DiffLine: {
+            /**
+             * After
+             * @description Copies in the later side; 0 for a card removed.
+             */
+            after: number;
+            /**
+             * Before
+             * @description Copies in the earlier side; 0 for a card added.
+             */
+            before: number;
+            /**
+             * Card Id
+             * Format: uuid
+             */
+            card_id: string;
+            /** Location */
+            location: string;
+            /** Name */
+            name: string;
         };
         /** Draft */
         Draft: {
@@ -5798,6 +6246,30 @@ export interface components {
             tokens: number;
         };
         /**
+         * Enforced
+         * @description What the server checks every deck against, beside the table's rules. The defaults allow
+         *     everything: a profile enforces only what its host turned on.
+         */
+        Enforced: {
+            /**
+             * Custom Cards
+             * @description Decks may hold the Godlike tier's custom cards.
+             * @default true
+             */
+            custom_cards: boolean;
+            /**
+             * Game Changers
+             * @description The most Game Changers a deck may hold (the Commander format's own list, as the catalog marks it); null: any number.
+             */
+            game_changers?: number | null;
+            /**
+             * Reserved List
+             * @description Decks may hold Reserved List cards.
+             * @default true
+             */
+            reserved_list: boolean;
+        };
+        /**
          * EngineStatus
          * @description Engine /health, passed through. "unavailable" means the engine is unreachable or invalid.
          */
@@ -5831,6 +6303,47 @@ export interface components {
              */
             status: "unavailable" | "loading" | "ready" | "failed";
             xmage?: components["schemas"]["XmageBuild"] | null;
+        };
+        /** EntitlementGrant */
+        EntitlementGrant: {
+            /**
+             * Card Id
+             * Format: uuid
+             */
+            card_id: string;
+            /**
+             * Copies
+             * @default 1
+             */
+            copies: number;
+            /** Reason */
+            reason: string;
+        };
+        /** EntitlementView */
+        EntitlementView: {
+            /**
+             * Card Id
+             * Format: uuid
+             */
+            card_id: string;
+            /** Copies */
+            copies: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+            /** Reason */
+            reason: string | null;
+        };
+        /** Entitlements */
+        Entitlements: {
+            /** Entitlements */
+            entitlements: components["schemas"]["EntitlementView"][];
         };
         /** EraInfo */
         EraInfo: {
@@ -6249,7 +6762,7 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.9.11
+             * @default 0.9.12
              */
             version: string;
         };
@@ -6340,6 +6853,11 @@ export interface components {
             candidates?: components["schemas"]["CardSummary"][];
             /** Card Id */
             card_id?: string | null;
+            /**
+             * Choice
+             * @description The line's choice (v0.9.12): Cryptic Spires's two circled colours.
+             */
+            choice?: string | null;
             /** Line */
             line: number;
             /**
@@ -6510,9 +7028,9 @@ export interface components {
             sellable: number;
             /**
              * Sources
-             * @description Where this edition's copies came from; grant: SysOp's (v0.8.8).
+             * @description Where this edition's copies came from; grant: SysOp's (v0.8.8); functional and staple (v0.9.12): built with, not owned (a basic land under the functional_basics policy, a starter staple claimed), so never sellable.
              */
-            sources: ("starter" | "grandfathered" | "alliance" | "pack" | "unique" | "auction" | "campaign" | "grant")[];
+            sources: ("starter" | "grandfathered" | "alliance" | "pack" | "unique" | "auction" | "campaign" | "grant" | "functional" | "staple")[];
         };
         /**
          * LibraryEdition
@@ -6819,6 +7337,54 @@ export interface components {
              */
             up_to?: string | null;
         };
+        /** Missing */
+        Missing: {
+            /** Cards */
+            cards: components["schemas"]["MissingCard"][];
+            /**
+             * Complete
+             * @description The library holds every card of the deck.
+             */
+            complete: boolean;
+            /**
+             * Deck Id
+             * Format: uuid
+             */
+            deck_id: string;
+            /**
+             * Missing
+             * @description Copies missing in all.
+             */
+            missing: number;
+        };
+        /** MissingCard */
+        MissingCard: {
+            /**
+             * Auctions
+             * @description Auctions open for the card now, the account's own apart.
+             */
+            auctions: number;
+            card: components["schemas"]["CardSummary"];
+            /** Missing */
+            missing: number;
+            /**
+             * Needed
+             * @description Copies the deck holds, the maybeboard apart.
+             */
+            needed: number;
+            /** Owned */
+            owned: number;
+            /**
+             * Packs
+             * @description The shop's packs whose set printed the card, the newest first, at most five.
+             */
+            packs: components["schemas"]["Pack"][];
+            /**
+             * Wished
+             * @description Copies on the account's wishlist.
+             */
+            wished: number;
+        };
         /** NotificationItem */
         NotificationItem: {
             actor: components["schemas"]["PlayerRef"] | null;
@@ -6957,6 +7523,72 @@ export interface components {
              */
             won: boolean;
         };
+        /** Organize */
+        Organize: {
+            /** Add Tags */
+            add_tags?: string[];
+            /** Deck Ids */
+            deck_ids: string[];
+            /**
+             * Folder
+             * @description The folder to move them into; left out, they stay.
+             */
+            folder?: string | null;
+            /** Remove Tags */
+            remove_tags?: string[];
+            /**
+             * Unfile
+             * @description Take them out of their folders.
+             * @default false
+             */
+            unfile: boolean;
+        };
+        /**
+         * PacePolicy
+         * @description What a pace means in numbers. Described only in v0.9.12: nothing measures or enforces it.
+         */
+        PacePolicy: {
+            /**
+             * Enforced
+             * @description Whether the game holds players to it. Not in v0.9.12.
+             * @default false
+             */
+            enforced: boolean;
+            /**
+             * Extended Factor
+             * @description What a player who asked for more time gets: each of the two, this many times over.
+             */
+            extended_factor: number;
+            /** Name */
+            name: string;
+            /**
+             * Notice Seconds
+             * @description How long a decision stays open before the table says who it waits for; null: it never does.
+             */
+            notice_seconds: number | null;
+            /**
+             * Nudge Seconds
+             * @description How long before the other players may nudge the player it waits for; null: never.
+             */
+            nudge_seconds: number | null;
+            /**
+             * Pace
+             * @enum {string}
+             */
+            pace: "relaxed" | "steady" | "brisk";
+        };
+        /** Pack */
+        Pack: {
+            /** Name */
+            name: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Set Code */
+            set_code: string;
+        };
         /**
          * PackArt
          * @description The picture of a sealed pack (v0.4.3), copied once and served from this site.
@@ -7048,6 +7680,34 @@ export interface components {
             granted: number;
             /** Inventory */
             inventory: components["schemas"]["InventoryItem"][];
+        };
+        /** Performance */
+        Performance: {
+            /**
+             * Deck Id
+             * Format: uuid
+             */
+            deck_id: string;
+            record: components["schemas"]["Record"];
+            /**
+             * Splits
+             * @description The record told apart by format, mode, opposition and the bots' skill.
+             */
+            splits: components["schemas"]["Split"][];
+            /**
+             * Versions
+             * @description By the version played, the newest first; a version never played is left out.
+             */
+            versions: components["schemas"]["VersionRecord"][];
+        };
+        /** Picks */
+        Picks: {
+            /** Earned */
+            earned: number;
+            /** Left */
+            left: number;
+            /** Used */
+            used: number;
         };
         /** Pins */
         Pins: {
@@ -7238,6 +7898,35 @@ export interface components {
             presence: components["schemas"]["Presence"] | null;
             tier: components["schemas"]["TierInfo"];
         };
+        /** Policies */
+        Policies: {
+            /** Policies */
+            policies: components["schemas"]["PolicyView"][];
+        };
+        /** PolicyView */
+        PolicyView: {
+            /**
+             * Changed
+             * @description Whether it differs from its default.
+             */
+            changed: boolean;
+            /**
+             * Default
+             * @description The game as it was: every switch off.
+             */
+            default: {
+                [key: string]: unknown;
+            };
+            /** Name */
+            name: string;
+            /**
+             * Value
+             * @description The policy as it stands.
+             */
+            value: {
+                [key: string]: unknown;
+            };
+        };
         /** PracticeFormat */
         PracticeFormat: {
             /**
@@ -7389,6 +8078,64 @@ export interface components {
              * @enum {string}
              */
             state: "in_game" | "in_queue" | "online" | "idle" | "offline";
+        };
+        /** Preset */
+        Preset: {
+            /** Built In */
+            built_in: boolean;
+            /**
+             * Id
+             * @description A saved preset's id; null for a built-in one.
+             */
+            id: string | null;
+            /** Name */
+            name: string;
+            profile: components["schemas"]["ProfileView"];
+            settings: components["schemas"]["PresetSettings"];
+        };
+        /** PresetSave */
+        PresetSave: {
+            /** Name */
+            name: string;
+            profile: components["schemas"]["TableProfile"];
+            settings?: components["schemas"]["PresetSettings"];
+        };
+        /**
+         * PresetSettings
+         * @description The table's other settings a host saves with a profile; each is the table request's own
+         *     field, and one left out takes the request's default when the table is opened.
+         */
+        PresetSettings: {
+            /** Best Of */
+            best_of?: (1 | 3) | null;
+            /** Bot Skill */
+            bot_skill?: number | null;
+            /** Bots */
+            bots?: number | null;
+            /** Format */
+            format?: ("legacy" | "commander" | "two_headed_giant" | "kings_table") | null;
+            rules?: components["schemas"]["TableRules"] | null;
+            /** Seats */
+            seats?: number | null;
+            /** Visibility */
+            visibility?: ("public" | "private") | null;
+        };
+        /** Presets */
+        Presets: {
+            /** Built In */
+            built_in: components["schemas"]["Preset"][];
+            /**
+             * Limit
+             * @description The most presets an account saves.
+             */
+            limit: number;
+            /**
+             * Paces
+             * @description What each pace a profile may name means in numbers (pace policies).
+             */
+            paces: components["schemas"]["PacePolicy"][];
+            /** Saved */
+            saved: components["schemas"]["Preset"][];
         };
         /** PriceChange */
         PriceChange: {
@@ -7597,6 +8344,51 @@ export interface components {
             locale?: string | null;
             preferences?: components["schemas"]["Preferences"] | null;
         };
+        /**
+         * ProfileView
+         * @description A profile as a table shows it: what it describes in words, and every rule the server
+         *     enforces at the table, the table's own rules among them.
+         */
+        ProfileView: {
+            /**
+             * Duration
+             * @description The minutes it is expected to take. Described only.
+             */
+            duration?: (30 | 60 | 90 | 120 | 180) | null;
+            enforced?: components["schemas"]["Enforced"];
+            /**
+             * Enforced Rules
+             * @description Everything checked on a deck at this table, in words: the table's rules (banned cards, cards not legal, stand-ins) and the profile's restrictions. Empty: any deck its format takes.
+             */
+            enforced_rules: components["schemas"]["Rule"][];
+            /**
+             * Intent
+             * @description What kind of game the table is for. Described only.
+             * @enum {string}
+             */
+            intent: "learning" | "precon" | "upgraded" | "high_power" | "competitive" | "custom";
+            /** Intent Name */
+            intent_name: string;
+            /**
+             * Note
+             * @description The host's own words. Described only.
+             * @default
+             */
+            note: string;
+            /**
+             * Pace
+             * @description How fast it is played. Described only.
+             */
+            pace?: ("relaxed" | "steady" | "brisk") | null;
+            /** Pace Name */
+            pace_name: string | null;
+            /**
+             * Version
+             * @default 1
+             * @constant
+             */
+            version: 1;
+        };
         /** Progress */
         Progress: {
             /** Alliance */
@@ -7732,6 +8524,20 @@ export interface components {
              */
             purged: number;
         };
+        /** QuestAlternative */
+        QuestAlternative: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Progress
+             * @description Counted so far, at most its target.
+             */
+            progress: number;
+            /** Target */
+            target: number;
+        };
         /** QuestBoards */
         QuestBoards: {
             daily: components["schemas"]["BoardView"];
@@ -7744,6 +8550,8 @@ export interface components {
         };
         /** QuestView */
         QuestView: {
+            /** @description A second quest that completes this slot as well (v0.9.12, the quest_alternatives policy); none on a board drawn with the policy off. */
+            alternative?: components["schemas"]["QuestAlternative"] | null;
             /** Completed At */
             completed_at: string | null;
             /**
@@ -8035,6 +8843,30 @@ export interface components {
              * Format: date-time
              */
             sold_at: string;
+        };
+        /** Record */
+        Record: {
+            /** Draws */
+            draws: number;
+            /**
+             * Games
+             * @description The sample: games that ended with a result.
+             */
+            games: number;
+            /** Losses */
+            losses: number;
+            /**
+             * Small Sample
+             * @description Fewer than 10 games: it says little.
+             */
+            small_sample: boolean;
+            /**
+             * Win Rate
+             * @description Wins over games, 0 to 1; null with no game.
+             */
+            win_rate: number | null;
+            /** Wins */
+            wins: number;
         };
         /** Related */
         Related: {
@@ -8437,6 +9269,14 @@ export interface components {
              */
             buy_now: number;
         };
+        /** Restore */
+        Restore: {
+            /**
+             * Version
+             * @description The draft version this restore starts from.
+             */
+            version: number;
+        };
         /** RestoredSleeve */
         RestoredSleeve: {
             /**
@@ -8599,6 +9439,13 @@ export interface components {
             playable: boolean;
             /** Title */
             title: string;
+        };
+        /** Rule */
+        Rule: {
+            /** Code */
+            code: string;
+            /** Text */
+            text: string;
         };
         /** Ruling */
         Ruling: {
@@ -8847,6 +9694,25 @@ export interface components {
             updated_at: string;
             validation: components["schemas"]["Validation"];
         };
+        /** Shelf */
+        Shelf: {
+            /** Decks */
+            decks: number;
+            /** Name */
+            name: string;
+        };
+        /** Shelves */
+        Shelves: {
+            /** Folders */
+            folders: components["schemas"]["Shelf"][];
+            /** Tags */
+            tags: components["schemas"]["Shelf"][];
+            /**
+             * Unfiled
+             * @description Decks in no folder.
+             */
+            unfiled: number;
+        };
         /** ShopAdminView */
         ShopAdminView: {
             /**
@@ -9010,6 +9876,48 @@ export interface components {
             /** Sleeves */
             sleeves: components["schemas"]["Sleeve"][];
         };
+        /** Split */
+        Split: {
+            /**
+             * Bot Skill
+             * @description The bots' skill, when the game had bots.
+             */
+            bot_skill: number | null;
+            /** Draws */
+            draws: number;
+            /** Format */
+            format: string;
+            /**
+             * Games
+             * @description The sample: games that ended with a result.
+             */
+            games: number;
+            /** Losses */
+            losses: number;
+            /**
+             * Mode
+             * @description The game's mode (api/modes.py): practice, table, campaign…
+             */
+            mode: string;
+            /**
+             * Opposition
+             * @description bots: no other player; players: no bot; mixed: both.
+             * @enum {string}
+             */
+            opposition: "bots" | "players" | "mixed";
+            /**
+             * Small Sample
+             * @description Fewer than 10 games: it says little.
+             */
+            small_sample: boolean;
+            /**
+             * Win Rate
+             * @description Wins over games, 0 to 1; null with no game.
+             */
+            win_rate: number | null;
+            /** Wins */
+            wins: number;
+        };
         /** SpoilsDeck */
         SpoilsDeck: {
             /** Commander */
@@ -9021,6 +9929,24 @@ export interface components {
             opponent: string;
             /** Title */
             title: string;
+        };
+        /** Staple */
+        Staple: {
+            card: components["schemas"]["CardSummary"];
+            /**
+             * Claimed
+             * @description The account builds with it through this pool.
+             */
+            claimed: boolean;
+        };
+        /** StaplePool */
+        StaplePool: {
+            /**
+             * Cards
+             * @description The pool, in its own order.
+             */
+            cards: components["schemas"]["Staple"][];
+            picks: components["schemas"]["Picks"];
         };
         /** StartEncounter */
         StartEncounter: {
@@ -9150,7 +10076,7 @@ export interface components {
             bonus: number;
             /**
              * Current
-             * @description Boards finished in a row, up to the last one finished (this period's when it is finished, else the previous one's); 0 when the previous period's was not.
+             * @description Boards finished in a row, up to the last one finished (this period's when it is finished, else the previous one's); 0 when the previous period's was not, unless the quest_streaks policy forgives a missed period (v0.9.12).
              */
             current: number;
             /**
@@ -9158,6 +10084,41 @@ export interface components {
              * @description What the next period's board pays if the streak holds.
              */
             next_bonus: number;
+        };
+        /** Substitute */
+        Substitute: {
+            card: components["schemas"]["CardSummary"];
+            /**
+             * Reasons
+             * @description Why it is offered, in words.
+             */
+            reasons: string[];
+            /**
+             * Score
+             * @description How alike the two are, 0 to 100; the list is by this.
+             */
+            score: number;
+            /**
+             * Spare
+             * @description Copies the library holds that the deck does not use.
+             */
+            spare: number;
+        };
+        /** Substitutions */
+        Substitutions: {
+            card: components["schemas"]["CardSummary"];
+            /**
+             * Deck Id
+             * Format: uuid
+             */
+            deck_id: string;
+            /**
+             * Note
+             * @description Why there are none, when the rules leave none.
+             */
+            note?: string | null;
+            /** Substitutes */
+            substitutes: components["schemas"]["Substitute"][];
         };
         /** Suggestion */
         Suggestion: {
@@ -9249,8 +10210,9 @@ export interface components {
         };
         /**
          * TableChange
-         * @description The host's changes to a King's Table table before its start (v0.8.7). Anything that
-         *     changes makes every player not ready again; the host's start is their ready.
+         * @description The host's changes to a table before its start: a King's Table table's settings and seats
+         *     (v0.8.7), and since v0.9.12 any table's Rule Zero profile. Anything that changes makes every
+         *     player not ready again; the host's start is their ready.
          */
         TableChange: {
             /**
@@ -9262,6 +10224,8 @@ export interface components {
             kings_table?: components["schemas"]["KingsTableChange"] | null;
             /** @description Moves a player to an open seat. */
             move?: components["schemas"]["SeatMove"] | null;
+            /** @description Since v0.9.12: the table's Rule Zero profile from now on; null removes it, and left out it stays. Any change to it, its note included, makes every player not ready again: getting ready again is how they accept it. */
+            profile?: components["schemas"]["TableProfile"] | null;
         };
         /**
          * TableInviting
@@ -9368,6 +10332,41 @@ export interface components {
             you: boolean;
         };
         /**
+         * TableProfile
+         * @description A table's Rule Zero profile, as its host writes it.
+         */
+        TableProfile: {
+            /**
+             * Duration
+             * @description The minutes it is expected to take. Described only.
+             */
+            duration?: (30 | 60 | 90 | 120 | 180) | null;
+            enforced?: components["schemas"]["Enforced"];
+            /**
+             * Intent
+             * @description What kind of game the table is for. Described only.
+             * @enum {string}
+             */
+            intent: "learning" | "precon" | "upgraded" | "high_power" | "competitive" | "custom";
+            /**
+             * Note
+             * @description The host's own words. Described only.
+             * @default
+             */
+            note: string;
+            /**
+             * Pace
+             * @description How fast it is played. Described only.
+             */
+            pace?: ("relaxed" | "steady" | "brisk") | null;
+            /**
+             * Version
+             * @default 1
+             * @constant
+             */
+            version: 1;
+        };
+        /**
          * TableRequest
          * @description A new table: the host takes the first seat with one of their decks.
          */
@@ -9420,6 +10419,8 @@ export interface components {
             invite?: string[];
             /** @description King's Table (v0.8.7): its settings, the defaults when left out. Refused at other tables. */
             kings_table?: components["schemas"]["KingsTableSettings"] | null;
+            /** @description Since v0.9.12: the table's Rule Zero profile (what kind of game it is for, and the restrictions on its decks the server enforces); none when left out. */
+            profile?: components["schemas"]["TableProfile"] | null;
             /** @description Which cards its decks may hold by their legality; casual unless told otherwise. */
             rules?: components["schemas"]["TableRules"];
             /**
@@ -9539,6 +10540,8 @@ export interface components {
              * @description Every seat in turn order, bots last (at Two-Headed Giant and King's Table tables, in their own seats).
              */
             players: components["schemas"]["TablePlayer"][];
+            /** @description Since v0.9.12: the table's Rule Zero profile: what it describes, and every rule the server enforces on its decks. Null when its host gave none. */
+            profile?: components["schemas"]["ProfileView"] | null;
             rules: components["schemas"]["TableRules"];
             /** Seats */
             seats: number;
@@ -9852,6 +10855,21 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** VersionRecord */
+        VersionRecord: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Number */
+            number: number;
+            record: components["schemas"]["Record"];
+            /** Splits */
+            splits: components["schemas"]["Split"][];
+            /** Title */
+            title: string;
+        };
         /**
          * WaitingRequest
          * @description Your friend request to a player who has not chosen a handle yet (v0.5.1).
@@ -10021,6 +11039,37 @@ export interface components {
             reason: string;
             /** Wins */
             wins: number;
+        };
+        /** Wish */
+        Wish: {
+            card: components["schemas"]["CardSummary"];
+            /**
+             * Deck Id
+             * @description The deck it is wanted for, when one was named.
+             */
+            deck_id: string | null;
+            /**
+             * Owned
+             * @description Copies the library holds; null: the whole catalog.
+             */
+            owned: number | null;
+            /** Quantity */
+            quantity: number;
+        };
+        /** WishSet */
+        WishSet: {
+            /** Deck Id */
+            deck_id?: string | null;
+            /**
+             * Quantity
+             * @default 1
+             */
+            quantity: number;
+        };
+        /** Wishlist */
+        Wishlist: {
+            /** Wishes */
+            wishes: components["schemas"]["Wish"][];
         };
         /** XmageBuild */
         XmageBuild: {
@@ -11551,6 +12600,198 @@ export interface operations {
             };
         };
     };
+    policies_api_v1_admin_policies_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Policies"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    change_policy_api_v1_admin_policies__name__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Policies"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     list_reports_api_v1_admin_reports_get: {
         parameters: {
             query?: {
@@ -12968,6 +14209,293 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    account_entitlements_api_v1_admin_users__user_id__entitlements_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Entitlements"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    give_entitlement_api_v1_admin_users__user_id__entitlements_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EntitlementGrant"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Entitlements"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    end_entitlement_api_v1_admin_users__user_id__entitlements__entitlement_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+                entitlement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Entitlements"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Too Many Requests */
@@ -18256,6 +19784,10 @@ export interface operations {
         parameters: {
             query?: {
                 view?: "active" | "archived" | "trash";
+                /** @description Only the decks in this folder (v0.9.12); empty: in none. */
+                folder?: string | null;
+                /** @description Only the decks with this tag (v0.9.12). */
+                tag?: string | null;
             };
             header?: never;
             path?: never;
@@ -18558,6 +20090,194 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImportPreview"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    organize_api_v1_decks_organize_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Organize"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeckSummary"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    shelves_api_v1_decks_shelves_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Shelves"];
                 };
             };
             /** @description Bad Request */
@@ -19294,6 +21014,103 @@ export interface operations {
             };
         };
     };
+    compare_api_v1_decks__deck_id__diff_get: {
+        parameters: {
+            query: {
+                before: string;
+                after?: string;
+            };
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeckDiff"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     save_draft_api_v1_decks__deck_id__draft_put: {
         parameters: {
             query?: never;
@@ -19503,6 +21320,194 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deck_missing_api_v1_decks__deck_id__missing_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Missing"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deck_performance_api_v1_decks__deck_id__performance_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Performance"];
+                };
             };
             /** @description Bad Request */
             400: {
@@ -19955,6 +21960,105 @@ export interface operations {
             };
         };
     };
+    restore_revision_api_v1_decks__deck_id__revisions__number__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deck_id: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Restore"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftSaved"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     choose_sleeve_api_v1_decks__deck_id__sleeve_put: {
         parameters: {
             query?: never;
@@ -19977,6 +22081,102 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeckSleeve"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deck_substitutions_api_v1_decks__deck_id__substitutions_get: {
+        parameters: {
+            query: {
+                card_id: string;
+            };
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Substitutions"];
                 };
             };
             /** @description Bad Request */
@@ -24209,6 +26409,192 @@ export interface operations {
             };
         };
     };
+    my_staples_api_v1_me_staples_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaplePool"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    claim_staple_api_v1_me_staples__card_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                card_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaplePool"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     choose_starters_api_v1_me_starters_post: {
         parameters: {
             query?: never;
@@ -24397,6 +26783,288 @@ export interface operations {
             };
         };
     };
+    my_presets_api_v1_me_table_presets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Presets"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    save_preset_api_v1_me_table_presets_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PresetSave"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Presets"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    remove_preset_api_v1_me_table_presets__preset_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Presets"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     my_tokens_api_v1_me_tokens_get: {
         parameters: {
             query?: never;
@@ -24509,6 +27177,290 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Me"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    my_wishlist_api_v1_me_wishlist_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Wishlist"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    wish_api_v1_me_wishlist__card_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                card_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WishSet"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Wishlist"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    unwish_api_v1_me_wishlist__card_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                card_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Wishlist"];
                 };
             };
             /** @description Bad Request */
@@ -27745,6 +30697,12 @@ export interface operations {
                 friends?: boolean;
                 /** @description Only tables whose host's handle holds this. */
                 host?: string | null;
+                /** @description Since v0.9.12: only tables whose Rule Zero profile says one of these kinds of game; a table with no profile matches none. */
+                intent?: ("learning" | "precon" | "upgraded" | "high_power" | "competitive" | "custom")[] | null;
+                /** @description Since v0.9.12: only tables whose profile says one of these paces. */
+                pace?: ("relaxed" | "steady" | "brisk")[] | null;
+                /** @description Since v0.9.12: only tables whose profile expects at most this many minutes; a table that says no length matches none. */
+                max_duration?: number | null;
                 /** @description newest (default), players (most seated) or fewest_open (seats). */
                 sort?: "newest" | "players" | "fewest_open";
                 page?: number;

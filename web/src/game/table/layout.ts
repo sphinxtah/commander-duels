@@ -80,6 +80,8 @@ export interface RowUnitBox {
   offered: boolean;
   /** A wider gap before this unit: the back row's step from lands to other permanents. */
   separate?: boolean;
+  /** The most of a pile's members drawn (v0.9.12); PILE_CAP when left out. */
+  cap?: number;
 }
 
 export interface PackedElement {
@@ -125,7 +127,7 @@ function metrics(base: { w: SU; h: SU }, f: number): Metrics {
 
 function shape(u: RowUnitBox) {
   const pile = u.members > 1;
-  const shown = pile ? Math.min(u.members, PILE_CAP) : 1;
+  const shown = pile ? Math.min(u.members, u.cap ?? PILE_CAP) : 1;
   const shownAttachments = Math.min(u.attachments.length, ATTACHMENT_CAP);
   return {
     pile,
@@ -888,6 +890,7 @@ export const layoutTable: LayoutTable = (model, options) => {
         pips: host ? pipCounters(host).length > 0 : false,
         offered: members.some((card) => card.offered.length > 0),
         separate,
+        cap: options.pileCap,
       };
     };
 
@@ -922,7 +925,7 @@ export const layoutTable: LayoutTable = (model, options) => {
             const hidden =
               unit.kind === "host"
                 ? unit.attachments.length - ATTACHMENT_CAP
-                : size - PILE_CAP;
+                : size - (options.pileCap ?? PILE_CAP);
             const first = model.cards.get(unit.cards[0]);
             const more = moreNode(
               `more:${unit.key}`,

@@ -1626,7 +1626,7 @@
             "type": "integer"
           },
           "version": {
-            "default": "0.9.11",
+            "default": "0.9.12",
             "title": "Version",
             "type": "string"
           }
@@ -4644,6 +4644,18 @@
           "draft": {
             "$ref": "#/components/schemas/Draft"
           },
+          "folder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The folder the owner keeps it in (v0.9.12); null: none.",
+            "title": "Folder"
+          },
           "format": {
             "enum": [
               "legacy",
@@ -4754,6 +4766,14 @@
             "description": "Copies switched to editions the library holds when v0.5.0 deployed, until the owner dismisses the note; null or empty: none.",
             "title": "Switched Editions"
           },
+          "tags": {
+            "description": "The owner's tags on it (v0.9.12).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -4803,6 +4823,58 @@
         "title": "DeckDetail",
         "type": "object"
       },
+      "DeckDiff": {
+        "additionalProperties": false,
+        "properties": {
+          "added": {
+            "description": "Copies the later side holds that the earlier does not.",
+            "title": "Added",
+            "type": "integer"
+          },
+          "after": {
+            "title": "After",
+            "type": "string"
+          },
+          "before": {
+            "description": "The earlier side: a version's number, or \"draft\".",
+            "title": "Before",
+            "type": "string"
+          },
+          "deck_id": {
+            "format": "uuid",
+            "title": "Deck Id",
+            "type": "string"
+          },
+          "lines": {
+            "description": "Each card and place whose copies differ, by place then name. Another edition of the same card is no difference.",
+            "items": {
+              "$ref": "#/components/schemas/DiffLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "removed": {
+            "title": "Removed",
+            "type": "integer"
+          },
+          "same": {
+            "description": "The two hold the same cards in the same places.",
+            "title": "Same",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "deck_id",
+          "before",
+          "after",
+          "added",
+          "removed",
+          "same",
+          "lines"
+        ],
+        "title": "DeckDiff",
+        "type": "object"
+      },
       "DeckEntry": {
         "additionalProperties": false,
         "properties": {
@@ -4810,6 +4882,19 @@
             "format": "uuid",
             "title": "Card Id",
             "type": "string"
+          },
+          "choice": {
+            "anyOf": [
+              {
+                "maxLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A choice made as the deck is built (v0.9.12): Cryptic Spires's two circled colours, two different letters of WUBRG; null for every other card.",
+            "title": "Choice"
           },
           "location": {
             "default": "main",
@@ -5116,6 +5201,18 @@
             ],
             "title": "Deleted At"
           },
+          "folder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The folder the owner keeps it in (v0.9.12); null: none.",
+            "title": "Folder"
+          },
           "format": {
             "enum": [
               "legacy",
@@ -5204,6 +5301,14 @@
             "description": "Copies switched to editions the library holds when v0.5.0 deployed, until the owner dismisses the note; null or empty: none.",
             "title": "Switched Editions"
           },
+          "tags": {
+            "description": "The owner's tags on it (v0.9.12).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -5247,6 +5352,19 @@
       "DeckUpdate": {
         "additionalProperties": false,
         "properties": {
+          "folder": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The folder to keep it in (v0.9.12); an empty name, or null sent on purpose, takes it out of its folder; left out, it stays.",
+            "title": "Folder"
+          },
           "notes": {
             "anyOf": [
               {
@@ -5258,6 +5376,24 @@
               }
             ],
             "title": "Notes"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 32,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 12,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its tags (v0.9.12), replacing those it had; left out, they stay.",
+            "title": "Tags"
           },
           "title": {
             "anyOf": [
@@ -5314,6 +5450,43 @@
           "url"
         ],
         "title": "DefaultSleeve",
+        "type": "object"
+      },
+      "DiffLine": {
+        "additionalProperties": false,
+        "properties": {
+          "after": {
+            "description": "Copies in the later side; 0 for a card removed.",
+            "title": "After",
+            "type": "integer"
+          },
+          "before": {
+            "description": "Copies in the earlier side; 0 for a card added.",
+            "title": "Before",
+            "type": "integer"
+          },
+          "card_id": {
+            "format": "uuid",
+            "title": "Card Id",
+            "type": "string"
+          },
+          "location": {
+            "title": "Location",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "card_id",
+          "name",
+          "location",
+          "before",
+          "after"
+        ],
+        "title": "DiffLine",
         "type": "object"
       },
       "Draft": {
@@ -5578,6 +5751,40 @@
         "title": "EncounterSpoils",
         "type": "object"
       },
+      "Enforced": {
+        "additionalProperties": false,
+        "description": "What the server checks every deck against, beside the table's rules. The defaults allow\neverything: a profile enforces only what its host turned on.",
+        "properties": {
+          "custom_cards": {
+            "default": true,
+            "description": "Decks may hold the Godlike tier's custom cards.",
+            "title": "Custom Cards",
+            "type": "boolean"
+          },
+          "game_changers": {
+            "anyOf": [
+              {
+                "maximum": 10.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The most Game Changers a deck may hold (the Commander format's own list, as the catalog marks it); null: any number.",
+            "title": "Game Changers"
+          },
+          "reserved_list": {
+            "default": true,
+            "description": "Decks may hold Reserved List cards.",
+            "title": "Reserved List",
+            "type": "boolean"
+          }
+        },
+        "title": "Enforced",
+        "type": "object"
+      },
       "EngineStatus": {
         "additionalProperties": false,
         "description": "Engine /health, passed through. \"unavailable\" means the engine is unreachable or invalid.",
@@ -5648,6 +5855,100 @@
           "status"
         ],
         "title": "EngineStatus",
+        "type": "object"
+      },
+      "EntitlementGrant": {
+        "additionalProperties": false,
+        "properties": {
+          "card_id": {
+            "format": "uuid",
+            "title": "Card Id",
+            "type": "string"
+          },
+          "copies": {
+            "default": 1,
+            "maximum": 4.0,
+            "minimum": 1.0,
+            "title": "Copies",
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 200,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "card_id",
+          "reason"
+        ],
+        "title": "EntitlementGrant",
+        "type": "object"
+      },
+      "EntitlementView": {
+        "additionalProperties": false,
+        "properties": {
+          "card_id": {
+            "format": "uuid",
+            "title": "Card Id",
+            "type": "string"
+          },
+          "copies": {
+            "title": "Copies",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "card_id",
+          "name",
+          "copies",
+          "reason"
+        ],
+        "title": "EntitlementView",
+        "type": "object"
+      },
+      "Entitlements": {
+        "additionalProperties": false,
+        "properties": {
+          "entitlements": {
+            "items": {
+              "$ref": "#/components/schemas/EntitlementView"
+            },
+            "title": "Entitlements",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entitlements"
+        ],
+        "title": "Entitlements",
         "type": "object"
       },
       "EraInfo": {
@@ -6721,7 +7022,7 @@
             "type": "string"
           },
           "version": {
-            "default": "0.9.11",
+            "default": "0.9.12",
             "title": "Version",
             "type": "string"
           }
@@ -6918,6 +7219,18 @@
               }
             ],
             "title": "Card Id"
+          },
+          "choice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The line's choice (v0.9.12): Cryptic Spires's two circled colours.",
+            "title": "Choice"
           },
           "line": {
             "title": "Line",
@@ -7292,7 +7605,7 @@
             "type": "integer"
           },
           "sources": {
-            "description": "Where this edition's copies came from; grant: SysOp's (v0.8.8).",
+            "description": "Where this edition's copies came from; grant: SysOp's (v0.8.8); functional and staple (v0.9.12): built with, not owned (a basic land under the functional_basics policy, a starter staple claimed), so never sellable.",
             "items": {
               "enum": [
                 "starter",
@@ -7302,7 +7615,9 @@
                 "unique",
                 "auction",
                 "campaign",
-                "grant"
+                "grant",
+                "functional",
+                "staple"
               ],
               "type": "string"
             },
@@ -8116,6 +8431,91 @@
         "title": "MessagesRead",
         "type": "object"
       },
+      "Missing": {
+        "additionalProperties": false,
+        "properties": {
+          "cards": {
+            "items": {
+              "$ref": "#/components/schemas/MissingCard"
+            },
+            "title": "Cards",
+            "type": "array"
+          },
+          "complete": {
+            "description": "The library holds every card of the deck.",
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "deck_id": {
+            "format": "uuid",
+            "title": "Deck Id",
+            "type": "string"
+          },
+          "missing": {
+            "description": "Copies missing in all.",
+            "title": "Missing",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deck_id",
+          "cards",
+          "missing",
+          "complete"
+        ],
+        "title": "Missing",
+        "type": "object"
+      },
+      "MissingCard": {
+        "additionalProperties": false,
+        "properties": {
+          "auctions": {
+            "description": "Auctions open for the card now, the account's own apart.",
+            "title": "Auctions",
+            "type": "integer"
+          },
+          "card": {
+            "$ref": "#/components/schemas/CardSummary"
+          },
+          "missing": {
+            "title": "Missing",
+            "type": "integer"
+          },
+          "needed": {
+            "description": "Copies the deck holds, the maybeboard apart.",
+            "title": "Needed",
+            "type": "integer"
+          },
+          "owned": {
+            "title": "Owned",
+            "type": "integer"
+          },
+          "packs": {
+            "description": "The shop's packs whose set printed the card, the newest first, at most five.",
+            "items": {
+              "$ref": "#/components/schemas/Pack"
+            },
+            "title": "Packs",
+            "type": "array"
+          },
+          "wished": {
+            "description": "Copies on the account's wishlist.",
+            "title": "Wished",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "card",
+          "needed",
+          "owned",
+          "missing",
+          "wished",
+          "auctions",
+          "packs"
+        ],
+        "title": "MissingCard",
+        "type": "object"
+      },
       "NotificationItem": {
         "additionalProperties": false,
         "properties": {
@@ -8449,6 +8849,154 @@
         "title": "Opponent",
         "type": "object"
       },
+      "Organize": {
+        "additionalProperties": false,
+        "properties": {
+          "add_tags": {
+            "items": {
+              "maxLength": 32,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 12,
+            "title": "Add Tags",
+            "type": "array"
+          },
+          "deck_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 250,
+            "minItems": 1,
+            "title": "Deck Ids",
+            "type": "array"
+          },
+          "folder": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The folder to move them into; left out, they stay.",
+            "title": "Folder"
+          },
+          "remove_tags": {
+            "items": {
+              "maxLength": 32,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 12,
+            "title": "Remove Tags",
+            "type": "array"
+          },
+          "unfile": {
+            "default": false,
+            "description": "Take them out of their folders.",
+            "title": "Unfile",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "deck_ids"
+        ],
+        "title": "Organize",
+        "type": "object"
+      },
+      "PacePolicy": {
+        "additionalProperties": false,
+        "description": "What a pace means in numbers. Described only in v0.9.12: nothing measures or enforces it.",
+        "properties": {
+          "enforced": {
+            "default": false,
+            "description": "Whether the game holds players to it. Not in v0.9.12.",
+            "title": "Enforced",
+            "type": "boolean"
+          },
+          "extended_factor": {
+            "description": "What a player who asked for more time gets: each of the two, this many times over.",
+            "title": "Extended Factor",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "notice_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How long a decision stays open before the table says who it waits for; null: it never does.",
+            "title": "Notice Seconds"
+          },
+          "nudge_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How long before the other players may nudge the player it waits for; null: never.",
+            "title": "Nudge Seconds"
+          },
+          "pace": {
+            "enum": [
+              "relaxed",
+              "steady",
+              "brisk"
+            ],
+            "title": "Pace",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pace",
+          "name",
+          "notice_seconds",
+          "nudge_seconds",
+          "extended_factor"
+        ],
+        "title": "PacePolicy",
+        "type": "object"
+      },
+      "Pack": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string"
+          },
+          "set_code": {
+            "title": "Set Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "product_id",
+          "name",
+          "set_code"
+        ],
+        "title": "Pack",
+        "type": "object"
+      },
       "PackArt": {
         "additionalProperties": false,
         "description": "The picture of a sealed pack (v0.4.3), copied once and served from this site.",
@@ -8649,6 +9197,67 @@
           "inventory"
         ],
         "title": "PacksGranted",
+        "type": "object"
+      },
+      "Performance": {
+        "additionalProperties": false,
+        "properties": {
+          "deck_id": {
+            "format": "uuid",
+            "title": "Deck Id",
+            "type": "string"
+          },
+          "record": {
+            "$ref": "#/components/schemas/Record"
+          },
+          "splits": {
+            "description": "The record told apart by format, mode, opposition and the bots' skill.",
+            "items": {
+              "$ref": "#/components/schemas/Split"
+            },
+            "title": "Splits",
+            "type": "array"
+          },
+          "versions": {
+            "description": "By the version played, the newest first; a version never played is left out.",
+            "items": {
+              "$ref": "#/components/schemas/VersionRecord"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "deck_id",
+          "record",
+          "splits",
+          "versions"
+        ],
+        "title": "Performance",
+        "type": "object"
+      },
+      "Picks": {
+        "additionalProperties": false,
+        "properties": {
+          "earned": {
+            "title": "Earned",
+            "type": "integer"
+          },
+          "left": {
+            "title": "Left",
+            "type": "integer"
+          },
+          "used": {
+            "title": "Used",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "earned",
+          "used",
+          "left"
+        ],
+        "title": "Picks",
         "type": "object"
       },
       "Pins": {
@@ -9074,6 +9683,57 @@
         "title": "PlayerSummary",
         "type": "object"
       },
+      "Policies": {
+        "additionalProperties": false,
+        "properties": {
+          "policies": {
+            "items": {
+              "$ref": "#/components/schemas/PolicyView"
+            },
+            "title": "Policies",
+            "type": "array"
+          }
+        },
+        "required": [
+          "policies"
+        ],
+        "title": "Policies",
+        "type": "object"
+      },
+      "PolicyView": {
+        "additionalProperties": false,
+        "properties": {
+          "changed": {
+            "description": "Whether it differs from its default.",
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "default": {
+            "additionalProperties": true,
+            "description": "The game as it was: every switch off.",
+            "title": "Default",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "value": {
+            "additionalProperties": true,
+            "description": "The policy as it stands.",
+            "title": "Value",
+            "type": "object"
+          }
+        },
+        "required": [
+          "name",
+          "value",
+          "default",
+          "changed"
+        ],
+        "title": "PolicyView",
+        "type": "object"
+      },
       "PracticeFormat": {
         "additionalProperties": false,
         "properties": {
@@ -9446,6 +10106,214 @@
           "state"
         ],
         "title": "Presence",
+        "type": "object"
+      },
+      "Preset": {
+        "additionalProperties": false,
+        "properties": {
+          "built_in": {
+            "title": "Built In",
+            "type": "boolean"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A saved preset's id; null for a built-in one.",
+            "title": "Id"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ProfileView"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/PresetSettings"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "built_in",
+          "profile",
+          "settings"
+        ],
+        "title": "Preset",
+        "type": "object"
+      },
+      "PresetSave": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 48,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/TableProfile"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/PresetSettings"
+          }
+        },
+        "required": [
+          "name",
+          "profile"
+        ],
+        "title": "PresetSave",
+        "type": "object"
+      },
+      "PresetSettings": {
+        "additionalProperties": false,
+        "description": "The table's other settings a host saves with a profile; each is the table request's own\nfield, and one left out takes the request's default when the table is opened.",
+        "properties": {
+          "best_of": {
+            "anyOf": [
+              {
+                "enum": [
+                  1,
+                  3
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Of"
+          },
+          "bot_skill": {
+            "anyOf": [
+              {
+                "maximum": 6.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bot Skill"
+          },
+          "bots": {
+            "anyOf": [
+              {
+                "maximum": 5.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bots"
+          },
+          "format": {
+            "anyOf": [
+              {
+                "enum": [
+                  "legacy",
+                  "commander",
+                  "two_headed_giant",
+                  "kings_table"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format"
+          },
+          "rules": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableRules"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "seats": {
+            "anyOf": [
+              {
+                "maximum": 6.0,
+                "minimum": 2.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seats"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "enum": [
+                  "public",
+                  "private"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visibility"
+          }
+        },
+        "title": "PresetSettings",
+        "type": "object"
+      },
+      "Presets": {
+        "additionalProperties": false,
+        "properties": {
+          "built_in": {
+            "items": {
+              "$ref": "#/components/schemas/Preset"
+            },
+            "title": "Built In",
+            "type": "array"
+          },
+          "limit": {
+            "description": "The most presets an account saves.",
+            "title": "Limit",
+            "type": "integer"
+          },
+          "paces": {
+            "description": "What each pace a profile may name means in numbers (pace policies).",
+            "items": {
+              "$ref": "#/components/schemas/PacePolicy"
+            },
+            "title": "Paces",
+            "type": "array"
+          },
+          "saved": {
+            "items": {
+              "$ref": "#/components/schemas/Preset"
+            },
+            "title": "Saved",
+            "type": "array"
+          }
+        },
+        "required": [
+          "built_in",
+          "saved",
+          "limit",
+          "paces"
+        ],
+        "title": "Presets",
         "type": "object"
       },
       "PriceChange": {
@@ -10076,6 +10944,108 @@
         "title": "ProfileUpdate",
         "type": "object"
       },
+      "ProfileView": {
+        "additionalProperties": false,
+        "description": "A profile as a table shows it: what it describes in words, and every rule the server\nenforces at the table, the table's own rules among them.",
+        "properties": {
+          "duration": {
+            "anyOf": [
+              {
+                "enum": [
+                  30,
+                  60,
+                  90,
+                  120,
+                  180
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The minutes it is expected to take. Described only.",
+            "title": "Duration"
+          },
+          "enforced": {
+            "$ref": "#/components/schemas/Enforced"
+          },
+          "enforced_rules": {
+            "description": "Everything checked on a deck at this table, in words: the table's rules (banned cards, cards not legal, stand-ins) and the profile's restrictions. Empty: any deck its format takes.",
+            "items": {
+              "$ref": "#/components/schemas/Rule"
+            },
+            "title": "Enforced Rules",
+            "type": "array"
+          },
+          "intent": {
+            "description": "What kind of game the table is for. Described only.",
+            "enum": [
+              "learning",
+              "precon",
+              "upgraded",
+              "high_power",
+              "competitive",
+              "custom"
+            ],
+            "title": "Intent",
+            "type": "string"
+          },
+          "intent_name": {
+            "title": "Intent Name",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "description": "The host's own words. Described only.",
+            "maxLength": 280,
+            "title": "Note",
+            "type": "string"
+          },
+          "pace": {
+            "anyOf": [
+              {
+                "enum": [
+                  "relaxed",
+                  "steady",
+                  "brisk"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How fast it is played. Described only.",
+            "title": "Pace"
+          },
+          "pace_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pace Name"
+          },
+          "version": {
+            "const": 1,
+            "default": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "intent",
+          "intent_name",
+          "pace_name",
+          "enforced_rules"
+        ],
+        "title": "ProfileView",
+        "type": "object"
+      },
       "Progress": {
         "additionalProperties": false,
         "properties": {
@@ -10347,6 +11317,36 @@
         "title": "Purged",
         "type": "object"
       },
+      "QuestAlternative": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "progress": {
+            "description": "Counted so far, at most its target.",
+            "title": "Progress",
+            "type": "integer"
+          },
+          "target": {
+            "title": "Target",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "target",
+          "progress"
+        ],
+        "title": "QuestAlternative",
+        "type": "object"
+      },
       "QuestBoards": {
         "additionalProperties": false,
         "properties": {
@@ -10373,6 +11373,17 @@
       "QuestView": {
         "additionalProperties": false,
         "properties": {
+          "alternative": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuestAlternative"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A second quest that completes this slot as well (v0.9.12, the quest_alternatives policy); none on a board drawn with the policy off."
+          },
           "completed_at": {
             "anyOf": [
               {
@@ -11011,6 +12022,55 @@
           "sold_at"
         ],
         "title": "RecentSale",
+        "type": "object"
+      },
+      "Record": {
+        "additionalProperties": false,
+        "properties": {
+          "draws": {
+            "title": "Draws",
+            "type": "integer"
+          },
+          "games": {
+            "description": "The sample: games that ended with a result.",
+            "title": "Games",
+            "type": "integer"
+          },
+          "losses": {
+            "title": "Losses",
+            "type": "integer"
+          },
+          "small_sample": {
+            "description": "Fewer than 10 games: it says little.",
+            "title": "Small Sample",
+            "type": "boolean"
+          },
+          "win_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Wins over games, 0 to 1; null with no game.",
+            "title": "Win Rate"
+          },
+          "wins": {
+            "title": "Wins",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "games",
+          "wins",
+          "losses",
+          "draws",
+          "win_rate",
+          "small_sample"
+        ],
+        "title": "Record",
         "type": "object"
       },
       "Related": {
@@ -12058,6 +13118,22 @@
         "title": "Repricing",
         "type": "object"
       },
+      "Restore": {
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "description": "The draft version this restore starts from.",
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "Restore",
+        "type": "object"
+      },
       "RestoredSleeve": {
         "additionalProperties": false,
         "properties": {
@@ -12427,6 +13503,25 @@
           "created_at"
         ],
         "title": "RevisionSummary",
+        "type": "object"
+      },
+      "Rule": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "text"
+        ],
+        "title": "Rule",
         "type": "object"
       },
       "Ruling": {
@@ -12995,6 +14090,56 @@
         "title": "SharedDeck",
         "type": "object"
       },
+      "Shelf": {
+        "additionalProperties": false,
+        "properties": {
+          "decks": {
+            "title": "Decks",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "decks"
+        ],
+        "title": "Shelf",
+        "type": "object"
+      },
+      "Shelves": {
+        "additionalProperties": false,
+        "properties": {
+          "folders": {
+            "items": {
+              "$ref": "#/components/schemas/Shelf"
+            },
+            "title": "Folders",
+            "type": "array"
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/Shelf"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "unfiled": {
+            "description": "Decks in no folder.",
+            "title": "Unfiled",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "folders",
+          "tags",
+          "unfiled"
+        ],
+        "title": "Shelves",
+        "type": "object"
+      },
       "ShopAdminView": {
         "additionalProperties": false,
         "properties": {
@@ -13399,6 +14544,90 @@
         "title": "Sleeves",
         "type": "object"
       },
+      "Split": {
+        "additionalProperties": false,
+        "properties": {
+          "bot_skill": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The bots' skill, when the game had bots.",
+            "title": "Bot Skill"
+          },
+          "draws": {
+            "title": "Draws",
+            "type": "integer"
+          },
+          "format": {
+            "title": "Format",
+            "type": "string"
+          },
+          "games": {
+            "description": "The sample: games that ended with a result.",
+            "title": "Games",
+            "type": "integer"
+          },
+          "losses": {
+            "title": "Losses",
+            "type": "integer"
+          },
+          "mode": {
+            "description": "The game's mode (api/modes.py): practice, table, campaign\u2026",
+            "title": "Mode",
+            "type": "string"
+          },
+          "opposition": {
+            "description": "bots: no other player; players: no bot; mixed: both.",
+            "enum": [
+              "bots",
+              "players",
+              "mixed"
+            ],
+            "title": "Opposition",
+            "type": "string"
+          },
+          "small_sample": {
+            "description": "Fewer than 10 games: it says little.",
+            "title": "Small Sample",
+            "type": "boolean"
+          },
+          "win_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Wins over games, 0 to 1; null with no game.",
+            "title": "Win Rate"
+          },
+          "wins": {
+            "title": "Wins",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "games",
+          "wins",
+          "losses",
+          "draws",
+          "win_rate",
+          "small_sample",
+          "format",
+          "mode",
+          "opposition",
+          "bot_skill"
+        ],
+        "title": "Split",
+        "type": "object"
+      },
       "SpoilsDeck": {
         "additionalProperties": false,
         "properties": {
@@ -13422,6 +14651,47 @@
           "opponent"
         ],
         "title": "SpoilsDeck",
+        "type": "object"
+      },
+      "Staple": {
+        "additionalProperties": false,
+        "properties": {
+          "card": {
+            "$ref": "#/components/schemas/CardSummary"
+          },
+          "claimed": {
+            "description": "The account builds with it through this pool.",
+            "title": "Claimed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "card",
+          "claimed"
+        ],
+        "title": "Staple",
+        "type": "object"
+      },
+      "StaplePool": {
+        "additionalProperties": false,
+        "properties": {
+          "cards": {
+            "description": "The pool, in its own order.",
+            "items": {
+              "$ref": "#/components/schemas/Staple"
+            },
+            "title": "Cards",
+            "type": "array"
+          },
+          "picks": {
+            "$ref": "#/components/schemas/Picks"
+          }
+        },
+        "required": [
+          "picks",
+          "cards"
+        ],
+        "title": "StaplePool",
         "type": "object"
       },
       "StartEncounter": {
@@ -13700,7 +14970,7 @@
             "type": "integer"
           },
           "current": {
-            "description": "Boards finished in a row, up to the last one finished (this period's when it is finished, else the previous one's); 0 when the previous period's was not.",
+            "description": "Boards finished in a row, up to the last one finished (this period's when it is finished, else the previous one's); 0 when the previous period's was not, unless the quest_streaks policy forgives a missed period (v0.9.12).",
             "title": "Current",
             "type": "integer"
           },
@@ -13717,6 +14987,79 @@
           "best"
         ],
         "title": "Streak",
+        "type": "object"
+      },
+      "Substitute": {
+        "additionalProperties": false,
+        "properties": {
+          "card": {
+            "$ref": "#/components/schemas/CardSummary"
+          },
+          "reasons": {
+            "description": "Why it is offered, in words.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "score": {
+            "description": "How alike the two are, 0 to 100; the list is by this.",
+            "title": "Score",
+            "type": "integer"
+          },
+          "spare": {
+            "description": "Copies the library holds that the deck does not use.",
+            "title": "Spare",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "card",
+          "spare",
+          "score",
+          "reasons"
+        ],
+        "title": "Substitute",
+        "type": "object"
+      },
+      "Substitutions": {
+        "additionalProperties": false,
+        "properties": {
+          "card": {
+            "$ref": "#/components/schemas/CardSummary"
+          },
+          "deck_id": {
+            "format": "uuid",
+            "title": "Deck Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why there are none, when the rules leave none.",
+            "title": "Note"
+          },
+          "substitutes": {
+            "items": {
+              "$ref": "#/components/schemas/Substitute"
+            },
+            "title": "Substitutes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "deck_id",
+          "card",
+          "substitutes"
+        ],
+        "title": "Substitutions",
         "type": "object"
       },
       "Suggestion": {
@@ -13921,7 +15264,7 @@
       },
       "TableChange": {
         "additionalProperties": false,
-        "description": "The host's changes to a King's Table table before its start (v0.8.7). Anything that\nchanges makes every player not ready again; the host's start is their ready.",
+        "description": "The host's changes to a table before its start: a King's Table table's settings and seats\n(v0.8.7), and since v0.9.12 any table's Rule Zero profile. Anything that changes makes every\nplayer not ready again; the host's start is their ready.",
         "properties": {
           "bot_seats": {
             "anyOf": [
@@ -13962,6 +15305,17 @@
               }
             ],
             "description": "Moves a player to an open seat."
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableProfile"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Since v0.9.12: the table's Rule Zero profile from now on; null removes it, and left out it stays. Any change to it, its note included, makes every player not ready again: getting ready again is how they accept it."
           }
         },
         "title": "TableChange",
@@ -14203,6 +15557,82 @@
         "title": "TablePlayer",
         "type": "object"
       },
+      "TableProfile": {
+        "additionalProperties": false,
+        "description": "A table's Rule Zero profile, as its host writes it.",
+        "properties": {
+          "duration": {
+            "anyOf": [
+              {
+                "enum": [
+                  30,
+                  60,
+                  90,
+                  120,
+                  180
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The minutes it is expected to take. Described only.",
+            "title": "Duration"
+          },
+          "enforced": {
+            "$ref": "#/components/schemas/Enforced"
+          },
+          "intent": {
+            "description": "What kind of game the table is for. Described only.",
+            "enum": [
+              "learning",
+              "precon",
+              "upgraded",
+              "high_power",
+              "competitive",
+              "custom"
+            ],
+            "title": "Intent",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "description": "The host's own words. Described only.",
+            "maxLength": 280,
+            "title": "Note",
+            "type": "string"
+          },
+          "pace": {
+            "anyOf": [
+              {
+                "enum": [
+                  "relaxed",
+                  "steady",
+                  "brisk"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How fast it is played. Described only.",
+            "title": "Pace"
+          },
+          "version": {
+            "const": 1,
+            "default": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "intent"
+        ],
+        "title": "TableProfile",
+        "type": "object"
+      },
       "TableRequest": {
         "additionalProperties": false,
         "description": "A new table: the host takes the first seat with one of their decks.",
@@ -14293,6 +15723,17 @@
               }
             ],
             "description": "King's Table (v0.8.7): its settings, the defaults when left out. Refused at other tables."
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableProfile"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Since v0.9.12: the table's Rule Zero profile (what kind of game it is for, and the restrictions on its decks the server enforces); none when left out."
           },
           "rules": {
             "$ref": "#/components/schemas/TableRules",
@@ -14501,6 +15942,17 @@
             },
             "title": "Players",
             "type": "array"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProfileView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Since v0.9.12: the table's Rule Zero profile: what it describes, and every rule the server enforces on its decks. Null when its host gave none."
           },
           "rules": {
             "$ref": "#/components/schemas/TableRules"
@@ -15311,6 +16763,43 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "VersionRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "record": {
+            "$ref": "#/components/schemas/Record"
+          },
+          "splits": {
+            "items": {
+              "$ref": "#/components/schemas/Split"
+            },
+            "title": "Splits",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "title",
+          "created_at",
+          "record",
+          "splits"
+        ],
+        "title": "VersionRecord",
+        "type": "object"
+      },
       "WaitingRequest": {
         "additionalProperties": false,
         "description": "Your friend request to a player who has not chosen a handle yet (v0.5.1).",
@@ -15645,6 +17134,94 @@
         "title": "WinsChange",
         "type": "object"
       },
+      "Wish": {
+        "additionalProperties": false,
+        "properties": {
+          "card": {
+            "$ref": "#/components/schemas/CardSummary"
+          },
+          "deck_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The deck it is wanted for, when one was named.",
+            "title": "Deck Id"
+          },
+          "owned": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Copies the library holds; null: the whole catalog.",
+            "title": "Owned"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "card",
+          "quantity",
+          "deck_id",
+          "owned"
+        ],
+        "title": "Wish",
+        "type": "object"
+      },
+      "WishSet": {
+        "additionalProperties": false,
+        "properties": {
+          "deck_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deck Id"
+          },
+          "quantity": {
+            "default": 1,
+            "maximum": 250.0,
+            "minimum": 1.0,
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "title": "WishSet",
+        "type": "object"
+      },
+      "Wishlist": {
+        "additionalProperties": false,
+        "properties": {
+          "wishes": {
+            "items": {
+              "$ref": "#/components/schemas/Wish"
+            },
+            "title": "Wishes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "wishes"
+        ],
+        "title": "Wishlist",
+        "type": "object"
+      },
       "XmageBuild": {
         "additionalProperties": false,
         "properties": {
@@ -15678,7 +17255,7 @@
   },
   "info": {
     "title": "Commander Duels",
-    "version": "0.9.11"
+    "version": "0.9.12"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -17497,6 +19074,227 @@
         "summary": "Change Economy"
       }
     },
+    "/api/v1/admin/policies": {
+      "get": {
+        "description": "The economy's policies as they stand, with their defaults (v0.9.12).",
+        "operationId": "policies_api_v1_admin_policies_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Policies"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Policies"
+      }
+    },
+    "/api/v1/admin/policies/{name}": {
+      "put": {
+        "description": "SysOp sets a policy: the owner's approval of an economy change, audited with what it was\nand what it became. A field left out takes its default.",
+        "operationId": "change_policy_api_v1_admin_policies__name__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Policies"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Change Policy"
+      }
+    },
     "/api/v1/admin/reports": {
       "get": {
         "description": "The reports, newest first: all of them, or those of the statuses named.",
@@ -19306,6 +21104,356 @@
           }
         },
         "summary": "Delete User"
+      }
+    },
+    "/api/v1/admin/users/{user_id}/entitlements": {
+      "get": {
+        "operationId": "account_entitlements_api_v1_admin_users__user_id__entitlements_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Entitlements"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Account Entitlements"
+      },
+      "post": {
+        "description": "SysOp lets an account build with a card it does not own, for testing; audited. It is\nfunctional access, not a card: SysOp's cards for testing are grants (api/testing.py).",
+        "operationId": "give_entitlement_api_v1_admin_users__user_id__entitlements_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntitlementGrant"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Entitlements"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Give Entitlement"
+      }
+    },
+    "/api/v1/admin/users/{user_id}/entitlements/{entitlement_id}": {
+      "delete": {
+        "description": "SysOp ends an entitlement; audited. A deck that held the card says so when it is next\nchecked, and a game already started plays on with the deck it was given.",
+        "operationId": "end_entitlement_api_v1_admin_users__user_id__entitlements__entitlement_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entitlement_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Entitlement Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Entitlements"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "End Entitlement"
       }
     },
     "/api/v1/admin/users/{user_id}/packs": {
@@ -26135,6 +28283,44 @@
               "title": "View",
               "type": "string"
             }
+          },
+          {
+            "description": "Only the decks in this folder (v0.9.12); empty: in none.",
+            "in": "query",
+            "name": "folder",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only the decks in this folder (v0.9.12); empty: in none.",
+              "title": "Folder"
+            }
+          },
+          {
+            "description": "Only the decks with this tag (v0.9.12).",
+            "in": "query",
+            "name": "tag",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only the decks with this tag (v0.9.12).",
+              "title": "Tag"
+            }
           }
         ],
         "responses": {
@@ -26559,6 +28745,218 @@
           }
         },
         "summary": "Import Preview"
+      }
+    },
+    "/api/v1/decks/organize": {
+      "post": {
+        "description": "Moves several decks into a folder, or out of theirs, and adds or removes tags on all of\nthem: every deck named must be the account's and out of the trash, or nothing changes.",
+        "operationId": "organize_api_v1_decks_organize_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Organize"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DeckSummary"
+                  },
+                  "title": "Response Organize Api V1 Decks Organize Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Organize"
+      }
+    },
+    "/api/v1/decks/shelves": {
+      "get": {
+        "description": "The account's folders and tags, each with how many of its decks it holds (the trash\napart).",
+        "operationId": "shelves_api_v1_decks_shelves_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Shelves"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Shelves"
       }
     },
     "/api/v1/decks/starters": {
@@ -27318,6 +29716,138 @@
         "summary": "Archive"
       }
     },
+    "/api/v1/decks/{deck_id}/diff": {
+      "get": {
+        "description": "Two saved versions of the deck compared, or a version and the draft: `before` and `after`\nare each a version's number or \"draft\".",
+        "operationId": "compare_api_v1_decks__deck_id__diff_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deck Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": true,
+            "schema": {
+              "pattern": "^(draft|[1-9][0-9]{0,5})$",
+              "title": "Before",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "default": "draft",
+              "pattern": "^(draft|[1-9][0-9]{0,5})$",
+              "title": "After",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckDiff"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Compare"
+      }
+    },
     "/api/v1/decks/{deck_id}/draft": {
       "put": {
         "description": "Autosave. version is the draft version this edit started from.",
@@ -27659,6 +30189,228 @@
           }
         },
         "summary": "Delete Forever"
+      }
+    },
+    "/api/v1/decks/{deck_id}/missing": {
+      "get": {
+        "description": "The cards of the deck its owner's library lacks, with the auctions open for each and the\nshop's packs that may hold it.",
+        "operationId": "deck_missing_api_v1_decks__deck_id__missing_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deck Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Missing"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Deck Missing"
+      }
+    },
+    "/api/v1/decks/{deck_id}/performance": {
+      "get": {
+        "description": "The deck's results, in all and by the version played, each with its sample size.",
+        "operationId": "deck_performance_api_v1_decks__deck_id__performance_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deck Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Performance"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Deck Performance"
       }
     },
     "/api/v1/decks/{deck_id}/removed-cards": {
@@ -28111,6 +30863,136 @@
         "summary": "Read Revision"
       }
     },
+    "/api/v1/decks/{deck_id}/revisions/{number}/restore": {
+      "post": {
+        "description": "Makes a saved version the draft again. The version is copied, never changed: it stays as\nthe games that played it knew it, and the draft takes a new version of its own, saved like any\nother (the editions the library holds, the cards the game still plays). Refused, as an\nautosave is, when the draft changed since the request's `version`.",
+        "operationId": "restore_revision_api_v1_decks__deck_id__revisions__number__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deck Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "title": "Number",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Restore"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftSaved"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Restore Revision"
+      }
+    },
     "/api/v1/decks/{deck_id}/sleeve": {
       "put": {
         "description": "Puts a sleeve on one of your decks: one of your own, a campaign back you earned, or none.",
@@ -28230,6 +31112,127 @@
           }
         },
         "summary": "Choose Sleeve"
+      }
+    },
+    "/api/v1/decks/{deck_id}/substitutions": {
+      "get": {
+        "description": "For a card (in the deck or wanted for it), the cards the library holds that could take its\nplace, each with why it is offered.",
+        "operationId": "deck_substitutions_api_v1_decks__deck_id__substitutions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deck Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "card_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Card Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Substitutions"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Deck Substitutions"
       }
     },
     "/api/v1/decks/{deck_id}/switched-editions": {
@@ -33083,6 +36086,216 @@
         "summary": "Delete Sleeve"
       }
     },
+    "/api/v1/me/staples": {
+      "get": {
+        "description": "The starter-staple pool, the account's picks and what it has claimed (v0.9.12). Not found\nwhile the starter_staples policy is off.",
+        "operationId": "my_staples_api_v1_me_staples_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaplePool"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "My Staples"
+      }
+    },
+    "/api/v1/me/staples/{card_id}": {
+      "post": {
+        "description": "Claims a card of the pool with a pick, once: from then on the account builds with one\ncopy of it, in its default printing, without owning it. A card already claimed is answered\nas it stands.",
+        "operationId": "claim_staple_api_v1_me_staples__card_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "card_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Card Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaplePool"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Claim Staple"
+      }
+    },
     "/api/v1/me/starters": {
       "post": {
         "description": "The two starter decks: each becomes a deck of the player's own, and every copy of their\ncards joins the library for good. Chosen once.",
@@ -33290,6 +36503,322 @@
         "summary": "My Stats"
       }
     },
+    "/api/v1/me/table-presets": {
+      "get": {
+        "description": "The built-in profiles to start a table from, and the tables the account saved.",
+        "operationId": "my_presets_api_v1_me_table_presets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Presets"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "My Presets"
+      },
+      "put": {
+        "description": "Saves a table to open again, under a name of the account's own: a name it already has is\nreplaced (case aside).",
+        "operationId": "save_preset_api_v1_me_table_presets_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresetSave"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Presets"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Save Preset"
+      }
+    },
+    "/api/v1/me/table-presets/{preset_id}": {
+      "delete": {
+        "operationId": "remove_preset_api_v1_me_table_presets__preset_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "preset_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Preset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Presets"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Remove Preset"
+      }
+    },
     "/api/v1/me/tokens": {
       "get": {
         "operationId": "my_tokens_api_v1_me_tokens_get",
@@ -33495,6 +37024,334 @@
           }
         },
         "summary": "Update Tutorial"
+      }
+    },
+    "/api/v1/me/wishlist": {
+      "get": {
+        "description": "The cards the account wants, in the order it wished for them.",
+        "operationId": "my_wishlist_api_v1_me_wishlist_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Wishlist"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "My Wishlist"
+      }
+    },
+    "/api/v1/me/wishlist/{card_id}": {
+      "delete": {
+        "operationId": "unwish_api_v1_me_wishlist__card_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "card_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Card Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Wishlist"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Unwish"
+      },
+      "put": {
+        "description": "Wishes for a card, or changes the wish: how many copies, and for which of the account's\ndecks. One wish a card.",
+        "operationId": "wish_api_v1_me_wishlist__card_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "card_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Card Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WishSet"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Wishlist"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Wish"
       }
     },
     "/api/v1/notifications": {
@@ -37312,6 +41169,81 @@
             }
           },
           {
+            "description": "Since v0.9.12: only tables whose Rule Zero profile says one of these kinds of game; a table with no profile matches none.",
+            "in": "query",
+            "name": "intent",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "learning",
+                      "precon",
+                      "upgraded",
+                      "high_power",
+                      "competitive",
+                      "custom"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Since v0.9.12: only tables whose Rule Zero profile says one of these kinds of game; a table with no profile matches none.",
+              "title": "Intent"
+            }
+          },
+          {
+            "description": "Since v0.9.12: only tables whose profile says one of these paces.",
+            "in": "query",
+            "name": "pace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "relaxed",
+                      "steady",
+                      "brisk"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Since v0.9.12: only tables whose profile says one of these paces.",
+              "title": "Pace"
+            }
+          },
+          {
+            "description": "Since v0.9.12: only tables whose profile expects at most this many minutes; a table that says no length matches none.",
+            "in": "query",
+            "name": "max_duration",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 600,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Since v0.9.12: only tables whose profile expects at most this many minutes; a table that says no length matches none.",
+              "title": "Max Duration"
+            }
+          },
+          {
             "description": "newest (default), players (most seated) or fewest_open (seats).",
             "in": "query",
             "name": "sort",
@@ -37561,7 +41493,7 @@
         "summary": "Get Table"
       },
       "patch": {
-        "description": "The host changes a King's Table table before its start (v0.8.7): its settings, the seats\nits bots fill, or a player's seat (to an open one). Anything that changes makes every player\nnot ready again.",
+        "description": "The host changes a table before its start: a King's Table table's settings, the seats\nits bots fill, or a player's seat (to an open one) (v0.8.7), and since v0.9.12 any table's\nRule Zero profile. Anything that changes makes every player not ready again.",
         "operationId": "change_table_api_v1_tables__code__patch",
         "parameters": [
           {

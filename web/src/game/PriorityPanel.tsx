@@ -52,7 +52,10 @@ export function PriorityPanel({
     state.role !== "controller" ||
     state.pending !== null ||
     Boolean(state.snapshot?.result);
-  const inPass = Boolean(controls?.passing) && state.seat !== null;
+  // A pass mode, or since v0.9.12 a yield: either is the engine passing for the seat.
+  const inPass =
+    Boolean(controls?.passing || controls?.yields?.length) &&
+    state.seat !== null;
   // Escape stops a pass from anywhere on the screen (UI07's emergency cancel), unless it is
   // closing a menu, which stops it there, or a dialog.
   useEffect(() => {
@@ -85,6 +88,20 @@ export function PriorityPanel({
             onClick={() => onSet({ cancel_passes: true })}
           >
             Stop passing
+          </button>
+        </p>
+      )}
+      {(controls.yields?.length ?? 0) > 0 && (
+        <p className={styles.passing} role="status" data-yields>
+          Passing for {controls.yields!.join(", ")} until the turn ends, or
+          until you can do something new.{" "}
+          <button
+            type="button"
+            className={styles.primaryButton}
+            disabled={disabled}
+            onClick={() => onSet({ cancel_passes: true })}
+          >
+            Stop yielding
           </button>
         </p>
       )}

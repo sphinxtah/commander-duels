@@ -1,0 +1,123 @@
+Cryptic Spires as printed (Commander Duels v0.9.12): "As you create your deck, circle two of the
+colors below. This land enters tapped. {T}: Add one mana of either of the circled colors."
+
+Reason: Commander Duels deals Cryptic Spires from Double Masters 2022's packs, and XMage had no
+implementation of it: its colors are circled as the deck is built, before any game, and XMage's
+deck lists carry nothing but a card's name, set and number. The card is a land that enters tapped
+and has no mana ability until `CrypticSpires.circle` gives it the two it was built with; the
+engine's deck loader calls it for each copy with the choice the deck's entry names
+(engine/src/main/java/com/commanderduels/DeckLists.java). The circled colors are the card's
+abilities, so a copy of it keeps them (its rulings: they are copiable values). One difference from
+the rulings is left: a permanent that gains the mana ability without becoming a copy would add the
+mana, where the ruling says it adds none.
+Upstream: none.
+Remove when: XMage implements Cryptic Spires with a deck-construction choice.
+diff --git a/Mage.Sets/src/mage/cards/c/CrypticSpires.java b/Mage.Sets/src/mage/cards/c/CrypticSpires.java
+new file mode 100644
+index 00000000..094ae832
+--- /dev/null
++++ b/Mage.Sets/src/mage/cards/c/CrypticSpires.java
+@@ -0,0 +1,91 @@
++package mage.cards.c;
++
++import mage.abilities.common.EntersBattlefieldTappedAbility;
++import mage.abilities.mana.BlackManaAbility;
++import mage.abilities.mana.BlueManaAbility;
++import mage.abilities.mana.GreenManaAbility;
++import mage.abilities.mana.RedManaAbility;
++import mage.abilities.mana.WhiteManaAbility;
++import mage.cards.CardImpl;
++import mage.cards.CardSetInfo;
++import mage.constants.CardType;
++
++import java.util.UUID;
++
++/**
++ * Cryptic Spires: "As you create your deck, circle two of the colors below. This land enters
++ * tapped. {T}: Add one mana of either of the circled colors."
++ * <p>
++ * The colors are circled before any game begins, so they are not chosen in the game: whoever
++ * loads the deck calls {@link #circle} on each copy with the two colors circled on it. Until then
++ * the card has no mana ability, as a copy with nothing circled has none. The circled colors are
++ * part of the card's copiable values: they are its abilities, and a copy keeps them.
++ *
++ * @author Commander Duels
++ */
++public final class CrypticSpires extends CardImpl {
++
++    private static final String COLORS = "WUBRG";
++
++    private String circled = "";
++
++    public CrypticSpires(UUID ownerId, CardSetInfo setInfo) {
++        super(ownerId, setInfo, new CardType[]{CardType.LAND}, "");
++
++        // This land enters tapped.
++        this.addAbility(new EntersBattlefieldTappedAbility());
++
++        // {T}: Add one mana of either of the circled colors: circle() adds one ability a color.
++    }
++
++    private CrypticSpires(final CrypticSpires card) {
++        super(card);
++        this.circled = card.circled;
++    }
++
++    /**
++     * Circles two colors, once: two different letters of WUBRG.
++     *
++     * @throws IllegalArgumentException when the letters are not two different colors
++     * @throws IllegalStateException    when the card's colors are already circled
++     */
++    public void circle(String colors) {
++        if (!circled.isEmpty()) {
++            throw new IllegalStateException("Cryptic Spires's colors are already circled: " + circled);
++        }
++        if (colors == null || colors.length() != 2 || colors.charAt(0) == colors.charAt(1)
++                || COLORS.indexOf(colors.charAt(0)) < 0 || COLORS.indexOf(colors.charAt(1)) < 0) {
++            throw new IllegalArgumentException("Cryptic Spires takes two different colors of WUBRG: " + colors);
++        }
++        for (char color : colors.toCharArray()) {
++            switch (color) {
++                case 'W':
++                    this.addAbility(new WhiteManaAbility());
++                    break;
++                case 'U':
++                    this.addAbility(new BlueManaAbility());
++                    break;
++                case 'B':
++                    this.addAbility(new BlackManaAbility());
++                    break;
++                case 'R':
++                    this.addAbility(new RedManaAbility());
++                    break;
++                default:
++                    this.addAbility(new GreenManaAbility());
++                    break;
++            }
++        }
++        circled = colors;
++    }
++
++    /** The two circled colors, as letters of WUBRG; empty before they are circled. */
++    public String getCircled() {
++        return circled;
++    }
++
++    @Override
++    public CrypticSpires copy() {
++        return new CrypticSpires(this);
++    }
++}
+diff --git a/Mage.Sets/src/mage/sets/DoubleMasters2022.java b/Mage.Sets/src/mage/sets/DoubleMasters2022.java
+index aba40850..401a34df 100644
+--- a/Mage.Sets/src/mage/sets/DoubleMasters2022.java
++++ b/Mage.Sets/src/mage/sets/DoubleMasters2022.java
+@@ -156,6 +156,7 @@ public final class DoubleMasters2022 extends ExpansionSet {
+         cards.add(new SetCardInfo("Crucible of Worlds", 303, Rarity.MYTHIC, mage.cards.c.CrucibleOfWorlds.class, NON_FULL_USE_VARIOUS));
+         cards.add(new SetCardInfo("Crucible of Worlds", 393, Rarity.MYTHIC, mage.cards.c.CrucibleOfWorlds.class, NON_FULL_USE_VARIOUS));
+         cards.add(new SetCardInfo("Crucible of Worlds", 558, Rarity.MYTHIC, mage.cards.c.CrucibleOfWorlds.class, NON_FULL_USE_VARIOUS));
++        cards.add(new SetCardInfo("Cryptic Spires", 332, Rarity.COMMON, mage.cards.c.CrypticSpires.class));
+         cards.add(new SetCardInfo("Dack's Duplicate", 198, Rarity.RARE, mage.cards.d.DacksDuplicate.class, NON_FULL_USE_VARIOUS));
+         cards.add(new SetCardInfo("Dack's Duplicate", 483, Rarity.RARE, mage.cards.d.DacksDuplicate.class, NON_FULL_USE_VARIOUS));
+         cards.add(new SetCardInfo("Damnation", 353, Rarity.RARE, mage.cards.d.Damnation.class, NON_FULL_USE_VARIOUS));

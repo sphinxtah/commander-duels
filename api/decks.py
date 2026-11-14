@@ -45,12 +45,12 @@ from datetime import UTC, date, datetime
 from typing import Annotated, Literal, cast
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi import Path as PathParam
 from fastapi.responses import PlainTextResponse, Response
 from pydantic import Field
 from sqlalchemy import delete as sql_delete
-from sqlalchemy import func, not_, or_, select
+from sqlalchemy import func, not_, or_, select, update
 from sqlalchemy.orm import Session
 
 from api import deckio, guided
@@ -95,10 +95,12 @@ from api.models import (
     SiteSetting,
     TableSeat,
     User,
+    WishlistEntry,
 )
 from api.roster import Planeswalker, roster_of
 from api.schemas import Contract, Error, StoredText, TableOption
 from api.validation import (
+    CHOICE_CARDS,
     MAX_ENTRIES,
     DeckContent,
     DeckEntry,
@@ -177,6 +179,10 @@ class DeckSummary(Contract):
         description='The card sleeve its cards wear at a table (v0.8.9): "sleeve:<id>", '
         '"back:<slug>", or null for the default.',
     )
+    folder: str | None = Field(
+        default=None, description="The folder the owner keeps it in (v0.9.12); null: none."
+    )
+    tags: list[str] = Field(default_factory=list, description="The owner's tags on it (v0.9.12).")
 
 
 class RevisionSummary(Contract):
@@ -222,6 +228,16 @@ class DeckUpdate(Contract):
     title: Title | None = None
     notes: StoredText | None = Field(default=None, max_length=MAX_NOTES)
     visibility: Literal["private", "link"] | None = None
+    folder: Annotated[StoredText, Field(max_length=64)] | None = Field(
+        default=None,
+        description="The folder to keep it in (v0.9.12); an empty name, or null sent on purpose, "
+        "takes it out of its folder; left out, it stays.",
+    )
+    tags: list[Annotated[StoredText, Field(min_length=1, max_length=32)]] | None = Field(
+        default=None,
+        max_length=12,
+        description="Its tags (v0.9.12), replacing those it had; left out, they stay.",
+    )
 
 
 class DraftSave(Contract):
@@ -309,24 +325,31 @@ def now() -> datetime:
 
 
 def normalized(entries: list[DeckEntry]) -> list[DeckEntry]:
-    """One entry per card, printing and location, in a stable order."""
-    totals: dict[tuple[UUID, UUID | None, str], int] = {}
+    """One entry per card, printing, location and choice, in a stable order."""
+    totals: dict[tuple[UUID, UUID | None, str, str | None], int] = {}
     for entry in entries:
-        key = (entry.card_id, entry.printing_id, entry.location)
+        key = (entry.card_id, entry.printing_id, entry.location, entry.choice)
         totals[key] = min(totals.get(key, 0) + entry.quantity, 250)
     ordered = sorted(
-        totals.items(), key=lambda item: (item[0][2], str(item[0][0]), str(item[0][1]))
+        totals.items(),
+        key=lambda item: (item[0][2], str(item[0][0]), str(item[0][1]), item[0][3] or ""),
     )
     return [
-        DeckEntry(card_id=card_id, printing_id=printing_id, quantity=quantity, location=location)  # type: ignore[arg-type]
-        for (card_id, printing_id, location), quantity in ordered
+        DeckEntry(
+            card_id=card_id,
+            printing_id=printing_id,
+            quantity=quantity,
+            location=location,  # type: ignore[arg-type]
+            choice=choice,
+        )
+        for (card_id, printing_id, location, choice), quantity in ordered
     ]
 
 
 def content_hash(fmt: str, entries: list[DeckEntry]) -> str:
     payload = {
         "format": fmt,
-        "entries": [entry.model_dump(mode="json") for entry in normalized(entries)],
+        "entries": [entry.kept() for entry in normalized(entries)],
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
@@ -444,6 +467,29 @@ def without_unplayable(db: Session, deck: Deck, entries: list[DeckEntry]) -> lis
     return [entry for entry in entries if entry.card_id not in gone]
 
 
+def without_choices_untaken(db: Session, entries: list[DeckEntry]) -> list[DeckEntry]:
+    """The entries, a choice kept only on a card that takes one (v0.9.12: Cryptic Spires's
+    circled colours); on any other card it is dropped, and its copies merge with the rest."""
+    chosen = {entry.card_id for entry in entries if entry.choice}
+    if not chosen:
+        return entries
+    taking = {
+        card_id
+        for card_id, name in db.execute(
+            select(CardConcept.id, CardConcept.name).where(CardConcept.id.in_(chosen))
+        )
+        if normalize(name) in CHOICE_CARDS
+    }
+    return normalized(
+        [
+            entry
+            if entry.choice is None or entry.card_id in taking
+            else entry.model_copy(update={"choice": None})
+            for entry in entries
+        ]
+    )
+
+
 def note_switched(deck: Deck, moved: list[Switch]) -> None:
     """The deck's note of copies switched to an edition the library holds (v0.5.0)."""
     stamp = now().isoformat()
@@ -517,7 +563,7 @@ def store_draft(
         printings -= {entry.printing_id for entry in held if entry.printing_id is not None}
         if cards or printings:
             raise unknown_card()
-    clean = without_unplayable(db, deck, normalized(entries))
+    clean = without_choices_untaken(db, without_unplayable(db, deck, normalized(entries)))
     if library is not None:
         owned, moved = owned_editions(db, clean, library, switch=switch)
         clean = normalized(owned)
@@ -529,7 +575,7 @@ def store_draft(
         today(),
         library.collection() if library else None,
     )
-    deck.draft = {"entries": [entry.model_dump(mode="json") for entry in clean]}
+    deck.draft = {"entries": [entry.kept() for entry in clean]}
     deck.draft_hash = content_hash(deck.format, clean)
     counts = validation.counts
     deck.card_count = counts.main + counts.commander
@@ -577,6 +623,8 @@ def deck_summary(db: Session, deck: Deck) -> DeckSummary:
             for item in deck.switched_editions or []
         ],
         sleeve=deck.sleeve,
+        folder=deck.folder,
+        tags=list(deck.tags or []),
     )
 
 
@@ -678,6 +726,11 @@ def purge(db: Session, deck: Deck) -> None:
         if revision not in kept
     ]
     quiet = {"synchronize_session": False}
+    # A wish made for the deck stays a wish, for no deck (v0.9.12).
+    db.execute(
+        update(WishlistEntry).where(WishlistEntry.deck_id == deck.id).values(deck_id=None),
+        execution_options=quiet,
+    )
     if unused:
         db.execute(
             sql_delete(DeckEntryRow).where(DeckEntryRow.revision_id.in_(unused)),
@@ -886,6 +939,7 @@ def publish(db: Session, deck: Deck, library: Library) -> DeckRevision:
                 printing_id=entry.printing_id,
                 quantity=entry.quantity,
                 location=entry.location,
+                choice=entry.choice,
             )
         )
     deck.latest_revision = revision.number
@@ -902,6 +956,7 @@ def revision_entries(db: Session, revision: DeckRevision) -> list[DeckEntry]:
                 printing_id=row.printing_id,
                 quantity=row.quantity,
                 location=row.location,  # type: ignore[arg-type]
+                choice=row.choice,
             )
             for row in rows
         ]
@@ -961,6 +1016,15 @@ def list_decks(
     principal: Builder,
     db: Db,
     view: Literal["active", "archived", "trash"] = "active",
+    folder: Annotated[
+        str | None,
+        Query(
+            max_length=64, description="Only the decks in this folder (v0.9.12); empty: in none."
+        ),
+    ] = None,
+    tag: Annotated[
+        str | None, Query(max_length=32, description="Only the decks with this tag (v0.9.12).")
+    ] = None,
 ) -> list[DeckSummary]:
     query = select(Deck).where(Deck.owner_id == principal.user.id, Deck.purged_at.is_(None))
     if view == "trash":
@@ -971,6 +1035,11 @@ def list_decks(
             Deck.archived_at.is_not(None) if view == "archived" else Deck.archived_at.is_(None)
         )
     decks = list(db.scalars(query.order_by(Deck.updated_at.desc())))
+    if folder is not None:
+        decks = [deck for deck in decks if (deck.folder or "") == folder]
+    if tag is not None:
+        wanted = tag.casefold()
+        decks = [deck for deck in decks if wanted in {each.casefold() for each in deck.tags or []}]
     # A deck last validated before v0.4.5 is validated again, once: a banned card, or one not
     # legal in the format, no longer makes it illegal, and the tables ask which options it needs.
     stale = [deck for deck in decks if deck.needs is None]
@@ -1033,6 +1102,12 @@ def update_deck(
         deck.visibility = body.visibility
         # A new link each time sharing starts, so turning it off and on again ends old links.
         deck.share_code = secrets.token_urlsafe(12) if body.visibility == "link" else None
+    if "folder" in body.model_fields_set:
+        deck.folder = body.folder or None
+    if body.tags is not None:
+        # Once each, case aside, in the order given.
+        tags = list({tag.casefold(): tag for tag in reversed(body.tags)}.values())[::-1]
+        deck.tags = tags or None
     deck.updated_at = now()
     db.commit()
     return deck_detail(db, deck, library)

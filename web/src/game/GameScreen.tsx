@@ -65,7 +65,7 @@ import { DomLayer } from "./table/DomLayer";
 import { Drawer } from "./table/Drawers";
 import { useDragController } from "./table/dnd";
 import { GameMenu } from "./table/GameMenu";
-import { REGIONS } from "./table/geometry";
+import { COMPACT_PILE_CAP, REGIONS } from "./table/geometry";
 import { useTableKeys } from "./table/keys";
 import { Magnifier } from "./table/Magnifier";
 import { PassingNotice } from "./table/PassingNotice";
@@ -313,6 +313,9 @@ export function GameScreen({
       choose: (option: PromptOption) => {
         answer({ option_id: option.id });
       },
+      chooseBatch: (batch) => {
+        answer({ batch });
+      },
       zoom: (card, located) => setZoomed({ card, located }),
       // The magnifier follows the pointer and keyboard focus through the table's store
       // (pointer.ts), so the old side preview has nothing left to draw.
@@ -352,6 +355,7 @@ export function GameScreen({
     input,
     expandedSeat,
     textScale: largeText ? 1.25 : 1,
+    pileCap: settings.reducedClutter ? COMPACT_PILE_CAP : undefined,
   });
   const diff = useTableEvents(model, state.phase, snapshot?.result ?? null);
   const frame = useMemo(
@@ -891,6 +895,7 @@ export function GameScreen({
                   {state.seat !== null && (
                     <PassingNotice
                       passing={controls?.passing ?? null}
+                      yields={controls?.yields}
                       disabled={
                         state.role !== "controller" ||
                         state.pending !== null ||

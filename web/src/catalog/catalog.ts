@@ -142,6 +142,10 @@ export const sourceLabels: Record<LibraryCard["sources"][number], string> = {
   campaign: "Won in the campaign",
   // Given by SysOp, for testing (v0.8.8).
   grant: "Given by SysOp",
+  // Functional access (v0.9.12): built with, not owned, so never sold. A basic land under the
+  // functional_basics policy, and a starter staple the account claimed.
+  functional: "Free to build with",
+  staple: "Starter staples",
 };
 
 /** A catalog printing's image, from our own server's cache of Scryfall's. */

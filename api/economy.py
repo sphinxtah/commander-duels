@@ -181,16 +181,22 @@ def bot_cap(db: Session) -> int | None:
     return setting.value if setting and isinstance(setting.value, int) else None
 
 
-def pay_game(db: Session, game: Game) -> None:
+def pay_game(db: Session, game: Game, unpaid: frozenset[int] = frozenset()) -> None:
     """Pays each player's seat that won the game for every seat it beat: in the caller's
     transaction, after the game's result is recorded. In Two-Headed Giant (v0.5.0) the winner's
     teammate won with it, so it is not a seat the winner beat; since v0.5.1 both players of the
-    winning team are paid, each for the other team's seats, under their own limits."""
+    winning team are paid, each for the other team's seats, under their own limits. unpaid
+    (v0.9.12) is the winning seats the farming policy withholds tokens from (api/farming.py);
+    none unless it is enforced."""
     winners = winning_seats(game.result or {})
     seats = list(
         db.scalars(select(GameSeat).where(GameSeat.game_id == game.id).order_by(GameSeat.seat))
     )
-    owners = {seat.seat: seat.user_id for seat in seats if seat.seat in winners and seat.user_id}
+    owners = {
+        seat.seat: seat.user_id
+        for seat in seats
+        if seat.seat in winners and seat.user_id and seat.seat not in unpaid
+    }
     # Two of a winner's games ending at once count today's paid wins one after the other. Every
     # player's row is locked, in one order, so two games paying the same players never wait on
     # each other; since v0.9.5 the losers' too, as their quest boards may count the game

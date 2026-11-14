@@ -1056,3 +1056,36 @@ a.deckTitle:hover {
 .meta {
   border-color: var(--cd-gold-line);
 }
+
+/* The two colours circled on a copy of Cryptic Spires (v0.9.12), in the card's dialog. */
+.choice {
+  margin: 16px 0 0;
+  border: 1px solid #ffffff1c;
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+.choice legend {
+  padding: 0 6px;
+  font-family: var(--cd-display);
+  color: var(--cd-gold-hi);
+}
+.choice p {
+  margin: 0 0 10px;
+  font-size: 0.86rem;
+}
+.choice p:last-child {
+  margin: 10px 0 0;
+}
+.choice div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.choice button {
+  min-height: 44px;
+  min-width: 84px;
+}
+.choice button[aria-pressed="true"] {
+  border-color: var(--cd-gold-line);
+  font-weight: 700;
+}

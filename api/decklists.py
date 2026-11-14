@@ -37,6 +37,10 @@ MAIN_HEADINGS = {"deck", "main", "maindeck", "main deck", "library", "mainboard"
 SKIPPED_HEADINGS = {"sideboard", "maybeboard", "considering", "tokens"}
 COMMANDER_HEADINGS = {"commander", "commanders"}
 SPACES = re.compile(r"\s+")
+# A choice made as the deck is built, at a line's end (v0.9.12): Cryptic Spires's two circled
+# colours, "1 Cryptic Spires <WU>", as a deck's export writes it (api/deckio.py).
+CHOICE = re.compile(r"\s*<(?P<choice>[WUBRGwubrg]{2})>\s*$")
+COLOUR_ORDER = "WUBRG"
 
 
 def invalid(line: int, message: str) -> ApiError:
@@ -44,9 +48,11 @@ def invalid(line: int, message: str) -> ApiError:
 
 
 def parse_deck_list(text: str, game_format: str) -> dict[str, object]:
-    """The engine's deck_list object: {"cards": [{"name", "count"}], "commanders": [...]}."""
+    """The engine's deck_list object: {"cards": [{"name", "count"}], "commanders": [...]}; an
+    entry with a choice (v0.9.12) also names it, and is counted apart from the card's others."""
     counts: dict[str, int] = {}
     spelled: dict[str, str] = {}
+    choices: dict[str, str] = {}
     commanders: list[str] = []
     section = "main"
     for number, raw in enumerate(text.splitlines(), 1):
@@ -73,6 +79,12 @@ def parse_deck_list(text: str, game_format: str) -> dict[str, object]:
             target = section
         if target == "skip":
             continue
+        choice = None
+        if chosen := CHOICE.search(line):
+            letters = sorted(set(chosen["choice"].upper()), key=COLOUR_ORDER.find)
+            if len(letters) != 2:
+                raise invalid(number, "a choice is two different colours, as in <WU>.")
+            choice, line = "".join(letters), line[: chosen.start()].strip()
         match = LINE.match(line)
         if match is None:
             raise invalid(number, "expected a count and a card name.")
@@ -87,8 +99,10 @@ def parse_deck_list(text: str, game_format: str) -> dict[str, object]:
             continue
         if not 1 <= count <= MAX_COUNT:
             raise invalid(number, f"a count is from 1 to {MAX_COUNT}.")
-        key = name.casefold()
+        key = name.casefold() + (f"<{choice}>" if choice else "")
         spelled.setdefault(key, name)
+        if choice:
+            choices[key] = choice
         counts[key] = counts.get(key, 0) + count
         if counts[key] > MAX_COUNT:
             raise invalid(number, f"at most {MAX_COUNT} copies of one card.")
@@ -109,7 +123,14 @@ def parse_deck_list(text: str, game_format: str) -> dict[str, object]:
     if game_format != "commander" and commanders:
         raise ApiError(422, "invalid_deck_list", "Only Commander deck lists have a commander.")
     deck: dict[str, object] = {
-        "cards": [{"name": spelled[key], "count": count} for key, count in counts.items()]
+        "cards": [
+            {
+                "name": spelled[key],
+                "count": count,
+                **({"choice": choices[key]} if key in choices else {}),
+            }
+            for key, count in counts.items()
+        ]
     }
     if commanders:
         deck["commanders"] = commanders

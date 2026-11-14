@@ -779,9 +779,110 @@ GRANT_QUERIES = {
     "WHERE grantor_id = :u ORDER BY resource_kind",
 }
 
+
+def claim_a_staple(engine: Engine, player: UUID, friend: UUID) -> None:
+    """v0.9.12's entitlements (migration 0047): the player claimed a starter staple, and SysOp's
+    functional access to another card was ended."""
+    with engine.connect() as connection:
+        cards = [
+            UUID(str(found)) if not isinstance(found, UUID) else found
+            for found in connection.execute(
+                text("SELECT id FROM card_concepts ORDER BY name LIMIT 2")
+            ).scalars()
+        ]
+    account = Account(engine)
+    for kind, card, revoked in (("staple", cards[0], None), ("staff", cards[1], T0)):
+        account.add(
+            "entitlements",
+            id=uuid4(),
+            user_id=player,
+            kind=kind,
+            card_id=card,
+            copies=1,
+            key=f"{kind}:{player}:{card}",
+            policy="staples-v1",
+            reason=None if kind == "staple" else "testing",
+            actor_id=None if kind == "staple" else friend,
+            created_at=T0,
+            revoked_at=revoked,
+            revoked_by=friend if revoked else None,
+        )
+    account.write(engine)
+
+
+ENTITLEMENT_QUERIES = {
+    "entitlements": "SELECT kind, copies, key, revoked_at IS NOT NULL FROM entitlements "
+    "WHERE user_id = :u ORDER BY kind",
+}
+
+
+def wish_for_a_card(engine: Engine, player: UUID, friend: UUID) -> None:
+    """v0.9.12's deck workshop (migration 0048): the player wished for a card, for one of their
+    decks, and filed that deck in a folder under two tags."""
+    key = player if engine.dialect.name == "postgresql" else player.hex
+    with engine.begin() as connection:
+        card = connection.execute(text("SELECT id FROM card_concepts ORDER BY name")).scalar()
+        deck = connection.execute(
+            text("SELECT id FROM decks WHERE owner_id = :u ORDER BY title"), {"u": key}
+        ).scalar()
+        connection.execute(
+            text("UPDATE decks SET folder = 'Tournament', tags = :tags WHERE id = :d"),
+            {"d": deck, "tags": '["aggro", "tested"]'},
+        )
+
+    def as_uuid(found: object) -> UUID:
+        return found if isinstance(found, UUID) else UUID(str(found))
+
+    account = Account(engine)
+    account.add(
+        "wishlist_entries",
+        id=uuid4(),
+        user_id=player,
+        card_id=as_uuid(card),
+        quantity=2,
+        deck_id=as_uuid(deck),
+        created_at=T0,
+        updated_at=T0,
+    )
+    account.write(engine)
+
+
+WISH_QUERIES = {
+    "wishes": "SELECT quantity, deck_id IS NOT NULL FROM wishlist_entries WHERE user_id = :u",
+    "shelves": "SELECT title, folder FROM decks WHERE owner_id = :u AND folder IS NOT NULL",
+}
+
+
+def save_a_table(engine: Engine, player: UUID, friend: UUID) -> None:
+    """v0.9.12's Rule Zero profiles (migration 0049): the player saved a table to open again."""
+    account = Account(engine)
+    account.add(
+        "table_presets",
+        id=uuid4(),
+        user_id=player,
+        name="Friday night",
+        preset={
+            "profile": {"version": 1, "intent": "upgraded", "enforced": {"game_changers": 3}},
+            "settings": {"format": "commander", "seats": 4},
+        },
+        created_at=T0,
+        updated_at=T0,
+    )
+    account.write(engine)
+
+
+PRESET_QUERIES = {
+    "saved tables": "SELECT name FROM table_presets WHERE user_id = :u ORDER BY name",
+}
+
 # The migrations after v0.9.9's that add something an account keeps: each one's rows are written
 # at its own revision, and its totals compared from there on.
-LATER = [("0046_access_grants", lend_a_deck, GRANT_QUERIES)]
+LATER = [
+    ("0046_access_grants", lend_a_deck, GRANT_QUERIES),
+    ("0047_economy_foundations", claim_a_staple, ENTITLEMENT_QUERIES),
+    ("0048_deck_workshop", wish_for_a_card, WISH_QUERIES),
+    ("0049_table_profiles", save_a_table, PRESET_QUERIES),
+]
 
 
 def tables_referring_to_accounts(engine: Engine) -> set[str]:

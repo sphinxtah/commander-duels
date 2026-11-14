@@ -69,7 +69,13 @@ from api.identity import (
     settings_of,
     utcnow,
 )
-from api.library import ONE_OF_A_KIND, library_of, sellable_copies, since_reset
+from api.library import (
+    FUNCTIONAL_SOURCES,
+    ONE_OF_A_KIND,
+    library_of,
+    sellable_copies,
+    since_reset,
+)
 from api.models import (
     Auction,
     AuctionBid,
@@ -818,6 +824,12 @@ def listable(
         if edition is not None and edition.copies > 0 and "alliance" in edition.sources:
             raise not_sellable(
                 f"{concept.name} is your alliance's: an alliance's cards cannot be sold."
+            )
+        if edition is not None and edition.copies > 0 and edition.sources & FUNCTIONAL_SOURCES:
+            # Functional access (v0.9.12): built with, never owned.
+            raise not_sellable(
+                f"You build with {concept.name} without owning this copy: only a copy granted "
+                "to you can be listed."
             )
     raise ApiError(
         409,

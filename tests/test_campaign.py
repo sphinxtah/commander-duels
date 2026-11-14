@@ -858,3 +858,30 @@ def test_apex_unbound_is_the_finale_again_for_its_badge_alone(
     if profile.status_code == 200:
         assert profile.json()["badges"] == ["Apex Unbound"]
     assert ada.get(f"/api/v1/players/{ada.id}").json()["badges"] == ["Apex Unbound"]
+
+
+def test_no_opponent_plays_a_power_nine_or_reserved_list_card() -> None:
+    """The owner, 2026-11-13 (v0.9.12): a warden's deck is won whole and for good, so no deck a
+    campaign opponent plays holds one of the Power Nine or a card of the Reserved List
+    (content/reserved-list.json, scripts/reserved_list.py). That is every ward's deck, with the
+    commanders it may be led by, and the two decks the court's Generals play and give."""
+    listed = json.loads((CONTENT.parent / "reserved-list.json").read_text(encoding="utf-8"))
+    power_nine, reserved = set(listed["power_nine"]), set(listed["cards"])
+    assert len(power_nine) == 9 and power_nine <= reserved
+    assert {"Underground Sea", "Tundra", "Bayou", "Grim Monolith", "Gaea's Cradle"} <= reserved
+    # What the rule leaves: strong cards that are not reserved (the owner: "I still want the
+    # higher level wards to produce some awesome rares").
+    assert not {"Mana Crypt", "Mana Drain", "Force of Will", "Demonic Tutor"} & reserved
+    content = json.loads(CONTENT.read_text(encoding="utf-8"))
+    decks: list[tuple[str, dict[str, Any]]] = []
+    for encounter in content["encounters"]:
+        decks.append((f"ward {encounter['number']}", encounter))
+        for general in (encounter.get("court") or {}).get("generals", []):
+            decks.append((general["deck_title"], general))
+    assert len(decks) == 17
+    held = {}
+    for label, deck in decks:
+        names = {card["name"] for card in deck.get("cards", [])}
+        names |= {deck[key] for key in ("commander", "fallback_commander") if deck.get(key)}
+        held[label] = sorted(names & reserved)
+    assert not any(held.values()), {label: names for label, names in held.items() if names}

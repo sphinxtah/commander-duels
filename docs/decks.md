@@ -121,6 +121,32 @@ An account at the Godlike tier (100,000 wins, SysOp included) may put the owner'
 - **Games.** A deck holding one starts a game only where the running engine has loaded every such card; the API asks the engine at each start and otherwise refuses (`422 custom_not_loaded`). Bots never play them (`422 custom_cards_for_bots`).
 - **Nobody else sees them.** A shared deck shows, exports and copies without them, whoever looks.
 
+## The deck workshop's foundations (v0.9.12)
+
+The owner's specification asks the Preparation Framework for what v1.0.0's deck workshop stands on (section 12). v0.9.12 built it as services with their contracts (`api/workshop.py`), and no page of their own yet: the pages are v1.0.0's.
+
+- **Folders and tags.** A deck is kept in one folder, by its name, and under up to twelve tags (`decks.folder`, `decks.tags`, migration 0048). `PATCH /decks/{id}` sets them (a folder sent empty or null takes the deck out of its folder; left out, it stays), `GET /decks?folder=&tag=` filters the list (an empty folder name is the decks in none), `GET /decks/shelves` counts both, and `POST /decks/organize` moves several decks at once and adds or removes tags on all of them: every deck named must be the account's, or nothing changes. A tag is kept once, case aside.
+- **Two versions compared.** `GET /decks/{id}/diff?before=&after=`: each side a version's number or `draft` (the default for `after`). It answers the cards and places whose copies differ, with how many were added and removed. Another edition of the same card is no difference.
+- **A version restored.** `POST /decks/{id}/revisions/{n}/restore` with the draft's `version` copies the version into the draft, saved like any draft (the editions the library holds, the cards the game still plays). **It changes no version**: a revision is immutable (PostgreSQL refuses its update), the games that played it name it still, and the draft takes a new version number of its own. A draft that changed since `version` refuses, as an autosave does (409 `draft_conflict`).
+- **Performance.** `GET /decks/{id}/performance`: the deck's record in all, and by the version played, from the results the games recorded (`player_results`, by the revision its seat was bound to when the game started). Every record carries its sample (`games`) and says when it is under ten (`small_sample`), and each is told apart by format, mode ([game modes](modes.md)), opposition (bots, players, or both) and the bots' skill. A result granted for testing names no game and so no deck: it is in none of them. A game with no result is not counted.
+- **The wishlist.** `GET /me/wishlist`, `PUT /me/wishlist/{card}` (`quantity`, and the deck it is for), `DELETE /me/wishlist/{card}`: the cards an account wants, one wish a card (`wishlist_entries`). A wish for a deck outlives the deck, for no deck; an account's deletion takes its wishes.
+- **What a deck lacks.** `GET /decks/{id}/missing`: the cards of the draft its owner's library holds too few of, each with how many are missing, how many are wished for, how many auctions are open for it (the account's own apart), and the shop's packs whose set printed it. A named card is not sold: these are where it might be had ([the economy](economy.md#what-the-owner-decided-at-the-start-2026-11-13)).
+- **Substitutions.** `GET /decks/{id}/substitutions?card_id=`: the cards the library holds that could take a card's place, each with a score and why. Every one is a card the engine plays as written (no stand-in), legal in the deck's format and not banned in it, within the deck's commanders' colour identity, a land for a land and a spell for a spell, with a copy the deck does not already use. They are ranked by what they share with the card: the Tagger tags that say what it does (60 of 100; tags about a card's name, history or cycle are left out), its type (25) and its mana value (15). A card that scores under 40 is not offered, and the answer says so when there is none.
+
+**Checked by** `tests/test_workshop.py`: folders, tags and the all-or-nothing batch; a diff's lines; a restore that leaves a played version's rows as they were; a record that matches the games played, version by version and split by split; the wishlist through a deck's deletion; the substitutions' rules one by one. `tests/test_account_data.py` writes a wish and a folder at migration 0048 and compares them at the head.
+
+### Cryptic Spires: a choice kept with each copy (v0.9.12)
+
+"As you create your deck, circle two of the colors below. This land enters tapped. {T}: Add one mana of either of the circled colors." Until v0.9.12 it played as a stand-in: XMage had no implementation, because the choice is made before any game and a deck list had nowhere to keep it.
+
+- **A deck entry has a `choice`**: two different letters of WUBRG, written in that order. It is kept in the draft, in a version's entries (`deck_entries.choice`), in a match's sideboard plans, and in the deck list a game sends the engine (`{"name", "count", "choice"}`). Copies with different colours circled are entries of their own.
+- **Only Cryptic Spires takes one** (`api/validation.py` `CHOICE_CARDS`). A copy outside the maybeboard with none keeps the deck from playing (`choice.missing`: "Cryptic Spires needs its two colours"); a choice on any other card is dropped as the draft is saved.
+- **A deck with no choice is written as before.** An entry's `choice` is kept only where one was made, so a deck's content hash is what it was, and an unchanged draft still makes no new version.
+- **The editor** shows "Circle two colours" in the card's dialog: five toggles, of which two stay pressed, and the row says the colours or "choose two colours".
+- **Import and export** write it at a line's end, `1 Cryptic Spires (2X2) 332 <WU>`, and as `"choice"` in a deck file; a typed deck list takes the same.
+- **The engine** has the card (XMage patch `0021-cryptic-spires.patch`): a land that enters tapped, with one mana ability for each circled colour, given as the deck is loaded (`DeckLists.circle`). A copy of it keeps them. The engine plays its own card even where a list still describes it as a stand-in, so the catalog may call it one until it has read the new engine's cards. `CrypticSpiresTest` plays it: the land enters tapped, pays for a green spell with red and green circled, and never with white and blue.
+- **Its colour identity is none**, as Scryfall has it and its rulings say ("They do not make Cryptic Spires those colors"): any Commander deck may hold it and circle any two colours.
+
 ## Routes
 
 All under `/api/v1`, for the signed-in owner only; another account's deck answers 404, as a deck in the trash does except for restoring it.
@@ -141,3 +167,7 @@ All under `/api/v1`, for the signed-in owner only; another account's deck answer
 | `GET /decks/{id}/export?kind=text\|json` | Export |
 | `POST /decks/import/preview`, `POST /decks/validate`, `POST /decks/guided` | Preview an import, validate a list, propose a guided deck |
 | `GET /shared-decks/{code}`, `/export`, `POST /shared-decks/{code}/copy` | A shared deck |
+| `GET /decks/shelves`, `POST /decks/organize` | v0.9.12: the account's folders and tags; several decks filed at once |
+| `GET /decks/{id}/diff?before=&after=`, `POST /decks/{id}/revisions/{n}/restore` | v0.9.12: two versions compared; a version restored into the draft |
+| `GET /decks/{id}/performance`, `/missing`, `/substitutions?card_id=` | v0.9.12: the deck's record by version; what its library lacks; owned cards that could take a card's place |
+| `GET /me/wishlist`, `PUT`/`DELETE /me/wishlist/{card}` | v0.9.12: the cards an account wants |

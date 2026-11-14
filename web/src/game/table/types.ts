@@ -391,6 +391,9 @@ export interface TableLayout {
 export interface LayoutOptions {
   expandedSeat: Seat | null;
   textScale: 1 | 1.25;
+  /** The most members of a pile drawn fanned (v0.9.12): PILE_CAP when left out; 1 with reduced
+   * clutter, where a pile is one card and its count. Every member stays in reach behind "+N". */
+  pileCap?: number;
 }
 export type LayoutTable = (
   model: TableModel,
@@ -663,6 +666,9 @@ export interface TableSettings {
   effects: EffectsLevel; // the special effects layer (v0.7.0)
   musicVolume: number; // 0–100, the gameplay music (v0.7.2)
   musicMuted: boolean; // the music alone; the sound effects go on
+  /** Reduced clutter (v0.9.12): a pile of like lands or tokens is drawn as one card with its
+   * count instead of a fan. Nothing is hidden: the count opens every member. */
+  reducedClutter: boolean;
 }
 export const TABLE_SETTINGS_KEY = "cd.table.v1";
 export const DEFAULT_TABLE_SETTINGS: TableSettings = {
@@ -675,6 +681,7 @@ export const DEFAULT_TABLE_SETTINGS: TableSettings = {
   effects: "full",
   musicVolume: 50,
   musicMuted: false,
+  reducedClutter: false,
 };
 
 /* ---------- app services used by the game screen ---------- */

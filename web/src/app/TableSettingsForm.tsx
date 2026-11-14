@@ -84,6 +84,35 @@ export function EffectsField({ compact = false }: { compact?: boolean }) {
   );
 }
 
+/** Settings › Display & accessibility: reduced clutter (v0.9.12). A pile of like lands or tokens
+ * is one card with its count; nothing is hidden, and every member stays in reach. */
+export function ReducedClutterField({
+  compact = false,
+}: {
+  compact?: boolean;
+}) {
+  const [settings, update] = useTableSettings();
+  const id = useId();
+  return (
+    <Row
+      id={id}
+      name="Reduced clutter"
+      description={
+        compact
+          ? undefined
+          : "Draws a group of identical lands or tokens as one card with its count, instead of a fan. The count opens every one of them."
+      }
+    >
+      <input
+        type="checkbox"
+        {...named(id, !compact)}
+        checked={settings.reducedClutter}
+        onChange={(event) => update({ reducedClutter: event.target.checked })}
+      />
+    </Row>
+  );
+}
+
 /** Settings › Display & accessibility: how fast the table moves (Reduce motion stops it). */
 export function AnimationSpeedField({
   compact = false,
@@ -203,6 +232,7 @@ export function TableSettingsForm({ compact = false }: { compact?: boolean }) {
         {/* The Settings page shows this under Display & accessibility, beside the animation
             speed; the game's drawer has only this form, so it goes here. */}
         {compact && <EffectsField compact />}
+        {compact && <ReducedClutterField compact />}
       </section>
       <section className={styles.panel} aria-labelledby={`${id}-sound`}>
         <Heading id={`${id}-sound`}>Sound</Heading>

@@ -56,6 +56,10 @@ export function sanitizeTableSettings(value: unknown): TableSettings {
     musicVolume: music === null ? d.musicVolume : percent(music),
     musicMuted:
       typeof record.musicMuted === "boolean" ? record.musicMuted : d.musicMuted,
+    reducedClutter:
+      typeof record.reducedClutter === "boolean"
+        ? record.reducedClutter
+        : d.reducedClutter,
   };
 }
 
