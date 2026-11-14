@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { GameContext, type GameContextValue } from "../Board";
 import {
@@ -109,6 +115,40 @@ describe("zone browsers", () => {
     expect(game.choose).toHaveBeenCalledWith(
       expect.objectContaining({ id: "80" }),
     );
+  });
+
+  it("list what a card shows of a library, and nothing else of it (v0.9.14)", () => {
+    const f = tableFixture("revealed");
+    const group = f.snapshot.view!.looked_at[0];
+    group.library_seat = 0;
+    f.snapshot.prompt!.options.push({
+      id: "82",
+      action: "cast",
+      label: null,
+      object_id: group.cards[0].id,
+      seat: null,
+      selected: false,
+    });
+    const target: ZoneBrowserTarget = { kind: "library", seat: 0 };
+    const { model, game } = browse(f, target);
+    expect(zoneTitle(target, model)).toBe("Your library");
+    expect(
+      screen.getByText(
+        `2 cards shown, of ${f.snapshot.view!.you!.library_count}`,
+      ),
+    ).toBeInTheDocument();
+    const cards = within(
+      screen.getByRole("group", { name: "Your library" }),
+    ).getAllByRole("button");
+    expect(cards).toHaveLength(2);
+    // The card the prompt offers to cast answers here as it would on the table.
+    fireEvent.click(cards[0]);
+    expect(game.choose).toHaveBeenCalled();
+    // A library no card shows anything of says so.
+    cleanup();
+    browse("duel", { kind: "library", seat: 1 });
+    expect(screen.getByText("Nothing is shown now")).toBeInTheDocument();
+    expect(screen.getByText(/^0 cards shown, of \d+$/)).toBeInTheDocument();
   });
 
   it("say so when the zone is empty", () => {

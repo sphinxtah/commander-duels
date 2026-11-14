@@ -157,6 +157,10 @@ export interface CombatGroup {
 export interface CardGroup {
   name: string;
   cards: CardView[];
+  /** The seat whose library holds every card of the group now (v0.9.14): the top of a library a
+   * card shows (Bolas's Citadel, Future Sight). The table opens such a group from the library
+   * itself. Absent or null for any other group. */
+  library_seat?: Seat | null;
 }
 
 export interface CommanderView {

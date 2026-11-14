@@ -1537,6 +1537,42 @@ function revealed(): TableFixture {
   });
 }
 
+/** The top of your library while a card shows it and lets you cast it (v0.9.14): Bolas's Citadel
+ * on your battlefield. The library's pile is a button that lists the card; the prompt column
+ * does not. */
+function libraryTop(): TableFixture {
+  const o = new Objects("lt");
+  const hand = [o.card(CARDS.island), o.card(CARDS.counterspell)];
+  const top = o.card(CARDS.serraAngel);
+  return fixture({
+    name: "library-top",
+    description:
+      "Your library's top card, shown by a card that lets you look at it any time and cast it: the library is a button, and the card may be cast from its browser.",
+    format: "legacy",
+    seats: [alice(), bot(1)],
+    view: view({
+      turn: 7,
+      active_seat: 0,
+      priority_seat: 0,
+      you: player(0, "Alice", { hand_count: hand.length, life: 14 }),
+      opponents: [player(1, "Bot 2", { hand_count: 3 })],
+      hand,
+      battlefield: [
+        ...o.many(4, 0, CARDS.swamp),
+        o.permanent(0, CARDS.grizzlyBears),
+        ...o.many(3, 1, CARDS.island),
+      ],
+      looked_at: [
+        { name: "Top of your library", cards: [top], library_seat: 0 },
+      ],
+    }),
+    prompt: prompt("p-library-top", "priority", "Play spells and abilities", [
+      () => option("cast", { object_id: top.id }),
+      () => option("pass"),
+    ]),
+  });
+}
+
 function starting(): TableFixture {
   return fixture({
     name: "starting",
@@ -2337,6 +2373,7 @@ export type FixtureName =
   | "hand25"
   | "blockers"
   | "revealed"
+  | "library-top"
   | "stress"
   | "starting"
   | "giant"
@@ -2364,6 +2401,7 @@ const makers: Record<FixtureName, () => TableFixture> = {
   hand25,
   blockers,
   revealed,
+  "library-top": libraryTop,
   stress,
   starting,
 };

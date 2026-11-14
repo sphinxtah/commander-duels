@@ -3,6 +3,9 @@ package com.commanderduels;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
+import mage.abilities.Ability;
+import mage.abilities.effects.ContinuousEffect;
+import mage.abilities.effects.common.continuous.LookAtTopCardOfLibraryAnyTimeEffect;
 import mage.cards.Card;
 import mage.cards.Cards;
 import mage.constants.AsThoughEffectType;
@@ -133,12 +136,49 @@ final class Visibility {
                     || revealedTo(game, objectId, viewerId));
             }
             case LIBRARY:
+                // A card revealed from a library, or its top card while a card shows it (v0.9.14).
+                return revealedTo(game, objectId, viewerId) || libraryTopShown(game, objectId, viewerId);
             case OUTSIDE:
-                // A card revealed from a library (its top card, say) or from outside the game.
+                // A card revealed from outside the game.
                 return revealedTo(game, objectId, viewerId);
             default:
                 return false;
         }
+    }
+
+    /**
+     * Whether the card is the top of a library that a card in force shows to the viewer (v0.9.14):
+     * to everyone while its owner plays with the top card revealed (Future Sight), to its owner,
+     * and the seat controlling its owner's turn, while the owner may look at it any time (Bolas's
+     * Citadel). XMage lists such a card only for the moment it tells its client; this holds for as
+     * long as the card does.
+     */
+    static boolean libraryTopShown(Game game, UUID cardId, UUID viewerId) {
+        Card card = game.getCard(cardId);
+        Player owner = card == null ? null : game.getPlayer(card.getOwnerId());
+        if (owner == null || !owner.isInGame()) {
+            return false;
+        }
+        Card top = owner.getLibrary().getFromTop(game);
+        if (top == null || !top.getId().equals(cardId)) {
+            return false;
+        }
+        return owner.isTopCardRevealed()
+            || viewerId != null && seesFor(game, viewerId).contains(owner.getId()) && looksAtTop(game, owner.getId());
+    }
+
+    /** Whether an effect in force lets the player look at the top card of their library any time. */
+    static boolean looksAtTop(Game game, UUID playerId) {
+        for (ContinuousEffect effect : game.getContinuousEffects().getLayeredEffects(game)) {
+            if (effect instanceof LookAtTopCardOfLibraryAnyTimeEffect look && look.canLookAtNextTopLibraryCard(game)) {
+                for (Ability ability : game.getContinuousEffects().getLayeredEffectAbilities(effect)) {
+                    if (playerId.equals(ability.getControllerId())) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /**

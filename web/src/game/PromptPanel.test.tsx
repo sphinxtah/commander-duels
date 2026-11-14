@@ -14,6 +14,7 @@ import type {
   PromptOption,
   Snapshot,
 } from "./types";
+import { tableFixture } from "./table/fixtures";
 
 vi.mock("../api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api")>()),
@@ -737,5 +738,72 @@ describe("Two-Headed Giant's team decisions (rules 805.5 to 805.7, v0.6.1)", () 
   it("adds nothing to prompts outside team games", () => {
     render(<Panel game={state(snapshot(5, priority("p")))} />);
     expect(document.querySelector("[data-team-note]")).toBeNull();
+  });
+});
+
+describe("the top of a library a card shows (v0.9.14)", () => {
+  const listed = () =>
+    screen.queryByRole("heading", {
+      name: "Looking at: Top of your library",
+    }) !== null;
+
+  function shown(change: (snap: Snapshot) => void): boolean {
+    const snap = tableFixture("revealed").snapshot;
+    change(snap);
+    const view = render(<Panel game={state(snap)} />);
+    const found = listed();
+    // What is revealed from elsewhere stays in the column whatever the library does.
+    expect(
+      screen.getByRole("heading", { name: "Revealed: Bot 2's hand" }),
+    ).toBeInTheDocument();
+    view.unmount();
+    return found;
+  }
+
+  it("is listed by the library on the table, not in the prompt column", () => {
+    // A group the view does not place in a library is listed, as before.
+    expect(shown(() => {})).toBe(true);
+    // The library's own: the pile on the table lists it.
+    expect(
+      shown((snap) => {
+        snap.view!.looked_at[0].library_seat = 0;
+      }),
+    ).toBe(false);
+    // At priority it stays with the library even when one of its cards may be cast.
+    expect(
+      shown((snap) => {
+        const group = snap.view!.looked_at[0];
+        group.library_seat = 0;
+        snap.prompt = {
+          ...snap.prompt!,
+          kind: "priority",
+          options: [
+            {
+              id: "90",
+              action: "cast",
+              label: null,
+              object_id: group.cards[0].id,
+              seat: null,
+              selected: false,
+            },
+          ],
+        };
+      }),
+    ).toBe(false);
+    // A choice asked of its cards is shown in the column too, so that it cannot be missed.
+    expect(
+      shown((snap) => {
+        const group = snap.view!.looked_at[0];
+        group.library_seat = 0;
+        snap.prompt!.options.push({
+          id: "91",
+          action: "choose",
+          label: null,
+          object_id: group.cards[0].id,
+          seat: null,
+          selected: false,
+        });
+      }),
+    ).toBe(true);
   });
 });

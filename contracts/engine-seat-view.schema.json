@@ -484,8 +484,15 @@
     "cardGroup": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "cards"],
-      "properties": {"name": {"type": "string"}, "cards": {"type": "array", "items": {"$ref": "#/$defs/card"}}}
+      "required": ["name", "cards", "library_seat"],
+      "properties": {
+        "name": {"type": "string"},
+        "cards": {"type": "array", "items": {"$ref": "#/$defs/card"}},
+        "library_seat": {
+          "description": "The seat whose library holds every card of the group now (v0.9.14): the top of a library a card shows. Null for any other group.",
+          "$ref": "#/$defs/nullableSeat"
+        }
+      }
     },
     "result": {
       "type": "object",

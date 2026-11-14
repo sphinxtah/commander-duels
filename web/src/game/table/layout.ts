@@ -1068,10 +1068,14 @@ export const layoutTable: LayoutTable = (model, options) => {
         seat,
         zone: "library",
         card: g.library.pile,
-        hit: null,
+        // A library a card shows some of (v0.9.14) is a button that lists what it shows.
+        hit: player.library.length > 0 ? g.library.pile : null,
         pedestal: { top: g.library.top, front: g.library.front },
-        label: `Library ${player.player.library_count}`,
-        topKey: null,
+        label:
+          player.library.length > 0
+            ? `Library ${player.player.library_count}, ${player.library.length} shown`
+            : `Library ${player.player.library_count}`,
+        topKey: player.library[0] ?? null,
         count: player.player.library_count,
       },
     );

@@ -399,13 +399,16 @@ export const buildTableModel: BuildTableModel = (input) => {
   // but they are buttons there and the magnifier shows them, so they are cards here too. A card
   // you reveal from your hand is both `hand:<id>` and `revealed:<id>`. The view says nothing of
   // whose they are, so, as in `objectIndex`, they belong to no seat.
+  // A group whose cards are all in one library (v0.9.14) is that library's: its player's pile
+  // lists them, and the prompt column does not.
+  const librarySeen = new Map<Seat, string[]>();
   for (const [zone, groups] of [
     ["revealed", view.revealed],
     ["looked_at", view.looked_at],
   ] as const)
     for (const group of groups)
-      for (const card of group.cards)
-        addCard(
+      for (const card of group.cards) {
+        const key = addCard(
           zone,
           card,
           { id: card.id, zone, seat: null, card },
@@ -413,6 +416,13 @@ export const buildTableModel: BuildTableModel = (input) => {
           null,
           offeredFor(card.id),
         );
+        const seat = group.library_seat;
+        if (seat !== null && seat !== undefined) {
+          const seen = librarySeen.get(seat) ?? [];
+          if (!seen.includes(key)) seen.push(key);
+          librarySeen.set(seat, seen);
+        }
+      }
 
   const combatIds = new Set<ObjectId>();
   for (const group of view.combat) {
@@ -608,6 +618,7 @@ export const buildTableModel: BuildTableModel = (input) => {
       graveyard: zones.graveyard,
       exile: zones.exile,
       command: zones.command,
+      library: librarySeen.get(seat) ?? [],
       commanders: player.commanders.map((commander) => ({
         name: commander.name,
         zone: commander.zone,

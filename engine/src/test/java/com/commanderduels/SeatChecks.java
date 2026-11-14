@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -735,6 +736,23 @@ class SeatChecks implements HumanGame.Hooks {
         for (UUID player : viewersFor(game, viewer)) {
             for (Cards cards : game.getState().getLookedAt(player).values()) {
                 hidden.removeAll(cards);
+            }
+        }
+        // The top of a library while a card shows it (v0.9.14), read here from the cards' own words
+        // and XMage's flag, apart from the engine's reading of XMage's effects: revealed to all
+        // while its owner plays with it revealed, and its owner's (and the seat's that controls
+        // them) while a permanent of theirs says they may look at it any time.
+        for (Player player : game.getPlayers().values()) {
+            Card top = player.getLibrary().getFromTop(game);
+            if (top == null) {
+                continue;
+            }
+            boolean looks = viewersFor(game, viewer).contains(player.getId())
+                && game.getBattlefield().getAllActivePermanents(player.getId()).stream().anyMatch(permanent ->
+                    permanent.getRules(game).stream().anyMatch(rule -> rule.toLowerCase(Locale.ROOT)
+                        .contains("look at the top card of your library any time")));
+            if (player.isTopCardRevealed() || looks) {
+                hidden.remove(top.getId());
             }
         }
         return hidden;

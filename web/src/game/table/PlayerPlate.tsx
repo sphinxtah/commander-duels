@@ -292,7 +292,8 @@ const back = {
 };
 
 /** A zone tile: the graveyard, exile or command zone as a button that opens its browser; the
- * library as a pile on its pedestal, with its count. */
+ * library as a pile on its pedestal, with its count, and since v0.9.14 a button too while a card
+ * shows some of it (its top, to a player who may look at it or plays with it revealed). */
 function Tile({
   tile,
   player,
@@ -312,7 +313,7 @@ function Tile({
       height: r.h,
       "--card-w": `${r.w}px`,
     }) as CSSProperties;
-  if (!tile.hit || tile.zone === "library")
+  if (!tile.hit)
     return painted ? (
       <div className={styles.slot} style={boxStyle(tile.card)} aria-hidden>
         {tile.count > 0 ? (
@@ -325,7 +326,8 @@ function Tile({
         <span className={styles.tileCount}>{tile.count}</span>
       </div>
     ) : null;
-  const zone: ZoneName = tile.zone;
+  const zone: ZoneName | "library" = tile.zone;
+  const library = zone === "library";
   const keys = player[zone];
   const actionable = keys.some(
     (key) => (scene.model?.cards.get(key)?.offered.length ?? 0) > 0,
@@ -344,7 +346,13 @@ function Tile({
         data-hover={tile.key}
         data-actionable={actionable || undefined}
         aria-label={tile.label}
-        onClick={() => onBrowse({ kind: "zone", seat: player.seat, zone })}
+        onClick={() =>
+          onBrowse(
+            zone === "library"
+              ? { kind: "library", seat: player.seat }
+              : { kind: "zone", seat: player.seat, zone },
+          )
+        }
         onFocus={(event) =>
           noteFocus(scene.ui, tile.key, event.currentTarget, {
             hand: false,
@@ -361,7 +369,15 @@ function Tile({
         )}
         {painted &&
           !plate &&
-          (top ? (
+          (library ? (
+            <div
+              className={styles.paint}
+              aria-hidden="true"
+              style={within(tile.card, hit)}
+            >
+              <CardFace card={{ ...back, id: tile.key }} seat={tile.seat} />
+            </div>
+          ) : top ? (
             <div
               className={styles.paint}
               aria-hidden="true"
