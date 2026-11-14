@@ -100,6 +100,75 @@ def print_timeline(args: argparse.Namespace) -> None:
     print("\n".join(lines) if lines else "No events kept for this game.")
 
 
+def write_fixtures(args: argparse.Namespace) -> None:
+    """The development fixtures (v0.9.13, api/fixtures.py), in a database that is not the live
+    site's: the accounts, the finished game with its events, and the access given on it."""
+    from sqlalchemy.orm import Session
+
+    from api import fixtures
+    from api.database import build_engine
+    from api.identity import utcnow
+
+    settings = Settings()
+    fixtures.refuse_production(settings.environment)
+    engine = build_engine(settings.database_url)
+    try:
+        with Session(engine) as db, db.begin():
+            written = fixtures.write(db, utcnow(), sessions=args.sessions, stage=args.rollout)
+    finally:
+        engine.dispose()
+    print(f"Fixture game: {written.game}")
+    for handle, account in written.accounts.items():
+        print(f"{handle}: {account}")
+    for handle, cookie in written.sessions.items():
+        print(f"{handle} is signed in for a day with the cookie {cookie}")
+    if args.rollout is None:
+        print("The access given on the game works once its workflows are staged (rollout).")
+
+
+def stage_rollout(args: argparse.Namespace) -> None:
+    """The unfinished workflows' stages (v0.9.13, api/rollout.py), read or set at the console:
+    the operator's way, where SysOp's is PUT /api/v1/admin/rollout/{workflow}. Audited."""
+    from sqlalchemy.orm import Session
+
+    from api import rollout
+    from api.database import build_engine
+    from api.identity import utcnow
+    from api.models import AuditEvent, SiteSetting
+
+    engine = build_engine(Settings().database_url)
+    try:
+        with Session(engine) as db, db.begin():
+            if args.workflow is not None:
+                if args.workflow not in rollout.WORKFLOWS:
+                    raise SystemExit(f"No such workflow. One of: {', '.join(rollout.WORKFLOWS)}")
+                if args.stage is None:
+                    raise SystemExit("Name the stage: off, staff or on.")
+                before = rollout.stage_of(db, args.workflow)
+                if args.stage != before:
+                    key = rollout.PREFIX + args.workflow
+                    setting = db.get(SiteSetting, key) or SiteSetting(key=key)
+                    setting.value, setting.updated_at = args.stage, utcnow()
+                    db.add(setting)
+                    db.add(
+                        AuditEvent(
+                            occurred_at=utcnow(),
+                            action="rollout.stage_changed",
+                            details={
+                                "workflow": args.workflow,
+                                "from": before,
+                                "to": args.stage,
+                                "by": "console",
+                            },
+                        )
+                    )
+                    db.flush()
+            for workflow in rollout.WORKFLOWS.values():
+                print(f"{workflow.id}: {rollout.stage_of(db, workflow.id)} ({workflow.name})")
+    finally:
+        engine.dispose()
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="python -m api.cli")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -120,9 +189,31 @@ def main(argv: list[str] | None = None) -> None:
     eyes.add_argument(
         "--inspection", action="store_true", help="Everything, with who may see what."
     )
+    made = commands.add_parser(
+        "fixtures",
+        help="Write the development fixtures: accounts, a finished game with events, access. "
+        "Never on the live site.",
+    )
+    made.add_argument(
+        "--sessions", action="store_true", help="Sign each fixture account in; print its cookie."
+    )
+    made.add_argument(
+        "--rollout", choices=["off", "staff", "on"], help="Stage every unfinished workflow."
+    )
+    staged = commands.add_parser(
+        "rollout", help="Print the unfinished workflows' stages, or set one: rollout sandbox staff."
+    )
+    staged.add_argument("workflow", nargs="?", help="The workflow to stage.")
+    staged.add_argument("stage", nargs="?", choices=["off", "staff", "on"], help="Its stage.")
     args = parser.parse_args(argv)
     if args.command == "timeline":
         print_timeline(args)
+        return
+    if args.command == "fixtures":
+        write_fixtures(args)
+        return
+    if args.command == "rollout":
+        stage_rollout(args)
         return
     secret = read_password(args)
     if len(secret) < MIN_LENGTH:

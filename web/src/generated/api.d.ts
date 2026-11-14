@@ -285,6 +285,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Operations
+         * @description The site's operating numbers, for SysOp and administrators: counts, codes and ids.
+         */
+        get: operations["operations_api_v1_admin_operations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/reports": {
         parameters: {
             query?: never;
@@ -357,6 +377,46 @@ export interface paths {
          * @description Sets the report's status; opening a new report in Administration marks it seen.
          */
         post: operations["change_report_status_api_v1_admin_reports__report_id__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/rollout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Rollout
+         * @description Every workflow's stage, for SysOp and administrators.
+         */
+        get: operations["read_rollout_api_v1_admin_rollout_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/rollout/{workflow}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change Stage
+         * @description SysOp sets a workflow's stage; audited. Setting the stage it has changes nothing.
+         */
+        put: operations["change_stage_api_v1_admin_rollout__workflow__put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3360,6 +3420,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/rollout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reach
+         * @description The unfinished workflows and whether the caller may reach each: the page shows the way
+         *     into a workflow only when it may.
+         */
+        get: operations["reach_api_v1_rollout_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sets": {
         parameters: {
             query?: never;
@@ -4434,7 +4515,7 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.9.12
+             * @default 0.9.13
              */
             version: string;
         };
@@ -5268,6 +5349,20 @@ export interface components {
             card_back?: string | null;
             /** Title */
             title?: string | null;
+        };
+        /** Count */
+        Count: {
+            /** Count */
+            count: number;
+            /**
+             * Labels
+             * @description Codes, statuses and workflow names only.
+             */
+            labels: {
+                [key: string]: string;
+            };
+            /** Name */
+            name: string;
         };
         /**
          * CourtAllyDeck
@@ -6516,6 +6611,28 @@ export interface components {
             /** Your Seat */
             your_seat: number | null;
         };
+        /** GamesEnded */
+        GamesEnded: {
+            /** Finished */
+            finished: number;
+            /** Interrupted */
+            interrupted: number;
+        };
+        /** GamesNow */
+        GamesNow: {
+            /**
+             * Active
+             * @description Games recorded as running.
+             */
+            active: number;
+            last_day: components["schemas"]["GamesEnded"];
+            last_week: components["schemas"]["GamesEnded"];
+            /**
+             * Running
+             * @description Games this process is following.
+             */
+            running: number;
+        };
         /** GoogleChallenge */
         GoogleChallenge: {
             /** Client Id */
@@ -6594,7 +6711,7 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.9.12
+             * @default 0.9.13
              */
             version: string;
         };
@@ -6792,6 +6909,20 @@ export interface components {
              * @description The friends invited now, each told in the bell.
              */
             invited: string[];
+        };
+        /** Job */
+        Job: {
+            /**
+             * Due At
+             * Format: date-time
+             */
+            due_at: string;
+            /** Kind */
+            kind: string;
+            /** Result Code */
+            result_code: string | null;
+            /** Status */
+            status: string;
         };
         /**
          * KingsTableChange
@@ -7118,7 +7249,7 @@ export interface components {
              */
             onboarding: "handle" | "starters" | "complete";
             /** Permissions */
-            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.approve" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage" | "economy.grant" | "shop.manage" | "reports.manage" | "players.presence" | "chat.read_all" | "admin.users.reset" | "players.history" | "auctions.manage" | "games.passive_bots")[];
+            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.approve" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage" | "economy.grant" | "shop.manage" | "reports.manage" | "players.presence" | "chat.read_all" | "admin.users.reset" | "players.history" | "auctions.manage" | "games.passive_bots" | "rollout.manage")[];
             preferences: components["schemas"]["Preferences"];
             /** Roles */
             roles: ("player" | "moderator" | "administrator" | "sysop")[];
@@ -7332,6 +7463,47 @@ export interface components {
              */
             opened_at: string;
             product: components["schemas"]["ProductRef"];
+        };
+        /** Operations */
+        Operations: {
+            /**
+             * Access
+             * @description Access given, by its state.
+             */
+            access: {
+                [key: string]: number;
+            };
+            /** Counts */
+            counts: components["schemas"]["Count"][];
+            /**
+             * Engine
+             * @description The engine's processes and recordings as it reports them; none while it does not answer.
+             */
+            engine: {
+                [key: string]: unknown;
+            } | null;
+            games: components["schemas"]["GamesNow"];
+            /**
+             * Jobs
+             * @description The worker's newest job of each kind.
+             */
+            jobs: components["schemas"]["Job"][];
+            /** Migration */
+            migration: string;
+            /**
+             * Now
+             * Format: date-time
+             */
+            now: string;
+            rollout: components["schemas"]["Rollout"];
+            /**
+             * Since
+             * Format: date-time
+             * @description When this process started counting.
+             */
+            since: string;
+            /** Version */
+            version: string;
         };
         /** Opponent */
         Opponent: {
@@ -8504,6 +8676,23 @@ export interface components {
              */
             waiting: number;
         };
+        /** Reach */
+        Reach: {
+            /** Workflows */
+            workflows: components["schemas"]["Reachable"][];
+        };
+        /** Reachable */
+        Reachable: {
+            /**
+             * Available
+             * @description Whether the caller may reach the workflow now.
+             */
+            available: boolean;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+        };
         /**
          * ReaderChat
          * @description A chat SysOp's reader lists: a conversation or a table's game.
@@ -9218,6 +9407,11 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** Rollout */
+        Rollout: {
+            /** Workflows */
+            workflows: components["schemas"]["Staged"][];
+        };
         /** Rule */
         Rule: {
             /** Code */
@@ -9707,6 +9901,35 @@ export interface components {
             opponent: string;
             /** Title */
             title: string;
+        };
+        /** StageChange */
+        StageChange: {
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "off" | "staff" | "on";
+        };
+        /** Staged */
+        Staged: {
+            /** Changed At */
+            changed_at?: string | null;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Section
+             * @description The specification's section the workflow delivers.
+             */
+            section: number;
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "off" | "staff" | "on";
+            /** Stands On */
+            stands_on: string;
         };
         /** StartEncounter */
         StartEncounter: {
@@ -12360,6 +12583,98 @@ export interface operations {
             };
         };
     };
+    operations_api_v1_admin_operations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operations"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     list_reports_api_v1_admin_reports_get: {
         parameters: {
             query?: {
@@ -12666,6 +12981,196 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReportDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    read_rollout_api_v1_admin_rollout_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rollout"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    change_stage_api_v1_admin_rollout__workflow__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflow: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StageChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rollout"];
                 };
             };
             /** @description Bad Request */
@@ -28380,6 +28885,98 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReportReceipt"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    reach_api_v1_rollout_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Reach"];
                 };
             };
             /** @description Bad Request */

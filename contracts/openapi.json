@@ -1626,7 +1626,7 @@
             "type": "integer"
           },
           "version": {
-            "default": "0.9.12",
+            "default": "0.9.13",
             "title": "Version",
             "type": "string"
           }
@@ -3799,6 +3799,34 @@
           }
         },
         "title": "CosmeticsChange",
+        "type": "object"
+      },
+      "Count": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Codes, statuses and workflow names only.",
+            "title": "Labels",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "labels",
+          "count"
+        ],
+        "title": "Count",
         "type": "object"
       },
       "CourtAllyDeck": {
@@ -6711,6 +6739,54 @@
         "title": "GameSummary",
         "type": "object"
       },
+      "GamesEnded": {
+        "additionalProperties": false,
+        "properties": {
+          "finished": {
+            "title": "Finished",
+            "type": "integer"
+          },
+          "interrupted": {
+            "title": "Interrupted",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "finished",
+          "interrupted"
+        ],
+        "title": "GamesEnded",
+        "type": "object"
+      },
+      "GamesNow": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "description": "Games recorded as running.",
+            "title": "Active",
+            "type": "integer"
+          },
+          "last_day": {
+            "$ref": "#/components/schemas/GamesEnded"
+          },
+          "last_week": {
+            "$ref": "#/components/schemas/GamesEnded"
+          },
+          "running": {
+            "description": "Games this process is following.",
+            "title": "Running",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "running",
+          "active",
+          "last_day",
+          "last_week"
+        ],
+        "title": "GamesNow",
+        "type": "object"
+      },
       "GoogleChallenge": {
         "additionalProperties": false,
         "properties": {
@@ -6928,7 +7004,7 @@
             "type": "string"
           },
           "version": {
-            "default": "0.9.12",
+            "default": "0.9.13",
             "title": "Version",
             "type": "string"
           }
@@ -7374,6 +7450,43 @@
           "already"
         ],
         "title": "InvitesSent",
+        "type": "object"
+      },
+      "Job": {
+        "additionalProperties": false,
+        "properties": {
+          "due_at": {
+            "format": "date-time",
+            "title": "Due At",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "result_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Code"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "status",
+          "result_code",
+          "due_at"
+        ],
+        "title": "Job",
         "type": "object"
       },
       "KingsTableChange": {
@@ -8188,7 +8301,8 @@
                 "admin.users.reset",
                 "players.history",
                 "auctions.manage",
-                "games.passive_bots"
+                "games.passive_bots",
+                "rollout.manage"
               ],
               "type": "string"
             },
@@ -8696,6 +8810,86 @@
           "best"
         ],
         "title": "OpeningSummary",
+        "type": "object"
+      },
+      "Operations": {
+        "additionalProperties": false,
+        "properties": {
+          "access": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Access given, by its state.",
+            "title": "Access",
+            "type": "object"
+          },
+          "counts": {
+            "items": {
+              "$ref": "#/components/schemas/Count"
+            },
+            "title": "Counts",
+            "type": "array"
+          },
+          "engine": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The engine's processes and recordings as it reports them; none while it does not answer.",
+            "title": "Engine"
+          },
+          "games": {
+            "$ref": "#/components/schemas/GamesNow"
+          },
+          "jobs": {
+            "description": "The worker's newest job of each kind.",
+            "items": {
+              "$ref": "#/components/schemas/Job"
+            },
+            "title": "Jobs",
+            "type": "array"
+          },
+          "migration": {
+            "title": "Migration",
+            "type": "string"
+          },
+          "now": {
+            "format": "date-time",
+            "title": "Now",
+            "type": "string"
+          },
+          "rollout": {
+            "$ref": "#/components/schemas/Rollout"
+          },
+          "since": {
+            "description": "When this process started counting.",
+            "format": "date-time",
+            "title": "Since",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "migration",
+          "since",
+          "now",
+          "counts",
+          "games",
+          "access",
+          "rollout",
+          "jobs",
+          "engine"
+        ],
+        "title": "Operations",
         "type": "object"
       },
       "Opponent": {
@@ -11576,6 +11770,48 @@
         "title": "QueueStatus",
         "type": "object"
       },
+      "Reach": {
+        "additionalProperties": false,
+        "properties": {
+          "workflows": {
+            "items": {
+              "$ref": "#/components/schemas/Reachable"
+            },
+            "title": "Workflows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "workflows"
+        ],
+        "title": "Reach",
+        "type": "object"
+      },
+      "Reachable": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "description": "Whether the caller may reach the workflow now.",
+            "title": "Available",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "available"
+        ],
+        "title": "Reachable",
+        "type": "object"
+      },
       "ReaderChat": {
         "additionalProperties": false,
         "description": "A chat SysOp's reader lists: a conversation or a table's game.",
@@ -13293,6 +13529,23 @@
         "title": "RevisionSummary",
         "type": "object"
       },
+      "Rollout": {
+        "additionalProperties": false,
+        "properties": {
+          "workflows": {
+            "items": {
+              "$ref": "#/components/schemas/Staged"
+            },
+            "title": "Workflows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "workflows"
+        ],
+        "title": "Rollout",
+        "type": "object"
+      },
       "Rule": {
         "additionalProperties": false,
         "properties": {
@@ -14439,6 +14692,77 @@
           "opponent"
         ],
         "title": "SpoilsDeck",
+        "type": "object"
+      },
+      "StageChange": {
+        "additionalProperties": false,
+        "properties": {
+          "stage": {
+            "enum": [
+              "off",
+              "staff",
+              "on"
+            ],
+            "title": "Stage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stage"
+        ],
+        "title": "StageChange",
+        "type": "object"
+      },
+      "Staged": {
+        "additionalProperties": false,
+        "properties": {
+          "changed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "section": {
+            "description": "The specification's section the workflow delivers.",
+            "title": "Section",
+            "type": "integer"
+          },
+          "stage": {
+            "enum": [
+              "off",
+              "staff",
+              "on"
+            ],
+            "title": "Stage",
+            "type": "string"
+          },
+          "stands_on": {
+            "title": "Stands On",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "section",
+          "stands_on",
+          "stage"
+        ],
+        "title": "Staged",
         "type": "object"
       },
       "StartEncounter": {
@@ -17002,7 +17326,7 @@
   },
   "info": {
     "title": "Commander Duels",
-    "version": "0.9.12"
+    "version": "0.9.13"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -18821,6 +19145,105 @@
         "summary": "Change Economy"
       }
     },
+    "/api/v1/admin/operations": {
+      "get": {
+        "description": "The site's operating numbers, for SysOp and administrators: counts, codes and ids.",
+        "operationId": "operations_api_v1_admin_operations_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operations"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Operations"
+      }
+    },
     "/api/v1/admin/reports": {
       "get": {
         "description": "The reports, newest first: all of them, or those of the statuses named.",
@@ -19311,6 +19734,225 @@
           }
         },
         "summary": "Change Report Status"
+      }
+    },
+    "/api/v1/admin/rollout": {
+      "get": {
+        "description": "Every workflow's stage, for SysOp and administrators.",
+        "operationId": "read_rollout_api_v1_admin_rollout_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rollout"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Read Rollout"
+      }
+    },
+    "/api/v1/admin/rollout/{workflow}": {
+      "put": {
+        "description": "SysOp sets a workflow's stage; audited. Setting the stage it has changes nothing.",
+        "operationId": "change_stage_api_v1_admin_rollout__workflow__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workflow",
+            "required": true,
+            "schema": {
+              "title": "Workflow",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StageChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rollout"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Change Stage"
       }
     },
     "/api/v1/admin/shop": {
@@ -38448,6 +39090,105 @@
           }
         },
         "summary": "Send Report"
+      }
+    },
+    "/api/v1/rollout": {
+      "get": {
+        "description": "The unfinished workflows and whether the caller may reach each: the page shows the way\ninto a workflow only when it may.",
+        "operationId": "reach_api_v1_rollout_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reach"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Reach"
       }
     },
     "/api/v1/sets": {

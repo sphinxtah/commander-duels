@@ -149,6 +149,7 @@ Permission = Literal[
     "players.history",
     "auctions.manage",
     "games.passive_bots",
+    "rollout.manage",
 ]
 Avatar = Literal["sigil", "sun", "moon", "flame", "wave", "leaf", "crown", "tower"]
 AccountStatus = Literal["active", "pending", "denied", "disabled", "deleted"]

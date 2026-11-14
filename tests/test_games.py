@@ -35,7 +35,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from starlette.websockets import WebSocketDisconnect
 
-from api import games
+from api import games, metrics
 from api.config import Settings
 from api.decklists import parse_deck_list
 from api.identity import ApiError, hash_token, utcnow
@@ -1225,12 +1225,17 @@ def test_an_end_the_database_missed_is_recorded_later(
         record_end(*args)
 
     monkeypatch.setattr(games, "record_end", flaky)
+    metrics.COUNTERS.reset()
     ada = Account(client, "ada")
     game_id = ada.post("/api/v1/practice-games", {}).json()["id"]
     closed_now = ada.post(f"/api/v1/games/{game_id}/close").json()
     assert not failures
     assert closed_now["status"] == "finished" and closed_now["result"]["kind"] == "closed"
     assert ada.post("/api/v1/practice-games", {}).status_code == 201
+    # v0.9.13: the wait is counted, and the end it came to.
+    assert metrics.COUNTERS.read("settlement.retried") == 1
+    assert metrics.COUNTERS.read("settlement.recorded", status="finished") == 1
+    assert metrics.COUNTERS.read("settlement.failed") == 0
 
 
 def test_a_create_that_gets_no_answer_is_closed_by_its_id() -> None:
@@ -1269,12 +1274,19 @@ def test_an_end_that_cannot_be_written_interrupts_the_game(
         record_end(database, game_id, status, *args)
 
     monkeypatch.setattr(games, "record_end", broken)
+    metrics.COUNTERS.reset()
     ada = Account(client, "ada")
     game_id = ada.post("/api/v1/practice-games", {}).json()["id"]
     closed_now = ada.post(f"/api/v1/games/{game_id}/close").json()
     assert refused == ["finished"]
     assert closed_now["status"] == "interrupted"
     assert ada.post("/api/v1/practice-games", {}).status_code == 201
+    # v0.9.13: the failure is counted for the operator, and the game says why it paid nothing.
+    assert metrics.COUNTERS.read("settlement.failed", outcome="recorded_interrupted") == 1
+    assert metrics.COUNTERS.read("settlement.recorded") == 0
+    with Session(app.state.database) as db:
+        kept = db.get_one(Game, uuid.UUID(game_id)).eligibility
+    assert kept is not None and kept["withheld"]["tokens"] == "settlement_failed"  # type: ignore[index]
 
 
 def test_closing_a_game_nothing_follows_interrupts_it(

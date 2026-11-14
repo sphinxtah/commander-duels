@@ -1,6 +1,6 @@
 # Game modes and reward eligibility (v0.9.10)
 
-Every game has a **mode**, and one function decides what a game of a mode may earn its players. Before v0.9.10 that decision was spread over six modules (`economy`, `progression`, `quests`, `awards`, `campaign`, `stats`), each reading `games.kind` and its own rules. This is the specification's §10, the foundation the sandbox, borrowed decks and leagues will ask (`api/modes.py`).
+Every game has a **mode**, and one function decides what a game of a mode may earn its players. Before v0.9.10 that decision was spread over six modules (`economy`, `progression`, `quests`, `awards`, `campaign`, `stats`), each reading `games.kind` and its own rules. This is the specification's §10, the foundation the sandbox and borrowed decks will ask (`api/modes.py`).
 
 ## Modes
 
@@ -10,10 +10,8 @@ Every game has a **mode**, and one function decides what a game of a mode may ea
 | `table` | People at a table: a table's game, a queue's, a match's | v0.4.0 |
 | `campaign` | A campaign duel, the Unbound Court, Apex Unbound | v0.8.0 |
 | `testing` | A result SysOp grants for testing; no game is played | v0.8.8 |
-| `sandbox` | Any implemented card, owned or not | v1.0.0 (proposed) |
-| `borrowed` | A seat plays a friend's lent deck | v1.0.0 (proposed) |
-| `league_practice` | A league's pool, outside its standings | v1.0.0 (proposed) |
-| `league` | A league's match, for its standings | v1.0.0 (proposed) |
+| `sandbox` | Any implemented card, owned or not | v1.0.0 (policy approved 2026-11-13) |
+| `borrowed` | A seat plays a friend's lent deck | v1.0.0 (policy approved 2026-11-13) |
 
 `games.mode` is set when the game is made: `practice` or `table` from its kind, and `campaign` when a campaign duel links it (a link always makes it the campaign's). `player_results.mode` is its game's, and `testing` for a granted result. Migration 0045 gave every game and result made before v0.9.10 its mode from what it is; results are append-only in PostgreSQL, so their guard is lifted for that one statement.
 
@@ -27,14 +25,12 @@ Every game has a **mode**, and one function decides what a game of a mode may ea
 | testing | `granted_for_testing` | yes | yes | yes | `granted_for_testing` | `granted_for_testing` |
 | sandbox | `sandbox_cards_not_owned` | `sandbox_cards_not_owned` | `sandbox_cards_not_owned` | `sandbox_cards_not_owned` | `sandbox_cards_not_owned` | `sandbox_cards_not_owned` |
 | borrowed | yes | yes | yes | yes | yes | `not_competitive` |
-| league practice | `league_practice` | `league_practice` | `league_practice` | `league_practice` | yes | `league_practice` |
-| league | `league_rewards_not_approved` | `league_rewards_not_approved` | `league_rewards_not_approved` | `league_rewards_not_approved` | yes | yes |
 
-The words in the table are the reason codes recorded for a reward withheld. A game that ends with no result (interrupted, or closed with no winner) earns nothing whatever its mode (`no_result`), and its players' results are still kept, as "no result", as before. A mode the code does not know earns nothing (`unknown_mode`): a game it cannot classify pays out nothing rather than the wrong thing.
+The words in the table are the reason codes recorded for a reward withheld. A game that ends with no result (interrupted, or closed with no winner) earns nothing whatever its mode (`no_result`), and its players' results are still kept, as "no result", as before. Since v0.9.13 a game recorded interrupted because its end could not be written says `settlement_failed` in place of `no_result`, so the game itself tells a failure of the servers from an interruption ([operations](operations.md#the-counts)). A mode the code does not know earns nothing (`unknown_mode`): a game it cannot classify pays out nothing rather than the wrong thing.
 
 **Nothing changed for the modes that exist.** practice, table, campaign and testing earn exactly what they earned before v0.9.10: a campaign duel's own rewards (spoils, chapter tokens, decks) are still `api/campaign.py`'s, and passive bots still count as any other game (the owner, v0.9.7). `tests/test_modes.py` pins the matrix and settles a game of each kind that exists to show it; the suites of the six modules pass unchanged.
 
-**The modes v1.0.0 will make are proposals**, for the owner to approve before any game is made in them: the sandbox earns nothing, so that unowned cards create no asset; a borrowed deck earns as a table does, since its player plays the game; a league keeps its standings and statistics, and pays nothing until a league reward policy is approved (the specification: "persistent collection rewards require an approved policy").
+**The two modes v1.0.0 will make have their policies**, approved by the owner on 2026-11-13: the sandbox earns nothing, so that unowned cards create no asset; a borrowed deck earns as a table does, since its player plays the game. No game is made in either until its workflow is rolled out (`api/rollout.py` `mode_available`; [the gates](operations.md#the-gates)). **The leagues' two modes are gone** with the leagues (the owner, 2026-11-14): v0.9.10 classified `league_practice` and `league`, no game was ever made in them, and a game named one would earn nothing, as any mode the code does not know.
 
 ## How it is asked, and recorded
 

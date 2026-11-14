@@ -725,6 +725,8 @@ def test_roles_follow_least_privilege_and_players_cannot_administer(
         "custom_cards.manage",
         "admin.roles.administrator",
         "cards.any",
+        # Staging an unfinished workflow is SysOp's alone (v0.9.13, api/rollout.py).
+        "rollout.manage",
     }
     # Since v0.8.8 an administrator builds from a library of its own, as a player does.
     assert "library.unlimited" not in promoted.json()["permissions"]

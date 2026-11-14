@@ -1,18 +1,28 @@
 # Access, consent and temporary entitlement (v0.9.10)
 
-One table of grants for every kind of access one account gives another, for a while: the specification's §8, the foundation v1.0.0's deck lending, spectators, coaching, replay sharing and sandbox, and v0.9.12's playgroups and league pools, are built on (`api/access.py`, `access_grants`, migration 0046).
+One table of grants for every kind of access one account gives another, for a while: the specification's §8, the foundation v1.0.0's deck lending, spectators, coaching, replay sharing and sandbox are built on (`api/access.py`, `access_grants`, migration 0046). Since v0.9.13 each kind of access is behind its workflow's gate ([below](#behind-the-gates-v0913)).
 
 ## A grant
 
 | Field | What it holds |
 | --- | --- |
 | `grantor_id`, `subject_id` | Who gives, and to whom: two accounts |
-| `resource_kind`, `resource_id` | What: `deck` (a deck, to play), `spectator` (a game, to watch), `replay` (a finished game, to replay), `hand` (a seat's hand, to coach), `group`, `pool` (v0.9.12), `sandbox` (cards, for testing; no resource) |
+| `resource_kind`, `resource_id` | What: `deck` (a deck, to play), `spectator` (a game, to watch), `replay` (a finished game, to replay), `hand` (a seat's hand, to coach), `sandbox` (cards, for testing; no resource). The table also takes `group` and `pool`, named in v0.9.10 for the playgroups and leagues the owner dropped on 2026-11-14: nothing writes them |
 | `scope` | What within it: the seat (`{"seat": 0}`) for a replay or a hand |
-| `consent` | `given` (the grantor's own to give: their game, their seat's view); or `offered`, then `accepted` or `declined` by the subject (a deck lent, a group, a pool) |
+| `consent` | `given` (the grantor's own to give: their game, their seat's view); or `offered`, then `accepted` or `declined` by the subject (a deck lent) |
 | `expires_at`, `revoked_at`, `revoked_by` | When it ends, and who ended it |
 
-Who may give what: a deck, its owner; a game to watch, one of its players; a seat's view (a replay, a hand), that seat's player alone; the sandbox's cards, SysOp alone. Never to oneself, never between two accounts one of which blocks the other, never to or from an account that is not active, never ending before it begins. Groups and pools are refused in words (`not_available`) until v0.9.12 makes them. Every change (given, offered, accepted, declined, revoked) is audited (`access.<change>`).
+Who may give what: a deck, its owner; a game to watch, one of its players; a seat's view (a replay, a hand), that seat's player alone; the sandbox's cards, SysOp alone. Never to oneself, never between two accounts one of which blocks the other, never to or from an account that is not active, never ending before it begins. A group and a pool are refused in words (`not_available`), always. Every change (given, offered, accepted, declined, revoked) is audited (`access.<change>`).
+
+## Behind the gates (v0.9.13)
+
+Each kind of access belongs to one of v1.0.0's unfinished workflows, and every workflow is off until SysOp stages it ([the gates](operations.md#the-gates)): a deck to `deck_lending`, a spectator's seat to `spectators`, a seat's hand to `coaching`, a replay to `replays`, the sandbox's cards to `sandbox`.
+
+- **Giving.** `access.offer` refuses (`not_available`) unless the workflow is available to both accounts: at `staff`, between SysOp and administrators alone.
+- **Using.** `access.active` gives nothing to a subject its workflow is not available to, whatever grants stand. Switching a workflow off stops its access at once, as an expiry does; switching it on again gives it back, since the grants were never touched.
+- **Counted.** Each refusal is counted for the operator by its code and the kind of access, never by the account ([the counts](operations.md#the-counts)).
+
+`tests/test_rollout.py` shows each of these; `tests/test_access.py` is access itself, with every gate open.
 
 ## When it works
 
