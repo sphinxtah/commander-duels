@@ -285,7 +285,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/admin/policies": {
+    "/api/v1/admin/operations": {
         parameters: {
             query?: never;
             header?: never;
@@ -293,32 +293,11 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Policies
-         * @description The economy's policies as they stand, with their defaults (v0.9.12).
+         * Operations
+         * @description The site's operating numbers, for SysOp and administrators: counts, codes and ids.
          */
-        get: operations["policies_api_v1_admin_policies_get"];
+        get: operations["operations_api_v1_admin_operations_get"];
         put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/policies/{name}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Change Policy
-         * @description SysOp sets a policy: the owner's approval of an economy change, audited with what it was
-         *     and what it became. A field left out takes its default.
-         */
-        put: operations["change_policy_api_v1_admin_policies__name__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -398,6 +377,46 @@ export interface paths {
          * @description Sets the report's status; opening a new report in Administration marks it seen.
          */
         post: operations["change_report_status_api_v1_admin_reports__report_id__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/rollout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Rollout
+         * @description Every workflow's stage, for SysOp and administrators.
+         */
+        get: operations["read_rollout_api_v1_admin_rollout_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/rollout/{workflow}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change Stage
+         * @description SysOp sets a workflow's stage; audited. Setting the stage it has changes nothing.
+         */
+        put: operations["change_stage_api_v1_admin_rollout__workflow__put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -620,49 +639,6 @@ export interface paths {
          */
         post: operations["delete_user_api_v1_admin_users__user_id__delete_post"];
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/users/{user_id}/entitlements": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Account Entitlements */
-        get: operations["account_entitlements_api_v1_admin_users__user_id__entitlements_get"];
-        put?: never;
-        /**
-         * Give Entitlement
-         * @description SysOp lets an account build with a card it does not own, for testing; audited. It is
-         *     functional access, not a card: SysOp's cards for testing are grants (api/testing.py).
-         */
-        post: operations["give_entitlement_api_v1_admin_users__user_id__entitlements_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/users/{user_id}/entitlements/{entitlement_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * End Entitlement
-         * @description SysOp ends an entitlement; audited. A deck that held the card says so when it is next
-         *     checked, and a game already started plays on with the deck it was given.
-         */
-        delete: operations["end_entitlement_api_v1_admin_users__user_id__entitlements__entitlement_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2912,49 +2888,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/me/staples": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * My Staples
-         * @description The starter-staple pool, the account's picks and what it has claimed (v0.9.12). Not found
-         *     while the starter_staples policy is off.
-         */
-        get: operations["my_staples_api_v1_me_staples_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/me/staples/{card_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Claim Staple
-         * @description Claims a card of the pool with a pick, once: from then on the account builds with one
-         *     copy of it, in its default printing, without owning it. A card already claimed is answered
-         *     as it stands.
-         */
-        post: operations["claim_staple_api_v1_me_staples__card_id__post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/me/starters": {
         parameters: {
             query?: never;
@@ -3481,6 +3414,27 @@ export interface paths {
          * @description Sends a problem report to the site's administrators, with an optional screenshot.
          */
         post: operations["send_report_api_v1_reports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rollout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reach
+         * @description The unfinished workflows and whether the caller may reach each: the page shows the way
+         *     into a workflow only when it may.
+         */
+        get: operations["reach_api_v1_rollout_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4561,7 +4515,7 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.9.12
+             * @default 0.9.13
              */
             version: string;
         };
@@ -5395,6 +5349,20 @@ export interface components {
             card_back?: string | null;
             /** Title */
             title?: string | null;
+        };
+        /** Count */
+        Count: {
+            /** Count */
+            count: number;
+            /**
+             * Labels
+             * @description Codes, statuses and workflow names only.
+             */
+            labels: {
+                [key: string]: string;
+            };
+            /** Name */
+            name: string;
         };
         /**
          * CourtAllyDeck
@@ -6304,47 +6272,6 @@ export interface components {
             status: "unavailable" | "loading" | "ready" | "failed";
             xmage?: components["schemas"]["XmageBuild"] | null;
         };
-        /** EntitlementGrant */
-        EntitlementGrant: {
-            /**
-             * Card Id
-             * Format: uuid
-             */
-            card_id: string;
-            /**
-             * Copies
-             * @default 1
-             */
-            copies: number;
-            /** Reason */
-            reason: string;
-        };
-        /** EntitlementView */
-        EntitlementView: {
-            /**
-             * Card Id
-             * Format: uuid
-             */
-            card_id: string;
-            /** Copies */
-            copies: number;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Kind */
-            kind: string;
-            /** Name */
-            name: string;
-            /** Reason */
-            reason: string | null;
-        };
-        /** Entitlements */
-        Entitlements: {
-            /** Entitlements */
-            entitlements: components["schemas"]["EntitlementView"][];
-        };
         /** EraInfo */
         EraInfo: {
             /**
@@ -6684,6 +6611,28 @@ export interface components {
             /** Your Seat */
             your_seat: number | null;
         };
+        /** GamesEnded */
+        GamesEnded: {
+            /** Finished */
+            finished: number;
+            /** Interrupted */
+            interrupted: number;
+        };
+        /** GamesNow */
+        GamesNow: {
+            /**
+             * Active
+             * @description Games recorded as running.
+             */
+            active: number;
+            last_day: components["schemas"]["GamesEnded"];
+            last_week: components["schemas"]["GamesEnded"];
+            /**
+             * Running
+             * @description Games this process is following.
+             */
+            running: number;
+        };
         /** GoogleChallenge */
         GoogleChallenge: {
             /** Client Id */
@@ -6762,7 +6711,7 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.9.12
+             * @default 0.9.13
              */
             version: string;
         };
@@ -6961,6 +6910,20 @@ export interface components {
              */
             invited: string[];
         };
+        /** Job */
+        Job: {
+            /**
+             * Due At
+             * Format: date-time
+             */
+            due_at: string;
+            /** Kind */
+            kind: string;
+            /** Result Code */
+            result_code: string | null;
+            /** Status */
+            status: string;
+        };
         /**
          * KingsTableChange
          * @description A change to a King's Table table's settings (v0.8.7); a setting left out stays.
@@ -7028,9 +6991,9 @@ export interface components {
             sellable: number;
             /**
              * Sources
-             * @description Where this edition's copies came from; grant: SysOp's (v0.8.8); functional and staple (v0.9.12): built with, not owned (a basic land under the functional_basics policy, a starter staple claimed), so never sellable.
+             * @description Where this edition's copies came from; grant: SysOp's (v0.8.8).
              */
-            sources: ("starter" | "grandfathered" | "alliance" | "pack" | "unique" | "auction" | "campaign" | "grant" | "functional" | "staple")[];
+            sources: ("starter" | "grandfathered" | "alliance" | "pack" | "unique" | "auction" | "campaign" | "grant")[];
         };
         /**
          * LibraryEdition
@@ -7286,7 +7249,7 @@ export interface components {
              */
             onboarding: "handle" | "starters" | "complete";
             /** Permissions */
-            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.approve" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage" | "economy.grant" | "shop.manage" | "reports.manage" | "players.presence" | "chat.read_all" | "admin.users.reset" | "players.history" | "auctions.manage" | "games.passive_bots")[];
+            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.approve" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage" | "economy.grant" | "shop.manage" | "reports.manage" | "players.presence" | "chat.read_all" | "admin.users.reset" | "players.history" | "auctions.manage" | "games.passive_bots" | "rollout.manage")[];
             preferences: components["schemas"]["Preferences"];
             /** Roles */
             roles: ("player" | "moderator" | "administrator" | "sysop")[];
@@ -7501,6 +7464,47 @@ export interface components {
             opened_at: string;
             product: components["schemas"]["ProductRef"];
         };
+        /** Operations */
+        Operations: {
+            /**
+             * Access
+             * @description Access given, by its state.
+             */
+            access: {
+                [key: string]: number;
+            };
+            /** Counts */
+            counts: components["schemas"]["Count"][];
+            /**
+             * Engine
+             * @description The engine's processes and recordings as it reports them; none while it does not answer.
+             */
+            engine: {
+                [key: string]: unknown;
+            } | null;
+            games: components["schemas"]["GamesNow"];
+            /**
+             * Jobs
+             * @description The worker's newest job of each kind.
+             */
+            jobs: components["schemas"]["Job"][];
+            /** Migration */
+            migration: string;
+            /**
+             * Now
+             * Format: date-time
+             */
+            now: string;
+            rollout: components["schemas"]["Rollout"];
+            /**
+             * Since
+             * Format: date-time
+             * @description When this process started counting.
+             */
+            since: string;
+            /** Version */
+            version: string;
+        };
         /** Opponent */
         Opponent: {
             /** Bot */
@@ -7700,15 +7704,6 @@ export interface components {
              */
             versions: components["schemas"]["VersionRecord"][];
         };
-        /** Picks */
-        Picks: {
-            /** Earned */
-            earned: number;
-            /** Left */
-            left: number;
-            /** Used */
-            used: number;
-        };
         /** Pins */
         Pins: {
             /**
@@ -7897,35 +7892,6 @@ export interface components {
             /** @description Null when the player does not share their presence with you. */
             presence: components["schemas"]["Presence"] | null;
             tier: components["schemas"]["TierInfo"];
-        };
-        /** Policies */
-        Policies: {
-            /** Policies */
-            policies: components["schemas"]["PolicyView"][];
-        };
-        /** PolicyView */
-        PolicyView: {
-            /**
-             * Changed
-             * @description Whether it differs from its default.
-             */
-            changed: boolean;
-            /**
-             * Default
-             * @description The game as it was: every switch off.
-             */
-            default: {
-                [key: string]: unknown;
-            };
-            /** Name */
-            name: string;
-            /**
-             * Value
-             * @description The policy as it stands.
-             */
-            value: {
-                [key: string]: unknown;
-            };
         };
         /** PracticeFormat */
         PracticeFormat: {
@@ -8524,20 +8490,6 @@ export interface components {
              */
             purged: number;
         };
-        /** QuestAlternative */
-        QuestAlternative: {
-            /** Id */
-            id: string;
-            /** Name */
-            name: string;
-            /**
-             * Progress
-             * @description Counted so far, at most its target.
-             */
-            progress: number;
-            /** Target */
-            target: number;
-        };
         /** QuestBoards */
         QuestBoards: {
             daily: components["schemas"]["BoardView"];
@@ -8550,8 +8502,6 @@ export interface components {
         };
         /** QuestView */
         QuestView: {
-            /** @description A second quest that completes this slot as well (v0.9.12, the quest_alternatives policy); none on a board drawn with the policy off. */
-            alternative?: components["schemas"]["QuestAlternative"] | null;
             /** Completed At */
             completed_at: string | null;
             /**
@@ -8725,6 +8675,23 @@ export interface components {
              * @description While waiting: players in your queue, you too.
              */
             waiting: number;
+        };
+        /** Reach */
+        Reach: {
+            /** Workflows */
+            workflows: components["schemas"]["Reachable"][];
+        };
+        /** Reachable */
+        Reachable: {
+            /**
+             * Available
+             * @description Whether the caller may reach the workflow now.
+             */
+            available: boolean;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
         };
         /**
          * ReaderChat
@@ -9440,6 +9407,11 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** Rollout */
+        Rollout: {
+            /** Workflows */
+            workflows: components["schemas"]["Staged"][];
+        };
         /** Rule */
         Rule: {
             /** Code */
@@ -9930,23 +9902,34 @@ export interface components {
             /** Title */
             title: string;
         };
-        /** Staple */
-        Staple: {
-            card: components["schemas"]["CardSummary"];
+        /** StageChange */
+        StageChange: {
             /**
-             * Claimed
-             * @description The account builds with it through this pool.
+             * Stage
+             * @enum {string}
              */
-            claimed: boolean;
+            stage: "off" | "staff" | "on";
         };
-        /** StaplePool */
-        StaplePool: {
+        /** Staged */
+        Staged: {
+            /** Changed At */
+            changed_at?: string | null;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
             /**
-             * Cards
-             * @description The pool, in its own order.
+             * Section
+             * @description The specification's section the workflow delivers.
              */
-            cards: components["schemas"]["Staple"][];
-            picks: components["schemas"]["Picks"];
+            section: number;
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "off" | "staff" | "on";
+            /** Stands On */
+            stands_on: string;
         };
         /** StartEncounter */
         StartEncounter: {
@@ -10076,7 +10059,7 @@ export interface components {
             bonus: number;
             /**
              * Current
-             * @description Boards finished in a row, up to the last one finished (this period's when it is finished, else the previous one's); 0 when the previous period's was not, unless the quest_streaks policy forgives a missed period (v0.9.12).
+             * @description Boards finished in a row, up to the last one finished (this period's when it is finished, else the previous one's); 0 when the previous period's was not.
              */
             current: number;
             /**
@@ -12600,7 +12583,7 @@ export interface operations {
             };
         };
     };
-    policies_api_v1_admin_policies_get: {
+    operations_api_v1_admin_operations_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -12615,107 +12598,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Policies"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    change_policy_api_v1_admin_policies__name__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                name: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Policies"];
+                    "application/json": components["schemas"]["Operations"];
                 };
             };
             /** @description Bad Request */
@@ -13098,6 +12981,196 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReportDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    read_rollout_api_v1_admin_rollout_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rollout"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    change_stage_api_v1_admin_rollout__workflow__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflow: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StageChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rollout"];
                 };
             };
             /** @description Bad Request */
@@ -14209,293 +14282,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    account_entitlements_api_v1_admin_users__user_id__entitlements_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                user_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Entitlements"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    give_entitlement_api_v1_admin_users__user_id__entitlements_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                user_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EntitlementGrant"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Entitlements"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    end_entitlement_api_v1_admin_users__user_id__entitlements__entitlement_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                user_id: string;
-                entitlement_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Entitlements"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Too Many Requests */
@@ -26409,192 +26195,6 @@ export interface operations {
             };
         };
     };
-    my_staples_api_v1_me_staples_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StaplePool"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    claim_staple_api_v1_me_staples__card_id__post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                card_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StaplePool"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
     choose_starters_api_v1_me_starters_post: {
         parameters: {
             query?: never;
@@ -29285,6 +28885,98 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReportReceipt"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    reach_api_v1_rollout_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Reach"];
                 };
             };
             /** @description Bad Request */

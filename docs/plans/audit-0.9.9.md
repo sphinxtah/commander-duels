@@ -13,9 +13,9 @@ The owner chose on 2026-11-11 to deliver the Preparation Framework in stages, ea
 | **v0.9.9** | The audit (this document); game recording and recovery, end to end ([recording and recovery](../engine/recovery.md)); the pack window (the owner's request) |
 | **v0.9.10** | Bot containment and game isolation (a process per game, the owner's choice); structured game events and perspectives; game modes and reward eligibility; access, consent and temporary entitlement |
 | **v0.9.12** (staged as v0.9.11) | Economy and acquisition; the deck workshop; Rule Zero profiles; large boards; and the owner's rule for the campaign's decks ([its plan](0.9.12.md)) |
-| **v0.9.13** | Playgroups, scheduling and leagues; rollout and operations; the release gate and the v1.0.0 backlog ([its plan](0.9.13.md)) |
+| **v0.9.13** | Rollout and operations; the release gate and the v1.0.0 backlog; the removal of v0.9.12's economy foundations ([its plan](0.9.13.md)) |
 
-Ten foundations are more than any version so far, and a v0.9.13 was foreseen for what v0.9.12 could not close. The owner split them at v0.9.12's start on 2026-11-13: four foundations there, two and the gate in v0.9.13. He also dropped two of the specification's items from the framework and from v1.0.0: a path to a specific card (§11, §22) and Rule Zero disclosures with deck analysis (§9, §18). (Staged as v0.9.11; v0.9.11 went to a game's start, [its notes](../releases/0.9.11.md).) The order follows the dependencies below: isolation and events change the engine and the game's protocol, which everything after them builds on; modes and access are the two decisions every later model consults.
+Ten foundations are more than any version so far, and a v0.9.13 was foreseen for what v0.9.12 could not close. The owner split them at v0.9.12's start on 2026-11-13: four foundations there, two and the gate in v0.9.13. He also dropped two of the specification's items from the framework and from v1.0.0: a path to a specific card (§11, §22) and Rule Zero disclosures with deck analysis (§9, §18). On 2026-11-14, at v0.9.13's start, he dropped three more: every change to progression and acquisition (§11, §22; the foundations v0.9.12 built are removed in v0.9.13), and playgroups, scheduling and leagues (§13, §25, §28). The rows below that name them stand as the record of what was planned. (Staged as v0.9.11; v0.9.11 went to a game's start, [its notes](../releases/0.9.11.md).) The order follows the dependencies below: isolation and events change the engine and the game's protocol, which everything after them builds on; modes and access are the two decisions every later model consults.
 
 **Why isolation moved out of v0.9.9.** Recovery is what makes isolation safe to build: a game moved into its own process needs its state to cross a process boundary, and the recording is that state. With recovery in place, the containment v0.9.9 has is coarse but real: an engine that runs out of memory exits (`-XX:+ExitOnOutOfMemoryError`), Docker restarts it, and the API asks for each game again, which the engine takes up from its recording. A game that keeps killing the engine is given up after five recoveries with no answer between them, so it cannot take the others down for good. What it does not have: one game's memory cannot be bounded on its own, and while the engine restarts (a few seconds) every game waits.
 
@@ -46,9 +46,9 @@ recording and recovery (v0.9.9) ──► isolation (v0.9.10) ──► large bo
             └──► structured events (v0.9.10) ──► timeline, replays, spectators (v1.0.0)
 access and consent (v0.9.10) ──► sandbox, lending, spectators, coaching, playgroups, leagues
 game modes and eligibility (v0.9.10) ──► economy (v0.9.12), deck analytics (v0.9.12), sandbox, leagues
-Rule Zero profiles (v0.9.12) ──► table discovery (v1.0.0), playgroups' saved profiles (v0.9.13)
-playgroups (v0.9.13) ──► leagues (v0.9.13) ──► Sealed leagues (v1.0.0)
-rollout and operations (v0.9.13) ── every foundation's metrics and gates
+Rule Zero profiles (v0.9.12) ──► table discovery (v1.0.0)
+playgroups, leagues, Sealed leagues: dropped by the owner, 2026-11-14
+rollout and operations (v0.9.13) ── the gates of sandbox, lending, replays, spectators, coaching, save and resume; the site's numbers
 ```
 
 ## Design decisions
@@ -77,7 +77,7 @@ rollout and operations (v0.9.13) ── every foundation's metrics and gates
 The rule since v0.8.3 holds: a migration only adds what the previous version can ignore (tables, nullable columns, columns with defaults, indexes), and a drop or rename waits for a later version that no longer uses it ([deployment](../deployment.md#deploying-a-version)). `deploy.sh` dumps the database before migrating, migrates while the old version serves, and brings the previous version back when the new one does not start.
 
 - **v0.9.9 adds no migration.** It adds the `engine_recordings` volume. Rolling back to v0.9.8 needs no restore: v0.9.8's engine ignores the volume, and the games running at the rollback end interrupted as at any upgrade.
-- **v0.9.10's, v0.9.12's and v0.9.13's** tables (grants, modes, events; entitlements, wishlists, table presets; groups, leagues) are new tables and nullable columns. No quotes: the path to a specific card was dropped. `games.mode` is filled for old rows from `kind` and the campaign's link in the same migration, and read with a default until it is.
+- **v0.9.10's and v0.9.12's** tables (grants, modes, events; entitlements, wishlists, table presets) are new tables and nullable columns. **v0.9.13's one migration is the exception**, by the owner's decision: 0050 drops what the economy's foundations left, and going back from it needs the dump taken before it ([operations](../operations.md#migrations)). No quotes: the path to a specific card was dropped. `games.mode` is filled for old rows from `kind` and the campaign's link in the same migration, and read with a default until it is.
 - **Account data.** Each migration is run in CI against a database holding a representative account (a library, decks with revisions, ledgers, quests, achievements, campaign progress, auctions), and the account's totals are compared before and after. This test is v0.9.10's first piece of work, before its first migration.
 
 ## The engine's known limits, each with something that runs

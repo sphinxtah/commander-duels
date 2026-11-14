@@ -42,7 +42,7 @@ import random
 import secrets
 import time
 from collections import defaultdict
-from collections.abc import AsyncIterator, Callable, Coroutine, Hashable, Mapping
+from collections.abc import AsyncIterator, Callable, Coroutine, Hashable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -62,7 +62,7 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from api import events as events_module
-from api import farming, kings_table, modes
+from api import kings_table, metrics, modes
 from api.auth import INPUT_ERRORS
 from api.config import Settings
 from api.custom_play import custom_in_seats
@@ -490,9 +490,6 @@ class LiveSeat:
     # theirs, not a loss.
     conceding: bool = False
     removing: bool = False
-    # Choices the engine took from the seat's player (v0.9.12): none in a game that was played
-    # is the idle signal of api/farming.py.
-    commands: int = 0
 
 
 @dataclass(eq=False)
@@ -1055,25 +1052,39 @@ class GameHub:
                     result,
                     content_dir,
                     game.owner_closed,
-                    {seat.seat: seat.commands for seat in game.seats.values()},
                 ),
                 what,
             )
+            metrics.count("settlement.recorded", status=status)
             return
         except Exception:
             log.exception("Could not %s; recording it interrupted", what)
+        # What the failure came to is counted (api/metrics.py), each step a worse one.
         if status != "interrupted" or result is not None:
             try:
                 await retried(
-                    partial(record_end, self.database, game.id, "interrupted", None, content_dir),
+                    # Not closed by its owner, and failed: its end could not be recorded.
+                    partial(
+                        record_end,
+                        self.database,
+                        game.id,
+                        "interrupted",
+                        None,
+                        content_dir,
+                        False,
+                        True,
+                    ),  # fmt: skip
                     what,
                 )
+                metrics.count("settlement.failed", outcome="recorded_interrupted")
                 return
             except Exception:
                 log.exception("Could not record game %s interrupted", game.id)
         try:
             await retried(partial(force_interrupted, self.database, game.id), what)
+            metrics.count("settlement.failed", outcome="forced")
         except Exception:
+            metrics.count("settlement.failed", outcome="lost")
             log.exception("Could not mark game %s interrupted", game.id)
 
     def broadcast(self, game: LiveGame, message: dict[str, Any]) -> None:
@@ -1383,8 +1394,6 @@ class GameHub:
             if conceding:
                 seat.conceding = False
         reply(status, body)
-        if status == 200 and not conceding:
-            seat.commands += 1
         if status == 200 and conceding:
             self.seat_left(game, seat, "conceded")
 
@@ -1406,6 +1415,7 @@ async def retried[T](work: Callable[[], T], what: str) -> T:
             return await run_in_threadpool(work)
         except (OperationalError, InterfaceError):
             log.warning("Could not %s; trying again in %.0f s", what, delay, exc_info=True)
+        metrics.count("settlement.retried")
         await asyncio.sleep(delay)
         delay = min(RETRY_MAX_SECONDS, delay * 2)
 
@@ -1540,7 +1550,7 @@ def record_end(
     result: dict[str, Any] | None,
     content_dir: str | None = None,
     owner_closed: bool = False,
-    activity: Mapping[int, int] | None = None,
+    failed: bool = False,
 ) -> None:
     """Records how the game ended and, in the same transaction, the win of a player's seat that
     won it (api/progression.py), the tokens it pays (api/economy.py), and since v0.5.0 the
@@ -1550,10 +1560,10 @@ def record_end(
     Since v0.8.0 a campaign duel's end is the campaign's instead (api/campaign.py): no win and no
     quests, and for a win the encounter and its rewards (a first win's spoils: the warden's deck
     and tokens), in this same transaction. owner_closed says the game's own player closed it
-    (v0.9.8), which the campaign's court counts as the court lost. activity is the choices each
-    seat's player sent, when the API followed the game to its end (v0.9.12): with the result it
-    gives the game's farming signals (api/farming.py), kept with the game, and what the farming
-    policy withholds for them, which is nothing until it is enforced."""
+    (v0.9.8), which the campaign's court counts as the court lost. failed (v0.9.13) says the
+    game's end could not be recorded as it ended and is recorded interrupted in its place: what
+    it would have earned is withheld as ``settlement_failed``, so the game says why it paid
+    nothing."""
     # Imported here, as above; api.matches and api.campaign import this module.
     from api import campaign, matches
     from api.awards import settle
@@ -1572,9 +1582,8 @@ def record_end(
             if game.mode is None or link is not None:
                 # A campaign duel is the campaign's whatever it was made as.
                 game.mode = modes.mode_of(game.kind, link is not None)
-            rules = modes.eligibility(game.mode, result=game.result is not None)
-            observed = farming.observe(db, game, activity)
-            game.eligibility = observed.record(rules.record())
+            rules = modes.eligibility(game.mode, result=game.result is not None, failed=failed)
+            game.eligibility = rules.record()
             # A game played with passive bots (the testing switch of SysOp, v0.8.6, and of
             # administrators, v0.8.7) counts as any other since v0.9.7 (the owner, 2026-11-10:
             # "Administrators should not have this restriction"): its win, tokens, quests and
@@ -1588,8 +1597,8 @@ def record_end(
                 if rules.earns("wins"):
                     count_win(db, game)
                 if rules.earns("tokens"):
-                    pay_game(db, game, observed.without("tokens"))
-                settle(db, game, rules, observed.without("quests"))
+                    pay_game(db, game)
+                settle(db, game, rules)
                 matches.game_ended(db, game)
             db.commit()
 
@@ -2909,6 +2918,8 @@ def origin_refused(websocket: WebSocket) -> bool:
 async def refuse(websocket: WebSocket, code: int, reason: str) -> None:
     """Tells the client why, and closes. A client already gone (a tab closed before its hello) is
     told nothing: sending to it raised, and every such close logged a server error (v0.9.7)."""
+    if code in (CLOSE_UNAUTHENTICATED, CLOSE_FORBIDDEN):
+        metrics.count("access.refused", code=reason, on="socket")
     with suppress(WebSocketDisconnect, RuntimeError):
         await websocket.send_json({"type": "error", "code": reason})
         await websocket.close(code, reason)

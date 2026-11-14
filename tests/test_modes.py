@@ -32,7 +32,8 @@ client = test_progression.client
 
 ALL = set(modes.REWARDS)
 # Each mode's rewards earned. The first four are the code as it was before v0.9.10, which the
-# settlement tests below pin; the rest are proposals for modes no game is made in yet.
+# settlement tests below pin; the other two are the owner's policies (2026-11-13) for modes no
+# game is made in until their workflows are rolled out (api/rollout.py).
 EARNS = {
     "practice": ALL - {"competitive"},
     "table": ALL - {"competitive"},
@@ -40,8 +41,6 @@ EARNS = {
     "testing": {"wins", "quests", "achievements"},
     "sandbox": set(),
     "borrowed": ALL - {"competitive"},
-    "league_practice": {"statistics"},
-    "league": {"statistics", "competitive"},
 }
 
 
@@ -59,9 +58,30 @@ def test_the_policy_matrix(mode: str) -> None:
 
 
 def test_a_game_no_mode_names_earns_nothing() -> None:
-    rules = modes.eligibility("chess")
-    assert not any(rules.earns(reward) for reward in modes.REWARDS)
-    assert set(rules.record()["withheld"].values()) == {"unknown_mode"}  # type: ignore[union-attr]
+    # The leagues' modes went with the leagues (the owner, 2026-11-14): no mode names them now.
+    for mode in ("chess", "league", "league_practice"):
+        rules = modes.eligibility(mode)
+        assert not any(rules.earns(reward) for reward in modes.REWARDS)
+        assert set(rules.record()["withheld"].values()) == {"unknown_mode"}  # type: ignore[union-attr]
+
+
+def test_an_end_that_could_not_be_recorded_says_so() -> None:
+    """v0.9.13: a game recorded interrupted because its end could not be written withholds what
+    it earned as settlement_failed, where a game that was only interrupted says no_result."""
+    lost = modes.eligibility("table", result=False, failed=True).record()["withheld"]
+    assert lost == {  # type: ignore[comparison-overlap]
+        "tokens": "settlement_failed",
+        "wins": "settlement_failed",
+        "quests": "settlement_failed",
+        "achievements": "settlement_failed",
+        "competitive": "not_competitive",
+    }
+    plain = modes.eligibility("table", result=False).record()["withheld"]
+    assert set(plain.values()) == {"no_result", "not_competitive"}  # type: ignore[union-attr]
+    # A game with its result is never one that failed.
+    assert modes.eligibility("table", failed=True).record()["withheld"] == {
+        "competitive": "not_competitive"
+    }
 
 
 def test_old_games_are_given_their_mode_from_what_they_are() -> None:

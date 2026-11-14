@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from test_events import CAST, DRAW
 from test_games import Account, build, connect
 
-from api import access
+from api import access, rollout
 from api.identity import ApiError, utcnow
 from api.models import (
     AccessGrant,
@@ -31,6 +31,7 @@ from api.models import (
     GameSeat,
     LibraryGrant,
     PlayerBlock,
+    SiteSetting,
     User,
 )
 
@@ -45,7 +46,14 @@ def database(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> str:
 
 @pytest.fixture
 def client(database: str) -> Any:
+    """Every workflow rolled out: since v0.9.13 each kind of access is behind its workflow's gate
+    (api/rollout.py; tests/test_rollout.py shows them shut), and these tests are of access
+    itself."""
     with connect(build(database, None)) as client:
+        with session(client) as db:
+            for workflow in rollout.WORKFLOWS:
+                db.add(SiteSetting(key=rollout.PREFIX + workflow, value="on", updated_at=utcnow()))
+            db.commit()
         yield client
 
 
@@ -118,7 +126,7 @@ def test_every_kind_of_access_is_its_grantors_alone_to_give(client: TestClient) 
         refused("invalid_grant", lambda: access.offer(db, a, b, "nothing", deck.id))
         # The sandbox's cards: SysOp's to give, nobody else's.
         refused("forbidden", lambda: access.offer(db, a, b, "sandbox", None))
-        # Groups and pools come with v0.9.12.
+        # A group and a league's pool: the owner dropped playgroups and leagues (2026-11-14).
         refused("not_available", lambda: access.offer(db, a, b, "group", uuid4()))
         refused("not_available", lambda: access.offer(db, a, b, "pool", uuid4()))
         # Never to an account that blocks or is blocked by the grantor.

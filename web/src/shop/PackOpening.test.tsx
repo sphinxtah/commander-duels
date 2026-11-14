@@ -385,15 +385,33 @@ describe("opening a pack", () => {
     const choice = screen.getByRole("region", {
       name: "Keep this deck together?",
     });
+    // The question is asked above the cards; its buttons are on the window's foot, after the
+    // way out (v0.9.13, the owner's request), in a group named as the question is.
+    expect(within(choice).queryByRole("button")).toBeNull();
+    const foot = document.querySelector("[data-opening-foot]") as HTMLElement;
+    expect(
+      within(foot)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual([
+      "Back to the shop",
+      "Save as a Legacy deck",
+      "Keep as individual cards",
+    ]);
+    expect(
+      within(
+        within(foot).getByRole("group", { name: "Keep this deck together?" }),
+      ).getAllByRole("button"),
+    ).toHaveLength(2);
     // What went wrong is said, and the choice stays open.
     fireEvent.click(
-      within(choice).getByRole("button", { name: "Save as a Legacy deck" }),
+      screen.getByRole("button", { name: "Save as a Legacy deck" }),
     );
     expect(await within(choice).findByRole("alert")).toHaveTextContent(
       "An account keeps at most 250 decks.",
     );
     fireEvent.click(
-      within(choice).getByRole("button", { name: "Save as a Legacy deck" }),
+      screen.getByRole("button", { name: "Save as a Legacy deck" }),
     );
     const kept = await screen.findByRole("region", {
       name: "Kept together as a Legacy deck",
@@ -403,6 +421,12 @@ describe("opening a pack", () => {
     );
     expect(within(kept).queryByRole("alert")).toBeNull();
     expect(save).toHaveBeenCalledTimes(2);
+    // Once the deck is made the foot holds its way out alone.
+    expect(
+      within(foot)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Back to the shop"]);
     // The cards are listed all the same.
     expect(
       within(

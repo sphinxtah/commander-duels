@@ -1156,8 +1156,24 @@ svg.packArt {
   font-weight: 600;
   white-space: nowrap;
 }
-.deckChoice .actions {
-  margin: 12px 0 0;
+/* Its buttons, on the window's foot beside the way out (v0.9.13). */
+.deckActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+/* On a phone they share a row of their own, in halves, so the foot stays low. */
+@media (max-width: 560px) {
+  .deckActions {
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+  }
+  .deckActions button {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: 8px;
+    white-space: normal;
+  }
 }
 /* A starter deck's box: its commander's card over a fanned deck. */
 .deckBox {

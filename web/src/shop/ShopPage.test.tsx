@@ -441,10 +441,10 @@ describe("Leng's card shop", () => {
       "Its cards are in your library either way. Save them as a Legacy deck to play it as it came, or keep them as individual cards for decks of your own.",
     );
     expect(
-      within(choice).getByRole("button", { name: "Keep as individual cards" }),
+      screen.getByRole("button", { name: "Keep as individual cards" }),
     ).toBeInTheDocument();
     fireEvent.click(
-      within(choice).getByRole("button", { name: "Save as a Legacy deck" }),
+      screen.getByRole("button", { name: "Save as a Legacy deck" }),
     );
     const kept = await screen.findByRole("region", {
       name: "Kept together as a Legacy deck",
@@ -596,11 +596,11 @@ describe("Leng's starter decks (v0.4.2)", () => {
       screen.getByText(/3 cards · 2 new to your library/),
     ).toBeInTheDocument();
     // Then it asks: build it into a Commander deck, or keep its cards loose.
-    const choice = screen.getByRole("region", {
-      name: "Keep this deck together?",
-    });
+    expect(
+      screen.getByRole("region", { name: "Keep this deck together?" }),
+    ).toHaveTextContent("Build them into a Commander deck");
     fireEvent.click(
-      within(choice).getByRole("button", { name: "Keep as individual cards" }),
+      screen.getByRole("button", { name: "Keep as individual cards" }),
     );
     const loose = screen.getByRole("region", {
       name: "Kept as individual cards",
@@ -614,7 +614,7 @@ describe("Leng's starter decks (v0.4.2)", () => {
     );
     // A change of mind, there and then.
     fireEvent.click(
-      within(loose).getByRole("button", {
+      screen.getByRole("button", {
         name: "Build it into a Commander deck after all",
       }),
     );

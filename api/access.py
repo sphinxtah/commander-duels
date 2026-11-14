@@ -2,8 +2,8 @@
 
 One table of grants (``access_grants``): access one account gives another, for a while, never
 ownership. A grant names its grantor, its subject (an account), the resource (a deck, a game to
-watch or replay, a seat's hand, a group, a league's pool, the sandbox), its scope within it (a
-seat), its consent, its expiry and its revocation. Every change is audited.
+watch or replay, a seat's hand, the sandbox), its scope within it (a seat), its consent, its
+expiry and its revocation. Every change is audited.
 
 **Read where access is decided, never copied.** A grant is asked for (``active``) at the moment
 access is decided, and nothing of it is written anywhere else: not into a library (so a card the
@@ -19,8 +19,15 @@ for access to end.
 
 v0.9.10 reads grants where a game's events are read (api/events.py): a spectator's grant shows
 the spectator's perspective, a replay's or a coach's (a seat's hand) the seat's. Lending decks,
-the sandbox, groups and pools are v1.0.0's and v0.9.12's workflows; their grants are modelled
-and checked here, and no route makes them yet.
+watching, coaching, sharing a replay and the sandbox are v1.0.0's workflows; their grants are
+modelled and checked here, and no route makes them yet.
+
+**Behind the rollout's gates** (v0.9.13, api/rollout.py). Each kind of access belongs to one of
+those workflows, and while the workflow is not available to an account, access of its kind can
+neither be offered by it nor to it, and a grant it holds gives it nothing: a workflow switched
+off again stops at once, as an expiry does. A group's and a league's pool, which v0.9.10 named
+for the playgroups and leagues the owner dropped on 2026-11-14, belong to no workflow and are
+never given; the table still takes the two words, and nothing writes them.
 """
 
 from datetime import datetime
@@ -30,6 +37,7 @@ from uuid import UUID
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from api import metrics, rollout
 from api.identity import ApiError, utcnow
 from api.models import AccessGrant, AuditEvent, Deck, GameSeat, PlayerBlock, User
 
@@ -103,8 +111,18 @@ def _check_resource(
         if resource in ("replay", "hand") and scope.get("seat") != seat:
             raise ApiError(422, "invalid_grant", "A seat's view is its own player's to give.")
         return
-    # Groups and pools come with v0.9.12's playgroups and leagues.
-    raise ApiError(409, "not_available", "Access of this kind cannot be given yet.")
+    raise not_given("not_available", resource)
+
+
+def not_given(code: str, resource: str) -> ApiError:
+    """Access that cannot be given, counted by why and of what kind (api/metrics.py)."""
+    metrics.count("access.refused", code=code, giving=resource)
+    words = {
+        "not_available": "Access of this kind cannot be given yet.",
+        "account_unavailable": "That account cannot be given access.",
+        "blocked": "That account cannot be given access.",
+    }
+    return ApiError(409, code, words[code])
 
 
 def offer(
@@ -126,10 +144,17 @@ def offer(
         raise ApiError(422, "invalid_grant", "No such kind of access.")
     if grantor.id == subject.id:
         raise ApiError(422, "invalid_grant", "Access is given to someone else.")
+    # Its workflow's gate (v0.9.13): both accounts may reach it, or nothing is given. A group
+    # and a pool belong to no workflow (the owner dropped playgroups and leagues).
+    workflow = rollout.ACCESS.get(resource)
+    if workflow is None or not all(
+        rollout.available(db, workflow, account) for account in (grantor, subject)
+    ):
+        raise not_given("not_available", resource)
     if subject.status != "active" or grantor.status != "active":
-        raise ApiError(409, "account_unavailable", "That account cannot be given access.")
+        raise not_given("account_unavailable", resource)
     if blocked(db, grantor.id, subject.id):
-        raise ApiError(409, "blocked", "That account cannot be given access.")
+        raise not_given("blocked", resource)
     if expires_at is not None and expires_at <= now:
         raise ApiError(422, "invalid_grant", "A grant cannot end before it begins.")
     _check_resource(db, grantor, resource, resource_id, scope)
@@ -185,9 +210,13 @@ def active(
     now: datetime | None = None,
 ) -> list[AccessGrant]:
     """The grants that give the subject this access now: consented to, not expired, not revoked,
-    between two active accounts neither of which blocks the other, and for a deck one still its
-    grantor's. Asked every time access is decided."""
+    between two active accounts neither of which blocks the other, for a deck one still its
+    grantor's, and of a workflow the subject may reach (v0.9.13, api/rollout.py). Asked every time
+    access is decided."""
     now = now or utcnow()
+    workflow = rollout.ACCESS.get(resource)
+    if workflow is None or not rollout.available(db, workflow, db.get(User, subject_id)):
+        return []
     query = select(AccessGrant).where(
         AccessGrant.subject_id == subject_id,
         AccessGrant.resource_kind == resource,

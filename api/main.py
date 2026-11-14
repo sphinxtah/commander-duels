@@ -26,18 +26,19 @@ from api import (
     decks,
     economy,
     engine_cards,
-    entitlements,
     events,
     games,
     how_to_play,
     lobby,
     matches,
-    policies,
+    metrics,
+    operations,
     progression,
     quests,
     queues,
     rematches,
     reports,
+    rollout,
     shop,
     sleeves,
     social,
@@ -92,7 +93,8 @@ CAPABILITIES = [
         available=True,
         milestone="M0–M3",
         reason="Practice games against bots are playable in the browser since v0.1.0, and human "
-        "tables, with a lobby and invite links, since v0.4.0. Recovery comes later.",
+        "tables, with a lobby and invite links, since v0.4.0. A game survives a restart of the "
+        "servers since v0.9.9; an upgrade still ends the games running.",
     ),
     Capability(
         id="alliance",
@@ -221,6 +223,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if (origin and origin not in allowed_origins) or request.headers.get(
                 "sec-fetch-site"
             ) == "cross-site":
+                metrics.count("access.refused", code="origin_refused")
                 return error_response(
                     request, 403, "origin_refused", "Requests from other sites are refused."
                 )
@@ -253,6 +256,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(ApiError)
     async def api_error(request: Request, exc: ApiError) -> JSONResponse:
+        if exc.status in (401, 403):
+            # Refused for who asked (api/metrics.py): counted by its code, never by its account.
+            metrics.count("access.refused", code=exc.code)
         response = error_response(request, exc.status, exc.code, exc.message, exc.names)
         response.headers.update(exc.headers or {})
         return response
@@ -375,6 +381,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(auth.router)
     app.include_router(admin.router)
+    app.include_router(rollout.routes)
+    app.include_router(operations.router)
     app.include_router(games.router)
     app.include_router(events.router)
     app.include_router(tables.router)
@@ -394,8 +402,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(tutorial.router)
     app.include_router(custom_cards.router)
     app.include_router(economy.router)
-    app.include_router(policies.router)
-    app.include_router(entitlements.router)
     app.include_router(shop.router)
     app.include_router(auctions.router)
     app.include_router(reports.router)
@@ -409,4 +415,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(testing.router)
     app.include_router(cosmetics.router)
     app.include_router(sleeves.router)
+    # No route of an unfinished workflow is served without its gate (v0.9.13, api/rollout.py).
+    if open_routes := rollout.unguarded(app):
+        raise RuntimeError(f"Routes of unfinished workflows without their gate: {open_routes}")
     return app

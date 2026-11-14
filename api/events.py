@@ -33,6 +33,7 @@ from sqlalchemy import Engine, delete, func, or_, select
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
+from api import metrics
 from api.identity import Active, ApiError, Db, Principal, audit
 from api.models import Game, GameEventRow, GameSeat
 
@@ -322,6 +323,10 @@ def game_events(
     audited. Anyone else is answered 404."""
     perspective = perspective_for(db, principal, game_id, view == "inspection")
     if perspective is None:
+        if db.scalar(select(GameSeat.seat).where(GameSeat.game_id == game_id).limit(1)) is not None:
+            # The game exists and the caller has no view of it; answered as a missing game all
+            # the same.
+            metrics.count("access.refused", code="no_view_of_game")
         raise ApiError(404, "not_found", "No such game.")
     if perspective.kind == "inspection":
         audit(
