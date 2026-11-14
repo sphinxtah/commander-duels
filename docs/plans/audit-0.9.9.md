@@ -48,7 +48,7 @@ access and consent (v0.9.10) ──► sandbox, lending, spectators, coaching, p
 game modes and eligibility (v0.9.10) ──► economy (v0.9.12), deck analytics (v0.9.12), sandbox, leagues
 Rule Zero profiles (v0.9.12) ──► table discovery (v1.0.0)
 playgroups, leagues, Sealed leagues: dropped by the owner, 2026-11-14
-rollout and operations (v0.9.13) ── every foundation's metrics and gates
+rollout and operations (v0.9.13) ── the gates of sandbox, lending, replays, spectators, coaching, save and resume; the site's numbers
 ```
 
 ## Design decisions
@@ -77,7 +77,7 @@ rollout and operations (v0.9.13) ── every foundation's metrics and gates
 The rule since v0.8.3 holds: a migration only adds what the previous version can ignore (tables, nullable columns, columns with defaults, indexes), and a drop or rename waits for a later version that no longer uses it ([deployment](../deployment.md#deploying-a-version)). `deploy.sh` dumps the database before migrating, migrates while the old version serves, and brings the previous version back when the new one does not start.
 
 - **v0.9.9 adds no migration.** It adds the `engine_recordings` volume. Rolling back to v0.9.8 needs no restore: v0.9.8's engine ignores the volume, and the games running at the rollback end interrupted as at any upgrade.
-- **v0.9.10's, v0.9.12's and v0.9.13's** tables (grants, modes, events; entitlements, wishlists, table presets; groups, leagues) are new tables and nullable columns. No quotes: the path to a specific card was dropped. `games.mode` is filled for old rows from `kind` and the campaign's link in the same migration, and read with a default until it is.
+- **v0.9.10's and v0.9.12's** tables (grants, modes, events; entitlements, wishlists, table presets) are new tables and nullable columns. **v0.9.13's one migration is the exception**, by the owner's decision: 0050 drops what the economy's foundations left, and going back from it needs the dump taken before it ([operations](../operations.md#migrations)). No quotes: the path to a specific card was dropped. `games.mode` is filled for old rows from `kind` and the campaign's link in the same migration, and read with a default until it is.
 - **Account data.** Each migration is run in CI against a database holding a representative account (a library, decks with revisions, ledgers, quests, achievements, campaign progress, auctions), and the account's totals are compared before and after. This test is v0.9.10's first piece of work, before its first migration.
 
 ## The engine's known limits, each with something that runs
