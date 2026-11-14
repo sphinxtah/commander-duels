@@ -1726,6 +1726,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/decks/organize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Organize
+         * @description Moves several decks into a folder, or out of theirs, and adds or removes tags on all of
+         *     them: every deck named must be the account's and out of the trash, or nothing changes.
+         */
+        post: operations["organize_api_v1_decks_organize_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decks/shelves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Shelves
+         * @description The account's folders and tags, each with how many of its decks it holds (the trash
+         *     apart).
+         */
+        get: operations["shelves_api_v1_decks_shelves_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/decks/starters": {
         parameters: {
             query?: never;
@@ -1823,6 +1865,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/decks/{deck_id}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Compare
+         * @description Two saved versions of the deck compared, or a version and the draft: `before` and `after`
+         *     are each a version's number or "draft".
+         */
+        get: operations["compare_api_v1_decks__deck_id__diff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/decks/{deck_id}/draft": {
         parameters: {
             query?: never;
@@ -1879,6 +1942,47 @@ export interface paths {
          * @description Deletes a deck in the trash for good (v0.9.3). Games that played it keep their copy.
          */
         delete: operations["delete_forever_api_v1_decks__deck_id__forever_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decks/{deck_id}/missing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Deck Missing
+         * @description The cards of the deck its owner's library lacks, with the auctions open for each and the
+         *     shop's packs that may hold it.
+         */
+        get: operations["deck_missing_api_v1_decks__deck_id__missing_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decks/{deck_id}/performance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Deck Performance
+         * @description The deck's results, in all and by the version played, each with its sample size.
+         */
+        get: operations["deck_performance_api_v1_decks__deck_id__performance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1955,6 +2059,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/decks/{deck_id}/revisions/{number}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Revision
+         * @description Makes a saved version the draft again. The version is copied, never changed: it stays as
+         *     the games that played it knew it, and the draft takes a new version of its own, saved like any
+         *     other (the editions the library holds, the cards the game still plays). Refused, as an
+         *     autosave is, when the draft changed since the request's `version`.
+         */
+        post: operations["restore_revision_api_v1_decks__deck_id__revisions__number__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/decks/{deck_id}/sleeve": {
         parameters: {
             query?: never;
@@ -1968,6 +2095,27 @@ export interface paths {
          * @description Puts a sleeve on one of your decks: one of your own, a campaign back you earned, or none.
          */
         put: operations["choose_sleeve_api_v1_decks__deck_id__sleeve_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decks/{deck_id}/substitutions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Deck Substitutions
+         * @description For a card (in the deck or wanted for it), the cards the library holds that could take its
+         *     place, each with why it is offered.
+         */
+        get: operations["deck_substitutions_api_v1_decks__deck_id__substitutions_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -2877,6 +3025,48 @@ export interface paths {
         put: operations["update_tutorial_api_v1_me_tutorial_put"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/wishlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Wishlist
+         * @description The cards the account wants, in the order it wished for them.
+         */
+        get: operations["my_wishlist_api_v1_me_wishlist_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/wishlist/{card_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Wish
+         * @description Wishes for a card, or changes the wish: how many copies, and for which of the account's
+         *     decks. One wish a card.
+         */
+        put: operations["wish_api_v1_me_wishlist__card_id__put"];
+        post?: never;
+        /** Unwish */
+        delete: operations["unwish_api_v1_me_wishlist__card_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -5545,6 +5735,11 @@ export interface components {
             deleted_at: string | null;
             draft: components["schemas"]["Draft"];
             /**
+             * Folder
+             * @description The folder the owner keeps it in (v0.9.12); null: none.
+             */
+            folder?: string | null;
+            /**
              * Format
              * @enum {string}
              */
@@ -5590,6 +5785,11 @@ export interface components {
              * @description Copies switched to editions the library holds when v0.5.0 deployed, until the owner dismisses the note; null or empty: none.
              */
             switched_editions?: components["schemas"]["SwitchedEdition"][] | null;
+            /**
+             * Tags
+             * @description The owner's tags on it (v0.9.12).
+             */
+            tags?: string[];
             /** Title */
             title: string;
             /**
@@ -5604,6 +5804,38 @@ export interface components {
              */
             visibility: "private" | "link";
         };
+        /** DeckDiff */
+        DeckDiff: {
+            /**
+             * Added
+             * @description Copies the later side holds that the earlier does not.
+             */
+            added: number;
+            /** After */
+            after: string;
+            /**
+             * Before
+             * @description The earlier side: a version's number, or "draft".
+             */
+            before: string;
+            /**
+             * Deck Id
+             * Format: uuid
+             */
+            deck_id: string;
+            /**
+             * Lines
+             * @description Each card and place whose copies differ, by place then name. Another edition of the same card is no difference.
+             */
+            lines: components["schemas"]["DiffLine"][];
+            /** Removed */
+            removed: number;
+            /**
+             * Same
+             * @description The two hold the same cards in the same places.
+             */
+            same: boolean;
+        };
         /** DeckEntry */
         DeckEntry: {
             /**
@@ -5611,6 +5843,11 @@ export interface components {
              * Format: uuid
              */
             card_id: string;
+            /**
+             * Choice
+             * @description A choice made as the deck is built (v0.9.12): Cryptic Spires's two circled colours, two different letters of WUBRG; null for every other card.
+             */
+            choice?: string | null;
             /**
              * Location
              * @default main
@@ -5734,6 +5971,11 @@ export interface components {
             /** Deleted At */
             deleted_at: string | null;
             /**
+             * Folder
+             * @description The folder the owner keeps it in (v0.9.12); null: none.
+             */
+            folder?: string | null;
+            /**
              * Format
              * @enum {string}
              */
@@ -5773,6 +6015,11 @@ export interface components {
              * @description Copies switched to editions the library holds when v0.5.0 deployed, until the owner dismisses the note; null or empty: none.
              */
             switched_editions?: components["schemas"]["SwitchedEdition"][] | null;
+            /**
+             * Tags
+             * @description The owner's tags on it (v0.9.12).
+             */
+            tags?: string[];
             /** Title */
             title: string;
             /**
@@ -5788,8 +6035,18 @@ export interface components {
         };
         /** DeckUpdate */
         DeckUpdate: {
+            /**
+             * Folder
+             * @description The folder to keep it in (v0.9.12); an empty name, or null sent on purpose, takes it out of its folder; left out, it stays.
+             */
+            folder?: string | null;
             /** Notes */
             notes?: string | null;
+            /**
+             * Tags
+             * @description Its tags (v0.9.12), replacing those it had; left out, they stay.
+             */
+            tags?: string[] | null;
             /** Title */
             title?: string | null;
             /** Visibility */
@@ -5806,6 +6063,28 @@ export interface components {
             name: string;
             /** Url */
             url: string;
+        };
+        /** DiffLine */
+        DiffLine: {
+            /**
+             * After
+             * @description Copies in the later side; 0 for a card removed.
+             */
+            after: number;
+            /**
+             * Before
+             * @description Copies in the earlier side; 0 for a card added.
+             */
+            before: number;
+            /**
+             * Card Id
+             * Format: uuid
+             */
+            card_id: string;
+            /** Location */
+            location: string;
+            /** Name */
+            name: string;
         };
         /** Draft */
         Draft: {
@@ -6508,6 +6787,11 @@ export interface components {
             candidates?: components["schemas"]["CardSummary"][];
             /** Card Id */
             card_id?: string | null;
+            /**
+             * Choice
+             * @description The line's choice (v0.9.12): Cryptic Spires's two circled colours.
+             */
+            choice?: string | null;
             /** Line */
             line: number;
             /**
@@ -6987,6 +7271,54 @@ export interface components {
              */
             up_to?: string | null;
         };
+        /** Missing */
+        Missing: {
+            /** Cards */
+            cards: components["schemas"]["MissingCard"][];
+            /**
+             * Complete
+             * @description The library holds every card of the deck.
+             */
+            complete: boolean;
+            /**
+             * Deck Id
+             * Format: uuid
+             */
+            deck_id: string;
+            /**
+             * Missing
+             * @description Copies missing in all.
+             */
+            missing: number;
+        };
+        /** MissingCard */
+        MissingCard: {
+            /**
+             * Auctions
+             * @description Auctions open for the card now, the account's own apart.
+             */
+            auctions: number;
+            card: components["schemas"]["CardSummary"];
+            /** Missing */
+            missing: number;
+            /**
+             * Needed
+             * @description Copies the deck holds, the maybeboard apart.
+             */
+            needed: number;
+            /** Owned */
+            owned: number;
+            /**
+             * Packs
+             * @description The shop's packs whose set printed the card, the newest first, at most five.
+             */
+            packs: components["schemas"]["Pack"][];
+            /**
+             * Wished
+             * @description Copies on the account's wishlist.
+             */
+            wished: number;
+        };
         /** NotificationItem */
         NotificationItem: {
             actor: components["schemas"]["PlayerRef"] | null;
@@ -7125,6 +7457,38 @@ export interface components {
              */
             won: boolean;
         };
+        /** Organize */
+        Organize: {
+            /** Add Tags */
+            add_tags?: string[];
+            /** Deck Ids */
+            deck_ids: string[];
+            /**
+             * Folder
+             * @description The folder to move them into; left out, they stay.
+             */
+            folder?: string | null;
+            /** Remove Tags */
+            remove_tags?: string[];
+            /**
+             * Unfile
+             * @description Take them out of their folders.
+             * @default false
+             */
+            unfile: boolean;
+        };
+        /** Pack */
+        Pack: {
+            /** Name */
+            name: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Set Code */
+            set_code: string;
+        };
         /**
          * PackArt
          * @description The picture of a sealed pack (v0.4.3), copied once and served from this site.
@@ -7216,6 +7580,25 @@ export interface components {
             granted: number;
             /** Inventory */
             inventory: components["schemas"]["InventoryItem"][];
+        };
+        /** Performance */
+        Performance: {
+            /**
+             * Deck Id
+             * Format: uuid
+             */
+            deck_id: string;
+            record: components["schemas"]["Record"];
+            /**
+             * Splits
+             * @description The record told apart by format, mode, opposition and the bots' skill.
+             */
+            splits: components["schemas"]["Split"][];
+            /**
+             * Versions
+             * @description By the version played, the newest first; a version never played is left out.
+             */
+            versions: components["schemas"]["VersionRecord"][];
         };
         /** Picks */
         Picks: {
@@ -8258,6 +8641,30 @@ export interface components {
              */
             sold_at: string;
         };
+        /** Record */
+        Record: {
+            /** Draws */
+            draws: number;
+            /**
+             * Games
+             * @description The sample: games that ended with a result.
+             */
+            games: number;
+            /** Losses */
+            losses: number;
+            /**
+             * Small Sample
+             * @description Fewer than 10 games: it says little.
+             */
+            small_sample: boolean;
+            /**
+             * Win Rate
+             * @description Wins over games, 0 to 1; null with no game.
+             */
+            win_rate: number | null;
+            /** Wins */
+            wins: number;
+        };
         /** Related */
         Related: {
             /** Component */
@@ -8658,6 +9065,14 @@ export interface components {
              * @description The unlimited listing's new Buy Now price (v0.9.0).
              */
             buy_now: number;
+        };
+        /** Restore */
+        Restore: {
+            /**
+             * Version
+             * @description The draft version this restore starts from.
+             */
+            version: number;
         };
         /** RestoredSleeve */
         RestoredSleeve: {
@@ -9069,6 +9484,25 @@ export interface components {
             updated_at: string;
             validation: components["schemas"]["Validation"];
         };
+        /** Shelf */
+        Shelf: {
+            /** Decks */
+            decks: number;
+            /** Name */
+            name: string;
+        };
+        /** Shelves */
+        Shelves: {
+            /** Folders */
+            folders: components["schemas"]["Shelf"][];
+            /** Tags */
+            tags: components["schemas"]["Shelf"][];
+            /**
+             * Unfiled
+             * @description Decks in no folder.
+             */
+            unfiled: number;
+        };
         /** ShopAdminView */
         ShopAdminView: {
             /**
@@ -9231,6 +9665,48 @@ export interface components {
             limit: number;
             /** Sleeves */
             sleeves: components["schemas"]["Sleeve"][];
+        };
+        /** Split */
+        Split: {
+            /**
+             * Bot Skill
+             * @description The bots' skill, when the game had bots.
+             */
+            bot_skill: number | null;
+            /** Draws */
+            draws: number;
+            /** Format */
+            format: string;
+            /**
+             * Games
+             * @description The sample: games that ended with a result.
+             */
+            games: number;
+            /** Losses */
+            losses: number;
+            /**
+             * Mode
+             * @description The game's mode (api/modes.py): practice, table, campaign…
+             */
+            mode: string;
+            /**
+             * Opposition
+             * @description bots: no other player; players: no bot; mixed: both.
+             * @enum {string}
+             */
+            opposition: "bots" | "players" | "mixed";
+            /**
+             * Small Sample
+             * @description Fewer than 10 games: it says little.
+             */
+            small_sample: boolean;
+            /**
+             * Win Rate
+             * @description Wins over games, 0 to 1; null with no game.
+             */
+            win_rate: number | null;
+            /** Wins */
+            wins: number;
         };
         /** SpoilsDeck */
         SpoilsDeck: {
@@ -9398,6 +9874,41 @@ export interface components {
              * @description What the next period's board pays if the streak holds.
              */
             next_bonus: number;
+        };
+        /** Substitute */
+        Substitute: {
+            card: components["schemas"]["CardSummary"];
+            /**
+             * Reasons
+             * @description Why it is offered, in words.
+             */
+            reasons: string[];
+            /**
+             * Score
+             * @description How alike the two are, 0 to 100; the list is by this.
+             */
+            score: number;
+            /**
+             * Spare
+             * @description Copies the library holds that the deck does not use.
+             */
+            spare: number;
+        };
+        /** Substitutions */
+        Substitutions: {
+            card: components["schemas"]["CardSummary"];
+            /**
+             * Deck Id
+             * Format: uuid
+             */
+            deck_id: string;
+            /**
+             * Note
+             * @description Why there are none, when the rules leave none.
+             */
+            note?: string | null;
+            /** Substitutes */
+            substitutes: components["schemas"]["Substitute"][];
         };
         /** Suggestion */
         Suggestion: {
@@ -10092,6 +10603,21 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** VersionRecord */
+        VersionRecord: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Number */
+            number: number;
+            record: components["schemas"]["Record"];
+            /** Splits */
+            splits: components["schemas"]["Split"][];
+            /** Title */
+            title: string;
+        };
         /**
          * WaitingRequest
          * @description Your friend request to a player who has not chosen a handle yet (v0.5.1).
@@ -10261,6 +10787,37 @@ export interface components {
             reason: string;
             /** Wins */
             wins: number;
+        };
+        /** Wish */
+        Wish: {
+            card: components["schemas"]["CardSummary"];
+            /**
+             * Deck Id
+             * @description The deck it is wanted for, when one was named.
+             */
+            deck_id: string | null;
+            /**
+             * Owned
+             * @description Copies the library holds; null: the whole catalog.
+             */
+            owned: number | null;
+            /** Quantity */
+            quantity: number;
+        };
+        /** WishSet */
+        WishSet: {
+            /** Deck Id */
+            deck_id?: string | null;
+            /**
+             * Quantity
+             * @default 1
+             */
+            quantity: number;
+        };
+        /** Wishlist */
+        Wishlist: {
+            /** Wishes */
+            wishes: components["schemas"]["Wish"][];
         };
         /** XmageBuild */
         XmageBuild: {
@@ -18975,6 +19532,10 @@ export interface operations {
         parameters: {
             query?: {
                 view?: "active" | "archived" | "trash";
+                /** @description Only the decks in this folder (v0.9.12); empty: in none. */
+                folder?: string | null;
+                /** @description Only the decks with this tag (v0.9.12). */
+                tag?: string | null;
             };
             header?: never;
             path?: never;
@@ -19277,6 +19838,194 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImportPreview"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    organize_api_v1_decks_organize_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Organize"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeckSummary"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    shelves_api_v1_decks_shelves_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Shelves"];
                 };
             };
             /** @description Bad Request */
@@ -20013,6 +20762,103 @@ export interface operations {
             };
         };
     };
+    compare_api_v1_decks__deck_id__diff_get: {
+        parameters: {
+            query: {
+                before: string;
+                after?: string;
+            };
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeckDiff"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     save_draft_api_v1_decks__deck_id__draft_put: {
         parameters: {
             query?: never;
@@ -20222,6 +21068,194 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deck_missing_api_v1_decks__deck_id__missing_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Missing"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deck_performance_api_v1_decks__deck_id__performance_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Performance"];
+                };
             };
             /** @description Bad Request */
             400: {
@@ -20674,6 +21708,105 @@ export interface operations {
             };
         };
     };
+    restore_revision_api_v1_decks__deck_id__revisions__number__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deck_id: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Restore"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftSaved"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     choose_sleeve_api_v1_decks__deck_id__sleeve_put: {
         parameters: {
             query?: never;
@@ -20696,6 +21829,102 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeckSleeve"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deck_substitutions_api_v1_decks__deck_id__substitutions_get: {
+        parameters: {
+            query: {
+                card_id: string;
+            };
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Substitutions"];
                 };
             };
             /** @description Bad Request */
@@ -25414,6 +26643,290 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Me"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    my_wishlist_api_v1_me_wishlist_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Wishlist"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    wish_api_v1_me_wishlist__card_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                card_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WishSet"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Wishlist"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    unwish_api_v1_me_wishlist__card_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                card_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Wishlist"];
                 };
             };
             /** @description Bad Request */

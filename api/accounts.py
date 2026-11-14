@@ -57,6 +57,7 @@ from api.models import (
     TableSeat,
     User,
     UserSession,
+    WishlistEntry,
 )
 from api.roster import Planeswalker
 from catalog.sync import Outcome
@@ -295,6 +296,8 @@ def delete_account(
     # Any session that survived would rotate, and then find no account to stand for.
     user.privilege_version += 1
     db.flush()
+    # The wishlist is the account's alone, and names its decks (v0.9.12, api/workshop.py).
+    db.execute(delete(WishlistEntry).where(WishlistEntry.user_id == user.id))
     remove_decks(db, user.id, now, removed)
     removed.sessions = db.execute(
         delete(UserSession).where(UserSession.user_id == user.id)

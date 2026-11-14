@@ -210,6 +210,8 @@ def arrangement_of(entries: list[DeckEntry]) -> dict[str, object]:
                 "card_id": str(entry.card_id),
                 "printing_id": str(entry.printing_id) if entry.printing_id else None,
                 "quantity": entry.quantity,
+                # A copy's choice (v0.9.12, Cryptic Spires's circled colours) goes with it.
+                **({"choice": entry.choice} if entry.choice else {}),
             }
             for entry in entries
             if entry.location == location
@@ -228,9 +230,36 @@ def arranged(arrangement: dict[str, object]) -> list[DeckEntry]:
                     printing_id=UUID(item["printing_id"]) if item.get("printing_id") else None,
                     quantity=int(item["quantity"]),
                     location=location,
+                    choice=item.get("choice"),
                 )
             )
     return entries
+
+
+def with_choices(entries: list[DeckEntry], source: list[DeckEntry]) -> list[DeckEntry]:
+    """The entries with the choices the revision's copies carry (v0.9.12: Cryptic Spires's
+    circled colours). A sideboard plan names cards and printings, not choices, so each copy takes
+    one of its card's own, the main deck's copies first; an entry whose copies differ is split."""
+    left: dict[Key, list[str]] = {}
+    for entry in source:
+        if entry.choice and entry.location in ("main", "sideboard"):
+            key = (str(entry.card_id), str(entry.printing_id) if entry.printing_id else None)
+            left.setdefault(key, []).extend([entry.choice] * entry.quantity)
+    if not left:
+        return entries
+    found: list[DeckEntry] = []
+    for entry in sorted(entries, key=lambda each: each.location != "main"):
+        key = (str(entry.card_id), str(entry.printing_id) if entry.printing_id else None)
+        mine = left.get(key, [])
+        taken, left[key] = mine[: entry.quantity], mine[entry.quantity :]
+        if not taken:
+            found.append(entry)
+            continue
+        for choice, count in Counter(taken).items():
+            found.append(entry.model_copy(update={"choice": choice, "quantity": count}))
+        if len(taken) < entry.quantity:
+            found.append(entry.model_copy(update={"quantity": entry.quantity - len(taken)}))
+    return found
 
 
 def pool(entries: list[DeckEntry]) -> Counter[Key]:
@@ -251,6 +280,7 @@ def revision_rows(db: Session, revision_id: UUID) -> list[DeckEntry]:
             printing_id=row.printing_id,
             quantity=row.quantity,
             location=row.location,  # type: ignore[arg-type]
+            choice=row.choice,
         )
         for row in rows
     ]
@@ -964,6 +994,7 @@ def save_arrangement(
             "An arrangement swaps cards between the main deck and the sideboard of the deck the "
             "match started with: it holds exactly those cards, no others.",
         )
+    proposed = with_choices(proposed, entries)
     if not principal.can("cards.any"):
         # SysOp's decks need only keep to the pool, as they need only cards in the game to start.
         kept = [entry for entry in entries if entry.location not in ("main", "sideboard")]

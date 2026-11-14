@@ -1094,6 +1094,10 @@ class Deck(Base):
     # campaign card back; null, the account's
     # campaign back if it chose one, else the official card back.
     sleeve: Mapped[str | None] = mapped_column(String(64))
+    # Where the owner keeps it among their decks (v0.9.12, api/workshop.py): one folder, by its
+    # name, and any tags; null for a deck in no folder, or with no tags.
+    folder: Mapped[str | None] = mapped_column(String(64))
+    tags: Mapped[list[str] | None] = mapped_column(JsonType)
     deleted_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     # Deleted from the trash for good (v0.9.3) while a revision a game, match or table used still
     # refers to it: in no list, and not counted toward the deck limit. Its deleted_at stays set.
@@ -1149,6 +1153,9 @@ class DeckEntryRow(Base):
     printing_id: Mapped[UUID | None] = mapped_column(ForeignKey("card_printings.id"))
     quantity: Mapped[int]
     location: Mapped[str] = mapped_column(String(16))
+    # A choice made as the deck is built (v0.9.12): Cryptic Spires's two circled colours, two of
+    # WUBRG in that order; null for every other card.
+    choice: Mapped[str | None] = mapped_column(String(8))
 
 
 class ProgressEntry(Base):
@@ -2140,3 +2147,22 @@ class Entitlement(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
     revoked_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     revoked_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+
+
+class WishlistEntry(Base):
+    """A card an account wants (v0.9.12, api/workshop.py): how many copies, and the deck it wants
+    them for when it said one. One row a card. The account's own, changed and removed by it
+    alone; a deck's deletion leaves the wish and clears its deck; kept with the account."""
+
+    __tablename__ = "wishlist_entries"
+    __table_args__ = (
+        UniqueConstraint("user_id", "card_id", name="uq_wishlist_entries_card"),
+        CheckConstraint("quantity BETWEEN 1 AND 250", name="ck_wishlist_entries_quantity"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    card_id: Mapped[UUID] = mapped_column(ForeignKey("card_concepts.id"))
+    quantity: Mapped[int] = mapped_column(SmallInteger)
+    deck_id: Mapped[UUID | None] = mapped_column(ForeignKey("decks.id"))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime())

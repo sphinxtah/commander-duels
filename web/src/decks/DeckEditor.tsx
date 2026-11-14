@@ -31,8 +31,10 @@ import { useDeckView } from "./deckView";
 import { IdentityPips } from "./DecksPage";
 import { LockIcon, ProblemList } from "./ProblemList";
 import {
+  CHOICE_COLOURS,
   atLeast,
   beyondLibrary,
+  choiceWords,
   collectionLocked,
   combine,
   differences,
@@ -42,7 +44,9 @@ import {
   locationNames,
   locationsFor,
   merge,
+  rowKey,
   sampleHand,
+  takesChoice,
   stats,
   typeGroup,
   typeOrder,
@@ -511,6 +515,15 @@ export function DeckEditor({
               actions={cardActions}
             />
           ))}
+        {opened?.entry && takesChoice(opened.card) && (
+          <ChoicePicker
+            choice={opened.entry.choice ?? null}
+            onChoose={(choice) => {
+              update(opened.entry!, { choice });
+              setOpened({ ...opened, entry: { ...opened.entry!, choice } });
+            }}
+          />
+        )}
       </dialog>
       <dialog
         ref={conflictDialog}
@@ -1074,7 +1087,7 @@ function DeckSections({
                       const shortage = beyond.get(entryKey(entry));
                       return (
                         <li
-                          key={entryKey(entry)}
+                          key={rowKey(entry)}
                           id={`entry-${entry.card_id}`}
                           data-highlight={highlight.has(entry.card_id)}
                           data-playable={card?.playable ?? false}
@@ -1119,6 +1132,14 @@ function DeckSections({
                             {card?.name ?? "Loading…"}
                             {card && entryEdition(entry, card) && (
                               <small> · {entryEdition(entry, card)}</small>
+                            )}
+                            {card && takesChoice(card) && (
+                              <small>
+                                {" · "}
+                                {entry.choice
+                                  ? choiceWords(entry.choice)
+                                  : "choose two colours"}
+                              </small>
                             )}
                           </button>
                           {card && <ManaCost cost={card.mana_cost} />}
@@ -1479,5 +1500,60 @@ function DeckMeta({
         </details>
       )}
     </section>
+  );
+}
+
+/** The two colours circled on a copy of Cryptic Spires (v0.9.12), chosen as the deck is built:
+ * five toggles, of which two stay pressed. Pressing a third lets go of the earlier of the two.
+ * One colour pressed is not yet a choice the deck keeps, but stays pressed here. */
+export function ChoicePicker({
+  choice,
+  onChoose,
+}: {
+  choice: string | null;
+  onChoose: (choice: string | null) => void;
+}) {
+  const [picked, setPicked] = useState<string[]>([...(choice ?? "")]);
+  function toggle(code: string) {
+    const next = picked.includes(code)
+      ? picked.filter((letter) => letter !== code)
+      : [...picked, code].slice(-2);
+    setPicked(next);
+    // Written in WUBRG order, as the server writes a choice.
+    const ordered = CHOICE_COLOURS.map(([letter]) => letter as string).filter(
+      (letter) => next.includes(letter),
+    );
+    onChoose(ordered.length === 2 ? ordered.join("") : null);
+  }
+  const ordered = CHOICE_COLOURS.map(([letter]) => letter as string).filter(
+    (letter) => picked.includes(letter),
+  );
+  return (
+    <fieldset className={styles.choice}>
+      <legend>Circle two colours</legend>
+      <p>
+        As you build the deck, choose the two colours this copy taps for. Each
+        copy keeps its own.
+      </p>
+      <div role="group" aria-label="Circled colours">
+        {CHOICE_COLOURS.map(([code, name]) => (
+          <button
+            key={code}
+            type="button"
+            className={styles.secondary}
+            aria-pressed={picked.includes(code)}
+            onClick={() => toggle(code)}
+          >
+            {picked.includes(code) ? "✓ " : ""}
+            {name}
+          </button>
+        ))}
+      </div>
+      <p role="status">
+        {ordered.length === 2
+          ? `Taps for ${choiceWords(ordered.join(""))}.`
+          : "Choose two: the deck cannot be played until every copy has its colours."}
+      </p>
+    </fieldset>
   );
 }

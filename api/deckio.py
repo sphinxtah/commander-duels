@@ -38,7 +38,7 @@ from api.cards import CardSummary, summaries
 from api.identity import ApiError
 from api.models import CardAlias, CardConcept, CardPrinting
 from api.schemas import Contract
-from api.validation import MAX_ENTRIES, MAX_QUANTITY, DeckEntry, Location
+from api.validation import CHOICE_CARDS, MAX_ENTRIES, MAX_QUANTITY, DeckEntry, Location
 from catalog.statuses import in_game as in_the_game
 from catalog.statuses import stands_in, unplayable_reason
 from catalog.text import normalize
@@ -65,6 +65,9 @@ PRINTING = re.compile(
     r"(?:\s+(?P<number>[A-Za-z0-9★†-]{1,12}))?\s*$"
 )
 MARKERS = re.compile(r"\s+(?:\*[A-Za-z]+\*|\[(?:commander|cmdr)\]|\*CMDR\*)\s*", re.I)
+# A choice made as the deck is built, at a line's end (v0.9.12): Cryptic Spires's two circled
+# colours, "1 Cryptic Spires <WU>". No other deck list uses angle brackets.
+CHOICE = re.compile(r"\s*<(?P<choice>[WUBRGwubrg]{2})>\s*$")
 COMMANDER_MARK = re.compile(r"\[(?:commander|cmdr)\]|\*CMDR\*", re.I)
 HEADINGS: dict[str, Location | None] = {
     "commander": "commander",
@@ -95,6 +98,10 @@ class ImportLine(Contract):
     status: Literal["resolved", "ambiguous", "unresolved", "unavailable"]
     card_id: UUID | None = None
     printing_id: UUID | None = None
+    choice: str | None = Field(
+        default=None,
+        description="The line's choice (v0.9.12): Cryptic Spires's two circled colours.",
+    )
     candidates: list[CardSummary] = Field(default_factory=list)
     reason: str | None = Field(
         default=None,
@@ -119,6 +126,7 @@ class Parsed:
     number: str | None = None
     oracle_id: UUID | None = None
     scryfall_id: UUID | None = None
+    choice: str | None = None
 
 
 @dataclass
@@ -180,6 +188,9 @@ def parse_text(text: str, game_format: str) -> ParsedDeck:
             continue
         if COMMANDER_MARK.search(line):
             location = "commander"
+        choice = None
+        if chosen := CHOICE.search(line):
+            choice, line = chosen["choice"].upper(), line[: chosen.start()].strip()
         line = MARKERS.sub(" ", line).strip()
         match = LINE.match(line)
         if match is None:
@@ -196,7 +207,16 @@ def parse_text(text: str, game_format: str) -> ParsedDeck:
         if not name or len(name) > 200:
             raise invalid(f"Line {number}: a card name is 1 to 200 characters.")
         parsed.lines.append(
-            Parsed(number, raw.strip()[:300], count, location, name, set_code, card_number)
+            Parsed(
+                number,
+                raw.strip()[:300],
+                count,
+                location,
+                name,
+                set_code,
+                card_number,
+                choice=choice,
+            )
         )
         seen_cards = True
     return parsed
@@ -242,6 +262,7 @@ def parse_json(text: str) -> ParsedDeck:
                 str(item["number"])[:16] if item.get("number") else None,
                 identity(item.get("oracle_id")),
                 identity(item.get("scryfall_id")),
+                choice=str(item["choice"])[:8].upper() if item.get("choice") else None,
             )
         )
     return parsed
@@ -359,6 +380,7 @@ def resolve(
                     status="resolved",
                     card_id=concept.id,
                     printing_id=printing_id,
+                    choice=line.choice if normalize(concept.name) in CHOICE_CARDS else None,
                 )
             )
             continue
@@ -435,16 +457,24 @@ def choose_printing(
 
 
 def merged(lines: list[ImportLine]) -> list[DeckEntry]:
-    """Resolved lines as deck entries, one per card, printing and location."""
-    totals: dict[tuple[UUID, UUID | None, str], int] = {}
+    """Resolved lines as deck entries, one per card, printing, location and choice. A choice
+    that is not two different colours is left off: validation then asks for one."""
+    totals: dict[tuple[UUID, UUID | None, str, str | None], int] = {}
     for line in lines:
         if line.card_id is None:
             continue
-        key = (line.card_id, line.printing_id, line.location)
+        choice = line.choice if line.choice and len(set(line.choice)) == 2 else None
+        key = (line.card_id, line.printing_id, line.location, choice)
         totals[key] = min(totals.get(key, 0) + line.quantity, MAX_QUANTITY)
     return [
-        DeckEntry(card_id=card_id, printing_id=printing_id, quantity=quantity, location=location)  # type: ignore[arg-type]
-        for (card_id, printing_id, location), quantity in totals.items()
+        DeckEntry(
+            card_id=card_id,
+            printing_id=printing_id,
+            quantity=quantity,
+            location=location,  # type: ignore[arg-type]
+            choice=choice,
+        )
+        for (card_id, printing_id, location, choice), quantity in totals.items()
     ]
 
 
@@ -474,6 +504,8 @@ def export_text(
             printing = printings.get(entry.printing_id) if entry.printing_id else None
             if printing is not None:
                 text += f" ({printing.set_code.upper()}) {printing.collector_number}"
+            if entry.choice:
+                text += f" <{entry.choice}>"
             lines.append(text)
     return "\n".join(lines) + "\n"
 
@@ -501,6 +533,7 @@ def export_json(
                 "name": cards[entry.card_id].name,
                 "quantity": entry.quantity,
                 "location": entry.location,
+                **({"choice": entry.choice} if entry.choice else {}),
                 **(
                     {
                         "scryfall_id": str(printing.scryfall_id),

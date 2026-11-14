@@ -61,6 +61,7 @@ def test_migration_upgrade_and_downgrade(tmp_path, monkeypatch):
         "game_events",
         "access_grants",
         "entitlements",
+        "wishlist_entries",
         "game_tables",
         "table_seats",
         "table_invites",

@@ -41,6 +41,7 @@ from api.models import (
 # Tables a test empties after itself, children first; the catalog stays.
 ACCOUNT_TABLES = (
     "entitlements",
+    "wishlist_entries",
     "token_ledger",
     "site_settings",
     "library_grants",
@@ -581,7 +582,14 @@ def test_cards_the_game_cannot_play_leave_drafts_but_not_revisions(client):
         assert [c["name"] for c in back["removed_cards"]] == ["Lightning Bolt"]
         # The version a game could have played keeps its four.
         kept = ada.get(f"{path}/revisions/1").json()["entries"]
-        assert {"card_id": bolt, "printing_id": None, "quantity": 4, "location": "main"} in kept
+        # Since v0.9.12 an entry names its choice (Cryptic Spires's colours): none here.
+        assert {
+            "card_id": bolt,
+            "printing_id": None,
+            "quantity": 4,
+            "location": "main",
+            "choice": None,
+        } in kept
         # Out of the game for everyone: search, its page, and a save naming it.
         assert ada.get("/api/v1/cards", q='!"lightning bolt"').json()["total"] == 0
         assert ada.get(f"/api/v1/cards/{bolt}").status_code == 404

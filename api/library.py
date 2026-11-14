@@ -833,10 +833,10 @@ def with_owned_editions(
 
 
 def merged_entries(entries: list[DeckEntry]) -> list[DeckEntry]:
-    """One entry per card, printing and location, in their first order."""
-    totals: dict[tuple[UUID, UUID | None, str], DeckEntry] = {}
+    """One entry per card, printing, location and choice, in their first order."""
+    totals: dict[tuple[UUID, UUID | None, str, str | None], DeckEntry] = {}
     for entry in entries:
-        key = (entry.card_id, entry.printing_id, entry.location)
+        key = (entry.card_id, entry.printing_id, entry.location, entry.choice)
         found = totals.get(key)
         totals[key] = (
             entry

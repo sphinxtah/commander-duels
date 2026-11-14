@@ -2025,8 +2025,9 @@ def engine_deck_list(
     game, where wishes find it (FMT07). Companions stay out of it, as the companion location does,
     since XMage would offer a sideboard's companion as one. Since v0.6.2 the list describes the
     stand-ins it holds (stand_ins), which the engine makes from their description."""
-    counts: dict[str, int] = defaultdict(int)
-    sideboard: dict[str, int] = defaultdict(int)
+    # By name and choice (v0.9.12): a copy of Cryptic Spires goes with its two circled colours.
+    counts: dict[tuple[str, str | None], int] = defaultdict(int)
+    sideboard: dict[tuple[str, str | None], int] = defaultdict(int)
     commanders: list[str] = []
     companions = set(
         db.scalars(
@@ -2042,18 +2043,21 @@ def engine_deck_list(
         if entry.location == "commander":
             commanders.append(name)
         elif entry.location == "main":
-            counts[name] += entry.quantity
+            counts[(name, entry.choice)] += entry.quantity
         elif entry.location == "sideboard" and fmt == "legacy" and entry.card_id not in companions:
-            sideboard[name] += entry.quantity
-    deck_list: dict[str, object] = {
-        "cards": [{"name": name, "count": count} for name, count in counts.items()]
-    }
+            sideboard[(name, entry.choice)] += entry.quantity
+
+    def listed(found: dict[tuple[str, str | None], int]) -> list[dict[str, object]]:
+        return [
+            {"name": name, "count": count, **({"choice": choice} if choice else {})}
+            for (name, choice), count in found.items()
+        ]
+
+    deck_list: dict[str, object] = {"cards": listed(counts)}
     if fmt == "commander":
         deck_list["commanders"] = commanders
     if sideboard:
-        deck_list["sideboard"] = [
-            {"name": name, "count": count} for name, count in sideboard.items()
-        ]
+        deck_list["sideboard"] = listed(sideboard)
     standing_in = stand_ins(db, {entry.card_id for entry in entries})
     if standing_in:
         deck_list["stand_ins"] = list(

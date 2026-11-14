@@ -815,11 +815,50 @@ ENTITLEMENT_QUERIES = {
     "WHERE user_id = :u ORDER BY kind",
 }
 
+
+def wish_for_a_card(engine: Engine, player: UUID, friend: UUID) -> None:
+    """v0.9.12's deck workshop (migration 0048): the player wished for a card, for one of their
+    decks, and filed that deck in a folder under two tags."""
+    key = player if engine.dialect.name == "postgresql" else player.hex
+    with engine.begin() as connection:
+        card = connection.execute(text("SELECT id FROM card_concepts ORDER BY name")).scalar()
+        deck = connection.execute(
+            text("SELECT id FROM decks WHERE owner_id = :u ORDER BY title"), {"u": key}
+        ).scalar()
+        connection.execute(
+            text("UPDATE decks SET folder = 'Tournament', tags = :tags WHERE id = :d"),
+            {"d": deck, "tags": '["aggro", "tested"]'},
+        )
+
+    def as_uuid(found: object) -> UUID:
+        return found if isinstance(found, UUID) else UUID(str(found))
+
+    account = Account(engine)
+    account.add(
+        "wishlist_entries",
+        id=uuid4(),
+        user_id=player,
+        card_id=as_uuid(card),
+        quantity=2,
+        deck_id=as_uuid(deck),
+        created_at=T0,
+        updated_at=T0,
+    )
+    account.write(engine)
+
+
+WISH_QUERIES = {
+    "wishes": "SELECT quantity, deck_id IS NOT NULL FROM wishlist_entries WHERE user_id = :u",
+    "shelves": "SELECT title, folder FROM decks WHERE owner_id = :u AND folder IS NOT NULL",
+}
+
+
 # The migrations after v0.9.9's that add something an account keeps: each one's rows are written
 # at its own revision, and its totals compared from there on.
 LATER = [
     ("0046_access_grants", lend_a_deck, GRANT_QUERIES),
     ("0047_economy_foundations", claim_a_staple, ENTITLEMENT_QUERIES),
+    ("0048_deck_workshop", wish_for_a_card, WISH_QUERIES),
 ]
 
 

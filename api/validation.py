@@ -41,7 +41,7 @@ from datetime import date
 from typing import Literal
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -77,6 +77,10 @@ KAHEERA_TYPES = frozenset({"Cat", "Elemental", "Nightmare", "Dinosaur", "Beast"}
 REMINDER = re.compile(r"\([^()]*\)")
 # A custom card's construction key: its ID, so it never meets a catalog card's name.
 CUSTOM_KEY = "custom:"
+# Cards that take a choice as the deck is built (v0.9.12), by normalized name. Cryptic Spires:
+# "As you create your deck, circle two of the colors below": two of WUBRG, kept with each copy.
+CHOICE_CARDS = frozenset({"cryptic spires"})
+COLOUR_ORDER = "WUBRG"
 CUSTOM_LEGAL = {"legacy": "legal", "commander": "legal"}
 
 
@@ -85,6 +89,28 @@ class DeckEntry(Contract):
     printing_id: UUID | None = None
     quantity: int = Field(ge=1, le=MAX_QUANTITY)
     location: Location = "main"
+    choice: str | None = Field(
+        default=None,
+        max_length=8,
+        description="A choice made as the deck is built (v0.9.12): Cryptic Spires's two circled "
+        "colours, two different letters of WUBRG; null for every other card.",
+    )
+
+    @field_validator("choice")
+    @classmethod
+    def two_colours(cls, choice: str | None) -> str | None:
+        """Two different colours, kept in WUBRG order, so one pair is written one way."""
+        if choice is None or choice == "":
+            return None
+        letters = sorted(set(choice.upper()), key=COLOUR_ORDER.find)
+        if len(choice) != 2 or len(letters) != 2 or any(c not in COLOUR_ORDER for c in letters):
+            raise ValueError("a choice is two different colours of WUBRG")
+        return "".join(letters)
+
+    def kept(self) -> dict[str, object]:
+        """As a draft keeps it: a choice only where one was made, so that a deck without one is
+        written, and hashed, as it was before v0.9.12."""
+        return self.model_dump(mode="json", exclude={} if self.choice else {"choice"})
 
 
 class DeckContent(Contract):
@@ -486,6 +512,19 @@ def validate(
     playing = [entry for entry in present if entry.location != "maybeboard"]
     for card_id in dict.fromkeys(entry.card_id for entry in playing):
         card_problems(report, cards[card_id], rules, today)
+    for card_id in dict.fromkeys(
+        entry.card_id
+        for entry in playing
+        if takes_choice(cards[entry.card_id]) and not entry.choice
+    ):
+        card = cards[card_id]
+        report.error(
+            "choice.missing",
+            f"{card.name} needs its two colours: they are circled as the deck is built.",
+            "Choose two colours for each copy.",
+            kind="structure",
+            card_ids=[card.id],
+        )
     copies(report, playing, cards, rules)
     if collection is not None and collection.copies is not None:
         owned_copies(report, playing, cards, collection)
@@ -515,6 +554,11 @@ def validate(
         warnings=report.warnings,
         counts=counts,
     )
+
+
+def takes_choice(card: Card) -> bool:
+    """Whether the card takes a choice as the deck is built (v0.9.12): Cryptic Spires."""
+    return normalize(card.name) in CHOICE_CARDS
 
 
 def not_allowed(validation: Validation, rules: TableRules) -> list[Problem]:

@@ -46,6 +46,7 @@ from api import (
     testing,
     tutorial,
     warden_openings,
+    workshop,
 )
 from api.config import Settings
 from api.database import build_engine, migration_head
@@ -384,6 +385,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # How to play's example cards, for anyone (v0.8.6).
     app.include_router(how_to_play.router)
     app.include_router(cards.router)
+    # Before the decks' own routes: /decks/shelves and /decks/organize are not deck ids.
+    app.include_router(workshop.router)
     app.include_router(decks.router)
     app.include_router(progression.router)
     app.include_router(tutorial.router)
