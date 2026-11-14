@@ -1078,3 +1078,32 @@ test.describe("the chat bar at the table (v0.5.1)", () => {
       await page.context().close();
     });
 });
+
+test.describe("a library a card shows the top of (v0.9.14)", () => {
+  test("is a button on the table that lists the card, which may be cast from there", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    const table = await openTable(page, { fixture: "library-top" });
+    const library = page.getByRole("button", {
+      name: /^Library \d+, 1 shown$/,
+    });
+    await expect(library).toBeVisible();
+    await expect(library).toHaveAttribute("data-actionable");
+    // The prompt column leaves the card to the library.
+    await expect(page.getByText("Looking at: Top of your library")).toHaveCount(
+      0,
+    );
+    await library.click();
+    await expect(
+      page.getByRole("heading", { name: "Your library" }),
+    ).toBeVisible();
+    await expect(page.getByText(/^1 card shown, of \d+$/)).toBeVisible();
+    await expect(
+      page
+        .getByRole("group", { name: "Your library" })
+        .getByRole("button", { name: /Serra Angel/ }),
+    ).toBeVisible();
+    expect(await table.problems()).toEqual([]);
+  });
+});

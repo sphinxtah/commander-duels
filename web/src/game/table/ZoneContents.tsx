@@ -67,6 +67,8 @@ export function zoneTitle(
       const seat = shownSeat(target, model);
       return seat === null ? model.handTitle : `${whose(model, seat)} hand`;
     }
+    case "library":
+      return `${whose(model, target.seat)} library`;
   }
 }
 
@@ -90,18 +92,26 @@ function keysOf(target: ZoneBrowserTarget, model: TableModel): string[] {
       const seat = shownSeat(target, model);
       return seat === null ? model.hand : (playerAt(model, seat)?.hand ?? []);
     }
+    case "library":
+      return playerAt(model, target.seat)?.library ?? [];
   }
 }
 
 export function ZoneContents({ target, model }: ZoneContentsProps) {
   const title = zoneTitle(target, model);
   const keys = keysOf(target, model);
-  const count = `${keys.length} ${keys.length === 1 ? "card" : "cards"}`;
+  // A library lists only what a card shows of it (v0.9.14), and says of how many.
+  const count =
+    target.kind === "library"
+      ? `${keys.length} ${keys.length === 1 ? "card" : "cards"} shown, of ${playerAt(model, target.seat)?.player.library_count ?? 0}`
+      : `${keys.length} ${keys.length === 1 ? "card" : "cards"}`;
   return (
     <>
       <p className={styles.zoneCount}>{count}</p>
       {keys.length === 0 ? (
-        <p className={styles.zoneEmpty}>Empty</p>
+        <p className={styles.zoneEmpty}>
+          {target.kind === "library" ? "Nothing is shown now" : "Empty"}
+        </p>
       ) : (
         <CardRow label={title} className={styles.zoneGrid}>
           {target.kind === "stack"

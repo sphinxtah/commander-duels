@@ -1,4 +1,11 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { GameContext, type GameContextValue } from "../Board";
 import type { Alliances, Seat } from "../types";
@@ -141,6 +148,39 @@ describe("a player's plate", () => {
       seat: 0,
       zone: "exile",
     });
+  });
+
+  it("makes the library a button while a card shows some of it (v0.9.14)", () => {
+    // As it was: a library is a pile and a count, and nothing to click.
+    plate("revealed", 0);
+    expect(screen.queryByRole("button", { name: /^Library/ })).toBeNull();
+    cleanup();
+
+    // The top of your library, shown by a card that lets you look at it and cast it.
+    const f = tableFixture("revealed");
+    const group = f.snapshot.view!.looked_at[0];
+    group.library_seat = 0;
+    f.snapshot.prompt!.options.push({
+      id: "81",
+      action: "cast",
+      label: null,
+      object_id: group.cards[0].id,
+      seat: null,
+      selected: false,
+    });
+    const { onBrowse, model } = plate(f, 0);
+    expect(model.anchored?.library).toEqual(
+      group.cards.map((card) => `looked_at:${card.id}`),
+    );
+    const library = screen.getByRole("button", {
+      name: `Library ${f.snapshot.view!.you!.library_count}, 2 shown`,
+    });
+    expect(library).toHaveAttribute("data-zone", "library");
+    expect(library).toHaveAttribute("data-actionable");
+    fireEvent.click(library);
+    expect(onBrowse).toHaveBeenCalledWith({ kind: "library", seat: 0 });
+    // The other player's library shows nothing, and stays a pile.
+    expect(model.opponents[0]?.library).toEqual([]);
   });
 
   it("opens the command zone, with the commander tax", () => {

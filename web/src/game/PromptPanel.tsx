@@ -622,26 +622,40 @@ export function PromptPanel({
         [
           ...view.revealed.map((g) => ({ ...g, kind: "Revealed" })),
           ...view.looked_at.map((g) => ({ ...g, kind: "Looking at" })),
-        ].map(
-          (group, i) =>
-            group.cards.length > 0 && (
-              <div key={i} className={styles.revealed}>
-                <h3>
-                  {group.kind}: {group.name}
-                </h3>
-                <CardRow label={`${group.kind}: ${group.name}`}>
-                  {group.cards.map((card) => (
-                    <CardButton
-                      key={card.id}
-                      card={card}
-                      located={game.index.get(card.id)}
-                      small
-                    />
-                  ))}
-                </CardRow>
-              </div>
-            ),
-        )}
+        ]
+          // The top of a library a card shows (v0.9.14) is listed by the library itself, which
+          // is a button on the table while it is shown. It stays here too while a choice other
+          // than priority is asked of its cards, so that the choice cannot be missed.
+          .filter(
+            (group) =>
+              group.library_seat === null ||
+              group.library_seat === undefined ||
+              (prompt !== null &&
+                prompt.kind !== "priority" &&
+                group.cards.some((card) =>
+                  prompt.options.some((option) => option.object_id === card.id),
+                )),
+          )
+          .map(
+            (group, i) =>
+              group.cards.length > 0 && (
+                <div key={i} className={styles.revealed}>
+                  <h3>
+                    {group.kind}: {group.name}
+                  </h3>
+                  <CardRow label={`${group.kind}: ${group.name}`}>
+                    {group.cards.map((card) => (
+                      <CardButton
+                        key={card.id}
+                        card={card}
+                        located={game.index.get(card.id)}
+                        small
+                      />
+                    ))}
+                  </CardRow>
+                </div>
+              ),
+          )}
     </section>
   );
 }

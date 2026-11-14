@@ -100,6 +100,7 @@ The live site's v0.9.10, from the owner's browser: 13.0 s for the practice game'
 | `cut_off_by_budget` | Searches the clock cut off: the bot played its best line so far |
 | `cut_off_by_heap` | Searches a filling heap cut off ([fair bots](fair-bots.md#a-searchs-memory-v098)) |
 | `kept_shallow` | Searches kept shallow for a heavy game or a heap under pressure |
+| `response_searches` | Since v0.9.14: searches that had a response's share of a round, not the bot's whole budget ([fair bots](fair-bots.md#a-round-of-responses-v0914)) |
 | `passed_unsearched` | Decisions where the search could not start or did not stop: the bot passed, a legal move |
 | `failed` | Searches XMage's simulation ended with an error |
 | `weaker_habits` | A weaker bot's slips, naive plays and the like: its skill, never a shortage |

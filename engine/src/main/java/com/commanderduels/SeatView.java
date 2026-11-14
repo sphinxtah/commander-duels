@@ -107,7 +107,12 @@ public record SeatView(
 
     public record CombatInfo(List<String> attackers, TargetRef defender, List<String> blockers, boolean blocked) {}
 
-    public record CardGroup(String name, List<CardInfo> cards) {}
+    /**
+     * A revealed or looked-at group. {@code librarySeat} (v0.9.14): the seat whose library holds every
+     * card of the group at this moment, when one does: the top of a library a card lets its player
+     * look at or play from. The table opens such a group from the library itself.
+     */
+    public record CardGroup(String name, List<CardInfo> cards, Integer librarySeat) {}
 
     public record ManaPoolInfo(int white, int blue, int black, int red, int green, int colorless) {}
 }

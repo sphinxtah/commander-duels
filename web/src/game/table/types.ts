@@ -123,6 +123,10 @@ export interface TablePlayer {
    * (723.4), whose cards carry their options; null for everyone else, and for the anchored
    * player, whose hand is the model's `hand`. */
   hand: string[] | null;
+  /** The cards of this player's library that a card shows the viewer now (v0.9.14), as card keys:
+   * its top while the player may look at it or plays with it revealed. Empty otherwise. The
+   * library's pile is then a button that lists them. */
+  library: string[];
   sigil: { seed: string; grey: boolean }; // seed: `handle:<h>` | `bot:<seat>` | `seat:<seat>`
   portrait: string | null; // a human's allied Planeswalker (v0.3.1), shown instead of the sigil
   /** Another human player's account and card sleeve (v0.8.9), for their profile at the table,
@@ -281,7 +285,8 @@ export type ZoneBrowserTarget =
   | { kind: "battlefield"; seat: Seat }
   | { kind: "pile"; unit: string }
   | { kind: "stack" }
-  | { kind: "hand"; seat?: Seat }; // a seat's hand: yours unless it names your teammate's
+  | { kind: "hand"; seat?: Seat } // a seat's hand: yours unless it names your teammate's
+  | { kind: "library"; seat: Seat }; // the cards of a library a card shows this viewer (v0.9.14)
 export interface MoreNode {
   kind: "more";
   key: string;
@@ -295,7 +300,7 @@ export interface ZoneTile {
   seat: Seat;
   zone: ZoneName | "library";
   card: Rect; // the top card / pile picture
-  hit: Rect | null; // library: null (count only)
+  hit: Rect | null; // library: null (count only), unless a card shows some of it (v0.9.14)
   pedestal: { top: Rect; front: Rect } | null;
   label: string; // "Graveyard 4", "Exile 0", "Command 1 · Tax 2"
   topKey: string | null; // top card shown (graveyard, exile), for the scene and the magnifier

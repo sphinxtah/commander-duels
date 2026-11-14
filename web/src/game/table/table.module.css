@@ -50,6 +50,13 @@
 .hit:disabled {
   cursor: default;
 }
+/* A library a card shows some of (v0.9.14): its pile is a button, ringed so that it is seen. */
+.hit[data-zone="library"] {
+  border-radius: calc(6px / var(--stage-k, 1));
+  box-shadow:
+    0 0 0 calc(2px / var(--stage-k, 1)) #efcc8d,
+    0 0 calc(14px / var(--stage-k, 1)) #efcc8d99;
+}
 /* Rings stay at least 3 CSS pixels however small the stage is drawn. */
 .hit:focus-visible {
   outline: calc(3px / var(--stage-k, 1)) solid #efcc8d;

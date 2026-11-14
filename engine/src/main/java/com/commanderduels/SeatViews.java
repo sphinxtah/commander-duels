@@ -3,9 +3,11 @@ package com.commanderduels;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -125,6 +127,7 @@ final class SeatViews {
         for (UUID player : Visibility.seesFor(game, viewer)) {
             state.getLookedAt(player).forEach((name, cards) -> lookedAt.add(group(name, cards, viewer)));
         }
+        libraryTops(viewer, revealed, lookedAt);
 
         return new SeatView(
             viewer == null ? null : seatIds.indexOf(viewer),
@@ -455,6 +458,41 @@ final class SeatViews {
     }
 
     /**
+     * The top of a library for as long as a card shows it (v0.9.14, the owner's request). XMage lists
+     * such a card in its looked-at or revealed cards only for the moment it tells its client, and
+     * clears the list as it asks for priority, so a seat's view at its own priority never had it
+     * and the table showed it for an instant. Here it is read from what holds: a player whose top
+     * card is played revealed (Future Sight) shows it to every seat; a player who may look at their
+     * top card any time (Bolas's Citadel, Mystic Forge) shows it to their own seat, and to the seat
+     * that controls their turn. Each is a group of its library, in place of XMage's passing one.
+     */
+    private void libraryTops(UUID viewer, List<SeatView.CardGroup> revealed, List<SeatView.CardGroup> lookedAt) {
+        Set<UUID> own = viewer == null ? Set.of() : new HashSet<>(Visibility.seesFor(game, viewer));
+        for (UUID id : seatIds) {
+            Player player = game.getPlayer(id);
+            Card top = player == null || !player.isInGame() ? null : player.getLibrary().getFromTop(game);
+            if (top == null) {
+                continue;
+            }
+            String ref = objectRef(top.getId());
+            int seat = seatIds.indexOf(id);
+            if (player.isTopCardRevealed()) {
+                revealed.removeIf(group -> isOnly(group, ref));
+                revealed.add(new SeatView.CardGroup("Top of " + plain(player.getName()) + "'s library",
+                    List.of(card(top, true)), seat));
+            } else if (own.contains(id) && Visibility.looksAtTop(game, id)) {
+                lookedAt.removeIf(group -> isOnly(group, ref));
+                lookedAt.add(new SeatView.CardGroup(id.equals(viewer) ? "Top of your library"
+                    : "Top of " + plain(player.getName()) + "'s library", List.of(card(top, true)), seat));
+            }
+        }
+    }
+
+    private static boolean isOnly(SeatView.CardGroup group, String ref) {
+        return group.cards().size() == 1 && ref.equals(group.cards().get(0).id());
+    }
+
+    /**
      * A revealed or looked-at group. XMage keeps a card listed after it moves, and its id here is the
      * card's current one, so since v0.8.3 a card that has since gone face down (exiled face down,
      * turned or cast face down) is shown hidden, unless the seat may see it face down: naming it
@@ -462,11 +500,19 @@ final class SeatViews {
      */
     private SeatView.CardGroup group(String name, Cards cards, UUID viewer) {
         List<SeatView.CardInfo> shown = new ArrayList<>();
+        // The seat whose library holds them all (v0.9.14): none for an empty group, cards of two
+        // libraries, or a group with a card that has since left its library.
+        Integer librarySeat = null;
+        boolean inOneLibrary = true;
         for (Card card : cards.getCards(game)) {
             shown.add(card(card, !Visibility.faceDown(game, card.getId())
                 || Visibility.identityVisible(game, card.getId(), viewer)));
+            Integer seat = game.getState().getZone(card.getId()) == Zone.LIBRARY
+                ? seatOrNull(card.getOwnerId()) : null;
+            inOneLibrary &= seat != null && (librarySeat == null || librarySeat.equals(seat));
+            librarySeat = seat;
         }
-        return new SeatView.CardGroup(plain(name), shown);
+        return new SeatView.CardGroup(plain(name), shown, inOneLibrary && !shown.isEmpty() ? librarySeat : null);
     }
 
     private String typeLine(MageObject object) {
