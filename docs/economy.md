@@ -1,5 +1,7 @@
 # The economy's foundations, and the proposals awaiting approval (v0.9.12)
 
+> **Not adopted.** The owner decided on 2026-11-14 to make none of these changes ("I want to keep the game pure, as if it were real life") and to have this foundation removed, its recording of farming signals included. That is [v0.9.13](plans/0.9.13.md)'s work; until then everything here is in the game with every policy off, and this page describes it as built.
+
 The owner's specification asks the Preparation Framework for the economy's next pieces before anyone decides to use them (section 11): "working transactional services behind disabled or test-only policies", "a simulation/reporting tool", and "concrete economy proposals for owner review". This is what v0.9.12 built, what each proposal would do measured by the game's own rules, and how a proposal is switched on. **Every policy is off.** The game pays, grants and sells exactly what it did in v0.9.11 until SysOp sets one, and setting one is what the owner's approval means in practice.
 
 ## What the owner decided at the start (2026-11-13)
