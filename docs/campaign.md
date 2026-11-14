@@ -311,7 +311,7 @@ The owner, 2026-11-13: "I also want the decks for the campaign opponents to NOT 
 
 **The list** is `content/reserved-list.json`: the 571 cards Scryfall marks as reserved (`is:reserved`), read once on 2026-11-13 and committed, with the Power Nine named apart (all nine are reserved). `python scripts/reserved_list.py` reads it again; `python scripts/reserved_list.py --check` names every listed card a deck holds. `tests/test_campaign.py` (`test_no_opponent_plays_a_power_nine_or_reserved_list_card`) fails on a listed card on every push.
 
-**What gave way.** Forty-two cards in eight wards' decks and the court's two gifts. A dual land gives way to the nearest land of its pair the deck does not already hold: the shock land first (the same basic land types, so the fetch lands still find it), then the check land, the pain land, the fast land, the filter land.
+**What gave way.** Forty-two cards in eight wards' decks and the court's two gifts, and three more in ward 14 after it was measured ([below](#no-power-nine-no-reserved-list-v0912)). A dual land gives way to the nearest land of its pair the deck does not already hold: the shock land first (the same basic land types, so the fetch lands still find it), then the check land, the pain land, the fast land, the filter land.
 
 | Deck | Out | In |
 |---|---|---|
@@ -323,13 +323,46 @@ The owner, 2026-11-13: "I also want the decks for the campaign opponents to NOT 
 | 11 Geyadrone Dihada | Underground Sea, Volcanic Island, Badlands | Drowned Catacomb, Sulfur Falls, Dragonskull Summit |
 | 12 Nicol Bolas | Underground Sea, Volcanic Island, Badlands | Drowned Catacomb, Sulfur Falls, Dragonskull Summit |
 | 14 The Sphinx | The ten dual lands | The ten shock lands, pair for pair |
-| 14 The Sphinx | Black Lotus; Mox Sapphire, Jet, Pearl, Ruby, Emerald | Jeweled Lotus; Mox Opal, Mox Amber, Lotus Petal, Fellwar Stone, Bloom Tender |
+| 14 The Sphinx | Black Lotus; Mox Sapphire, Jet, Pearl, Ruby, Emerald | Jeweled Lotus; Chrome Mox (Mox Opal at first, see below), Mox Amber, Lotus Petal, Fellwar Stone, Bloom Tender |
 | 14 The Sphinx | Ancestral Recall, Time Walk, Grim Monolith | Jace, the Mind Sculptor, Time Warp, Coalition Relic |
 | Nicol Bolas's Gift (the court) | Black Lotus; Mox Sapphire, Jet, Ruby; Ancestral Recall, Time Walk | Jeweled Lotus; Mox Amber, Mox Opal, Lotus Petal; Jace, the Mind Sculptor, Time Warp |
 | Nicol Bolas's Gift (the court) | Underground Sea, Volcanic Island, Badlands | Drowned Catacomb, Sulfur Falls, Dragonskull Summit |
 | Liliana's Gift (the court) | Black Lotus, Mox Jet, Grim Monolith | Jeweled Lotus, Mox Amber, Jet Medallion |
 
 Players who already won a deck keep the deck and the cards they won, as in v0.9.3 and v0.9.8; a first win from now on gives the deck as it is now. The starter decks are not an opponent's: each still holds its one Revised dual land, which is most of its price ([the shop](shop.md#starter-decks-v042)).
+
+**Measured.** Three sets of hosted runs on 2026-11-13, three runs a set, 30 games a ward a run (the court 6), so 90 games a ward a set. The first is v0.9.11's decks, run the same day so that the runners' load is the same; the second is the replacements above; the third is the second with ward 14 strengthened. The reference decks' wins:
+
+| Ward | v0.9.11's decks | Replaced | Ward 14 strengthened | Changed |
+|---:|---:|---:|---:|---|
+| 1 | 77 (86%) | 81 (90%) | 82 (91%) | |
+| 2 | 68 (76%) | 67 (74%) | 74 (82%) | |
+| 3 | 60 (67%) | 63 (70%) | 59 (66%) | |
+| 4 | 54 (60%) | 56 (62%) | 51 (57%) | |
+| 5 | 60 (67%) | 62 (69%) | 71 (79%) | One land |
+| 6 | 39 (43%) | 51 (57%) | 49 (54%) | One land |
+| 7 | 38 (42%) | 41 (46%) | 43 (48%) | One land |
+| 8 | 45 (50%) | 37 (41%) | 41 (46%) | |
+| 9 | 28 (31%) | 23 (26%) | 29 (32%) | One land |
+| 10 | 20 (22%) | 19 (21%) | 23 (26%) | One land |
+| 11 | 39 (43%) | 37 (41%) | 37 (41%) | Three lands |
+| 12 | 22 (24%) | 24 (27%) | 19 (21%) | Three lands |
+| 13 | 27 (30%) | 32 (36%) | 31 (34%) | |
+| 14 | 35 (39%) | 47 (52%) | 41 (46%) | Nineteen cards, then three more |
+| The court | 3 of 18 | 3 of 18 | 3 of 18 | Twelve cards in the two gifts |
+
+- **What the noise is.** Wards 1 to 4, 8 and 13 changed nothing, and the second and third sets differ only in ward 14. Between sets those unchanged decks moved by up to nine points (ward 8: 50%, 41%, 46%), and one deck by ten between two sets that played the same list (ward 5: 69% and 79%). Ninety games do not tell five points apart.
+- **The land swaps did not move their wards.** Wards 5, 7, 9, 10, 11 and 12 stayed within that noise. Ward 6 measured 43% with v0.9.11's deck and 57% and 54% after one land changed; v0.9.8 measured the same deck at 53%, and its target is 55%, so the 43% is the odd one out.
+- **Ward 14 got easier, as losing eight of the Power Nine would make it.** From 39% to 52% in the first set. It was then strengthened with cards that are not reserved and that the bot gets full value from:
+
+| Out | In | Why |
+|---|---|---|
+| Mox Opal | Chrome Mox | A Mox that makes mana from the first turn. Mox Opal waits for three artifacts, which this deck rarely has early |
+| Swan Song | Consecrated Sphinx | A counterspell the bot seldom times, for a card that pays whatever it does |
+| Brainstorm | Smothering Tithe | The same: a Treasure each time the opponent draws |
+
+- **After that: 46%.** Seven points above v0.9.11's deck and within the noise above, so the runs cannot say whether it is back where it was; they do say it is not harder. Its target is 10%, which it has never met (39% in v0.9.8, when it was left as it is). As then, this measures the public stand-in: the live finale also plays the High Priest and the incarnation, which only the owner's engine has. Whether the finale is hard enough is the owner's to say after playing it.
+- **The runs:** v0.9.11's decks 43556214363, 43556214324, 43556214212; replaced 43550437848, 43550437738, 43550437887; ward 14 strengthened 43561413180, 43561414742, 43561416558.
 
 ## Content
 
