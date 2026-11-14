@@ -7,8 +7,9 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    # It takes about 8 minutes; a hang fails here instead of holding a runner for six hours.
-    timeout-minutes: 30
+    # It takes about 25 minutes, and over 30 on a slow runner (v0.9.13's first run was cancelled
+    # in its last step at 30); a hang fails here instead of holding a runner for six hours.
+    timeout-minutes: 45
     env:
       CD_TEST_POSTGRES_URL: postgresql+psycopg://commander:commander@localhost:5432/commander
     services:
