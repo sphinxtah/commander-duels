@@ -137,6 +137,20 @@ class FairBot extends ComputerPlayerControllableProxy {
     static final long HEAP_CHECK_MILLIS = 100;
     /** XMage's own count of a search's nodes past which it reports an error (private there). */
     private static final int MAX_NODES_ERROR = 5100;
+    /**
+     * How long the bots of a table think between them when they answer (v0.9.14, the owner's report
+     * of 2026-11-14): a round of responses. A search has a bot's whole budget, twelve seconds at
+     * skill 4, and every priority a bot gets starts one; late in a four-seat Commander game each
+     * runs to its limit, so one spell of a player's waited for three bots in turn, a minute and
+     * more at turn 27. A bot now has its whole budget only for its own turn with nothing on the
+     * stack. Any other decision, a response to a spell or an ability or a priority in another
+     * player's turn, has its share of one round: this long divided among the table's bots, at least
+     * {@link #RESPONSE_FLOOR_MILLIS} and never more than its budget. Alone against one player a bot
+     * answers as before, with its whole budget: there the wait does not multiply, and the
+     * campaign's duels are measured with it.
+     */
+    static final long RESPONSE_ROUND_MILLIS = 6_000;
+    static final long RESPONSE_FLOOR_MILLIS = 1_000;
     /** How long a decision waits for a free search thread before the bot passes instead. */
     static final long QUEUE_WAIT_MILLIS = 60_000;
     /** XMage's own pool for its AI has five threads; a busy engine needs one per processor. */
@@ -229,6 +243,8 @@ class FairBot extends ComputerPlayerControllableProxy {
         private final AtomicLong found = new AtomicLong();
         // Sacrifice outlets a search left out of its options (v0.9.8).
         private final AtomicLong outlets = new AtomicLong();
+        // Searches that had a response's share of a round, not the bot's whole budget (v0.9.14).
+        private final AtomicLong responses = new AtomicLong();
 
         /** Determinized copies made: one per search. */
         long samples() {
@@ -283,6 +299,7 @@ class FairBot extends ComputerPlayerControllableProxy {
             metrics.put("cut_off_by_budget", timedOut());
             metrics.put("cut_off_by_heap", heapStops());
             metrics.put("kept_shallow", light());
+            metrics.put("response_searches", responses.get());
             metrics.put("passed_unsearched", abandoned() + unstarted());
             metrics.put("failed", failed());
             metrics.put("weaker_habits", slips() + naivePlays() + heldBack() + recklessAttacks() + unblocked());
@@ -404,6 +421,8 @@ class FairBot extends ComputerPlayerControllableProxy {
      * at a time. Only the thread running this bot's search touches it.
      */
     private transient Finds finds;
+    /** The thinking time of the decision under way (v0.9.14), set as priority comes; 0 before one. */
+    private transient long thinkNowMillis;
 
     /** A search effect on a node's stack, and the cards it may find that the search has not tried. */
     private record Finds(SimulationNode2 node, StackAbility search, int depth, Deque<UUID> cards) {}
@@ -535,6 +554,7 @@ class FairBot extends ComputerPlayerControllableProxy {
             pass(game);
             return false;
         }
+        thinkNowMillis = thinkMillis(game);
         if (habitsNow()) {
             boolean ownMain = game.getActivePlayerId() != null && game.getActivePlayerId().equals(playerId)
                 && game.getStack().isEmpty() && isMainPhase(game);
@@ -892,6 +912,28 @@ class FairBot extends ComputerPlayerControllableProxy {
         return budget;
     }
 
+    /**
+     * How long this decision's search may think (v0.9.14): the bot's budget in its own turn with
+     * nothing on the stack, in a game of two players, and wherever it is the table's only bot; else
+     * its share of a round of responses ({@link #RESPONSE_ROUND_MILLIS}). A game of two keeps the
+     * budget even between two bots, so that the campaign's duels are measured as they are played.
+     */
+    long thinkMillis(Game game) {
+        long whole = budget.thinkMillis();
+        if (playerId.equals(game.getActivePlayerId()) && game.getStack().isEmpty()) {
+            return whole;
+        }
+        if (game.getPlayers().size() <= 2) {
+            return whole;
+        }
+        long bots = game.getPlayers().values().stream()
+            .filter(player -> player instanceof FairBot && player.isInGame()).count();
+        if (bots < 2) {
+            return whole;
+        }
+        return Math.min(whole, Math.max(RESPONSE_FLOOR_MILLIS, RESPONSE_ROUND_MILLIS / bots));
+    }
+
     Stats stats() {
         return stats;
     }
@@ -1239,7 +1281,12 @@ class FairBot extends ComputerPlayerControllableProxy {
     private Integer awaitSearch(FutureTask<Integer> search, AtomicBoolean heapFilled)
             throws InterruptedException, ExecutionException, TimeoutException {
         long slice = TimeUnit.MILLISECONDS.toNanos(HEAP_CHECK_MILLIS);
-        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(budget.thinkMillis());
+        // The decision's own time (v0.9.14); a search no priority started has the bot's budget.
+        long think = thinkNowMillis > 0 ? thinkNowMillis : budget.thinkMillis();
+        if (think < budget.thinkMillis()) {
+            stats.responses.incrementAndGet();
+        }
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(think);
         while (true) {
             long left = Math.max(0, deadline - System.nanoTime());
             try {

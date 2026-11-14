@@ -146,6 +146,20 @@ At the campaign's court (six seats, five of them bots at skill 6) a search held 
 
 What it changes in play: a bot that tutors still finds the card it rates best among its own library's names. XMage's target named every card in every library in range for any search, though a search is of one library; the step tries another player's cards only when none of the named cards is in the searcher's own library (a search of an opponent's library, such as Bribery's), and then every card named. A trigger with more than twelve options is chosen among twelve. `FairBotMemoryTest` fixes the counts (XMage's 119 copies against the fair bot's at most two alive, eleven tried), the twelve options, one card for each name, and a search stopped by a full heap.
 
+## A round of responses (v0.9.14)
+
+The owner, playing a four-seat Commander game against three bots on 2026-11-14: from turn 18 every action of his waited for the bots, 20 seconds and then, at turn 27, "a full minute for me to cast a spell"; with the bots made passive the wait was gone.
+
+A search has a bot's whole budget, twelve seconds at skill 4 (15 at 5, 18 at 6), and every priority a bot gets starts one. Early in a game a search finishes in milliseconds. Late in a four-player game each runs to its limit, and three bots answer one spell in turn: one round of priority cost three budgets and their two-second stops, and a spell is at least two rounds.
+
+Since v0.9.14 a bot has its whole budget only for its own turn with nothing on the stack. Any other decision, a response to a spell or an ability, or a priority in another player's turn, has its share of one **round of responses**: `RESPONSE_ROUND_MILLIS` (six seconds) divided among the bots at the table, at least `RESPONSE_FLOOR_MILLIS` (one second) and never more than the bot's budget (`FairBot.thinkMillis`). Three bots answer in two seconds each; King's Table's five in 1.2.
+
+- **A search that finishes within its share is the search it was.** Only one that would have run past it is cut off, and it then plays its best line so far, as a search out of budget always did.
+- **A game of two players keeps the whole budget for everything**, and so does a bot that is the table's only one. There the wait does not multiply. Two bots in a game of two keep theirs as well, so the campaign's duels, which are measured bot against bot, are measured as a player meets them. The Unbound Court's five bots do share a round: its measured difficulty ([the campaign](../campaign.md)) was taken before this and has not been taken again.
+- **Counted** as `response_searches` in the bots' numbers ([isolation](isolation.md#what-the-operator-reads)): searches that had less than the bot's whole budget.
+
+`ResponseRoundTest`: at a table of one player and three skill 4 bots every response has 2,000 ms and a bot's own turn 12,000; in a duel every decision has 12,000; two bots seated at a game of two have their budgets, 18,000 and 3,000.
+
 ## Sacrifice outlets left alone (v0.9.8)
 
 XMage's AI feeds its board to an ability paid for by sacrificing another permanent. The difficulty harness's trace showed it twice in the campaign:
