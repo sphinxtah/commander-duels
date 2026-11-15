@@ -1008,6 +1008,7 @@ button.life[data-selected] {
   flex-wrap: wrap;
   margin: 28px 0 10px;
 }
+.gamesHead h2,
 .gamesHead h3 {
   margin: 0;
   font-size: 1rem;

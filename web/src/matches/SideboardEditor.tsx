@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { client, describe } from "../api";
 import { exitTableFullscreen } from "../app/fullscreen";
-import { tableFullscreen } from "../game/PracticeTable";
+import { tableFullscreen } from "../game/practice";
 import { getSoundEngine } from "../game/sound/engine";
 import game from "../game/game.module.css";
 import {

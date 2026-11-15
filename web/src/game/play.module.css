@@ -1,0 +1,227 @@
+/* The Play wizard (v1.0.0): one question a slide, the slides named and numbered along the top,
+   Back and Next under each, and "Start Game" on the last. In the practice table's own colours
+   (game.module.css), which it replaced. */
+
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 4px;
+  list-style: none;
+  margin: 0 0 22px;
+  padding: 0 0 16px;
+  border-bottom: 1px solid #ffffff12;
+}
+.steps button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: #87968b;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.steps button:hover {
+  border-color: #d5b77c55;
+  color: #eceee5;
+}
+.steps button:focus-visible {
+  outline: 2px solid #efcc8d;
+  outline-offset: 2px;
+}
+.unseen {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.number {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #ffffff2a;
+  border-radius: 50%;
+  font-size: 0.7rem;
+}
+.steps em {
+  font-style: normal;
+}
+.steps li[aria-current="step"] button {
+  color: #efcc8d;
+  font-weight: 650;
+  border-color: #d5b77c44;
+}
+.steps li[aria-current="step"] .number {
+  border-color: #d5b77c;
+  background: var(--cd-gold-fill);
+  color: #192220;
+  box-shadow: var(--cd-gold-shadow);
+  font-family: var(--cd-display);
+  font-weight: 700;
+}
+.steps li[data-done] .number {
+  border-color: #d5b77c88;
+  color: #d5b77c;
+}
+
+.slide {
+  display: grid;
+  gap: 20px;
+}
+.head h2 {
+  margin: 4px 0 0;
+}
+/* A slide's heading takes the focus when the player moves to it, so a screen reader says where
+   the wizard went; like the page's own heading it draws no ring. */
+.head h2:focus {
+  outline: none;
+}
+.body {
+  min-height: 150px;
+  align-content: start;
+  align-items: start;
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding-top: 18px;
+  border-top: 1px solid #ffffff12;
+}
+.nav > p {
+  margin: 0;
+  flex: 1 1 220px;
+}
+.nav a {
+  text-decoration: none;
+}
+
+/* The account's last setup, offered on the first slide. */
+.again {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  padding: 14px 16px;
+  border: 1px solid #d5b77c55;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #1c2b27, #111a18);
+}
+.again p {
+  margin: 0;
+  display: grid;
+  gap: 2px;
+}
+.again small {
+  color: #a9b5aa;
+}
+
+/* A game still running: the way back to it, above every slide. */
+.running {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  border: 1px solid #efcc8d66;
+  border-radius: 8px;
+  background: #efcc8d12;
+}
+.running p {
+  margin: 0;
+}
+.running a {
+  text-decoration: none;
+}
+
+/* The last slide: what was chosen, a line each, with the way back to its slide. */
+.summary {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+.row {
+  display: grid;
+  grid-template-columns: minmax(120px, 190px) 1fr auto;
+  gap: 4px 16px;
+  align-items: baseline;
+  padding: 11px 0;
+  border-bottom: 1px solid #ffffff0f;
+}
+.row:last-child {
+  border-bottom: 0;
+}
+.row dt {
+  color: #a9b5aa;
+  font-size: 0.82rem;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+.row dd {
+  margin: 0;
+  font-weight: 600;
+}
+.row dd small,
+.row dd p {
+  display: block;
+  margin: 3px 0 0;
+  color: #a9b5aa;
+  font-weight: 400;
+  font-size: 0.82rem;
+}
+.change {
+  background: transparent;
+  border: 1px solid #ffffff2a;
+  border-radius: 4px;
+  color: #c9d0c6;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+.change:hover,
+.change:focus-visible {
+  border-color: #d5b77c;
+  color: #efcc8d;
+}
+
+/* A phone: the slides' names give way to their numbers but for the one shown, the summary
+   stacks, and Back and Next fill the row. */
+@media (max-width: 640px) {
+  .steps li:not([aria-current="step"]) em {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .steps button {
+    padding: 6px;
+  }
+  .row {
+    grid-template-columns: 1fr auto;
+  }
+  .row dt {
+    grid-column: 1 / -1;
+  }
+  .nav > a,
+  .nav > button {
+    flex: 1 1 130px;
+    text-align: center;
+    justify-content: center;
+  }
+}

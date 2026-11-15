@@ -58,7 +58,7 @@ import { HomeHub } from "./shell/HomeHub";
 import { useHud } from "./shell/hud";
 import { PageBand } from "./shell/PageBand";
 import { pages, type Page } from "./shell/pages";
-import { PlayPage } from "./shell/PlayPage";
+import { PLAY_GAMES_ROUTE, PlayPage } from "./shell/PlayPage";
 import { MusicBox } from "./shell/music/MusicBox";
 import { TopBar } from "./shell/TopBar";
 import {
@@ -130,6 +130,10 @@ function currentHowToPlay(): string | undefined {
   const match = HOW_TO_PLAY_ROUTE.exec(window.location.hash);
   return match ? (match[1] ?? "") : undefined;
 }
+/** #play/games (v1.0.0): the account's games, the page the Play wizard's first slide opens. */
+function currentPlayGames(): boolean {
+  return PLAY_GAMES_ROUTE.test(window.location.hash);
+}
 /** #player/<id> opens a player's profile (v0.4.3), under Friends. */
 function currentPlayer(): string | undefined {
   return PLAYER_ROUTE.exec(window.location.hash)?.[1]?.toLowerCase();
@@ -145,7 +149,7 @@ function currentPage(): Page {
   if (path.startsWith("tables/")) return "Tables";
   // Tivit's Auction House's tabs (v0.6.0): #auctions/search, #auctions/list, #auctions/targets.
   if (path.startsWith("auctions/")) return "Auctions";
-  if (path.startsWith("match/")) return "Play";
+  if (path.startsWith("match/") || path === "play/games") return "Play";
   // The campaign (v0.8.0), and its way back from a duel.
   if (path.startsWith("campaign/")) return "Campaign";
   if (path.startsWith("deck/") || path.startsWith("shared/")) return "Decks";
@@ -164,6 +168,7 @@ export function App() {
   const [deckRoute, setDeckRoute] = useState(currentDeck);
   const [tableRoute, setTableRoute] = useState(currentTable);
   const [matchRoute, setMatchRoute] = useState(currentMatch);
+  const [playGames, setPlayGames] = useState(currentPlayGames);
   const [playerRoute, setPlayerRoute] = useState(currentPlayer);
   const [campaignRoute, setCampaignRoute] = useState(currentCampaign);
   const [messagesRoute, setMessagesRoute] = useState(currentMessages);
@@ -312,6 +317,7 @@ export function App() {
       setDeckRoute(currentDeck());
       setTableRoute(currentTable());
       setMatchRoute(currentMatch());
+      setPlayGames(currentPlayGames());
       setPlayerRoute(currentPlayer());
       setCampaignRoute(currentCampaign());
       setMessagesRoute(currentMessages());
@@ -753,11 +759,13 @@ export function App() {
               />
             ) : page === "Play" ? (
               <PlayPage
+                key={playGames ? "games" : "wizard"}
                 me={me}
                 formats={formats}
                 connection={connection}
                 onRetry={retry}
                 heading={heading}
+                view={playGames ? "games" : "wizard"}
               />
             ) : page === "HowToPlay" ? (
               <HowToPlay rest={howToPlayRoute} heading={heading} />

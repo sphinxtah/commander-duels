@@ -8,7 +8,7 @@ import {
 import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { client, type Me } from "../api";
-import { PracticeTable } from "../game/PracticeTable";
+import { PlayWizard } from "../game/PlayWizard";
 import {
   DEFAULT_TABLE_SETTINGS,
   TABLE_SETTINGS_KEY,
@@ -112,7 +112,8 @@ const active = {
   ],
 };
 
-/** The practice table with its options and games answered; POST answers as given. */
+/** The Play wizard with its options and games answered; POST answers as given. `startButton`
+ * goes to its last slide for the button that starts the game. */
 function practice(post: () => Promise<unknown>) {
   const ok = (data: unknown) =>
     Promise.resolve({ data, response: new Response(null) });
@@ -135,14 +136,18 @@ function practice(post: () => Promise<unknown>) {
     return ok(undefined);
   }) as never);
   const sent = vi.spyOn(client, "POST").mockImplementation(post as never);
-  render(createElement(PracticeTable, { me: alice }));
+  render(createElement(PlayWizard, { me: alice }));
   return sent;
+}
+async function startButton(): Promise<HTMLElement> {
+  fireEvent.click(await screen.findByRole("button", { name: /: Start Game$/ }));
+  return screen.findByRole("button", { name: "Start Game" });
 }
 
 describe("full screen when a game starts", () => {
   it("is asked for inside the click, before the start request, which need never answer", async () => {
     const post = practice(() => new Promise(() => {}));
-    const start = await screen.findByRole("button", { name: "Start the game" });
+    const start = await startButton();
     await vi.waitFor(() => expect(start).toBeEnabled());
     fireEvent.click(start);
     // Synchronously: nothing was awaited between the click and the request.
@@ -167,7 +172,7 @@ describe("full screen when a game starts", () => {
         response: new Response(null, { status: 503 }),
       }),
     );
-    const start = await screen.findByRole("button", { name: "Start the game" });
+    const start = await startButton();
     await vi.waitFor(() => expect(start).toBeEnabled());
     fireEvent.click(start);
     await grant();
@@ -180,7 +185,7 @@ describe("full screen when a game starts", () => {
   it("leaves full screen when the start request throws, and the button comes back", async () => {
     // The network dropped: openapi-fetch rethrows fetch's TypeError.
     practice(() => Promise.reject(new TypeError("Failed to fetch")));
-    const start = await screen.findByRole("button", { name: "Start the game" });
+    const start = await startButton();
     await vi.waitFor(() => expect(start).toBeEnabled());
     fireEvent.click(start);
     expect(requestFullscreen).toHaveBeenCalledTimes(1);
@@ -191,14 +196,14 @@ describe("full screen when a game starts", () => {
     await vi.waitFor(() => expect(exitFullscreen).toHaveBeenCalledTimes(1));
     expect(document.fullscreenElement).toBeNull();
     expect(keyboard.unlock).toHaveBeenCalled();
-    expect(
-      screen.getByRole("button", { name: "Start the game" }),
-    ).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Start Game" })).toBeEnabled();
   });
 
   it("is not asked for by a click that opens the game in another tab or window", async () => {
     practice(() => new Promise(() => {}));
-    const resume = await screen.findByRole("link", { name: "Resume" });
+    const resume = await screen.findByRole("link", {
+      name: "Return to your game",
+    });
     resume.addEventListener("click", (event) => event.preventDefault());
     for (const modifier of [
       { ctrlKey: true },
@@ -215,7 +220,9 @@ describe("full screen when a game starts", () => {
 
   it("is asked for by Resume, and not at all when the setting is off", async () => {
     practice(() => new Promise(() => {}));
-    const resume = await screen.findByRole("link", { name: "Resume" });
+    const resume = await screen.findByRole("link", {
+      name: "Return to your game",
+    });
     resume.addEventListener("click", (event) => event.preventDefault());
     fireEvent.click(resume);
     expect(requestFullscreen).toHaveBeenCalledTimes(1);
@@ -228,7 +235,7 @@ describe("full screen when a game starts", () => {
       JSON.stringify({ ...DEFAULT_TABLE_SETTINGS, fullscreenOnStart: false }),
     );
     fireEvent.click(resume);
-    fireEvent.click(screen.getByRole("button", { name: "Start the game" }));
+    fireEvent.click(await startButton());
     expect(requestFullscreen).not.toHaveBeenCalled();
   });
 });

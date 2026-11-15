@@ -35,7 +35,8 @@ import { leaveTable } from "./app/serviceWorker";
 import { GameScreen } from "./game/GameScreen";
 import { loadGoogle, type GoogleId } from "./google";
 
-// The game screen and the practice table have their own tests; here they only take up room.
+// The game screen, the Play wizard and the list of games have their own tests; here they only
+// take up room.
 vi.mock("./game/GameScreen", async () => {
   const { createElement } = await import("react");
   return {
@@ -44,7 +45,8 @@ vi.mock("./game/GameScreen", async () => {
     ),
   };
 });
-vi.mock("./game/PracticeTable", () => ({ PracticeTable: () => null }));
+vi.mock("./game/PlayWizard", () => ({ PlayWizard: () => null }));
+vi.mock("./game/GamesList", () => ({ GamesList: () => null }));
 // Google's script stays away unless a test brings its own.
 vi.mock("./google", () => ({ loadGoogle: vi.fn(() => new Promise(() => {})) }));
 // Whether leaving the table leaves full screen and applies a waiting update; fullscreen.test.ts
@@ -1120,7 +1122,7 @@ describe("what this version offers", () => {
     // Since v0.5.1 at tables and in the queue too; since v0.6.1 with team priority and the
     // team's one attack and block.
     expect(dialog).toHaveTextContent(
-      "Two teams of two, with Legacy decks: with a bot teammate at the practice table here",
+      "Two teams of two, with Legacy decks: with a bot teammate from the wizard here",
     );
     expect(dialog).toHaveTextContent(
       "Your team takes its turns together, holds priority together, attacks and blocks together, shares one life total and wins together.",

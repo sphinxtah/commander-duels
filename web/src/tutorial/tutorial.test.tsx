@@ -582,13 +582,13 @@ describe("the main menu's tour", () => {
     );
   });
 
-  it("ends at the practice table, with a last bubble", async () => {
+  it("ends at the Play wizard, with a last bubble", async () => {
     target("practice-start");
     const onChange = vi.fn();
     move.mockResolvedValue({ me: at("done") });
     render(<Tour me={at("tour_play")} page="Play" onChange={onChange} />);
     expect(
-      await screen.findByText(/At the practice table you play against bots/),
+      await screen.findByText(/Here you play against bots, one question a slide/),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Finish the tour/ }));
     await waitFor(() => expect(onChange).toHaveBeenCalledWith(at("done")));
@@ -614,7 +614,7 @@ describe("the main menu's tour", () => {
     target("practice-start");
     move.mockResolvedValue({ me: at("done") });
     render(<Tour me={at("tour_play")} page="Play" onChange={() => {}} />);
-    await screen.findByText(/At the practice table/);
+    await screen.findByText(/Here you play against bots/);
     act(() => {
       window.location.hash = "#game/00000000-0000-4000-8000-0000000000aa";
       window.dispatchEvent(new HashChangeEvent("hashchange"));

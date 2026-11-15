@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { occluded, sizeChecks } from "./helpers/checks";
+import { playWizard, startFromWizard, toSlide } from "./helpers/playWizard";
 import type {
   GameView,
   Prompt,
@@ -334,17 +335,22 @@ async function startGame(
     turnCap: number;
   },
 ): Promise<string> {
+  // The Play wizard (v1.0.0): each choice on its own slide.
   await page.goto("/#play");
-  const table = page.getByRole("region", { name: "Sit down against the bots" });
+  const table = playWizard(page);
+  await toSlide(page, "Format");
   await table.getByRole("radio", { name: new RegExp(options.format) }).check();
+  await toSlide(page, "The table's rules");
+  await table.getByLabel("Turn limit").fill(String(options.turnCap));
+  await toSlide(page, "Your deck");
   await table.getByLabel("Your deck").selectOption(options.deck);
+  await toSlide(page, "The bots");
   if (options.bots)
     await table
       .getByLabel("Bots", { exact: true })
       .selectOption(String(options.bots));
   await table.getByLabel(/Bot skill/).fill("1");
-  await table.getByLabel("Turn limit").fill(String(options.turnCap));
-  await table.getByRole("button", { name: "Start the game" }).click();
+  await startFromWizard(page);
   await expect(page).toHaveURL(/#game\/[0-9a-f-]{36}$/, { timeout: 30_000 });
   return page.url().split("#game/")[1];
 }
@@ -986,13 +992,14 @@ test.describe("practice games in the browser", () => {
     await page
       .getByRole("link", { name: "Play it at the practice table" })
       .click();
-    const practice = page.getByRole("region", {
-      name: "Sit down against the bots",
-    });
+    const practice = playWizard(page);
+    await toSlide(page, "Your deck");
     await expect(practice.getByLabel("Your deck")).toHaveValue(/^own:/);
+    await toSlide(page, "The bots");
     await practice.getByLabel(/Bot skill/).fill("1");
+    await toSlide(page, "The table's rules");
     await practice.getByLabel("Turn limit").fill("8");
-    await practice.getByRole("button", { name: "Start the game" }).click();
+    await startFromWizard(page);
     await expect(page).toHaveURL(/#game\/[0-9a-f-]{36}$/, { timeout: 30_000 });
 
     // Play up to the first priority prompt that offers to pass until the next turn.

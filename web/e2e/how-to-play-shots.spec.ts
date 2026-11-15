@@ -1,4 +1,5 @@
 import { test, expect, type Locator, type Page } from "@playwright/test";
+import { startFromWizard } from "./helpers/playWizard";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 // How to play's screenshots of the table (v0.8.6), taken from the game as it is: the tutorial's
@@ -188,10 +189,7 @@ test.describe("How to play's screenshots", () => {
     });
     test.skip(!engine?.gameplay_available, "Needs the engine's games.");
     await page.goto("/#practice");
-    await page
-      .getByRole("button", { name: /Start (the )?game/i })
-      .first()
-      .click();
+    await startFromWizard(page);
     await expect(page).toHaveURL(/#game\//, { timeout: 60_000 });
     const keep = page.getByRole("button", { name: /Keep Hand/i }).first();
     await expect(keep).toBeVisible({ timeout: 120_000 });

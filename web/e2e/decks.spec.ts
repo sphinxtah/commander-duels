@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { playWizard, toSlide } from "./helpers/playWizard";
 
 // The deck builder and the card catalog (M1) as SysOp, who may build decks: a list imported,
 // fixed in the editor, saved, shared and taken to the practice table, and the catalog searched.
@@ -127,10 +128,12 @@ test.describe("decks and the card catalog", () => {
       .getByRole("link", { name: "Play it at the practice table" })
       .click();
     await expect(page).toHaveURL(/#play\?deck=/);
-    // The practice table's own choices: "Find a game" above it has its own (v0.5.0).
-    const practice = page.getByRole("region", {
-      name: "Sit down against the bots",
-    });
+    // The Play wizard opens on its last slide (v1.0.0), the deck chosen on its own slide.
+    const practice = playWizard(page);
+    await expect(
+      practice.getByRole("heading", { name: "Ready to play" }),
+    ).toBeVisible();
+    await toSlide(page, "Your deck");
     await expect(practice.getByLabel("Your deck")).toHaveValue(`own:${deckId}`);
 
     // From the list: archived, then back.
@@ -189,16 +192,16 @@ test.describe("decks and the card catalog", () => {
     await expect(page.getByRole("region", { name: "Commander" })).toContainText(
       "Kenrith, the Returned King",
     );
-    // The table opens on Legacy; the link switches it to Commander, then picks the deck.
+    // The wizard opens on Legacy; the link switches it to Commander, then picks the deck.
     await page
       .getByRole("link", { name: "Play it at the practice table" })
       .click();
-    const practice = page.getByRole("region", {
-      name: "Sit down against the bots",
-    });
+    const practice = playWizard(page);
+    await toSlide(page, "Format");
     await expect(
       practice.getByRole("radio", { name: /Commander/ }),
     ).toBeChecked();
+    await toSlide(page, "Your deck");
     await expect(practice.getByLabel("Your deck")).toHaveValue(`own:${deckId}`);
   });
 

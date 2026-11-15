@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { playWizard, startFromWizard, toSlide } from "./helpers/playWizard";
 import type { Snapshot } from "../src/game/types";
 
 // A best-of-three Legacy match (v0.5.0) against the bot, with the real engine: SysOp starts a
@@ -112,18 +113,20 @@ test.describe("a best-of-three match in the browser", () => {
         page.getByRole("region", { name: "Sideboard" }),
       ).toContainText("Grizzly Bears");
 
-      // Best of three at the practice table.
+      // Best of three, from the Play wizard (v1.0.0): a choice a slide.
       await page.goto("/#play");
-      const table = page.getByRole("region", {
-        name: "Sit down against the bots",
-      });
+      const table = playWizard(page);
+      await toSlide(page, "Format");
       await table.getByRole("radio", { name: /Legacy/ }).check();
+      await toSlide(page, "Games");
       await table.getByRole("radio", { name: /^Best of three/ }).check();
+      await toSlide(page, "Your deck");
       await table
         .getByLabel("Your deck")
         .selectOption({ label: `Match ${stamp}` });
+      await toSlide(page, "The bots");
       await table.getByLabel(/Bot skill/).fill("1");
-      await table.getByRole("button", { name: "Start the game" }).click();
+      await startFromWizard(page);
       await expect(page).toHaveURL(/#game\/[0-9a-f-]{36}$/, {
         timeout: 30_000,
       });

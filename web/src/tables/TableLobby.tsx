@@ -7,7 +7,7 @@ import {
 } from "react";
 import { client, describe } from "../api";
 import { exitTableFullscreen } from "../app/fullscreen";
-import { tableFullscreen } from "../game/PracticeTable";
+import { tableFullscreen } from "../game/practice";
 import { getSoundEngine } from "../game/sound/engine";
 import { InviteFriendsButton } from "./InviteFriends";
 import game from "../game/game.module.css";

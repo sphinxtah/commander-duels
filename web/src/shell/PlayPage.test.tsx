@@ -4,9 +4,12 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { Format, Me } from "../api";
 import { PlayPage, comingSoon } from "./PlayPage";
 
-// The practice table has its own tests (game/PracticeTable.test.tsx).
-vi.mock("../game/PracticeTable", () => ({
-  PracticeTable: () => <section aria-label="Practice table" />,
+// The Play wizard and the list of games have their own tests (game/PlayWizard.test.tsx).
+vi.mock("../game/PlayWizard", () => ({
+  PlayWizard: () => <section aria-label="Play wizard" />,
+}));
+vi.mock("../game/GamesList", () => ({
+  GamesList: () => <section aria-label="Your games" />,
 }));
 
 const me = { handle: "ada", permissions: ["games.play"] } as unknown as Me;
@@ -54,12 +57,55 @@ describe("the Play page's formats (v0.8.7)", () => {
     );
     const dialog = screen.getByRole("dialog", { hidden: true });
     expect(dialog).toHaveTextContent(
-      "at the practice table here, you and five bots in the seat you choose; or at a table in Tables",
+      "from the wizard here, you and five bots in the seat you choose; or at a table in Tables",
     );
     expect(dialog).toHaveTextContent("Not in the queues.");
   });
 
   it("never calls King's Table coming soon, whatever the server's flag", () => {
     expect(comingSoon({ ...kingsTable, available: false })).toBe(false);
+  });
+});
+
+describe("the Play page's two views (v1.0.0)", () => {
+  const page = (view?: "wizard" | "games") => (
+    <PlayPage
+      me={me}
+      formats={[kingsTable]}
+      connection="connected"
+      onRetry={() => undefined}
+      heading={createRef()}
+      view={view}
+    />
+  );
+
+  it("is the wizard, over the formats", () => {
+    render(page());
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Battle the bots." }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Play wizard" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Your games" })).toBeNull();
+    expect(
+      screen.getByRole("heading", { name: "Formats" }),
+    ).toBeInTheDocument();
+  });
+
+  it("is the account's games at #play/games, with the way back to the wizard", () => {
+    render(page("games"));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Your games." }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Your games" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Play wizard" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Formats" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Back to Play" })).toHaveAttribute(
+      "href",
+      "#play",
+    );
   });
 });

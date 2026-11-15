@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { Format, Me, PracticeFormat } from "../api";
-import { PracticeTable } from "../game/PracticeTable";
+import { GamesList } from "../game/GamesList";
+import { PlayWizard } from "../game/PlayWizard";
 import shell from "../App.module.css";
 import type { Connection } from "./TopBar";
 import { hoverSound, selectSound } from "./menuSound";
@@ -28,9 +29,9 @@ export function early(format: Format | undefined): boolean {
 /** What a format's details say of how to play it, beyond the general way in. */
 const howToPlay: Record<string, string> = {
   two_headed_giant:
-    "Two teams of two, with Legacy decks: with a bot teammate at the practice table here; or, from Tables, in the queue, alone or with a friend, and at a table for four players, or players with bots as teammates or opponents. Your team takes its turns together, holds priority together, attacks and blocks together, shares one life total and wins together.",
+    "Two teams of two, with Legacy decks: with a bot teammate from the wizard here; or, from Tables, in the queue, alone or with a friend, and at a table for four players, or players with bots as teammates or opponents. Your team takes its turns together, holds priority together, attacks and blocks together, shares one life total and wins together.",
   kings_table:
-    "Six players in two teams of three, a King and two Generals each: at the practice table here, you and five bots in the seat you choose; or at a table in Tables, with players in any seats and bots in the others. Not in the queues. Each player takes their own turns with their own life; a team wins when the other team's King is out.",
+    "Six players in two teams of three, a King and two Generals each: from the wizard here, you and five bots in the seat you choose; or at a table in Tables, with players in any seats and bots in the others. Not in the queues. Each player takes their own turns with their own life; a team wins when the other team's King is out.",
 };
 const symbols: Record<string, string> = {
   commander: "♜",
@@ -45,10 +46,16 @@ const players: Record<string, string> = {
   kings_table: "6 PLAYERS",
 };
 
+/** #play/games (v1.0.0): the account's games, a page of their own under Play. */
+export const PLAY_GAMES_ROUTE = /^#play\/games$/i;
+
 /**
- * Play (v0.4.5; the first page until then): since v0.8.7 for the bots alone, the practice table
- * and the formats, those not built yet marked "Coming soon". The owner's banner left it in
- * v0.8.7, and "Find a game" in the public queues moved to Tables.
+ * Play (v0.4.5; the first page until then): since v0.8.7 for the bots alone. Since v1.0.0 it is
+ * the Play wizard (the owner's request): one question a slide, and "Start Game" on the last. The
+ * list of the account's games, which sat under the old page's options, is a page of its own,
+ * opened from the wizard's first slide (`view` "games"). The formats, those not built yet marked
+ * "Coming soon", stay under the wizard. The owner's banner left the page in v0.8.7, and "Find a
+ * game" in the public queues moved to Tables.
  */
 export function PlayPage({
   me,
@@ -56,18 +63,41 @@ export function PlayPage({
   connection,
   onRetry,
   heading,
+  view = "wizard",
 }: {
   me: Me;
   formats: Format[];
   connection: Connection;
   onRetry: () => void;
   heading: RefObject<HTMLHeadingElement | null>;
+  view?: "wizard" | "games";
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [selected, setSelected] = useState<Format>();
   useEffect(() => {
     if (selected) dialog.current?.showModal();
   }, [selected]);
+  if (view === "games")
+    return (
+      <>
+        <header className={styles.playHead}>
+          <span className={styles.kicker}>Play</span>
+          <h1 id="page-title" ref={heading} tabIndex={-1}>
+            Your games.
+          </h1>
+          <p>
+            The games you have running, to resume or to close, and the last ones
+            that ended.{" "}
+            <a href="#play" onClick={selectSound}>
+              Back to Play
+            </a>
+          </p>
+        </header>
+        <div className={styles.practice}>
+          <GamesList me={me} />
+        </div>
+      </>
+    );
   return (
     <>
       <header className={styles.playHead}>
@@ -77,8 +107,9 @@ export function PlayPage({
         </h1>
         <p>
           Practice against the bots in Legacy, Commander, Two-Headed Giant or
-          King&apos;s Table, with your own decks, at the skill you choose. To
-          play other people, find a game or sit down at a table in{" "}
+          King&apos;s Table, with your own decks, at the skill you choose:
+          answer one question a slide, then press Start Game. To play other
+          people, find a game or sit down at a table in{" "}
           <a href="#tables" onClick={selectSound}>
             Tables
           </a>
@@ -86,7 +117,7 @@ export function PlayPage({
         </p>
       </header>
       <div id="practice" className={styles.practice}>
-        <PracticeTable me={me} />
+        <PlayWizard me={me} />
       </div>
       <section
         id="formats"
@@ -177,7 +208,7 @@ export function PlayPage({
           {comingSoon(selected)
             ? `${selected?.name} is coming soon.`
             : ((selected && howToPlay[selected.id]) ??
-              "Start a practice game against the bots from the practice table here, or play other people from Tables: find a game in the queue, or open a table.")}
+              "Start a practice game against the bots from the wizard here, or play other people from Tables: find a game in the queue, or open a table.")}
         </p>
         <button
           className={shell.primary}

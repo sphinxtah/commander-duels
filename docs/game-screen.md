@@ -4,13 +4,13 @@ v0.1.0 put the practice games on screen and v0.2.0 added the priority controls. 
 
 ## Starting a game
 
-The Play page (since v0.8.7 for the bots alone, with a plain heading in place of the owner's banner; "Find a game" in the public queues is in Tables) opens with the practice table, which offers:
+The Play page (since v0.8.7 for the bots alone, with a plain heading in place of the owner's banner; "Find a game" in the public queues is in Tables) is since v1.0.0 the Play wizard, which asks one of these a slide and starts the game from its last one ([the Play wizard](menus.md#every-other-page)). Until then it opened with the practice table, one page that asked them all at once. A practice game offers:
 - **the format.** Legacy against one bot, or Commander against one to three bots;
 - **your deck, and each bot's:** a starter deck, or one of your own playable decks ([decks](decks.md#at-the-practice-table)). "Play it at the practice table" in the deck builder opens the table with that deck chosen;
 - **the bots' skill** (1–6) and a turn limit. Since v0.9.7 the limit shown is the table's own, 40 turns for each player, and it follows the format and the number of bots (80 for a duel, 160 against three bots, 240 at King's Table) until the player types one; emptying the field goes back to it;
 - **for SysOp, a deck list.** Any card the engine implements, with card-name lookup that adds a line per click.
 
-The table also lists your running games (resume or close) and your recent ones with their results. SysOp may list every player's games and observe any running one.
+Your running games (resume or close) and your recent ones with their results are listed on a page of their own since v1.0.0, "Your games" (`#play/games`), opened from the wizard's first slide; until then they were under the practice table's options. SysOp may list every player's games and observe any running one.
 
 **Full screen.** Start, Resume and Observe put the window in full screen, and Escape belongs to the game there (Chrome and Edge hold it with the Keyboard Lock; holding Escape for two seconds still leaves). F, the band's full-screen diamond and the Game menu turn it on and off at any time. Settings › "Full screen when a game starts" turns the automatic part off. A table opened without a click (a reload, a typed address, the installed app's window) plays in the window and says once, on the band: "Full screen: F".
 

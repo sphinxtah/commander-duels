@@ -15,11 +15,12 @@ import styles from "./tutorial.module.css";
 // The main menu's tour (v0.8.4), for Beginner and Novice players once their game is set up:
 // first to Leng's Card Shop to buy and open a pack, then to Tivit's Auction House to list a card
 // from it; since v0.8.5 on to Decks (the starter decks, and building one) and to the Play page,
-// where it ends at the practice table. Each page it passes through says what happened with a
+// where it ends at the Play wizard (v1.0.0; the practice table until then). Each page it passes through says what happened with a
 // tutorial signal, or the player presses Next; the stage is the account's, so a reload or another
 // device picks up where the player was. "Skip the tour" ends it at once, from any bubble.
 
-/** The practice table's start button, which the Play page marks with no data-tour name. */
+/** The Play wizard's own button (v1.0.0), which the Play page marks with no data-tour name: Next
+ * on every slide, and "Start Game" on the last. */
 function startButton(): HTMLElement | null {
   const table = document.getElementById("practice");
   if (!table) return null;
@@ -27,7 +28,7 @@ function startButton(): HTMLElement | null {
     [
       ...table.querySelectorAll<HTMLButtonElement>('button[type="submit"]'),
     ].find((button) =>
-      /Start the game|Shuffling/.test(button.textContent ?? ""),
+      /Next|Start Game|Shuffling/.test(button.textContent ?? ""),
     ) ?? null
   );
 }
@@ -59,7 +60,7 @@ export function Tour({
   page: Page;
   onChange: (me: Me) => void;
 }) {
-  /** The last bubble, once the tour has ended at the practice table. */
+  /** The last bubble, once the tour has ended at the Play wizard. */
   const [finished, setFinished] = useState(false);
   /** Where on Decks the player is: the decks, then building one. */
   const [decksStep, setDecksStep] = useState(0);
@@ -306,14 +307,14 @@ export function Tour({
           target: "practice-start",
           locate: startButton,
           title: "Play a practice game",
-          text: "At the practice table you play against bots. Pick Commander and one of your starter decks, choose how many bots and how good they are, then press Start the game. Wins against bots earn tokens too.",
+          text: "Here you play against bots, one question a slide. Pick Commander and one of your starter decks, choose how many bots and how good they are, then press Start Game on the last slide. Wins against bots earn tokens too.",
           actions: next(() => {
             void move("done").then((ok) => ok && setFinished(true));
           }, "Finish the tour"),
         },
         {
           title: "Play a practice game",
-          text: "At the practice table you play against bots with one of your decks. Wins against bots earn tokens too.",
+          text: "Here you play against bots with one of your decks, one question a slide. Wins against bots earn tokens too.",
           actions: next(() => {
             void move("done").then((ok) => ok && setFinished(true));
           }, "Finish the tour"),
