@@ -4918,6 +4918,11 @@ export interface components {
              * @description Your campaign duel still running, to go back to.
              */
             running: string | null;
+            /**
+             * Saved
+             * @description Your campaign duels saved to be played on later (v1.0.0), the newest first: the map says so at each one's ward. Empty while saving is not open to you.
+             */
+            saved: components["schemas"]["SavedDuel"][];
             /** Title */
             title: string;
         };
@@ -9670,6 +9675,51 @@ export interface components {
              * @description Sunday midnight, Arizona time.
              */
             starts_at: string;
+        };
+        /**
+         * SavedDuel
+         * @description A campaign duel saved to be played on later (v1.0.0, api/saves.py; docs/games.md).
+         */
+        SavedDuel: {
+            /**
+             * Challenge
+             * @description The duel is the Apex Unbound challenge's.
+             */
+            challenge: boolean;
+            /** Encounter */
+            encounter: number;
+            /**
+             * Expires At
+             * Format: date-time
+             * @description When the save runs out: the duel then counts as unfinished, which is no loss.
+             */
+            expires_at: string;
+            /**
+             * Game
+             * Format: uuid
+             */
+            game: string;
+            /**
+             * Save
+             * Format: uuid
+             * @description The save: POST /api/v1/saves/{id}/resume plays it on.
+             */
+            save: string;
+            /**
+             * Saved At
+             * Format: date-time
+             */
+            saved_at: string;
+            /**
+             * Table
+             * @description The code of the private table whose players suspended the game together (ward 15's court with friends): it is played on there, once every player still in it is back and ready. Null for a duel its own player saved.
+             */
+            table: string | null;
+            /**
+             * Turn
+             * @description The duel's turn as it was saved, when known.
+             */
+            turn: number | null;
         };
         /**
          * SavedGame

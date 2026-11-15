@@ -140,6 +140,8 @@ const ended: Record<string, string> = {
   not_live: "This game is no longer running on the server.",
   saved:
     "This game is saved. It waits under Saved games on Your games: resume it there to play on from where it stopped.",
+  savedDuel:
+    "This duel is saved. It waits on the campaign's map and under Saved games on Your games: resume it from either to play on from where it stopped.",
   signed_out: "Your session ended. Sign in again to keep playing.",
   forbidden: "This game is not available to this account.",
   not_found: "There is no such game, or it is not yours.",
@@ -932,6 +934,17 @@ export function GameScreen({
                             {tableCode ? "Go to the table" : "Your games"}
                           </a>
                         </>
+                      ) : campaign ? (
+                        <>
+                          <p>{ended.savedDuel}</p>
+                          <a
+                            href="#campaign"
+                            className={styles.secondaryButton}
+                            onClick={leave}
+                          >
+                            Back to the campaign
+                          </a>
+                        </>
                       ) : (
                         <>
                           <p>{ended.saved}</p>
@@ -1307,9 +1320,9 @@ export function GameScreen({
                 gameId={gameId}
                 onSaved={() => {
                   // Left on purpose: the table's lock on leaving lets go, and the saved game is
-                  // shown where it waits.
+                  // shown where it waits: a campaign duel on the campaign's map.
                   leave();
-                  window.location.hash = "#play/games";
+                  window.location.hash = campaign ? "#campaign" : "#play/games";
                 }}
               />
             )}

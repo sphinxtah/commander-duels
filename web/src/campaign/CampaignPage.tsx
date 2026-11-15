@@ -23,6 +23,7 @@ import {
   TIER_NAMES,
   type CampaignEncounter,
   type CampaignState,
+  type SavedDuel,
 } from "./campaign";
 import type { PlayerFace } from "./cast";
 import { CosmeticsPicker } from "./CosmeticsPicker";
@@ -34,6 +35,7 @@ import {
   WardenOpening,
   type WardenOpeningSummary,
 } from "./WardenOpening";
+import { SavedDuels, savedTitle, useResuming } from "./SavedDuels";
 import { MAP_LINE, STORY, type Scene } from "./script";
 import { useCampaignSettings } from "./settings";
 import type { Step } from "./stage";
@@ -116,6 +118,15 @@ export function CampaignPage({
     };
   }, []);
 
+  // A saved duel played on (v1.0.0), from the map's first button or its list; a refusal asks for
+  // the campaign again.
+  const reload = useCallback(() => {
+    void loadCampaign().then((fresh) => {
+      if (fresh) setState(fresh);
+    });
+  }, []);
+  const resuming = useResuming(reload);
+
   /** Opens a warden's deck, then runs what follows (the spoils card after a duel). */
   function unseal(id: string, then?: () => void) {
     setOpening({ id, then });
@@ -189,6 +200,15 @@ export function CampaignPage({
     }
     const fresh = (await loadCampaign()) ?? state ?? null;
     if (fresh) setState(fresh);
+    if (summary.status === "saved") {
+      // Saved, not ended (v1.0.0): no story and no aftermath, and the map offers it below.
+      setNotice(
+        summary.table
+          ? "Your duel is suspended. It is played on at its table."
+          : "Your duel is saved. Resume it from the map when you are ready.",
+      );
+      return;
+    }
     const number = ref.encounter;
     if (ref.challenge && number === FLIGHT && ref.outcome === "won") {
       // Apex Unbound's Sphinx flees too (v0.9.6): the challenge goes on at his court.
@@ -359,6 +379,7 @@ export function CampaignPage({
 
   const won = new Set(state.progress.completed);
   const next = state.encounters.find((e) => e.status === "open");
+  const newest = state.saved[0];
   const current = playing?.scenes[0];
   const setupEncounter = state.encounters.find((e) => e.number === setup);
   const rewards = [
@@ -444,6 +465,24 @@ export function CampaignPage({
               <a className={styles.gold} href={`#game/${state.running}`}>
                 Return to your duel <span aria-hidden="true">▶</span>
               </a>
+            ) : newest?.table ? (
+              <a className={styles.gold} href={`#tables/${newest.table}`}>
+                Your suspended duel: {savedTitle(state, newest)}{" "}
+                <span aria-hidden="true">▶</span>
+              </a>
+            ) : newest ? (
+              // A duel that waits saved comes before a new one (v1.0.0): a ward is still begun
+              // from its place on the map.
+              <button
+                type="button"
+                className={styles.gold}
+                disabled={resuming.busy !== null}
+                onClick={() => void resuming.resume(newest)}
+                onPointerEnter={() => hoverSound()}
+              >
+                Resume your saved duel: {savedTitle(state, newest)}{" "}
+                <span aria-hidden="true">▶</span>
+              </button>
             ) : next ? (
               <button
                 type="button"
@@ -477,6 +516,8 @@ export function CampaignPage({
           )}
         </div>
       </header>
+
+      <SavedDuels state={state} resuming={resuming} />
 
       {openings.length > 0 && (
         <section className={styles.openings} aria-label="Warden decks">
@@ -570,6 +611,9 @@ export function CampaignPage({
                       key={number}
                       encounter={encounter}
                       fleeing={fleeing && number === FLIGHT}
+                      saved={state.saved.find(
+                        (duel) => duel.encounter === number && !duel.challenge,
+                      )}
                       onBegin={() => begin(encounter)}
                     />
                   ) : null;
@@ -819,11 +863,14 @@ async function gameOf(gameId: string) {
 function Node({
   encounter,
   fleeing = false,
+  saved,
   onBegin,
 }: {
   encounter: CampaignEncounter;
   /** The Sphinx's flight, played once (v0.9.6): he shakes with fury, then flees the throne. */
   fleeing?: boolean;
+  /** A duel of this ward that waits saved (v1.0.0): the node says so. */
+  saved?: SavedDuel;
   onBegin: () => void;
 }) {
   const locked = encounter.status === "locked";
@@ -854,7 +901,7 @@ function Node({
                   : fled
                     ? ", fled: he waits at his court"
                     : ""
-              }`
+              }${saved ? ", a duel saved" : ""}`
         }
       >
         <span className={styles.medallion} aria-hidden="true">
@@ -932,6 +979,12 @@ function Node({
                 .map((deck) => deck.title)
                 .join(" & ")} ·{" "}
               {encounter.spoils.tokens.toLocaleString("en-US")} tokens
+            </span>
+          )}
+          {saved && !locked && (
+            <span className={styles.nodeSaved}>
+              {saved.table ? "Suspended" : "Saved"}
+              {saved.turn !== null ? ` · turn ${saved.turn}` : ""}
             </span>
           )}
           {encounter.status === "open" && (

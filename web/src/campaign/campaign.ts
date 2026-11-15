@@ -9,6 +9,7 @@ export type CampaignState = components["schemas"]["CampaignState"];
 export type CampaignEncounter = components["schemas"]["CampaignEncounter"];
 export type CampaignChapter = components["schemas"]["CampaignChapter"];
 export type CampaignRef = components["schemas"]["CampaignRef"];
+export type SavedDuel = components["schemas"]["SavedDuel"];
 export type Tier = CampaignEncounter["tier"];
 
 export const CAMPAIGN_ROUTE = /^#campaign\/game\/([0-9a-f-]{36})$/i;

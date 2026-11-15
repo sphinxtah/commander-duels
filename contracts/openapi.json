@@ -2119,6 +2119,14 @@
             "description": "Your campaign duel still running, to go back to.",
             "title": "Running"
           },
+          "saved": {
+            "description": "Your campaign duels saved to be played on later (v1.0.0), the newest first: the map says so at each one's ward. Empty while saving is not open to you.",
+            "items": {
+              "$ref": "#/components/schemas/SavedDuel"
+            },
+            "title": "Saved",
+            "type": "array"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -2134,6 +2142,7 @@
           "chapters",
           "progress",
           "running",
+          "saved",
           "challenge"
         ],
         "title": "CampaignState",
@@ -13689,6 +13698,79 @@
           "products"
         ],
         "title": "SaleInfo",
+        "type": "object"
+      },
+      "SavedDuel": {
+        "additionalProperties": false,
+        "description": "A campaign duel saved to be played on later (v1.0.0, api/saves.py; docs/games.md).",
+        "properties": {
+          "challenge": {
+            "description": "The duel is the Apex Unbound challenge's.",
+            "title": "Challenge",
+            "type": "boolean"
+          },
+          "encounter": {
+            "title": "Encounter",
+            "type": "integer"
+          },
+          "expires_at": {
+            "description": "When the save runs out: the duel then counts as unfinished, which is no loss.",
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "game": {
+            "format": "uuid",
+            "title": "Game",
+            "type": "string"
+          },
+          "save": {
+            "description": "The save: POST /api/v1/saves/{id}/resume plays it on.",
+            "format": "uuid",
+            "title": "Save",
+            "type": "string"
+          },
+          "saved_at": {
+            "format": "date-time",
+            "title": "Saved At",
+            "type": "string"
+          },
+          "table": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The code of the private table whose players suspended the game together (ward 15's court with friends): it is played on there, once every player still in it is back and ready. Null for a duel its own player saved.",
+            "title": "Table"
+          },
+          "turn": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The duel's turn as it was saved, when known.",
+            "title": "Turn"
+          }
+        },
+        "required": [
+          "save",
+          "game",
+          "encounter",
+          "challenge",
+          "turn",
+          "saved_at",
+          "expires_at",
+          "table"
+        ],
+        "title": "SavedDuel",
         "type": "object"
       },
       "SavedGame": {

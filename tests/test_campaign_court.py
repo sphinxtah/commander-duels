@@ -28,6 +28,7 @@ from test_kings_table import KingsEngine, until_left
 from test_tables import Account, concede, deck, left_reason, opened, served, until_finished
 
 from api import campaign
+from api.identity import utcnow
 from api.models import (
     CampaignGame,
     CampaignProgress,
@@ -36,6 +37,7 @@ from api.models import (
     Game,
     PlayerResult,
     ProgressEntry,
+    SiteSetting,
     TokenEntry,
     WardenOpening,
 )
@@ -706,3 +708,49 @@ def test_apex_unbound_is_wards_14_and_15_as_one_run(
     assert (after["earned"], after["at"]) == (True, 14)
     assert rewards(client, ada) == ["badge:apex-unbound"]
     assert campaign.CHALLENGE_REWARD == "badge:apex-unbound"
+
+
+def test_a_court_its_players_suspended_is_on_the_hosts_map(
+    client: TestClient, engine: CourtEngine
+) -> None:
+    """The court with a friend, suspended by both (v1.0.0, api/saves.py): the save and the
+    campaign's game are the host's, so the host's map names it with its table, where it is
+    played on. The friend's map names nothing: the table is among their suspended tables."""
+    engine.recordings = True
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        db.add(SiteSetting(key="rollout.save_resume", value="on", updated_at=utcnow()))
+        db.commit()
+    ada, bob = (Account(client, name, admin=True) for name in ("ada", "bob"))
+    befriend(ada, bob)
+    unlock(client, ada, 15, completed=[*range(1, 15)])
+    mine = deck(ada, client, "commander", "Ada's Commander")
+    his = deck(bob, client, "commander", "Bob's Commander")
+    opened_table = ada.send(
+        "POST", "/api/v1/campaign/encounters/15/court", {"deck_id": mine, "friends": [str(bob.id)]}
+    )
+    assert opened_table.status_code == 201, opened_table.text
+    code = opened_table.json()["code"]
+    joined = bob.send("POST", f"/api/v1/tables/{code}/join", {"deck_id": his, "seat": 0})
+    assert joined.status_code == 200, joined.text
+    assert bob.send("PATCH", f"/api/v1/tables/{code}/seat", {"ready": True}).status_code == 200
+    started = ada.send("POST", f"/api/v1/tables/{code}/start", {})
+    assert started.status_code == 200, started.text
+    game_id = started.json()["game_id"]
+    assert state(ada)["running"] == game_id and state(ada)["saved"] == []
+
+    with ExitStack() as stack:
+        opened(ada, game_id, [], stack)
+        opened(bob, game_id, [], stack)
+        assert bob.send("POST", f"/api/v1/tables/{code}/suspension").json()["status"] == "voting"
+        done = ada.send("POST", f"/api/v1/tables/{code}/suspension")
+        assert done.status_code == 200, done.text
+        assert done.json()["status"] == "suspended"
+        save_id = done.json()["save_id"]
+
+    hosts = state(ada)
+    assert hosts["running"] is None
+    assert [
+        (duel["save"], duel["game"], duel["encounter"], duel["table"]) for duel in hosts["saved"]
+    ] == [(save_id, game_id, 15, code)]
+    assert state(bob)["saved"] == []
+    assert [found["code"] for found in bob.get("/api/v1/saves").json()["tables"]] == [code]

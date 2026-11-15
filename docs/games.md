@@ -288,6 +288,8 @@ A game against the bots can be closed into its recording and played on later ([r
 
 **Not saved at all:** a game of a best-of-three match, against the bots or at a table (the owner's decision: the match would stand between its games for as long as the save lasts).
 
+**A saved campaign duel is on the campaign's map** (the owner, 2026-11-15; [the campaign](campaign.md#a-saved-duel-v100)). `GET /api/v1/campaign` names the account's campaign duels that wait saved (`saved`, the newest first: the `save`, the `game`, the `encounter`, whether it is the challenge's, the `turn`, when it was saved and when it runs out, and the `table`'s code when its players suspended a court together). The list is empty while save and resume is not open to the account, and never names a save past its days. Saving a campaign duel from the Game menu leads back to the campaign, not to Your games.
+
 Migration `0052_game_saves` lets a game's status be `saved` and adds `game_saves`: each time a game was saved, until when, the engine build that holds it, and how the save ended. Its downgrade is refused while a game is saved.
 
 ### Recordings and attaching (v0.9.9)

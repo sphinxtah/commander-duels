@@ -886,6 +886,59 @@ button.choice:focus-visible {
   list-style: none;
 }
 
+/* Saved duels (v1.0.0): each with its ward, when it runs out, and the way to play it on; and the
+   line that marks a ward's node while a duel of it waits saved. */
+.saved {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid #e7c47f55;
+  border-radius: 10px;
+  background: #0d0a1099;
+}
+.saved h2 {
+  margin: 0 0 8px;
+}
+.saved ul {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.saved li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.saved p {
+  margin: 0;
+  font-size: 0.82rem;
+}
+.saved p a {
+  color: var(--cd-gold-hi);
+  text-decoration: underline;
+}
+.savedWords {
+  display: grid;
+  gap: 2px;
+}
+.savedWords strong {
+  color: var(--cd-gold-hi);
+  font-family: var(--cd-display);
+  letter-spacing: 0.04em;
+}
+.savedWords small {
+  color: #d9c79e;
+  font-size: 0.8rem;
+}
+.nodeSaved {
+  font-size: 0.74rem;
+  color: var(--cd-ember);
+  letter-spacing: 0.06em;
+}
+
 /* Ward 15, The Unbound Court (v0.9.6): its seal beside the throne's, its medallion's crown, and
    ward 14's fled throne: The Sphinx shaking furiously, then fleeing, leaving the Fled marker. */
 .sealCourt {

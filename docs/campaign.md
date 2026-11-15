@@ -5,7 +5,7 @@
 ## Where it is
 
 - **The main menu's Campaign tile** (`#campaign`), under the greeting in the left column (the owner's layout: the greeting about 70% of the column, the tile the rest), over the owner's painting of the throne, with the account's progress ("3 of 13 seals claimed", or "A new story begins").
-- **The Campaign page**: the title and the map's line ("Defeat each warden to reach the throne"), the thirteen seals and the throne, Continue (the next open ward) or Return to your duel, the journal and Replay the opening; the map, by chapter (Bronze 4 wards, Silver 4, Gold 2, Platinum 2, Mythic 1, the Throne 1), each ward a medallion with its opponent's portrait (a dark silhouette while locked, its title hidden), its seal once won; and the refuge beside it: Kaya, the way to the decks and the alliance, the story settings, the rewards and the campaign's rules.
+- **The Campaign page**: the title and the map's line ("Defeat each warden to reach the throne"), the thirteen seals and the throne, Continue (the next open ward), Return to your duel or, since v1.0.0, Resume your saved duel ([below](#a-saved-duel-v100)), the journal and Replay the opening; the map, by chapter (Bronze 4 wards, Silver 4, Gold 2, Platinum 2, Mythic 1, the Throne 1), each ward a medallion with its opponent's portrait (a dark silhouette while locked, its title hidden), its seal once won; and the refuge beside it: Kaya, the way to the decks and the alliance, the story settings, the rewards and the campaign's rules.
 - **The first visit** plays the opening cinematic (FC.OPEN: the village's lamps failing, the five suns, the gold thread, the High Priest and the voice from the throne) and the refuge's introduction; with Kaya as the account's ally, her own line follows. After the finale is won, the next visit plays the replay's framing once.
 
 ## A duel
@@ -38,6 +38,17 @@ The owner, 2026-10-31: "As you advance in the campaign, beating a planeswalker a
 - **The journal** (`Journal.tsx`): every scene seen, in full, so a skipped scene can be read; for each ward reached, what its seal revealed and Kaya's advice; the tutorial's lessons, seen or not, and Kaya's help.
 
 The script (`web/src/campaign/script.ts`) holds every line of the handoff under its scene keys (FC.OPEN.01 to FC.REPLAY.03: 247 lines), the barks with their triggers, the tutorial's twelve prompts, and the staging: each scene's scenery and phase, a line's effect or change of scenery. It names neither custom card.
+
+## A saved duel (v1.0.0)
+
+A campaign duel is saved as any game against the bots is ([save and resume](games.md#save-and-resume-v100)): "Save and leave" in the Game menu, where the workflow is open to the account. The owner's decision of 2026-11-15: the map says so.
+
+- **Leaving.** Saving a campaign duel leads back to the Campaign page, where it waits. A saved duel has not ended: coming back from it by the table's way out plays no scene and offers no retreat, and the page says "Your duel is saved."
+- **The first button** is the duel's, before a new one: "Resume your saved duel: The Laughing Gate" (the newest save), where Continue or Begin stood. A duel still running comes first, as before ("Return to your duel"). A ward is still begun from its place on the map, beside a saved duel of it: both are the campaign's, and each ends as a duel does.
+- **Saved duels**, under the title: each with its ward (or Apex Unbound), the turn it was saved on, when it runs out, and Resume. A refused resume says why (the save ran out, the game was upgraded, another game is running) and the map is asked for again. Discarding a save, and the saves' rules, are on Your games, which the list links to.
+- **The ward's place** on the map says "Saved · turn 7".
+- **The court with friends**, suspended by its players together ([tables](tables.md#suspending-a-tables-game-v100)), is the host's: the host's map names it "Suspended", and its button leads to the table, where it is played on once every player still in it is back and ready. A friend's map names nothing: the table is among their suspended tables on Your games.
+- **When a save ends** without being played on (its 30 days, an upgrade, a discard), the duel is recorded unfinished: nothing is lost and nothing is won.
 
 ## At the table
 
@@ -111,7 +122,7 @@ The handoff's optional post-campaign challenge: "An optional Apex Unbound challe
 
 | Route | Who | What |
 | --- | --- | --- |
-| `GET /api/v1/campaign` | `games.play` | The campaign: its encounters (status locked, open or won; the finale's commander null), chapters with their rewards earned, the progress and the tutorial, and the account's campaign duel still running |
+| `GET /api/v1/campaign` | `games.play` | The campaign: its encounters (status locked, open or won; the finale's commander null), chapters with their rewards earned, the progress and the tutorial, the account's campaign duel still running, and since v1.0.0 its duels that wait saved (`saved`) |
 | `POST /api/v1/campaign/encounters/{n}/start` | `games.play` (own decks: `decks.edit`) | `{"deck_id"}`, `{"loaner": true}` or `{"learn": true}`, and since v0.9.3 `"challenge": true` on the finale (Apex Unbound): the duel, as a game summary (201). 409 `encounter_locked`, `challenge_locked`, `game_limit`; 422 `invalid_seat` (no deck or two), `invalid_deck`, `deck_not_playable`, `custom_not_loaded`; 429 `games_busy`; 503 as practice games |
 | `POST /api/v1/campaign/encounters/15/court` | `decks.edit` | Since v0.9.6: `{"deck_id", "friends": [1–2 friends], "challenge"}`: the court's private King's Table table, the player seated as King A and the friends invited (201, the table). 409 `encounter_locked`, `challenge_locked`, `at_a_table`, `in_queue`; 422 `not_friend`, `invalid_deck` |
 | `POST /api/v1/campaign/scenes` | `games.play` | `{"scene": "FC.E01.POST"}`: a scene seen (to its end or skipped); FC.END.WIN or FC.END.EARLY after the finale's win records the ending |

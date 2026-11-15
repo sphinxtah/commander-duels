@@ -35,6 +35,7 @@ import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any, Literal, cast
@@ -47,7 +48,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from api import kings_table, tables, warden_openings
+from api import kings_table, rollout, tables, warden_openings
 from api.auth import INPUT_ERRORS
 from api.custom_play import custom_in_seats
 from api.decks import refresh_decks, store_draft
@@ -82,6 +83,7 @@ from api.models import (
     CustomCardGrant,
     Deck,
     Game,
+    GameSave,
     GameSeat,
     GameTable,
     User,
@@ -522,6 +524,25 @@ class CampaignChallenge(Contract):
     )
 
 
+class SavedDuel(Contract):
+    """A campaign duel saved to be played on later (v1.0.0, api/saves.py; docs/games.md)."""
+
+    save: UUID = Field(description="The save: POST /api/v1/saves/{id}/resume plays it on.")
+    game: UUID
+    encounter: int
+    challenge: bool = Field(description=f"The duel is the {CHALLENGE_NAME} challenge's.")
+    turn: int | None = Field(description="The duel's turn as it was saved, when known.")
+    saved_at: datetime
+    expires_at: datetime = Field(
+        description="When the save runs out: the duel then counts as unfinished, which is no loss."
+    )
+    table: str | None = Field(
+        description="The code of the private table whose players suspended the game together "
+        "(ward 15's court with friends): it is played on there, once every player still in it "
+        "is back and ready. Null for a duel its own player saved."
+    )
+
+
 class CampaignState(Contract):
     id: str
     title: str
@@ -532,6 +553,10 @@ class CampaignState(Contract):
     chapters: list[CampaignChapter]
     progress: CampaignProgressView
     running: UUID | None = Field(description="Your campaign duel still running, to go back to.")
+    saved: list[SavedDuel] = Field(
+        description="Your campaign duels saved to be played on later (v1.0.0), the newest first: "
+        "the map says so at each one's ward. Empty while saving is not open to you."
+    )
     challenge: CampaignChallenge
 
 
@@ -697,6 +722,42 @@ def running_of(db: Session, user_id: UUID) -> UUID | None:
     )
 
 
+def saved_duels(db: Session, user: User) -> list[SavedDuel]:
+    """The player's campaign duels that wait saved (v1.0.0), the newest first: the map says so,
+    and offers each to be played on. A court its players suspended together is the host's, as its
+    save and its campaign game are, and is named with its table. None while saving is not open
+    to the player (the gate save_resume): a save could not be played on, so the map does not
+    offer it."""
+    if not rollout.available(db, "save_resume", user):
+        return []
+    rows = db.execute(
+        select(GameSave, CampaignGame, GameTable.code)
+        .join(Game, Game.id == GameSave.game_id)
+        .join(CampaignGame, CampaignGame.game_id == GameSave.game_id)
+        .outerjoin(GameTable, GameTable.game_id == GameSave.game_id)
+        .where(
+            CampaignGame.user_id == user.id,
+            Game.status == "saved",
+            GameSave.ended_at.is_(None),
+            GameSave.expires_at > utcnow(),
+        )
+        .order_by(GameSave.saved_at.desc())
+    )
+    return [
+        SavedDuel(
+            save=save.id,
+            game=save.game_id,
+            encounter=link.encounter,
+            challenge=link.challenge,
+            turn=save.turn,
+            saved_at=save.saved_at,
+            expires_at=save.expires_at,
+            table=code,
+        )
+        for save, link, code in rows
+    ]
+
+
 def spoils_commander(encounter: Encounter, finale: "FinaleCache | None") -> str:
     """The commander the spoils name: the finale's private one by the story's word while the
     running engine serves the owner's finale (or has not been asked yet), else the stand-in."""
@@ -841,6 +902,7 @@ def state_of(
             ),
         ),
         running=running_of(db, user.id),
+        saved=saved_duels(db, user),
         challenge=CampaignChallenge(
             name=CHALLENGE_NAME,
             open=campaign.last in done,

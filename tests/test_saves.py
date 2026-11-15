@@ -471,3 +471,61 @@ def test_a_deleted_accounts_saves_end(database: str, engine: FakeEngine) -> None
             db.commit()
         assert saves_of(client, game_id)[0].ended_reason == "account"
         assert game_of(client, game_id).status == "interrupted"
+
+
+def test_a_saved_campaign_duel_is_on_the_campaigns_map(database: str, engine: FakeEngine) -> None:
+    """The campaign names its player's duels that wait saved, so that its map can say so and
+    offer them: the ward, the turn and the save. Nobody else's map names it, a duel played on is
+    the running one again, and with the workflow closed the map offers nothing."""
+    with connect(build(database, engine)) as client:
+        root = staged(client)
+        ada, bob = Account(client, "ada"), Account(client, "bob")
+        begun = ada.post("/api/v1/campaign/encounters/1/start", {"loaner": True})
+        assert begun.status_code == 201, begun.text
+        game_id = str(begun.json()["id"])
+        state = ada.get("/api/v1/campaign").json()
+        assert (state["running"], state["saved"]) == (game_id, [])
+
+        save = saved(ada, game_id)
+        assert save["game"]["campaign"]["encounter"] == 1
+        state = ada.get("/api/v1/campaign").json()
+        assert state["running"] is None
+        assert state["saved"] == [
+            {
+                "save": save["id"],
+                "game": game_id,
+                "encounter": 1,
+                "challenge": False,
+                "turn": save["turn"],
+                "saved_at": save["saved_at"],
+                "expires_at": save["expires_at"],
+                "table": None,
+            }
+        ]
+        assert bob.get("/api/v1/campaign").json()["saved"] == []
+        # A second duel of the ward may be begun beside the saved one: both are the campaign's.
+        again = ada.post("/api/v1/campaign/encounters/1/start", {"loaner": True})
+        assert again.status_code == 201, again.text
+        state = ada.get("/api/v1/campaign").json()
+        assert state["running"] == again.json()["id"]
+        assert [duel["game"] for duel in state["saved"]] == [game_id]
+        assert ada.post(f"/api/v1/games/{again.json()['id']}/close").status_code == 200
+
+        # Closed, a save cannot be played on: the map does not offer it.
+        assert root.put("/api/v1/admin/rollout/save_resume", {"stage": "off"}).status_code == 200
+        assert ada.get("/api/v1/campaign").json()["saved"] == []
+        assert root.put("/api/v1/admin/rollout/save_resume", {"stage": "on"}).status_code == 200
+
+        resumed = ada.post(f"{SAVES}/{save['id']}/resume")
+        assert resumed.status_code == 200, resumed.text
+        state = ada.get("/api/v1/campaign").json()
+        assert (state["running"], state["saved"]) == (game_id, [])
+
+        # A save past its days is not offered, even before the daily job ends it.
+        save = saved(ada, game_id)
+        with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+            row = db.get(GameSave, uuid.UUID(save["id"]))
+            assert row is not None
+            row.expires_at = utcnow() - timedelta(minutes=1)
+            db.commit()
+        assert ada.get("/api/v1/campaign").json()["saved"] == []

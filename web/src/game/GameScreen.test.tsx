@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { useLayoutEffect, useState } from "react";
 import {
@@ -985,6 +986,54 @@ describe("save, resume and recovery at the table (v1.0.0)", () => {
         "#play/games",
       );
       expect(FakeSocket.made).toHaveLength(1);
+    } finally {
+      window.location.hash = "";
+      restore();
+    }
+  });
+
+  it("leaves a saved campaign duel for the campaign's map, where it waits", async () => {
+    const { client, restore } = await served(
+      {
+        campaign: {
+          encounter: 3,
+          opponent: "warden-03",
+          name: "The Warden",
+          title: "The Ember Gate",
+          hints: false,
+          deck: "own",
+          finale: null,
+          outcome: null,
+          challenge: false,
+        },
+      },
+      true,
+    );
+    const post = vi.fn(async () => ({ data: { id: "s1" } }));
+    Object.assign(client, { POST: post });
+    try {
+      const socket = playing(view);
+      fireEvent.click(screen.getByRole("button", { name: "Game menu" }));
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Save and leave" }),
+      );
+      fireEvent.click(
+        screen.getAllByRole("button", { name: "Save and leave" }).at(-1)!,
+      );
+      await waitFor(() => expect(window.location.hash).toBe("#campaign"));
+
+      act(() => {
+        socket.deliver({ type: "saved", game_id: "g1", save_id: "s1" });
+        socket.onclose?.({ code: 1000 });
+      });
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "This duel is saved. It waits on the campaign's map",
+      );
+      expect(
+        within(screen.getByRole("alert")).getByRole("link", {
+          name: "Back to the campaign",
+        }),
+      ).toHaveAttribute("href", "#campaign");
     } finally {
       window.location.hash = "";
       restore();
