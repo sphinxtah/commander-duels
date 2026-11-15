@@ -68,6 +68,8 @@ def test_migration_upgrade_and_downgrade(tmp_path, monkeypatch):
         "game_saves",
         # v1.0.0 (0053): a reader's bookmarks and notes on a replay.
         "replay_marks",
+        # v1.0.0 (0054): how a table's game fit what its profile described.
+        "table_fit",
         "game_tables",
         "table_seats",
         "table_invites",

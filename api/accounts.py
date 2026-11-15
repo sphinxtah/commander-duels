@@ -56,6 +56,7 @@ from api.models import (
     RoleGrant,
     ScheduledJob,
     StarterPurchase,
+    TableFit,
     TablePreset,
     TableSeat,
     User,
@@ -315,6 +316,8 @@ def delete_account(
     # And its bookmarks and notes on replays (v1.0.0, api/replays.py). What it shared ends with
     # the account: a grant works only between two active accounts (api/access.py).
     db.execute(delete(ReplayMark).where(ReplayMark.user_id == user.id))
+    # And its answers to how a table fit (v1.0.0, api/table_fit.py): the tally loses them.
+    db.execute(delete(TableFit).where(TableFit.user_id == user.id))
     remove_decks(db, user.id, now, removed)
     removed.sessions = db.execute(
         delete(UserSession).where(UserSession.user_id == user.id)

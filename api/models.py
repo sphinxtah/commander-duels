@@ -313,6 +313,26 @@ class GameSave(Base):
     ended_reason: Mapped[str | None] = mapped_column(String(16))
 
 
+class TableFit(Base):
+    """A player's answer, after a table's game, to how the table fit what its Rule Zero profile
+    described (v1.0.0, api/table_fit.py; docs/tables.md): as described, stronger or weaker. One
+    a player a game, kept with the kind of game the profile named. Read by nobody but the site's
+    numbers (the owner's decision 25, 2026-11-15): it rates no player and no host, and no route
+    shows one account's answer to another."""
+
+    __tablename__ = "table_fit"
+    __table_args__ = (
+        UniqueConstraint("game_id", "user_id", name="uq_table_fit_answer"),
+        CheckConstraint("fit IN ('as_described', 'stronger', 'weaker')", name="ck_table_fit_fit"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    game_id: Mapped[UUID] = mapped_column(ForeignKey("games.id"), index=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    fit: Mapped[str] = mapped_column(String(16))
+    intent: Mapped[str] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
 class ReplayMark(Base):
     """A reader's own marks on a game's replay (v1.0.0, api/replays.py; docs/replays.md): a
     bookmark at one of the game's events (``seq``, the event's number) with a label and a note,
@@ -509,6 +529,9 @@ class GameTable(Base):
     # is for, in the host's words, and the restrictions the server enforces on its decks. Null:
     # none, as every table before v0.9.12. What the lobby searches by is kept beside it.
     profile: Mapped[dict[str, object] | None] = mapped_column(JsonType)
+    # How often the host changed the profile since the table opened (v1.0.0): a seat that last
+    # saw fewer changes (table_seats.profile_seen) says so before it gets ready again.
+    profile_changes: Mapped[int] = mapped_column(default=0, server_default="0")
     intent: Mapped[str | None] = mapped_column(String(16))
     pace: Mapped[str | None] = mapped_column(String(16))
     duration: Mapped[int | None] = mapped_column(SmallInteger)
@@ -532,6 +555,9 @@ class TableSeat(Base):
         ForeignKey("deck_revisions.id"), index=True
     )
     ready: Mapped[bool] = mapped_column(default=False)
+    # The table's profile changes this seat's player has seen (v1.0.0): all of them as they sat
+    # down, and again each time they acknowledge a change as they get ready.
+    profile_seen: Mapped[int] = mapped_column(default=0, server_default="0")
     joined_at: Mapped[datetime] = mapped_column(UtcDateTime())
 
 

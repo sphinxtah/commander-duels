@@ -2551,6 +2551,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/games/{game_id}/table-fit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Fit
+         * @description Whether the game's result asks how the table fit, and the caller's own answer.
+         */
+        get: operations["read_fit_api_v1_games__game_id__table_fit_get"];
+        /**
+         * Answer Fit
+         * @description The caller's answer to how the table fit what it described; answering again changes it.
+         *     Counted in the site's numbers and shown to nobody else.
+         */
+        put: operations["answer_fit_api_v1_games__game_id__table_fit_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/games/{game_id}/timeline": {
         parameters: {
             query?: never;
@@ -6688,6 +6713,29 @@ export interface components {
             /** Type Line */
             type_line?: string | null;
         };
+        /**
+         * FitCount
+         * @description The answers for one kind of game, in the site's numbers.
+         */
+        FitCount: {
+            /**
+             * As Described
+             * @default 0
+             */
+            as_described: number;
+            /** Intent */
+            intent: string;
+            /**
+             * Stronger
+             * @default 0
+             */
+            stronger: number;
+            /**
+             * Weaker
+             * @default 0
+             */
+            weaker: number;
+        };
         /** Format */
         Format: {
             /**
@@ -7878,6 +7926,11 @@ export interface components {
              * @description When this process started counting.
              */
             since: string;
+            /**
+             * Table Fit
+             * @description Since v1.0.0: how players said a table's game fit what its Rule Zero profile described, by the kind of game. Counts only; shown nowhere else.
+             */
+            table_fit?: components["schemas"]["FitCount"][];
             /** Version */
             version: string;
         };
@@ -10160,6 +10213,11 @@ export interface components {
         /** SeatChange */
         SeatChange: {
             /**
+             * Acknowledge Profile
+             * @description Since v1.0.0, with ready: you have read the table's Rule Zero profile as the host changed it since you sat down or last got ready (the view's profile_changed). Getting ready is refused without it (409 profile_changed) while a change is unread.
+             */
+            acknowledge_profile?: boolean | null;
+            /**
              * Deck Id
              * @description Another of your decks; unreadies.
              */
@@ -11146,6 +11204,58 @@ export interface components {
             profile?: components["schemas"]["TableProfile"] | null;
         };
         /**
+         * TableExpectations
+         * @description What a table's Rule Zero profile says of it (v1.0.0), for an invitation: what the host
+         *     describes, which nothing checks, apart from what the server checks on every deck.
+         */
+        TableExpectations: {
+            /**
+             * Duration
+             * @description The minutes the game is expected to take.
+             */
+            duration: number | null;
+            /**
+             * Enforced
+             * @description Every rule checked on a deck at the table, in words: the table's own rules and the profile's restrictions. Empty: any deck its format takes.
+             */
+            enforced: string[];
+            /** Intent Name */
+            intent_name: string;
+            /** Note */
+            note: string;
+            /** Pace Name */
+            pace_name: string | null;
+        };
+        /** TableFitAnswer */
+        TableFitAnswer: {
+            /**
+             * Fit
+             * @enum {string}
+             */
+            fit: "as_described" | "stronger" | "weaker";
+        };
+        /**
+         * TableFitView
+         * @description What the result's screen needs to ask, and the caller's own answer.
+         */
+        TableFitView: {
+            /**
+             * Asked
+             * @description Whether the question applies: a finished game of a table that kept a Rule Zero profile, and the caller played in it.
+             */
+            asked: boolean;
+            /**
+             * Fit
+             * @description The caller's own answer, if they gave one.
+             */
+            fit: ("as_described" | "stronger" | "weaker") | null;
+            /**
+             * Intent Name
+             * @description The kind of game the table said it was for, in words; null when not asked.
+             */
+            intent_name: string | null;
+        };
+        /**
          * TableInviting
          * @description Friends a table's player invites (v0.9.2).
          */
@@ -11160,6 +11270,8 @@ export interface components {
         TableNotice: {
             /** Code */
             code: string;
+            /** @description Since v1.0.0: what the table's Rule Zero profile says of it, so that an invitation shows what is expected before it is answered; null for a table without one. */
+            expectations?: components["schemas"]["TableExpectations"] | null;
             /**
              * Format
              * @enum {string}
@@ -11466,6 +11578,12 @@ export interface components {
             players: components["schemas"]["TablePlayer"][];
             /** @description Since v0.9.12: the table's Rule Zero profile: what it describes, and every rule the server enforces on its decks. Null when its host gave none. */
             profile?: components["schemas"]["ProfileView"] | null;
+            /**
+             * Profile Changed
+             * @description Since v1.0.0: the host changed the table's Rule Zero profile (or removed it) since you sat down or last got ready, so getting ready asks you to say you have read it (acknowledge_profile). False for anyone not seated.
+             * @default false
+             */
+            profile_changed: boolean;
             rules: components["schemas"]["TableRules"];
             /** Seats */
             seats: number;
@@ -25157,6 +25275,198 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SavedGame"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    read_fit_api_v1_games__game_id__table_fit_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableFitView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    answer_fit_api_v1_games__game_id__table_fit_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TableFitAnswer"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableFitView"];
                 };
             };
             /** @description Bad Request */

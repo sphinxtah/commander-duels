@@ -1023,7 +1023,13 @@ def test_friends_are_invited_to_a_table(client, engine):
     notices = bob.get("/api/v1/notifications").json()["items"]
     invite = next(item for item in notices if item["kind"] == "table_invite")
     assert invite["actor"]["handle"] == "ada" and invite["request_pending"] is True
-    assert invite["table"] == {"code": code, "format": "commander", "open": True}
+    assert invite["table"] == {
+        "code": code,
+        "format": "commander",
+        "open": True,
+        # A table without a Rule Zero profile says nothing of what it expects (v1.0.0).
+        "expectations": None,
+    }
 
     # Any seated player invites more; inviting again tells nobody anything new.
     sent = ada.send(

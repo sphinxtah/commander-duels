@@ -97,6 +97,7 @@ function table(fields: Partial<TableView> = {}): TableView {
     created_at: "2026-10-21T10:00:00Z",
     open_seats: 0,
     starter: false,
+    profile_changed: false,
     ...fields,
   };
 }

@@ -278,6 +278,20 @@ class AuctionNotice(Contract):
     )
 
 
+class TableExpectations(Contract):
+    """What a table's Rule Zero profile says of it (v1.0.0), for an invitation: what the host
+    describes, which nothing checks, apart from what the server checks on every deck."""
+
+    intent_name: str
+    pace_name: str | None
+    duration: int | None = Field(description="The minutes the game is expected to take.")
+    note: str
+    enforced: list[str] = Field(
+        description="Every rule checked on a deck at the table, in words: the table's own "
+        "rules and the profile's restrictions. Empty: any deck its format takes."
+    )
+
+
 class TableNotice(Contract):
     """The table an invitation names (v0.9.2), which the bell links to (#tables/<code>)."""
 
@@ -286,6 +300,11 @@ class TableNotice(Contract):
     open: bool = Field(
         description="Whether the table still waits for players: not started, "
         "closed or left open too long."
+    )
+    expectations: TableExpectations | None = Field(
+        default=None,
+        description="Since v1.0.0: what the table's Rule Zero profile says of it, so that an "
+        "invitation shows what is expected before it is answered; null for a table without one.",
     )
 
 
@@ -900,7 +919,8 @@ def table_notices(
     if not codes:
         return {}
     # Imported here: api.tables imports this module.
-    from api.tables import cutoff
+    from api import table_profiles
+    from api.tables import cutoff, rules_of
 
     found = list(db.scalars(select(GameTable).where(GameTable.code.in_(set(codes)))))
     seated: dict[UUID, set[UUID]] = {}
@@ -915,8 +935,22 @@ def table_notices(
         open_now = table.status == "open" and table.created_at >= cutoff()
         players = seated.get(table.id, set())
         free = table.seats - table.bots > len(players)
+        shown = table_profiles.view(table_profiles.profile_of(table), rules_of(table))
         notices[table.code] = (
-            TableNotice(code=table.code, format=table.format, open=open_now),  # type: ignore[arg-type]
+            TableNotice(
+                code=table.code,
+                format=table.format,  # type: ignore[arg-type]
+                open=open_now,
+                expectations=TableExpectations(
+                    intent_name=shown.intent_name,
+                    pace_name=shown.pace_name,
+                    duration=shown.duration,
+                    note=shown.note,
+                    enforced=[rule.text for rule in shown.enforced_rules],
+                )
+                if shown is not None
+                else None,
+            ),
             open_now and free and user_id not in players,
         )
     return notices

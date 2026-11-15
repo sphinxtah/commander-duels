@@ -188,6 +188,45 @@ describe("the words (v0.4.3)", () => {
     ).toBe(
       "bob invited you to their Commander table, which is no longer open.",
     );
+    // A table with a Rule Zero profile says what it expects while the invitation waits
+    // (v1.0.0): what the host describes, and apart from it what is checked on every deck.
+    const expecting = {
+      ...invite,
+      table: {
+        ...invite.table!,
+        expectations: {
+          intent_name: "Upgraded casual",
+          pace_name: "Steady",
+          duration: 90,
+          note: "Bring the deck you are still tuning.",
+          enforced: ["No custom cards", "At most 1 Game Changers a deck"],
+        },
+      },
+    };
+    expect(notificationWords(expecting)).toBe(
+      "bob invites you to their Commander table. The host describes it as: Upgraded casual, Steady, about 90 minutes. “Bring the deck you are still tuning.” Checked on every deck: No custom cards; At most 1 Game Changers a deck.",
+    );
+    expect(
+      notificationWords({
+        ...expecting,
+        table: {
+          ...expecting.table,
+          expectations: {
+            intent_name: "Custom",
+            pace_name: null,
+            duration: null,
+            note: "",
+            enforced: [],
+          },
+        },
+      }),
+    ).toBe(
+      "bob invites you to their Commander table. The host describes it as: Custom. Any deck its format takes may sit down.",
+    );
+    // Answered or closed, it says only what happened.
+    expect(notificationWords({ ...expecting, request_pending: false })).toBe(
+      "bob invited you to their Commander table.",
+    );
   });
 });
 

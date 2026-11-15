@@ -6128,6 +6128,36 @@
         "title": "FaceSummary",
         "type": "object"
       },
+      "FitCount": {
+        "additionalProperties": false,
+        "description": "The answers for one kind of game, in the site's numbers.",
+        "properties": {
+          "as_described": {
+            "default": 0,
+            "title": "As Described",
+            "type": "integer"
+          },
+          "intent": {
+            "title": "Intent",
+            "type": "string"
+          },
+          "stronger": {
+            "default": 0,
+            "title": "Stronger",
+            "type": "integer"
+          },
+          "weaker": {
+            "default": 0,
+            "title": "Weaker",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "intent"
+        ],
+        "title": "FitCount",
+        "type": "object"
+      },
       "Format": {
         "additionalProperties": false,
         "properties": {
@@ -8953,6 +8983,14 @@
             "format": "date-time",
             "title": "Since",
             "type": "string"
+          },
+          "table_fit": {
+            "description": "Since v1.0.0: how players said a table's game fit what its Rule Zero profile described, by the kind of game. Counts only; shown nowhere else.",
+            "items": {
+              "$ref": "#/components/schemas/FitCount"
+            },
+            "title": "Table Fit",
+            "type": "array"
           },
           "version": {
             "title": "Version",
@@ -14327,6 +14365,18 @@
       "SeatChange": {
         "additionalProperties": false,
         "properties": {
+          "acknowledge_profile": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Since v1.0.0, with ready: you have read the table's Rule Zero profile as the host changed it since you sat down or last got ready (the view's profile_changed). Getting ready is refused without it (409 profile_changed) while a change is unread.",
+            "title": "Acknowledge Profile"
+          },
           "deck_id": {
             "anyOf": [
               {
@@ -16509,6 +16559,126 @@
         "title": "TableChange",
         "type": "object"
       },
+      "TableExpectations": {
+        "additionalProperties": false,
+        "description": "What a table's Rule Zero profile says of it (v1.0.0), for an invitation: what the host\ndescribes, which nothing checks, apart from what the server checks on every deck.",
+        "properties": {
+          "duration": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The minutes the game is expected to take.",
+            "title": "Duration"
+          },
+          "enforced": {
+            "description": "Every rule checked on a deck at the table, in words: the table's own rules and the profile's restrictions. Empty: any deck its format takes.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Enforced",
+            "type": "array"
+          },
+          "intent_name": {
+            "title": "Intent Name",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "pace_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pace Name"
+          }
+        },
+        "required": [
+          "intent_name",
+          "pace_name",
+          "duration",
+          "note",
+          "enforced"
+        ],
+        "title": "TableExpectations",
+        "type": "object"
+      },
+      "TableFitAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "fit": {
+            "enum": [
+              "as_described",
+              "stronger",
+              "weaker"
+            ],
+            "title": "Fit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fit"
+        ],
+        "title": "TableFitAnswer",
+        "type": "object"
+      },
+      "TableFitView": {
+        "additionalProperties": false,
+        "description": "What the result's screen needs to ask, and the caller's own answer.",
+        "properties": {
+          "asked": {
+            "description": "Whether the question applies: a finished game of a table that kept a Rule Zero profile, and the caller played in it.",
+            "title": "Asked",
+            "type": "boolean"
+          },
+          "fit": {
+            "anyOf": [
+              {
+                "enum": [
+                  "as_described",
+                  "stronger",
+                  "weaker"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The caller's own answer, if they gave one.",
+            "title": "Fit"
+          },
+          "intent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The kind of game the table said it was for, in words; null when not asked.",
+            "title": "Intent Name"
+          }
+        },
+        "required": [
+          "asked",
+          "intent_name",
+          "fit"
+        ],
+        "title": "TableFitView",
+        "type": "object"
+      },
       "TableInviting": {
         "additionalProperties": false,
         "description": "Friends a table's player invites (v0.9.2).",
@@ -16537,6 +16707,17 @@
           "code": {
             "title": "Code",
             "type": "string"
+          },
+          "expectations": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableExpectations"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Since v1.0.0: what the table's Rule Zero profile says of it, so that an invitation shows what is expected before it is answered; null for a table without one."
           },
           "format": {
             "enum": [
@@ -17147,6 +17328,12 @@
               }
             ],
             "description": "Since v0.9.12: the table's Rule Zero profile: what it describes, and every rule the server enforces on its decks. Null when its host gave none."
+          },
+          "profile_changed": {
+            "default": false,
+            "description": "Since v1.0.0: the host changed the table's Rule Zero profile (or removed it) since you sat down or last got ready, so getting ready asks you to say you have read it (acknowledge_profile). False for anyone not seated.",
+            "title": "Profile Changed",
+            "type": "boolean"
           },
           "rules": {
             "$ref": "#/components/schemas/TableRules"
@@ -34971,6 +35158,236 @@
           }
         },
         "summary": "Save Game"
+      }
+    },
+    "/api/v1/games/{game_id}/table-fit": {
+      "get": {
+        "description": "Whether the game's result asks how the table fit, and the caller's own answer.",
+        "operationId": "read_fit_api_v1_games__game_id__table_fit_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableFitView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Read Fit"
+      },
+      "put": {
+        "description": "The caller's answer to how the table fit what it described; answering again changes it.\nCounted in the site's numbers and shown to nobody else.",
+        "operationId": "answer_fit_api_v1_games__game_id__table_fit_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TableFitAnswer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableFitView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Answer Fit"
       }
     },
     "/api/v1/games/{game_id}/timeline": {

@@ -93,6 +93,26 @@ const TABLE_FORMATS: Record<string, string> = {
   kings_table: "King's Table",
 };
 
+/** What an invited table expects (v1.0.0), in sentences that keep its two parts apart: what
+ * the host describes, which nothing checks, and what the server checks on every deck there.
+ * Empty for a table without a Rule Zero profile. */
+export function expectationWords(table: NotificationItem["table"]): string {
+  const expected = table?.expectations;
+  if (!expected) return "";
+  const described = [
+    expected.intent_name,
+    expected.pace_name,
+    expected.duration ? `about ${expected.duration} minutes` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const note = expected.note ? ` “${expected.note}”` : "";
+  const enforced = expected.enforced.length
+    ? `Checked on every deck: ${expected.enforced.join("; ")}.`
+    : "Any deck its format takes may sit down.";
+  return ` The host describes it as: ${described}.${note} ${enforced}`;
+}
+
 export function notificationWords(item: NotificationItem): string {
   // The auction house's five kinds (v0.6.0).
   const auction = auctionNotice(item);
@@ -135,7 +155,9 @@ export function notificationWords(item: NotificationItem): string {
       // An invitation to a table (v0.9.2): its format, and whether it still waits for players.
       const format = item.table ? (TABLE_FORMATS[item.table.format] ?? "") : "";
       const table = format ? `their ${format} table` : "their table";
-      if (item.request_pending) return `${who} invites you to ${table}.`;
+      // While it waits, it says what the table expects (v1.0.0), before it is answered.
+      if (item.request_pending)
+        return `${who} invites you to ${table}.${expectationWords(item.table)}`;
       if (item.table && !item.table.open)
         return `${who} invited you to ${table}, which is no longer open.`;
       return `${who} invited you to ${table}.`;

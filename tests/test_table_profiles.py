@@ -81,8 +81,10 @@ def table(host: Account, deck_id: str, **extra: Any) -> Any:
     return host.send("POST", "/api/v1/tables", {"format": "legacy", "deck_id": deck_id} | extra)
 
 
-def ready(account: Account, code: str) -> Any:
-    return account.send("PATCH", f"/api/v1/tables/{code}/seat", {"ready": True})
+def ready(account: Account, code: str, acknowledge: bool = False) -> Any:
+    """Gets ready; with ``acknowledge``, saying the changed profile was read (v1.0.0)."""
+    body = {"ready": True} | ({"acknowledge_profile": True} if acknowledge else {})
+    return account.send("PATCH", f"/api/v1/tables/{code}/seat", body)
 
 
 def kept(client: TestClient, code: str) -> GameTable:
@@ -285,22 +287,47 @@ def test_any_change_to_the_profile_makes_every_player_not_ready(client, engine):
     # has no other settings.
     assert change(UPGRADED).status_code == 200 and bob_ready()
     assert ada.send("PATCH", f"/api/v1/tables/{code}", {}).status_code == 422 and bob_ready()
-    # Its note alone is a change: getting ready again is how a player accepts it.
+
+    def changed_for(account: Account) -> bool:
+        return bool(account.get(f"/api/v1/tables/{code}").json()["profile_changed"])
+
+    assert not changed_for(bob) and not changed_for(ada)
+    # Its note alone is a change. Since v1.0.0 getting ready again is not enough to accept it:
+    # the player says they have read it, and the table tells them (and only them) that it changed.
     assert change(UPGRADED | {"note": "No infinite combos, please."}).status_code == 200
     assert not bob_ready()
     assert ada.get(f"/api/v1/tables/{code}").json()["can_start"] is False
+    assert changed_for(bob) and not changed_for(ada), "the host wrote it"
+    unread = ready(bob, code)
+    assert (unread.status_code, unread.json()["code"]) == (409, "profile_changed")
+    assert not bob_ready()
+    assert ready(bob, code, acknowledge=True).status_code == 200 and bob_ready()
+    assert not changed_for(bob)
+    # Read once, it is read: unready and ready again asks nothing more.
+    bob.send("PATCH", f"/api/v1/tables/{code}/seat", {"ready": False})
     assert ready(bob, code).status_code == 200 and bob_ready()
     # So is a restriction, which the players' decks are then checked by, and its removal.
     assert change(UPGRADED | {"enforced": {"game_changers": 0}}).status_code == 200
-    assert not bob_ready()
+    assert not bob_ready() and changed_for(bob)
+    # Someone who sits down sees the table as it stands, with nothing to acknowledge.
+    dee, cy = Account(client, "dee", admin=True), Account(client, "cy", admin=True)
+    other = table(dee, deck(dee, client), profile=UPGRADED).json()["code"]
+    changed = dee.send("PATCH", f"/api/v1/tables/{other}", {"profile": {"intent": "learning"}})
+    assert changed.status_code == 200, changed.text
+    joined = cy.send("POST", f"/api/v1/tables/{other}/join", {"deck_id": deck(cy, client)})
+    assert joined.status_code == 200, joined.text
+    assert joined.json()["profile_changed"] is False
+    assert ready(cy, other).status_code == 200
     stored = kept(client, code)
     assert stored.profile is not None and stored.profile["enforced"] == {
         "custom_cards": True,
         "reserved_list": True,
         "game_changers": 0,
     }
-    assert ready(bob, code).status_code == 200
+    assert ready(bob, code, acknowledge=True).status_code == 200
     assert change(None).status_code == 200 and not bob_ready()
+    # A profile taken away is a change to read as well.
+    assert changed_for(bob) and ready(bob, code).status_code == 409
     stored = kept(client, code)
     assert (stored.profile, stored.intent, stored.pace, stored.duration) == (None,) * 4
     # A Legacy table still has no other settings to change.
@@ -423,3 +450,27 @@ def test_a_host_saves_tables_to_open_again(client):
     assert removed.status_code == 200 and len(removed.json()["saved"]) == 19
     with Session(client.app.state.database) as db:
         assert db.scalar(select(TablePreset).where(TablePreset.id == UUID(friday["id"]))) is None
+
+
+def test_an_invitation_says_what_the_table_expects(client, engine):
+    """An invitation shows what a table's profile describes and what the server enforces there
+    (v1.0.0), before it is answered."""
+    ada, bob = Account(client, "ada", admin=True), Account(client, "bob", admin=True)
+    assert ada.send("PUT", f"/api/v1/friends/{bob.id}").status_code == 200
+    assert bob.send("PUT", f"/api/v1/friends/{ada.id}").json()["friendship"] == "friends"
+    made = table(ada, deck(ada, client), profile=UPGRADED, invite=[str(bob.id)])
+    assert made.status_code == 201, made.text
+    notices = bob.get("/api/v1/notifications").json()["items"]
+    invite = next(item for item in notices if item["kind"] == "table_invite")
+    assert invite["table"]["expectations"] == {
+        "intent_name": "Upgraded casual",
+        "pace_name": "Steady",
+        "duration": 90,
+        "note": "Bring the deck you are still tuning.",
+        # The table's own rules (a casual table's are none) and the profile's restrictions.
+        "enforced": [
+            "No custom cards",
+            "No Reserved List cards",
+            "At most 1 Game Changers a deck",
+        ],
+    }

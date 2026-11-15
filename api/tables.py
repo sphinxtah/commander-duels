@@ -278,6 +278,12 @@ class SeatTaking(Contract):
 class SeatChange(Contract):
     deck_id: UUID | None = Field(default=None, description="Another of your decks; unreadies.")
     ready: bool | None = None
+    acknowledge_profile: bool | None = Field(
+        default=None,
+        description="Since v1.0.0, with ready: you have read the table's Rule Zero profile as "
+        "the host changed it since you sat down or last got ready (the view's profile_changed). "
+        "Getting ready is refused without it (409 profile_changed) while a change is unread.",
+    )
     team: Team | None = Field(
         default=None,
         description=f"{TEAM_TEXT} Moves you to a free seat of that team; unreadies you, and the "
@@ -365,6 +371,12 @@ class TableView(Contract):
         "tables, in their own seats)."
     )
     your_seat: int | None
+    profile_changed: bool = Field(
+        default=False,
+        description="Since v1.0.0: the host changed the table's Rule Zero profile (or removed "
+        "it) since you sat down or last got ready, so getting ready asks you to say you have "
+        "read it (acknowledge_profile). False for anyone not seated.",
+    )
     can_start: bool = Field(description="You host it, every player's seat is taken and ready.")
     game_id: UUID | None = Field(description="Its game, once started; for its players and SysOp.")
     created_at: datetime
@@ -675,6 +687,7 @@ def view_of(db: Session, table: GameTable, principal: Principal) -> TableView:
         host=found.get(table.host_id, (None, None))[0],
         players=players,
         your_seat=mine.seat if mine is not None else None,
+        profile_changed=mine is not None and mine.profile_seen < table.profile_changes,
         can_start=status == "open" and table.host_id == you and ready,
         game_id=table.game_id if mine is not None or full_access(principal) else None,
         created_at=table.created_at,
@@ -1285,6 +1298,8 @@ def join_table(
             deck_revision_id=revision,
             # At a starter-deck table a seat is ready once it has bought (the owner's decision).
             ready=table.starter,
+            # They sit down at the table as it stands: its profile's changes so far are seen.
+            profile_seen=table.profile_changes,
             joined_at=utcnow(),
         )
     )
@@ -1419,6 +1434,18 @@ def change_seat(
         if body.ready and table.format == TEAM_FORMAT:
             check_team(db, request, principal, table, row)
         profile = table_profiles.profile_of(table)
+        if body.ready and row.profile_seen < table.profile_changes:
+            # The host changed what the table is for (v1.0.0, the specification's "explicit
+            # acknowledgment of changed rules"): readiness alone no longer stands for having
+            # read it.
+            if not body.acknowledge_profile:
+                raise ApiError(
+                    409,
+                    "profile_changed",
+                    "The host changed what this table is for. Read it, and say so as you get "
+                    "ready.",
+                )
+            row.profile_seen = table.profile_changes
         if body.ready and (table.format == KINGS or profile is not None):
             # The settings' deck format may have changed since the deck was chosen, and since
             # v0.9.12 the table's profile: getting ready checks the deck by what stands now.
@@ -1485,6 +1512,13 @@ def change_table(code: Code, body: TableChange, principal: Player, db: Db) -> Ta
         )
     rows = seats_of(db, table)
     changed = profiled and table_profiles.keep(table, body.profile)
+    if changed:
+        # Counted, so that each player says they have read it before getting ready again
+        # (v1.0.0); the host, who wrote it, has.
+        table.profile_changes += 1
+        for row in rows:
+            if row.user_id == table.host_id:
+                row.profile_seen = table.profile_changes
     if body.kings_table is not None:
         before = kings_table.config_of(table.kings_table)
         after = before.model_copy(update=body.kings_table.model_dump(exclude_none=True))

@@ -23,6 +23,7 @@ The Preparation Framework's last foundation (the specification's section 15). It
 | `access` | Access given ([access](access.md)), by its state: `offered`, `accepted`, `given`, `declined`, `revoked`, `expired` |
 | `rollout` | Every unfinished workflow's stage ([the gates](#the-gates)) |
 | `jobs` | The worker's newest job of each kind, with its status and result code |
+| `table_fit` | Since v1.0.0: how players said a table's game fit what its Rule Zero profile described, by the kind of game: `as_described`, `stronger`, `weaker` ([tables](tables.md#how-the-table-fit-v100)). Counts only, and shown nowhere else (the owner's decision 25) |
 | `engine` | The engine's own numbers as it reports them: `processes` (budgets, each game's process, the bots' decision times, searches cut off, fallbacks, processes that ended unasked: [isolation](engine/isolation.md#what-the-operator-reads)) and `recordings` (checkpoints, recoveries and refusals: [recovery](engine/recovery.md#for-the-operator)). None while the engine does not answer |
 
 ### The counts

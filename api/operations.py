@@ -33,6 +33,7 @@ from api.games import EngineUnavailable, hub_of
 from api.identity import Principal, require_permission, utcnow
 from api.models import AccessGrant, Game, ScheduledJob
 from api.schemas import Contract
+from api.table_fit import FitCount, tally
 from api.version import APP_VERSION
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
@@ -68,6 +69,11 @@ class Operations(Contract):
     access: dict[str, int] = Field(description="Access given, by its state.")
     rollout: rollout.Rollout
     jobs: list[Job] = Field(description="The worker's newest job of each kind.")
+    table_fit: list[FitCount] = Field(
+        default_factory=list,
+        description="Since v1.0.0: how players said a table's game fit what its Rule Zero "
+        "profile described, by the kind of game. Counts only; shown nowhere else.",
+    )
     engine: dict[str, Any] | None = Field(
         description="The engine's processes and recordings as it reports them; none while it "
         "does not answer."
@@ -145,6 +151,7 @@ class Recorded(Contract):
     access: dict[str, int]
     rollout: rollout.Rollout
     jobs: list[Job]
+    table_fit: list[FitCount]
 
 
 def recorded(database: Engine, running: int, now: datetime) -> Recorded:
@@ -160,6 +167,7 @@ def recorded(database: Engine, running: int, now: datetime) -> Recorded:
             access=grants(db, now),
             rollout=rollout.staged(db),
             jobs=jobs(db),
+            table_fit=tally(db),
         )
 
 
@@ -179,5 +187,6 @@ async def operations(request: Request, principal: Reader) -> Operations:
         access=found.access,
         rollout=found.rollout,
         jobs=found.jobs,
+        table_fit=found.table_fit,
         engine=await engine_numbers(request),
     )

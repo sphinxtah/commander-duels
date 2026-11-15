@@ -76,6 +76,8 @@ TRANSIENT = {
     "its game is the record",
     "replay_marks": "a reader's bookmarks and notes on a replay; they go with the game's events, "
     "90 days after the game",
+    "table_fit": "an answer to how a table's game fit its description; counted in the site's "
+    "numbers, no asset",
 }
 
 
