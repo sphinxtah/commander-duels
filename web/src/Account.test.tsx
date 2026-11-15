@@ -625,9 +625,12 @@ describe("the wait for approval", () => {
     expect(
       await screen.findByRole("heading", { name: "Welcome to the table." }),
     ).toBeInTheDocument();
-    // The setup wizard opens on the approved account (v0.4.2).
+    // The setup wizard opens on the approved account (v0.4.2). Its dialog is opened by an effect,
+    // so the heading is waited for: a slow runner has not opened it yet (v1.0.0).
     expect(
-      screen.getByRole("heading", { name: "Welcome to Commander Duels" }),
+      await screen.findByRole("heading", {
+        name: "Welcome to Commander Duels",
+      }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Set up your game" }),
