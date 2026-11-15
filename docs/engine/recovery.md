@@ -90,7 +90,7 @@ A game its player saves stops on purpose where a dead process stops one by accid
 - **It is kept as long as its save lasts, and no longer.** The sweep passes over a saved recording however old it is, and removes it once its time is up, whatever the retention.
 - **A game that cannot be saved plays on.** One whose recording stopped is refused in words, and is where it was.
 
-How it goes (`HumanGame.suspend`, `HumanGames.save`): every state taken so far is brought to disk, so the game goes on from the last point it could go on from; the journal notes the save; `saved.json` is written; and only then does the recording close and the game's thread end. No result is written. Anything that fails before the game is stopped leaves it running. On the front process the save is forwarded to the game's process, which is then no longer the game's (`GameProcesses.vacated`).
+How it goes (`HumanGame.suspend`, `HumanGames.save`): every state taken so far is brought to disk, so the game goes on from the last point it could go on from; the journal notes the save; `saved.json` is written; and only then does the recording close and the game's thread end. No result is written. Anything that fails before the game is stopped leaves it running. On the front process the save is forwarded to the game's process, which is then no longer the game's (`GameProcesses.save`).
 
 What a resume is exact about is what a recovery is exact about. A game saved while a person is asked something, which is nearly always, comes back at that question. One saved while the bots play goes back to the last state taken, at most one decision at priority earlier, and a bot may decide otherwise from there than it was about to.
 

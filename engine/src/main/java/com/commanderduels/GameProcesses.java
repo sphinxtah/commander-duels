@@ -228,6 +228,12 @@ final class GameProcesses implements AutoCloseable {
         volatile long peakHeapUsed;
         /** Games given to it, its first included (v0.9.11's reuse). */
         volatile int games;
+        /**
+         * Its game is being saved (v1.0.0): the game is dropped from it before this process hears
+         * so, and the poller, which ends a claimed process that reports no game, leaves it alone
+         * meanwhile.
+         */
+        volatile boolean vacating;
 
         GameProcess(int number, Size size, Process process, String token) {
             this.number = number;
@@ -667,11 +673,29 @@ final class GameProcesses implements AutoCloseable {
     }
 
     /**
-     * A process whose game was saved (v1.0.0): the game is its recording's now, and comes back in
-     * whichever process a later attach gives it. This one takes its next game at once, where a
-     * process whose game is over waits for the end to be read, or is ended if it may not be reused.
+     * Saves a process's game (v1.0.0): the request is forwarded to it, and when it has saved the
+     * game, the game is its recording's and comes back in whichever process a later attach gives
+     * it. This process then takes its next game at once, where a process whose game is over waits
+     * for the end to be read, or is ended if it may not be reused. The poller keeps its hands off
+     * the process from before the game is dropped until it is back among the warm processes: it
+     * would end a claimed process that reports no game (the hosted run of 1475d1a did, between
+     * the two). Returns what the process answered; a refusal leaves everything as it was.
      */
-    void vacated(GameProcess process) throws InterruptedException {
+    Optional<Forwarded> save(GameProcess process, String path, byte[] body) throws InterruptedException {
+        process.vacating = true;
+        try {
+            Optional<Forwarded> answer = forward(process, "POST", path, null, null, body, 60_000);
+            if (answer.isPresent() && answer.get().status() == 200) {
+                vacated(process);
+            }
+            return answer;
+        } finally {
+            process.vacating = false;
+        }
+    }
+
+    /** The process's game was saved: it is given back to the warm processes, or ended. */
+    private void vacated(GameProcess process) throws InterruptedException {
         String gameId = process.gameId;
         if (gameId != null) {
             byGame.remove(gameId, process);
@@ -790,8 +814,17 @@ final class GameProcesses implements AutoCloseable {
                 claimed = live.stream().filter(process -> process.claimedNanos != 0).toList();
             }
             for (GameProcess process : claimed) {
+                // The claim as it stood when this round began: a process given back meanwhile, or
+                // whose game is being saved (v1.0.0), is no longer this round's to judge.
+                long claimedAt = process.claimedNanos;
+                if (claimedAt == 0 || process.vacating) {
+                    continue;
+                }
                 Optional<Forwarded> answer = forward(process, "GET", "/v1/service/process", null, null, null, 5_000);
                 if (answer.isEmpty() || answer.get().status() != 200) {
+                    continue;
+                }
+                if (process.claimedNanos != claimedAt || process.vacating) {
                     continue;
                 }
                 JsonObject status = JsonParser.parseString(new String(answer.get().body(), StandardCharsets.UTF_8))
@@ -802,7 +835,7 @@ final class GameProcesses implements AutoCloseable {
                     process.peakHeapUsed = Math.max(process.peakHeapUsed, memory.get("heap_used_megabytes").getAsLong());
                 }
                 var games = status.getAsJsonArray("games");
-                long claimedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - process.claimedNanos);
+                long claimedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - claimedAt);
                 if (games == null || games.isEmpty()) {
                     // Its create or attach was refused, or its finished game was dropped.
                     if (claimedMillis > TimeUnit.SECONDS.toMillis(30)) {

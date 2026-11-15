@@ -437,7 +437,8 @@ public final class EngineServer {
     /**
      * A save on the front process (v1.0.0): forwarded to the game's process, which stops the game;
      * the process is then no longer the game's, and takes its next game or is ended, as after a
-     * game that is over. The game comes back in whichever process a later attach gives it.
+     * game that is over ({@link GameProcesses#save}). The game comes back in whichever process a
+     * later attach gives it.
      */
     private static void isolatedSave(HttpExchange exchange, Engine engine, String id) throws IOException {
         if (!exchange.getRequestMethod().equals("POST")) {
@@ -459,11 +460,8 @@ public final class EngineServer {
             }
             Optional<GameProcesses.Forwarded> answer;
             try {
-                answer = processes.forward(process.get(), "POST", exchange.getRequestURI().getRawPath(), null, null,
-                    body.get().getBytes(StandardCharsets.UTF_8), 60_000);
-                if (answer.filter(forwarded -> forwarded.status() == 200).isPresent()) {
-                    processes.vacated(process.get());
-                }
+                answer = processes.save(process.get(), exchange.getRequestURI().getRawPath(),
+                    body.get().getBytes(StandardCharsets.UTF_8));
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 respond(exchange, 503, Map.of("code", "interrupted"));
