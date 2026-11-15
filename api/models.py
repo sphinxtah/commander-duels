@@ -417,6 +417,9 @@ class GameTable(Base):
     allow_not_legal: Mapped[bool] = mapped_column(default=True)
     # And since v0.6.2 whether they may hold cards the engine plays as stand-ins.
     allow_stand_in: Mapped[bool] = mapped_column(default=True)
+    # A starter-deck table (v1.0.0, api/starter_tables.py): each player sits down with a starter
+    # deck bought for it, which plays as it came.
+    starter: Mapped[bool] = mapped_column(default=False, server_default=false())
     # Best of one game, or (v0.5.0, Legacy only) of three: a match with sideboarding between games.
     best_of: Mapped[int] = mapped_column(default=1)
     # open (the lobby), started (its game holds the rest) or closed (the host left).
@@ -1454,6 +1457,37 @@ class Pack(Base):
     grant_id: Mapped[UUID | None]
     actor_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
     reason: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class StarterPurchase(Base):
+    """A starter deck bought to be played at a table (v1.0.0, api/starter_tables.py): what was
+    bought, the deck it made and the revision of that deck as it came, which is the one such a
+    table plays. The purchase carries the client's key, so a retried request buys once. It sits
+    down at one table: table_id is the table it last sat at, and once that table's game started
+    it sits at no other. Against the bots it may be played again."""
+
+    __tablename__ = "starter_purchases"
+    __table_args__ = (
+        UniqueConstraint("user_id", "request_key", name="uq_starter_purchases_key"),
+        CheckConstraint("format IN ('legacy', 'commander')", name="ck_starter_purchases_format"),
+        CheckConstraint("tokens >= 0", name="ck_starter_purchases_tokens"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    request_key: Mapped[str] = mapped_column(String(64))
+    format: Mapped[str] = mapped_column(String(16))
+    # What Leng sold: a Commander starter deck's ID, or a Legacy deck product's.
+    offer: Mapped[str] = mapped_column(String(64))
+    title: Mapped[str] = mapped_column(String(160))
+    deck_id: Mapped[UUID] = mapped_column(ForeignKey("decks.id"), index=True)
+    revision_id: Mapped[UUID] = mapped_column(ForeignKey("deck_revisions.id"))
+    # A Legacy deck product's opening, whose cards the deck is.
+    opening_id: Mapped[UUID | None] = mapped_column(ForeignKey("pack_openings.id"))
+    tokens: Mapped[int] = mapped_column(BigInteger)
+    # Bought at the weekly sale's price.
+    sale: Mapped[bool] = mapped_column(default=False, server_default=false())
+    table_id: Mapped[UUID | None] = mapped_column(ForeignKey("game_tables.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
 
 

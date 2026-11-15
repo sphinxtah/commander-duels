@@ -62,6 +62,8 @@ def test_migration_upgrade_and_downgrade(tmp_path, monkeypatch):
         "access_grants",
         "wishlist_entries",
         "table_presets",
+        # v1.0.0 (0051): a starter deck bought at the table.
+        "starter_purchases",
         "game_tables",
         "table_seats",
         "table_invites",

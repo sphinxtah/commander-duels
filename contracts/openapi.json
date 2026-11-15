@@ -10000,6 +10000,12 @@
             "description": "King's Table (v0.8.7): 0 team A's Left General, 1 team A's King, 2 team A's Right General, 3 team B's Right General, 4 team B's King, 5 team B's Left General. Your seat; team A's King (1) when left out. Refused in other formats.",
             "title": "Seat"
           },
+          "starter": {
+            "default": false,
+            "description": "Since v1.0.0: a starter-deck game (docs/tables.md), in Legacy or Commander: deck_id is a starter deck bought for one (POST /starter-decks/purchases), which plays as it came under casual rules, and each bot plays a starter deck of the same kind, so bots names none. Refused while the workflow is not the account's to reach.",
+            "title": "Starter",
+            "type": "boolean"
+          },
           "turn_cap": {
             "anyOf": [
               {
@@ -13809,7 +13815,7 @@
         "additionalProperties": false,
         "properties": {
           "deck_id": {
-            "description": "One of your decks, in the table's format.",
+            "description": "One of your decks, in the table's format; at a starter-deck table (v1.0.0) a starter deck bought for it, and the seat is ready at once.",
             "format": "uuid",
             "title": "Deck Id",
             "type": "string"
@@ -14737,7 +14743,7 @@
             "type": "string"
           },
           "section": {
-            "description": "The specification's section the workflow delivers.",
+            "description": "The specification's section the workflow delivers; 0 for one the owner asked for himself.",
             "title": "Section",
             "type": "integer"
           },
@@ -14801,6 +14807,91 @@
           }
         },
         "title": "StartEncounter",
+        "type": "object"
+      },
+      "StarterBought": {
+        "additionalProperties": false,
+        "properties": {
+          "balance": {
+            "title": "Balance",
+            "type": "integer"
+          },
+          "cards": {
+            "description": "A Commander starter's cards as a pack reveals them, the commander last; empty for a Legacy product, whose opening holds them, and on a retry.",
+            "items": {
+              "$ref": "#/components/schemas/DeckCard"
+            },
+            "title": "Cards",
+            "type": "array"
+          },
+          "deck_id": {
+            "description": "The deck it made, which the table plays as it came.",
+            "format": "uuid",
+            "title": "Deck Id",
+            "type": "string"
+          },
+          "format": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "offer": {
+            "title": "Offer",
+            "type": "string"
+          },
+          "opening_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Legacy product's opening, to reveal as a pack is (GET /shop/openings/{id}); null for a Commander starter.",
+            "title": "Opening Id"
+          },
+          "repeated": {
+            "description": "A retry: it was bought already.",
+            "title": "Repeated",
+            "type": "boolean"
+          },
+          "sale": {
+            "title": "Sale",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tokens": {
+            "description": "The price paid.",
+            "title": "Tokens",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "format",
+          "offer",
+          "title",
+          "deck_id",
+          "tokens",
+          "sale",
+          "balance",
+          "opening_id",
+          "repeated"
+        ],
+        "title": "StarterBought",
         "type": "object"
       },
       "StarterChoice": {
@@ -14932,6 +15023,168 @@
           "chosen"
         ],
         "title": "StarterDeck",
+        "type": "object"
+      },
+      "StarterOffer": {
+        "additionalProperties": false,
+        "description": "A deck Leng sells that a starter-deck table of the format takes.",
+        "properties": {
+          "affordable": {
+            "description": "Whether the account's tokens buy it now.",
+            "title": "Affordable",
+            "type": "boolean"
+          },
+          "commander_printing_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Commander starter's commander's picture.",
+            "title": "Commander Printing Id"
+          },
+          "detail": {
+            "description": "A Commander starter's commander and colours; a Legacy product's edition and size.",
+            "title": "Detail",
+            "type": "string"
+          },
+          "format": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "id": {
+            "description": "A Commander starter deck's ID, or a Legacy deck product's.",
+            "title": "Id",
+            "type": "string"
+          },
+          "list_price": {
+            "description": "Leng's price, the sale aside.",
+            "title": "List Price",
+            "type": "integer"
+          },
+          "on_sale": {
+            "description": "In this week's sale.",
+            "title": "On Sale",
+            "type": "boolean"
+          },
+          "owned": {
+            "default": false,
+            "description": "A Commander starter the account has already: here it is bought again.",
+            "title": "Owned",
+            "type": "boolean"
+          },
+          "price": {
+            "description": "What it costs now, in tokens: Leng's price, or the week's sale price.",
+            "title": "Price",
+            "type": "integer"
+          },
+          "product": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProductRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Legacy product, as the shop shows it."
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "format",
+          "title",
+          "detail",
+          "price",
+          "list_price",
+          "on_sale",
+          "affordable"
+        ],
+        "title": "StarterOffer",
+        "type": "object"
+      },
+      "StarterOffers": {
+        "additionalProperties": false,
+        "properties": {
+          "balance": {
+            "title": "Balance",
+            "type": "integer"
+          },
+          "format": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "offers": {
+            "items": {
+              "$ref": "#/components/schemas/StarterOffer"
+            },
+            "title": "Offers",
+            "type": "array"
+          },
+          "short": {
+            "description": "The tokens the account lacks for the cheapest deck on offer; 0 when it can buy one, or none is on offer. A player who can buy none cannot sit down.",
+            "title": "Short",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "format",
+          "balance",
+          "offers",
+          "short"
+        ],
+        "title": "StarterOffers",
+        "type": "object"
+      },
+      "StarterPurchaseRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "key": {
+            "description": "The client's key for this purchase: a retry buys once.",
+            "maxLength": 64,
+            "minLength": 8,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Key",
+            "type": "string"
+          },
+          "offer": {
+            "description": "The offer's ID.",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Offer",
+            "type": "string"
+          }
+        },
+        "required": [
+          "format",
+          "offer",
+          "key"
+        ],
+        "title": "StarterPurchaseRequest",
         "type": "object"
       },
       "StarterResult": {
@@ -15832,6 +16085,12 @@
             "title": "Seats",
             "type": "integer"
           },
+          "starter": {
+            "default": false,
+            "description": "Since v1.0.0: a starter-deck table (docs/tables.md), in Legacy or Commander, one game, by casual rules and with no profile: every player sits down with a starter deck bought for it (POST /starter-decks/purchases), deck_id here being the host's, and plays it as it came. Refused while the workflow is not the account's to reach.",
+            "title": "Starter",
+            "type": "boolean"
+          },
           "turn_cap": {
             "anyOf": [
               {
@@ -16031,6 +16290,12 @@
           "seats": {
             "title": "Seats",
             "type": "integer"
+          },
+          "starter": {
+            "default": false,
+            "description": "Since v1.0.0: a starter-deck table: a seat is taken with a starter deck bought for it, which plays as it came.",
+            "title": "Starter",
+            "type": "boolean"
           },
           "status": {
             "enum": [
@@ -40539,6 +40804,230 @@
           }
         },
         "summary": "Sleeve Image"
+      }
+    },
+    "/api/v1/starter-decks": {
+      "get": {
+        "description": "The starter decks a starter-deck table of the format takes, each at what it costs now,\nwith the account's tokens and what it lacks for the cheapest.",
+        "operationId": "starter_decks_api_v1_starter_decks_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "commander",
+              "enum": [
+                "legacy",
+                "commander"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StarterOffers"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Starter Decks"
+      }
+    },
+    "/api/v1/starter-decks/purchases": {
+      "post": {
+        "description": "Buys a starter deck to play at a starter-deck table, or against the bots from the Play\nwizard: the tokens are spent, the cards join the library and a deck is made of them, together.\nA Commander starter already owned is bought again. The deck then sits down by its ID.",
+        "operationId": "buy_starter_deck_api_v1_starter_decks_purchases_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StarterPurchaseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StarterBought"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Buy Starter Deck"
       }
     },
     "/api/v1/tables": {

@@ -55,6 +55,11 @@ export function TableTags({ table }: { table: TableView }) {
           Best of three
         </span>
       )}
+      {table.starter && (
+        <span className={styles.badge} data-tone="gold">
+          Starter decks
+        </span>
+      )}
       {kings && (
         <span className={styles.visuallyHidden}>
           King&apos;s Table settings:{" "}
@@ -324,7 +329,9 @@ export function RulesFields({
         />
         <span>
           <strong>Tournament rules</strong>
-          <small>None of these: every card legal in {name}, with its rules</small>
+          <small>
+            None of these: every card legal in {name}, with its rules
+          </small>
         </span>
       </label>
     </fieldset>

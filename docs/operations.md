@@ -76,6 +76,7 @@ Every workflow is `off` until it is set.
 | `replays` | Replays and review (23) | A shared replay's access | `/replays`, `/games/{id}/replay` |
 | `spectators` | Spectators (24) | A spectator's access | `/games/{id}/spectators`, `/tables/{id}/spectators` |
 | `coaching` | Coaching (24) | A coach's access to a seat's hand | `/games/{id}/coaches` |
+| `starter_tables` | A starter deck bought at the table (the owner's own request, 2026-11-14) | A table or a practice game asked to be one (`starter`) | `/starter-decks` |
 
 **Setting a stage.** SysOp: `PUT /api/v1/admin/rollout/{workflow}` with `{"stage": "staff"}` (the permission `rollout.manage`, SysOp's alone). At the console, on the VM: `docker compose exec api python -m api.cli rollout sandbox staff`; `rollout` alone prints every stage. Either way the change is in the audit record (`rollout.stage_changed`, the console's with `"by": "console"`). `GET /api/v1/admin/rollout` shows the stages to staff, and `GET /api/v1/rollout` tells any signed-in account which workflows it may reach, which is what a page asks before it shows the way into one.
 

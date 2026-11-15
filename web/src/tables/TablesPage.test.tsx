@@ -2,9 +2,11 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { createRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Me } from "../api";
+import { forgetRollout } from "../app/rollout";
 import { mockApi, openDialogs, reply } from "../decks/fixtures";
 import type { OwnDeck, TablePlayer, TableView } from "./tables";
 import { lobbyChanged, setLobbyLive } from "./lobby";
+import { boughtDeck, offer, offersOf } from "./starterFixtures";
 import { TablesPage } from "./TablesPage";
 
 // The public queues are in the lobby since v0.8.7, from the Play page, and since v0.9.2 in its
@@ -94,6 +96,7 @@ function table(fields: Partial<TableView> = {}): TableView {
     game_id: null,
     created_at: "2026-10-21T10:00:00Z",
     open_seats: 0,
+    starter: false,
     ...fields,
   };
 }
@@ -1429,5 +1432,182 @@ describe("finding a game (v0.9.2)", () => {
       body: { players: [cara.id] },
     });
     expect(screen.getByText("Invited cara.")).toBeInTheDocument();
+  });
+});
+
+describe("a starter-deck table (v1.0.0)", () => {
+  const legacyOffers = () =>
+    offersOf({
+      format: "legacy",
+      offers: [
+        offer({
+          id: "product-1",
+          format: "legacy",
+          title: "Tempest Starter Deck",
+          detail: "TMP · 60 cards",
+          price: 304,
+          list_price: 380,
+          on_sale: true,
+        }),
+      ],
+    });
+  const legacyDeal = () =>
+    boughtDeck({
+      format: "legacy",
+      offer: "product-1",
+      title: "Tempest Starter Deck",
+      tokens: 304,
+      sale: true,
+    });
+  function staged(api: ReturnType<typeof mockApi>, available = true) {
+    forgetRollout();
+    api.on("GET /api/v1/rollout", () =>
+      reply(200, {
+        workflows: [{ id: "starter_tables", name: "Starter decks", available }],
+      }),
+    );
+    api.on("GET /api/v1/starter-decks", () => reply(200, legacyOffers()));
+    api.on("POST /api/v1/starter-decks/purchases", () =>
+      reply(201, legacyDeal()),
+    );
+  }
+  const bodies = (api: ReturnType<typeof mockApi>, route: string) =>
+    api.calls
+      .filter((c) => c.route === route)
+      .map((c) => (c.options as { body: Record<string, unknown> }).body);
+
+  it("is not offered while the workflow is not the account's to reach", async () => {
+    const api = mockApi();
+    serveLobby(api, () => reply(200, []));
+    staged(api, false);
+    api.on("GET /api/v1/decks", () => reply(200, [deck()]));
+    render(<TablesPage me={ada} heading={createRef()} />);
+    await settle();
+    await openForm();
+    expect(
+      form().queryByRole("checkbox", { name: /^A starter-deck table/ }),
+    ).toBeNull();
+  });
+
+  it("is opened by buying the host's deck: one game, by casual rules", async () => {
+    const api = mockApi();
+    serveLobby(api, () => reply(200, []));
+    staged(api);
+    api.on("GET /api/v1/decks", () => reply(200, [deck()]));
+    api.on(
+      "POST /api/v1/tables",
+      () => reply(503, { code: "engine_unavailable", message: "Not now." }),
+      () => reply(201, table({ host: "ada", your_seat: 0, starter: true })),
+    );
+    render(<TablesPage me={ada} heading={createRef()} />);
+    await settle();
+    await openForm();
+    await act(async () =>
+      form()
+        .getByRole("checkbox", { name: /^A starter-deck table/ })
+        .click(),
+    );
+    await settle();
+    // Its decks are dealt: no rules to choose, no match, and no deck of the account's own.
+    expect(
+      form().queryByRole("checkbox", { name: /^Banned cards/ }),
+    ).toBeNull();
+    expect(form().queryByRole("radio", { name: /^Best of three/ })).toBeNull();
+    expect(form().queryByLabelText("Your deck")).toBeNull();
+    expect(form().getByText("You have 600 tokens.")).toBeInTheDocument();
+    // Nothing is chosen yet, so nothing is bought.
+    expect(
+      form().getByRole("button", { name: "Open the table" }),
+    ).toBeDisabled();
+    await act(async () =>
+      form()
+        .getByRole("radio", { name: /^Tempest Starter Deck · 304 tokens/ })
+        .click(),
+    );
+    await act(async () =>
+      form()
+        .getByRole("button", {
+          name: "Buy the deck and open the table · 304 tokens",
+        })
+        .click(),
+    );
+    await settle();
+    // The table was refused: the deck is bought all the same, and is not bought again.
+    expect(form().getByRole("alert")).toBeInTheDocument();
+    expect(
+      form().getByText(/You bought Tempest Starter Deck for 304 tokens/),
+    ).toBeInTheDocument();
+    await act(async () =>
+      form().getByRole("button", { name: "Open the table" }).click(),
+    );
+    await settle();
+    expect(bodies(api, "POST /api/v1/starter-decks/purchases")).toHaveLength(1);
+    expect(bodies(api, "POST /api/v1/tables")[1]).toMatchObject({
+      format: "legacy",
+      starter: true,
+      deck_id: legacyDeal().deck_id,
+      best_of: 1,
+      rules: { banned: true, not_legal: true, stand_in: true },
+    });
+    expect(window.location.hash).toBe(`#tables/${CODE}`);
+  });
+
+  it("seats a player who buys a deck for it, ready at once", async () => {
+    const api = mockApi();
+    staged(api);
+    const open = table({ starter: true });
+    const seated = table({
+      starter: true,
+      your_seat: 1,
+      players: [
+        seat({ seat: 0, taken: true, handle: "bob", host: true, ready: true }),
+        seat({
+          seat: 1,
+          taken: true,
+          handle: "ada",
+          you: true,
+          ready: true,
+          deck: "Tempest Starter Deck",
+          deck_id: legacyDeal().deck_id,
+        }),
+      ],
+    });
+    api.on("GET /api/v1/tables/{code}", () => reply(200, open));
+    api.on("GET /api/v1/decks", () => reply(200, [deck()]));
+    api.on("POST /api/v1/tables/{code}/join", () => reply(200, seated));
+    render(<TablesPage me={ada} heading={createRef()} code={CODE} />);
+    await settle();
+    // The table says what it is, and asks for a purchase in place of a deck of the account's.
+    expect(screen.getAllByText("Starter decks").length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText("Your deck")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Buy a deck to take a seat" }),
+    ).toBeDisabled();
+    await act(async () =>
+      screen
+        .getByRole("radio", { name: /^Tempest Starter Deck · 304 tokens/ })
+        .click(),
+    );
+    api.on("GET /api/v1/tables/{code}", () => reply(200, seated));
+    await act(async () =>
+      screen
+        .getByRole("button", {
+          name: "Buy the deck and take a seat · 304 tokens",
+        })
+        .click(),
+    );
+    await settle();
+    expect(bodies(api, "POST /api/v1/starter-decks/purchases")).toEqual([
+      expect.objectContaining({ format: "legacy", offer: "product-1" }),
+    ]);
+    expect(
+      api.calls.find((c) => c.route === "POST /api/v1/tables/{code}/join")!
+        .options,
+    ).toMatchObject({ body: { deck_id: legacyDeal().deck_id } });
+    // Seated: the deck is the one bought for the table, and no other is offered.
+    expect(
+      screen.getByText(/Tempest Starter Deck: the starter deck you bought/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: /^Tempest/ })).toBeNull();
   });
 });

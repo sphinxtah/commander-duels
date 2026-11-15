@@ -10,6 +10,16 @@ import { exitTableFullscreen } from "../app/fullscreen";
 import { tableFullscreen } from "../game/practice";
 import { getSoundEngine } from "../game/sound/engine";
 import { InviteFriendsButton } from "./InviteFriends";
+import {
+  StarterOfferFields,
+  StarterReveal,
+  buyStarter,
+  purchaseKey,
+  revealOf,
+  tokens,
+  useStarterOffers,
+  type StarterBought,
+} from "./starterDecks";
 import game from "../game/game.module.css";
 import {
   CIRCLE_ROWS,
@@ -84,6 +94,23 @@ export function TableLobby({
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const opened = useRef(false);
+  // A starter-deck table (v1.0.0, the owner's request): a seat is taken with one of Leng's
+  // starter decks bought for it. The purchase is kept, so a seat the server refused is asked
+  // for again without buying twice; its cards are revealed in a window that can be skipped,
+  // with the seat taken and ready already.
+  const [offerId, setOfferId] = useState("");
+  const [bought, setBought] = useState<StarterBought | null>(null);
+  const [reveal, setReveal] = useState<{
+    opening: Parameters<typeof StarterReveal>[0]["opening"];
+    title: string;
+  } | null>(null);
+  const buyKey = useRef(purchaseKey());
+  const offers = useStarterOffers(
+    table?.format ?? "",
+    Boolean(table?.starter) &&
+      table?.status === "open" &&
+      !table.players.some((player) => player.you),
+  );
   useEffect(() => {
     if (loaded?.table) setTable(loaded.table);
   }, [loaded]);
@@ -155,6 +182,33 @@ export function TableLobby({
     else setError(refusal(failure));
     refresh();
     return data;
+  }
+  const offer = offers?.offers.find((found) => found.id === offerId);
+  /** At a starter-deck table: buys the deck chosen (once, whatever is retried), sits down with
+   * it, ready at once, and reveals its cards. */
+  async function buyAndSit() {
+    let deal = bought;
+    if (!deal) {
+      if (!offer) return;
+      setError("");
+      setBusy(true);
+      const answer = await buyStarter(offer, buyKey.current);
+      setBusy(false);
+      if (typeof answer === "string") return setError(answer);
+      buyKey.current = purchaseKey();
+      setBought(answer);
+      deal = answer;
+    }
+    const deck = deal.deck_id;
+    const sat = await act(() =>
+      client.POST("/api/v1/tables/{code}/join", {
+        ...path,
+        body: { deck_id: deck },
+      }),
+    );
+    if (!sat || !offer) return;
+    const shown = await revealOf(offer, deal);
+    if (shown) setReveal({ opening: shown, title: deal.title });
   }
   /** The API's refusal in words. Getting ready at King's Table checks the deck by the settings'
    * deck format again (v0.8.7): a deck of the other one says which decks the table takes now. */
@@ -471,9 +525,38 @@ export function TableLobby({
         </div>
       )}
 
+      {reveal && (
+        <StarterReveal
+          opening={reveal.opening}
+          title={reveal.title}
+          doneLabel="Back to the table"
+          onDone={() => setReveal(null)}
+        />
+      )}
       {table.status === "open" && (
         <div className={styles.actions}>
-          {(mine || free) && (
+          {(mine || free) && table.starter && (
+            <>
+              {mine || bought ? (
+                <div className={game.field}>
+                  <span>Your deck</span>
+                  <span>
+                    {mine?.deck ?? bought?.title}: the starter deck you bought
+                    for this table. It plays as it came.
+                  </span>
+                </div>
+              ) : (
+                <StarterOfferFields
+                  offers={offers}
+                  format={table.format}
+                  chosen={offerId}
+                  onChoose={setOfferId}
+                  name="seat-starter-offer"
+                />
+              )}
+            </>
+          )}
+          {(mine || free) && !table.starter && (
             <label className={game.field}>
               <span>Your deck</span>
               <select
@@ -500,7 +583,21 @@ export function TableLobby({
               </select>
             </label>
           )}
-          {!mine && free && (
+          {!mine && free && table.starter && (
+            <button
+              type="button"
+              className={game.primaryButton}
+              disabled={busy || (!bought && !offer?.affordable)}
+              onClick={() => void buyAndSit()}
+            >
+              {bought
+                ? "Take a seat"
+                : offer
+                  ? `Buy the deck and take a seat · ${tokens(offer.price)}`
+                  : "Buy a deck to take a seat"}
+            </button>
+          )}
+          {!mine && free && !table.starter && (
             <button
               type="button"
               className={game.primaryButton}

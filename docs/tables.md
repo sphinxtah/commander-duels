@@ -158,6 +158,36 @@ A profile's pace is a word. What it means in numbers (how long a decision stays 
 - **Six built in**, the specification's, as starting points a host changes: Learning game (relaxed, two hours, no Game Changers), Preconstructed decks (no Game Changers), Upgraded casual (at most three), High power, Competitive (brisk, one hour) and Custom. The limits on Game Changers follow the Commander format's brackets.
 - **A host's own.** `PUT /api/v1/me/table-presets` saves a profile under a name, with the table's other settings (format, seats, bots, bot skill, visibility, rules, best of) to open the same table again. A name the account already has, whatever its case, is replaced. At most 20 an account (`409 preset_limit`). They are the account's alone and are removed with it.
 
+## Starter-deck tables (v1.0.0)
+
+The owner, 2026-11-14: "I want a gameplay option where when you get to the table, you purchase a starter deck of whichever edition you want (Leng prices, no discounts, unless the deck is already on weekly discount), and you play that deck at the table. You can play humans or bots in that gameplay mode, with legacy or commander as the option, which will limit the starter decks allowed to purchase." His decisions on what he left open are in [the v1.0.0 plan](plans/1.0.0.md#the-owners-decisions-at-its-start-2026-11-14) (`api/starter_tables.py`).
+
+**Behind its own gate.** The workflow `starter_tables` ([operations](operations.md#the-gates)): off until SysOp stages it, at `staff` for SysOp and administrators, then on. While it is not an account's to reach, the offers and the purchase answer as paths that do not exist, no table or game is made as one, and the pages show no way in.
+
+| Part | What |
+| --- | --- |
+| The option | A table is opened as a starter-deck table (`starter` on `POST /api/v1/tables`: a box in "Open a table"), or a game against the bots is one (`starter` on `POST /api/v1/practice-games`: the Play wizard's "Way to play" slide). Legacy or Commander, one game |
+| The offers | `GET /api/v1/starter-decks?format=`: for Legacy, the products that are decks (Starter Decks, Tournament Packs and Tournament Decks on sale); for Commander, Leng's ten starter decks. Each at Leng's price, or the week's sale price where the product is in the sale, with no other discount. The answer carries the account's tokens and what it lacks for the cheapest |
+| The purchase | `POST /api/v1/starter-decks/purchases` with the format, the offer and a key: the tokens are spent, the cards join the library and a deck is made of them, in one transaction. A Legacy product is bought and opened as a pack is (it is among "Packs you opened", its deck saved); a Commander starter is granted under the purchase's own key. A retry with the key buys once |
+| The deck played | The deck sits down by its ID. Only the revision the purchase made plays at such a table: a deck changed since is refused (`starter_deck_changed`), and a deck that was not bought for one is not a starter deck (`not_a_starter_deck`) |
+| Ready | A seat is ready the moment it sits down; the reveal of the cards can be skipped, so nobody waits on another's |
+| The bots | A Commander bot plays one of Leng's starter decks, as at any table. A Legacy bot plays a starter rolled for the game from a product on the shelf: drawn as a pack of it would be, never recorded or granted, and counted against no print run |
+| What it earns | What a table's game or a practice game earns: nothing of the economy changes |
+
+**The owner's decisions, as built.**
+
+- **A Commander starter already owned is bought again**, at full price, and its copies join the library. Only this purchase lifts the rule that each starter sells once; Leng's shop keeps it, and a deck bought for a table does not count as bought at the shop.
+- **A Legacy starter plays as it came.** It is random cards of its edition and may hold more than four of a card, or one Legacy bans. Such a table's rules are casual whatever is asked (banned cards, cards not legal and stand-ins all sit), and it sets aside the limit of four copies, the one error of deck building it ignores (`deck.copy_limit`). Any other problem refuses the deck as at any table. Outside a starter-deck game the same deck is what its cards make it.
+- **A player who cannot buy any deck on offer cannot sit down**: the offers say what they lack, each deck they cannot afford is greyed, and the purchase refuses.
+- **A sold-out product is not offered**, and its purchase is refused as at the shop. SysOp's packs are counted against no print run, so nothing is sold out for it.
+- **One table a purchase.** A purchase sits down at one table of people: once that table's game has started, the deck sits at no other (`starter_deck_played`). Before that it may move: the player left, or the table closed. Against the bots the deck may be played again, as a rematch plays it; the Play wizard buys a deck anew each time.
+- **No profile.** A starter-deck table has no Rule Zero profile: its decks are dealt, and a restriction could refuse a deck already paid for.
+- **A new account** chooses its two free starter decks first, as at the shop.
+
+**At the table.** A player at a starter-deck table does not change deck (`starter_table`): to play another they leave, and buy one to sit down again. A rematch plays the decks as they came again. The lobby tags the table "Starter decks".
+
+**In the web.** `web/src/tables/starterDecks.tsx` holds what the three places share: the offers as a choice (`StarterOfferFields`), the purchase (`buyStarter`) and the reveal (`StarterReveal`, the shop's own pack reveal in its window, with "Skip the reveal"). The purchase is kept by the page that made it, so a table or a game the server then refused is asked for again without buying twice.
+
 ## The campaign's court (v0.9.6)
 
 Ward 15 of [the campaign](campaign.md#the-unbound-court-ward-15-v096), with friends as the player's Generals, is a table the campaign opens (`POST /api/v1/campaign/encounters/15/court`): private, King's Table with Commander decks under the court's settings (everyone at 40 life; since v0.9.7 the house rule with its guard, and 240 turns, 40 for each player), casual rules, bots at skill 6. The player hosts it, seated as King A; team B's three seats are the court's bots, named and pictured in the table's view (The Sphinx, Nicol Bolas, Liliana); each friend invited has a General's seat waiting, the other is a bot's. The view says so (`campaign`: the encounter's title), and the page reads "Campaign · King's Table".
@@ -218,6 +248,8 @@ Migration `0036_kings_table` (v0.8.7) lets a table's and a game's format be `kin
 Migration `0039_table_invites` (v0.9.2) adds **`table_invites`**: a friend invited to a table, who invited them and when, one row per player and table. It also lets a notification be `table_invite`, its subject the table's code. It only adds. Going back deletes the table invitations' notices and drops the table.
 
 Migration `0049_table_profiles` (v0.9.12) adds `game_tables.profile` with `intent`, `pace` and `duration` beside it and the index `ix_game_tables_status_intent`, `games.table_profile`, and **`table_presets`** (an account's saved tables, one row a name). Expand only: nullable columns and a new table. Going back drops them, and tables and games are as they were.
+
+Migration `0051_starter_tables` (v1.0.0) adds `game_tables.starter`, false for the tables already there, and **`starter_purchases`**: a starter deck bought for a table, with its key, the format, what was bought, the price, the deck it made, that deck's revision as it came, a Legacy product's opening, and the table it last sat at ([starter-deck tables](#starter-deck-tables-v100)). Expand only.
 
 ## Verification
 

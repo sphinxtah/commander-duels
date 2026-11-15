@@ -867,6 +867,43 @@ PRESET_QUERIES = {
     "saved tables": "SELECT name FROM table_presets WHERE user_id = :u ORDER BY name",
 }
 
+
+def buy_a_starter_at_a_table(engine: Engine, player: UUID, friend: UUID) -> None:
+    """v1.0.0's starter-deck tables (migration 0051): the player bought a starter deck for a
+    table, which made one of their decks."""
+    key = player if engine.dialect.name == "postgresql" else player.hex
+    with engine.connect() as connection:
+        deck, revision = connection.execute(
+            text(
+                "SELECT d.id, r.id FROM decks d JOIN deck_revisions r ON r.deck_id = d.id "
+                "WHERE d.owner_id = :u ORDER BY d.title, r.number"
+            ),
+            {"u": key},
+        ).first()
+    account = Account(engine)
+    account.add(
+        "starter_purchases",
+        id=uuid4(),
+        user_id=player,
+        request_key="starter-table-key",
+        format="commander",
+        offer="starter_red_test",
+        title="Red Test",
+        deck_id=deck if isinstance(deck, UUID) else UUID(str(deck)),
+        revision_id=revision if isinstance(revision, UUID) else UUID(str(revision)),
+        tokens=500,
+        sale=False,
+        created_at=T0,
+    )
+    account.write(engine)
+
+
+STARTER_QUERIES = {
+    "starter decks bought at a table": (
+        "SELECT title, tokens FROM starter_purchases WHERE user_id = :u ORDER BY title"
+    ),
+}
+
 # The migrations after v0.9.9's that add something an account keeps: each one's rows are written
 # at its own revision, and its totals compared from there on.
 LATER = [
@@ -874,6 +911,7 @@ LATER = [
     ("0047_economy_foundations", play_on_v0_9_12, V0_9_12_QUERIES),
     ("0048_deck_workshop", wish_for_a_card, WISH_QUERIES),
     ("0049_table_profiles", save_a_table, PRESET_QUERIES),
+    ("0051_starter_tables", buy_a_starter_at_a_table, STARTER_QUERIES),
 ]
 
 

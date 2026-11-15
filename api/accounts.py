@@ -54,6 +54,7 @@ from api.models import (
     MatchPlayer,
     RoleGrant,
     ScheduledJob,
+    StarterPurchase,
     TablePreset,
     TableSeat,
     User,
@@ -197,6 +198,11 @@ def remove_decks(db: Session, user_id: UUID, now: datetime, removed: Removed) ->
     played = select(GameSeat.deck_revision_id).where(GameSeat.deck_revision_id.is_not(None))
     unplayed = revisions.where(DeckRevision.id.not_in(played))
     quiet = {"synchronize_session": False}
+    # The starter decks it bought for tables (v1.0.0) are its own purchases: they go, and so
+    # let go of the decks and revisions they name.
+    db.execute(
+        delete(StarterPurchase).where(StarterPurchase.user_id == user_id), execution_options=quiet
+    )
     # A seat a table still keeps (a started table's) lets go of a revision no game played (v0.5.1).
     db.execute(
         update(TableSeat)

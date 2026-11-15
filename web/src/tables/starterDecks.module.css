@@ -1,0 +1,28 @@
+/* A starter deck bought at the table (v1.0.0): the offers' note and the way past the reveal. */
+
+.note {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #c9d0c6;
+}
+/* Over the reveal of a deck just bought: the way past it, in words, beside the window's own
+   round close button (shop.module.css, .windowClose), which does the same. */
+.skip {
+  position: absolute;
+  top: 14px;
+  right: calc(max(12px, (100% - 83rem) / 2) + 56px);
+  z-index: 2;
+  background: #16211ee6;
+  border: 1px solid #ffffff3a;
+  border-radius: 4px;
+  color: #eceee5;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.skip:hover,
+.skip:focus-visible {
+  border-color: #d5b77c;
+  color: #efcc8d;
+}

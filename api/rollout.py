@@ -62,8 +62,9 @@ PREFIX = "rollout."
 
 @dataclass(frozen=True)
 class Workflow:
-    """An unfinished workflow of v1.0.0: its name, the specification's section, the foundation it
-    stands on, and the paths (after /api/v1) its routes are made under."""
+    """An unfinished workflow of v1.0.0: its name, the specification's section (0 for one the
+    owner asked for himself), the foundation it stands on, and the paths (after /api/v1) its
+    routes are made under."""
 
     id: str
     name: str
@@ -116,6 +117,14 @@ WORKFLOWS: dict[str, Workflow] = {
             24,
             "Structured events and access (v0.9.10)",
             ("/games/{game_id}/coaches",),
+        ),
+        # The owner's own request (2026-11-14), which the specification has no section for.
+        Workflow(
+            "starter_tables",
+            "A starter deck bought at the table",
+            0,
+            "Leng's card shop (v0.4.2, v0.9.8); tables and practice games",
+            ("/starter-decks",),
         ),
     )
 }
@@ -246,7 +255,10 @@ class Reach(Contract):
 class Staged(Contract):
     id: str
     name: str
-    section: int = Field(description="The specification's section the workflow delivers.")
+    section: int = Field(
+        description="The specification's section the workflow delivers; 0 for one the owner "
+        "asked for himself."
+    )
     stands_on: str
     stage: Stage
     changed_at: datetime | None = None

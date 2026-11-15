@@ -443,6 +443,8 @@ def plan_rematch(
                 deck_format_of(game.format, game.kings_table),
                 library,
                 rules_of(table),
+                # A starter-deck table's rematch plays the decks as they came again (v1.0.0).
+                starter=table.starter,
             )
             if team:
                 # MTR 9.5: Two-Headed Giant Constructed has no sideboards, and bans Erayo, which

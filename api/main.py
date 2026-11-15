@@ -42,6 +42,7 @@ from api import (
     shop,
     sleeves,
     social,
+    starter_tables,
     stats,
     table_profiles,
     tables,
@@ -403,6 +404,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(custom_cards.router)
     app.include_router(economy.router)
     app.include_router(shop.router)
+    app.include_router(starter_tables.router)
     app.include_router(auctions.router)
     app.include_router(reports.router)
     app.include_router(social.router)

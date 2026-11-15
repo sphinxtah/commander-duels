@@ -518,6 +518,13 @@ class PracticeGameRequest(Contract):
         description="King's Table (v0.8.7): its settings, the defaults when left out. Refused in "
         "other formats.",
     )
+    starter: bool = Field(
+        default=False,
+        description="Since v1.0.0: a starter-deck game (docs/tables.md), in Legacy or Commander: "
+        "deck_id is a starter deck bought for one (POST /starter-decks/purchases), which plays "
+        "as it came under casual rules, and each bot plays a starter deck of the same kind, so "
+        "bots names none. Refused while the workflow is not the account's to reach.",
+    )
 
 
 class PracticeFormat(Contract):

@@ -7,6 +7,7 @@ import {
 } from "react";
 import { client, describe, type Me } from "../api";
 import { exitTableFullscreen } from "../app/fullscreen";
+import { useWorkflow } from "../app/rollout";
 import { RunningMatches } from "../matches/RunningMatches";
 import {
   PRACTICE_KINGS_TABLE,
@@ -53,19 +54,36 @@ import {
   type PracticeOptions,
   type PracticeRequest,
 } from "./practice";
+import {
+  STARTER_TABLES,
+  StarterOfferFields,
+  StarterReveal,
+  buyStarter,
+  purchaseKey,
+  revealOf,
+  starterFormat,
+  tokens,
+  useStarterOffers,
+  type StarterBought,
+} from "../tables/starterDecks";
 import { getSoundEngine } from "./sound/engine";
+import type { components } from "../generated/api";
 import styles from "./game.module.css";
 import wizard from "./play.module.css";
 
+type Opening = components["schemas"]["Opening"];
+
 /** The wizard's slides (v1.0.0), in their order. One that has a single possible answer is left
  * out: Games where the format has no match, Your seat anywhere but King's Table, Your deck for
- * an account with one deck of the format. */
+ * an account with one deck of the format, Way to play where a starter deck cannot be bought at
+ * the table. */
 export type SlideId =
-  "format" | "games" | "rules" | "seat" | "deck" | "bots" | "start";
+  "format" | "way" | "games" | "rules" | "seat" | "deck" | "bots" | "start";
 
 /** Each slide's name, along the top and on the last slide's summary. */
 export const SLIDE_NAMES: Record<SlideId, string> = {
   format: "Format",
+  way: "Way to play",
   games: "Games",
   rules: "The table's rules",
   seat: "Your seat",
@@ -77,6 +95,7 @@ export const SLIDE_NAMES: Record<SlideId, string> = {
 /** What each slide asks: its heading. */
 const QUESTIONS: Record<SlideId, string> = {
   format: "Which format do you play?",
+  way: "Your own deck, or one bought at the table?",
   games: "One game, or a match?",
   rules: "What are the table's rules?",
   seat: "Where do you sit?",
@@ -161,6 +180,16 @@ function Wizard({ me }: { me: Me }) {
   const title = useRef<HTMLHeadingElement>(null);
   /** Whether a slide was changed by the player: only then does its heading take the focus. */
   const moved = useRef(false);
+  // A starter deck bought at the table (v1.0.0, the owner's request), where the account may
+  // reach it: the way to play, Leng's offers for the format, the one chosen, the purchase once
+  // it is made, and its cards while they are revealed.
+  const starterAllowed = useWorkflow(STARTER_TABLES);
+  const [way, setWay] = useState<"own" | "starter">("own");
+  const [offerId, setOfferId] = useState("");
+  const [bought, setBought] = useState<StarterBought | null>(null);
+  const [revealing, setRevealing] = useState<Opening | null>(null);
+  const [buying, setBuying] = useState(false);
+  const buyKey = useRef(purchaseKey());
 
   useEffect(() => {
     // StrictMode (pnpm dev, and so the browser journeys) mounts the wizard twice: the first
@@ -193,6 +222,9 @@ function Wizard({ me }: { me: Me }) {
     setBots(from.formats.find((f) => f.id === id)?.default_bots ?? 1);
     setDeck("");
     setBotDecks(blankBots);
+    // A starter deck is of one format: another format's offers are asked for again.
+    setOfferId("");
+    setBought(null);
   }
 
   /** Every slide set to a remembered setup; false where its format is no longer offered. */
@@ -216,6 +248,7 @@ function Wizard({ me }: { me: Me }) {
         : Math.min(setup.turn_cap, from.max_turn_cap ?? MAX_TURN_LIMIT),
     );
     setUseList(false);
+    setWay("own");
     return true;
   }
 
@@ -320,20 +353,35 @@ function Wizard({ me }: { me: Me }) {
     allowed(deck) ||
     (ownOnly && firstPlayable ? `${OWN}${firstPlayable.id}` : "");
   const noDeck = ownOnly && ownDecks !== null && !firstPlayable && !useList;
-  const canStart =
+  const canStartOwn =
     options !== undefined &&
     (useList ? deckList.trim() !== "" : !(ownOnly && !chosenDeck));
 
+  // A starter deck bought at the table: in Legacy and Commander, where the account may.
+  const starterOffered = starterAllowed && starterFormat(format);
+  const starter = starterOffered && way === "starter";
+  const offers = useStarterOffers(format, starter);
+  const offer = offers?.offers.find((found) => found.id === offerId);
+  const canBuy = offer !== undefined && offer.affordable;
+  const canStart = starter
+    ? options !== undefined && (bought !== null || canBuy)
+    : canStartOwn;
+
   // The slides this game has. Your deck is left out for an account whose one deck of the format
-  // is the only thing the slide could offer.
+  // is the only thing the slide could offer; a starter-deck game always asks which deck to buy,
+  // and is one game.
   const oneDeck =
+    !starter &&
     ownOnly &&
     !options?.deck_lists &&
     ownHere.length === 1 &&
     firstPlayable !== undefined;
   const slides: SlideId[] = [
     ...((options?.formats.length ?? 0) > 1 ? (["format"] as const) : []),
-    ...(chosenFormat?.best_of?.includes(3) ? (["games"] as const) : []),
+    ...(starterOffered ? (["way"] as const) : []),
+    ...(chosenFormat?.best_of?.includes(3) && !starter
+      ? (["games"] as const)
+      : []),
     "rules",
     ...(kingsTable ? (["seat"] as const) : []),
     ...(oneDeck ? [] : (["deck"] as const)),
@@ -357,8 +405,13 @@ function Wizard({ me }: { me: Me }) {
   }, [current]);
 
   /** What stops the slide from moving on, said beside Next; "" when nothing does. */
-  const blocked =
-    current === "deck"
+  const blocked = starter
+    ? current === "deck" && !bought && !canBuy
+      ? offers && offers.short > 0
+        ? `You need ${tokens(offers.short)} more to buy the cheapest deck on offer.`
+        : "Choose the deck you buy to go on."
+      : ""
+    : current === "deck"
       ? noDeck
         ? "You need a deck to go on."
         : useList && !deckList.trim()
@@ -366,7 +419,9 @@ function Wizard({ me }: { me: Me }) {
           : ""
       : "";
 
-  async function start() {
+  /** Starts the game: with the deck chosen, or (starterDeck) with the starter deck just bought
+   * for it, which plays as it came against bots the table deals starter decks. */
+  async function start(starterDeck?: string) {
     const fullscreen = tableFullscreen();
     // Browsers start sound only from a click, and this is the last one before the table opens.
     getSoundEngine().unlock();
@@ -376,20 +431,33 @@ function Wizard({ me }: { me: Me }) {
       allowed(botDecks[i] ?? ""),
     );
     const games = chosenFormat?.best_of?.includes(bestOf) ? bestOf : 1;
-    const body: PracticeRequest = {
-      format,
-      bot_skill: skill,
-      // Left out, the API gives the table its default: 40 turns for each player.
-      ...(turnCap !== null ? { turn_cap: turnCap } : {}),
-      rules,
-      best_of: games,
-      bots: chosenBots.map(seatChoice),
-      ...(useList && deckList.trim()
-        ? { deck_list: deckList }
-        : seatChoice(chosenDeck)),
-      // King's Table (v0.8.7): your seat and the settings; the bots in the other seats.
-      ...(kingsTable ? { seat, kings_table: kings } : {}),
-    };
+    const body: PracticeRequest = starterDeck
+      ? {
+          format,
+          bot_skill: skill,
+          ...(turnCap !== null ? { turn_cap: turnCap } : {}),
+          // Casual, and one game: a starter-deck game is nothing else.
+          rules: casualRules,
+          best_of: 1,
+          bots: Array.from({ length: bots }, () => ({})),
+          deck_id: starterDeck,
+          starter: true,
+        }
+      : {
+          format,
+          bot_skill: skill,
+          // Left out, the API gives the table its default: 40 turns for each player.
+          ...(turnCap !== null ? { turn_cap: turnCap } : {}),
+          rules,
+          best_of: games,
+          bots: chosenBots.map(seatChoice),
+          ...(useList && deckList.trim()
+            ? { deck_list: deckList }
+            : seatChoice(chosenDeck)),
+          // King's Table (v0.8.7): your seat and the settings; the bots in the other seats.
+          ...(kingsTable ? { seat, kings_table: kings } : {}),
+          starter: false,
+        };
     // A request that throws (the network dropped) is a failure like a refusal: no game, so the
     // full screen asked for above ends and the button comes back.
     const answer = await client
@@ -398,6 +466,11 @@ function Wizard({ me }: { me: Me }) {
     const data = answer?.data;
     const failure = answer?.error;
     setStarting(false);
+    if (data && starterDeck) {
+      // A starter-deck game is bought anew each time: it is not the setup to play again.
+      window.location.hash = `#game/${data.id}`;
+      return;
+    }
     if (data) {
       // The setup is remembered for the next visit (v1.0.0); a typed deck list is not.
       saveLastSetup(me.id, {
@@ -429,10 +502,40 @@ function Wizard({ me }: { me: Me }) {
     void refresh();
   }
 
+  /** A starter-deck game's start: the deck is bought (once, whatever is retried), its cards
+   * are revealed in a window that can be skipped, and the game starts when that closes. With
+   * the deck bought already (a start the server refused), the game starts at once. */
+  async function buyAndStart() {
+    if (bought) return start(bought.deck_id);
+    if (!offer) return;
+    setError("");
+    setBuying(true);
+    const deal = await buyStarter(offer, buyKey.current);
+    if (typeof deal === "string") {
+      setBuying(false);
+      setError(deal);
+      return;
+    }
+    buyKey.current = purchaseKey();
+    setBought(deal);
+    const opening = await revealOf(offer, deal);
+    setBuying(false);
+    // Nothing to reveal (a retry, or the opening did not answer): the game starts.
+    if (opening) setRevealing(opening);
+    else void start(deal.deck_id);
+  }
+
+  /** The reveal is over, or was skipped: the game starts with the deck just bought. */
+  function revealed() {
+    setRevealing(null);
+    if (bought) void start(bought.deck_id);
+  }
+
   function submit(event: FormEvent) {
     event.preventDefault();
     if (current === "start") {
-      if (canStart && !starting) void start();
+      if (!canStart || starting || buying) return;
+      void (starter ? buyAndStart() : start());
     } else if (!blocked) go(slides[at + 1]!);
   }
 
@@ -591,6 +694,39 @@ function Wizard({ me }: { me: Me }) {
                 ))}
               </fieldset>
             )}
+            {current === "way" && (
+              <fieldset>
+                <legend>Way to play</legend>
+                <label className={styles.choice}>
+                  <input
+                    type="radio"
+                    name="way"
+                    checked={way === "own"}
+                    onChange={() => setWay("own")}
+                  />
+                  <span>
+                    <strong>Your own deck</strong>
+                    <small>One of your {formatNames[format]} decks</small>
+                  </span>
+                </label>
+                <label className={styles.choice}>
+                  <input
+                    type="radio"
+                    name="way"
+                    checked={way === "starter"}
+                    onChange={() => setWay("starter")}
+                  />
+                  <span>
+                    <strong>A starter deck bought at the table</strong>
+                    <small>
+                      You buy one of Leng&apos;s {formatNames[format]} starter
+                      decks at his price, play it as it came, and keep its
+                      cards. Each bot plays a starter deck too.
+                    </small>
+                  </span>
+                </label>
+              </fieldset>
+            )}
             {current === "games" && (
               <fieldset>
                 <legend>Games</legend>
@@ -641,11 +777,19 @@ function Wizard({ me }: { me: Me }) {
                     }}
                   />
                 )}
-                <RulesFields
-                  rules={rules}
-                  format={decksFormat}
-                  onChange={setRules}
-                />
+                {starter ? (
+                  <p className={wizard.note}>
+                    A starter-deck game plays by casual rules: the decks play as
+                    they came, more than four copies of a card and banned cards
+                    included.
+                  </p>
+                ) : (
+                  <RulesFields
+                    rules={rules}
+                    format={decksFormat}
+                    onChange={setRules}
+                  />
+                )}
                 <label className={styles.field}>
                   <span>
                     Turn limit{" "}
@@ -690,7 +834,25 @@ function Wizard({ me }: { me: Me }) {
                 ))}
               </fieldset>
             )}
-            {current === "deck" && (
+            {current === "deck" && starter && (
+              <>
+                {bought ? (
+                  <p className={wizard.note}>
+                    You bought <strong>{bought.title}</strong> for{" "}
+                    {tokens(bought.tokens)}: it is the deck this game plays.
+                  </p>
+                ) : (
+                  <StarterOfferFields
+                    offers={offers}
+                    format={format}
+                    chosen={offerId}
+                    onChoose={setOfferId}
+                    name="starter-offer"
+                  />
+                )}
+              </>
+            )}
+            {current === "deck" && !starter && (
               <>
                 {noDeck ? (
                   <div className={styles.field} data-no-deck>
@@ -813,33 +975,40 @@ function Wizard({ me }: { me: Me }) {
                     </select>
                   </label>
                 )}
-                {Array.from({ length: bots }, (_, i) => (
-                  <label key={i} className={styles.field}>
-                    <span>{botLabel(format, bots, i, seat)}</span>
-                    <select
-                      aria-label={botLabel(format, bots, i, seat)}
-                      value={allowed(botDecks[i] ?? "")}
-                      onChange={(event) =>
-                        setBotDecks((held) =>
-                          held.map((value, j) =>
-                            j === i ? event.target.value : value,
-                          ),
-                        )
-                      }
-                    >
-                      {/* Left to the server: Commander bots play the starter decks, Legacy bots
+                {starter && (
+                  <p className={wizard.note}>
+                    The table deals each bot a starter deck of the same kind, at
+                    no cost to anyone.
+                  </p>
+                )}
+                {!starter &&
+                  Array.from({ length: bots }, (_, i) => (
+                    <label key={i} className={styles.field}>
+                      <span>{botLabel(format, bots, i, seat)}</span>
+                      <select
+                        aria-label={botLabel(format, bots, i, seat)}
+                        value={allowed(botDecks[i] ?? "")}
+                        onChange={(event) =>
+                          setBotDecks((held) =>
+                            held.map((value, j) =>
+                              j === i ? event.target.value : value,
+                            ),
+                          )
+                        }
+                      >
+                        {/* Left to the server: Commander bots play the starter decks, Legacy bots
                           the engine's fixture decks, Two-Headed Giant bots fixture decks that
                           share no card with their teammate's, and King's Table bots the engine's
                           fixture decks of its deck format. */}
-                      <option value="">Chosen by the table</option>
-                      <DeckOptions
-                        fixtures={fixtures}
-                        own={ownHere}
-                        rules={rules}
-                      />
-                    </select>
-                  </label>
-                ))}
+                        <option value="">Chosen by the table</option>
+                        <DeckOptions
+                          fixtures={fixtures}
+                          own={ownHere}
+                          rules={rules}
+                        />
+                      </select>
+                    </label>
+                  ))}
                 <label className={styles.field}>
                   <span>
                     Bot skill <small>{skill} of 6</small>
@@ -857,12 +1026,20 @@ function Wizard({ me }: { me: Me }) {
             {current === "start" && (
               <dl className={wizard.summary} aria-label="What you chose">
                 {row("format", chosenFormat?.name ?? formatNames[format])}
+                {slides.includes("way") &&
+                  row(
+                    "way",
+                    starter
+                      ? "A starter deck bought at the table"
+                      : "Your own deck",
+                  )}
                 {slides.includes("games") &&
                   row("games", bestOf === 3 ? "Best of three" : "One game")}
                 {row(
                   "rules",
                   <>
-                    {rulesTag(rules, format, kings)} · {turnWords}
+                    {starter ? "Casual" : rulesTag(rules, format, kings)} ·{" "}
+                    {turnWords}
                     {kingsTable && <KingsRules settings={kings} />}
                   </>,
                 )}
@@ -873,26 +1050,50 @@ function Wizard({ me }: { me: Me }) {
                   )}
                 {row(
                   "deck",
-                  useList
-                    ? "Your own deck list"
-                    : noDeck
-                      ? `No playable ${formatNames[decksFormat]} deck`
-                      : deckWords(chosenDeck, "Any free fixture deck"),
+                  starter ? (
+                    bought ? (
+                      <>
+                        {bought.title}
+                        <small>
+                          Bought for {tokens(bought.tokens)}: it is in your
+                          decks and your library
+                        </small>
+                      </>
+                    ) : offer ? (
+                      <>
+                        {offer.title} · {tokens(offer.price)}
+                        <small>
+                          Bought from Leng as the game starts; you have{" "}
+                          {tokens(offers?.balance ?? 0)}
+                        </small>
+                      </>
+                    ) : (
+                      "No starter deck chosen"
+                    )
+                  ) : useList ? (
+                    "Your own deck list"
+                  ) : noDeck ? (
+                    `No playable ${formatNames[decksFormat]} deck`
+                  ) : (
+                    deckWords(chosenDeck, "Any free fixture deck")
+                  ),
                 )}
                 {row(
                   "bots",
                   <>
                     {botWords}
                     <small>
-                      {Array.from({ length: bots }, (_, i) =>
-                        allowed(botDecks[i] ?? ""),
-                      ).every((value) => !value)
-                        ? "Their decks chosen by the table"
-                        : Array.from(
-                            { length: bots },
-                            (_, i) =>
-                              `${botLabel(format, bots, i, seat)}: ${deckWords(allowed(botDecks[i] ?? ""), "chosen by the table")}`,
-                          ).join(" · ")}
+                      {starter
+                        ? "Each plays a starter deck the table deals"
+                        : Array.from({ length: bots }, (_, i) =>
+                              allowed(botDecks[i] ?? ""),
+                            ).every((value) => !value)
+                          ? "Their decks chosen by the table"
+                          : Array.from(
+                              { length: bots },
+                              (_, i) =>
+                                `${botLabel(format, bots, i, seat)}: ${deckWords(allowed(botDecks[i] ?? ""), "chosen by the table")}`,
+                            ).join(" · ")}
                     </small>
                   </>,
                 )}
@@ -918,9 +1119,15 @@ function Wizard({ me }: { me: Me }) {
             <button
               type="submit"
               className={styles.primaryButton}
-              disabled={starting || !canStart}
+              disabled={starting || buying || !canStart}
             >
-              {starting ? "Shuffling…" : "Start Game"}
+              {starting
+                ? "Shuffling…"
+                : buying
+                  ? "Buying…"
+                  : starter && !bought && offer
+                    ? `Start Game · ${tokens(offer.price)}`
+                    : "Start Game"}
             </button>
           ) : (
             <button
@@ -934,9 +1141,13 @@ function Wizard({ me }: { me: Me }) {
           {blocked && <p className={styles.hint}>{blocked}</p>}
           {current === "start" && !canStart && options && (
             <p className={styles.hint}>
-              {useList
-                ? "Type your deck list to start."
-                : "Choose a deck to start."}
+              {starter
+                ? offers && offers.short > 0
+                  ? `You need ${tokens(offers.short)} more to buy the cheapest deck on offer.`
+                  : "Choose the starter deck you buy to start."
+                : useList
+                  ? "Type your deck list to start."
+                  : "Choose a deck to start."}
             </p>
           )}
           {error && (
@@ -946,6 +1157,14 @@ function Wizard({ me }: { me: Me }) {
           )}
         </div>
       </form>
+      {revealing && bought && (
+        <StarterReveal
+          opening={revealing}
+          title={bought.title}
+          doneLabel="Start Game"
+          onDone={revealed}
+        />
+      )}
     </section>
   );
 }

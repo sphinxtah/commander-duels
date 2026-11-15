@@ -1033,9 +1033,25 @@ def save_pack_deck(opening_id: UUID, request: Request, principal: Builder, db: D
     saved = saved_deck(db, found)
     if saved is not None:
         return PackDeckSaved(deck=saved.id, title=saved.title, format=fmt, repeated=True)
+    deck = opening_deck(db, request, principal, found, product)
+    db.commit()
+    return PackDeckSaved(deck=deck.id, title=deck.title, format=fmt, repeated=False)
+
+
+def opening_deck(
+    db: Session,
+    request: Request,
+    principal: Principal,
+    opening: PackOpening,
+    product: ShopProduct,
+) -> Deck:
+    """An opened deck pack's cards as a deck of the account's, named for the product and
+    remembering its opening: in the caller's transaction. A starter deck bought at a table
+    (v1.0.0, api/starter_tables.py) is made the same way."""
+    user = principal.user
     # Every card the opening shows is the account's (opening_of): one entry per card and edition.
     quantities: dict[tuple[UUID, UUID], int] = defaultdict(int)
-    for card in opening_of(db, found, art_of(request)).cards:
+    for card in opening_of(db, opening, art_of(request)).cards:
         quantities[(card.card_id, card.printing_id)] += 1
     entries = [
         DeckEntry(card_id=card_id, printing_id=printing_id, quantity=quantity)
@@ -1045,14 +1061,13 @@ def save_pack_deck(opening_id: UUID, request: Request, principal: Builder, db: D
         db,
         principal,
         free_title(db, user.id, product.name),
-        fmt,
+        DECK_KINDS[kind_of(product.booster)],
         entries,
         library_of(db, user, principal.permissions, roster_of(request)),
         source="pack",
     )
-    deck.opening_id = found.id
-    db.commit()
-    return PackDeckSaved(deck=deck.id, title=deck.title, format=fmt, repeated=False)
+    deck.opening_id = opening.id
+    return deck
 
 
 def granted_editions(db: Session, user: User, printings: set[UUID]) -> set[UUID]:

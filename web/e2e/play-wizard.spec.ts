@@ -80,12 +80,23 @@ const decks = [
 
 /** A player who may play and build decks, with the Play page's requests answered here. Returns
  * the bodies of the games the page asked to start. */
-async function player(page: Page, games: unknown[] = []) {
+async function player(page: Page, games: unknown[] = [], starter = false) {
   await standIn(page, {
     handle: "pat",
     permissions: ["profile.edit", "games.play", "decks.edit"],
   });
   const started: Record<string, unknown>[] = [];
+  // Whether a starter deck may be bought at the table: the workflow's gate, as the account
+  // reaches it.
+  await page.route("**/api/v1/rollout", (route) =>
+    route.fulfill({
+      json: {
+        workflows: [
+          { id: "starter_tables", name: "Starter decks", available: starter },
+        ],
+      },
+    }),
+  );
   await page.route("**/api/v1/practice-games/options", (route) =>
     route.fulfill({ json: options }),
   );
@@ -317,4 +328,127 @@ test("the wizard's first slide opens the account's games, and a running game lea
   await expect(
     wizard.getByRole("heading", { name: "Which format do you play?" }),
   ).toBeVisible();
+});
+
+test("a starter deck is bought at the table: chosen, revealed or skipped, and played", async ({
+  page,
+}) => {
+  const started = await player(page, [], true);
+  const bought: Record<string, unknown>[] = [];
+  const card = (position: number, name: string, commander = false) => ({
+    position,
+    card_id: `00000000-0000-4000-8000-0000000c000${position}`,
+    printing_id: `00000000-0000-4000-8000-0000000f000${position}`,
+    name,
+    mana_cost: null,
+    type_line: commander ? "Legendary Creature" : "Basic Land",
+    rarity: commander ? "rare" : "common",
+    set_code: "tst",
+    set_name: "Test",
+    released_at: null,
+    collector_number: String(position + 1),
+    finish: "nonfoil",
+    sheet: "",
+    new: true,
+    faces: 0,
+    stand_in: false,
+    extra: false,
+    commander,
+  });
+  await page.route("**/api/v1/starter-decks?*", (route) =>
+    route.fulfill({
+      json: {
+        format: "commander",
+        balance: 600,
+        short: 0,
+        offers: [
+          {
+            id: "starter_red",
+            format: "commander",
+            title: "Red Test",
+            detail: "Kenrith, the Returned King · Five colours",
+            price: 500,
+            list_price: 500,
+            on_sale: false,
+            affordable: true,
+            owned: true,
+            commander_printing_id: null,
+            product: null,
+          },
+          {
+            id: "starter_karlach",
+            format: "commander",
+            title: "Karlach Test",
+            detail: "Karlach, Fury of Avernus · Red",
+            price: 1500,
+            list_price: 1500,
+            on_sale: false,
+            affordable: false,
+            owned: false,
+            commander_printing_id: null,
+            product: null,
+          },
+        ],
+      },
+    }),
+  );
+  await page.route("**/api/v1/starter-decks/purchases", async (route) => {
+    bought.push(route.request().postDataJSON() as Record<string, unknown>);
+    await route.fulfill({
+      status: 201,
+      json: {
+        id: "00000000-0000-4000-8000-00000000b001",
+        format: "commander",
+        offer: "starter_red",
+        title: "Red Test 2",
+        deck_id: "00000000-0000-4000-8000-00000000d00d",
+        tokens: 500,
+        sale: false,
+        balance: 100,
+        opening_id: null,
+        cards: [
+          card(0, "Mountain"),
+          card(1, "Kenrith, the Returned King", true),
+        ],
+        repeated: false,
+      },
+    });
+  });
+  await page.goto("/#play");
+  const wizard = playWizard(page);
+  await wizard.getByRole("radio", { name: /Commander/ }).check();
+  await toSlide(page, "Way to play");
+  await wizard
+    .getByRole("radio", { name: /^A starter deck bought at the table/ })
+    .check();
+  await toSlide(page, "Your deck");
+  await expect(wizard.getByText("You have 600 tokens.")).toBeVisible();
+  // One the account cannot afford is not to be chosen; one it owns is bought again.
+  await expect(
+    wizard.getByRole("radio", { name: /^Karlach Test/ }),
+  ).toBeDisabled();
+  await wizard.getByRole("radio", { name: /^Red Test · 500 tokens/ }).check();
+  await toSlide(page, "The bots");
+  await wizard.getByLabel("Bots", { exact: true }).selectOption("1");
+  await toSlide(page, "Start Game");
+  await wizard.getByRole("button", { name: "Start Game · 500 tokens" }).click();
+  // The deck is bought, and its cards are revealed in a window that can be skipped.
+  const reveal = page.getByRole("dialog", { name: "Red Test 2: your deck" });
+  await expect(reveal).toBeVisible();
+  expect(bought).toHaveLength(1);
+  expect(bought[0]).toMatchObject({
+    format: "commander",
+    offer: "starter_red",
+  });
+  expect(started).toHaveLength(0);
+  await reveal.getByRole("button", { name: "Skip the reveal" }).click();
+  await expect(page).toHaveURL(new RegExp(`#game/${GAME}$`));
+  expect(started).toEqual([
+    expect.objectContaining({
+      format: "commander",
+      deck_id: "00000000-0000-4000-8000-00000000d00d",
+      starter: true,
+      bots: [{}],
+    }),
+  ]);
 });

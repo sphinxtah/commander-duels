@@ -17,7 +17,7 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 from test_games import build, connect
 
-from api import cli, fixtures
+from api import cli, fixtures, rollout
 from api.identity import utcnow
 from api.models import AccessGrant, AuditEvent, Game, GameEventRow, User, UserSession
 
@@ -117,7 +117,9 @@ def test_the_fixtures_stage_every_workflow_when_asked_and_never_on_the_live_site
     engine.dispose()
     cli.main(["rollout"])
     stages = capsys.readouterr().out.splitlines()
-    assert len(stages) == 6 and all(": on (" in line for line in stages)
+    # The specification's six, and since v1.0.0 the owner's own starter-deck tables.
+    assert len(stages) == len(rollout.WORKFLOWS) == 7
+    assert all(": on (" in line for line in stages)
     with pytest.raises(SystemExit, match="No such workflow"):
         cli.main(["rollout", "leagues", "on"])
     with pytest.raises(SystemExit, match="Name the stage"):

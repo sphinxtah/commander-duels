@@ -118,6 +118,7 @@ from api.schemas import (
     PracticeOptions,
     SeatChoice,
     TableRules,
+    casual,
     default_turn_cap,
 )
 from api.schemas import GameSeat as SeatSummary
@@ -1982,6 +1983,8 @@ def own_deck(
     fmt: str,
     library: Library,
     rules: TableRules,
+    *,
+    starter: bool = False,
 ) -> tuple[dict[str, object], UUID, str]:
     """One of the account's decks as the engine's deck list, bound to an immutable revision of
     it (DECK01). The revision must be playable: legal, every card in the game, and every copy in
@@ -1989,7 +1992,9 @@ def own_deck(
     legality: banned cards, and cards not legal in the format; since v0.6.2 its stand-ins, which
     the deck list describes to the engine (api/stand_ins.py). SysOp's decks need only cards in
     the game (since v0.4.5 no longer any card the engine implements), as its deck lists do. A
-    table's host starts the game with every player's deck (api/tables.py)."""
+    table's host starts the game with every player's deck (api/tables.py). A starter-deck table
+    or game (starter, v1.0.0: api/starter_tables.py) plays its deck as it came, more than four
+    copies of a card included; the caller checks that the revision is the purchase's own."""
     deck = db.get(Deck, deck_id)
     if deck is None or deck.owner_id != owner.id or deck.deleted_at is not None:
         raise ApiError(422, "invalid_deck", "That is not one of your decks.")
@@ -2012,7 +2017,13 @@ def own_deck(
         library.collection(),
     )
     names = engine_names(db, entries, library.godlike, library.won_custom)
-    if not validation.playable:
+    playable = validation.playable
+    if starter:
+        # Imported here: api.starter_tables imports this module's deck lists.
+        from api.starter_tables import COPY_LIMIT
+
+        playable = all(problem.code == COPY_LIMIT for problem in validation.errors)
+    if not playable:
         sysop_ok = "cards.any" in permissions and all(names.get(e.card_id) for e in entries)
         locked = any(problem.kind == "collection_locked" for problem in validation.errors)
         if locked and not sysop_ok:
@@ -2199,6 +2210,22 @@ def plan_seats(
     # site keeps them on the engine's fixture decks (the browser journeys' leak checks).
     starters = list(starters_of(request).values()) if settings.bot_decks == "starters" else []
     random.shuffle(starters)
+    # A starter-deck game (v1.0.0): the player's deck is one bought for it and plays as it came;
+    # each bot plays a starter of the same kind (a Legacy one rolled now). Imported here:
+    # api.starter_tables imports this module's deck lists.
+    from api import starter_tables
+
+    purchase = None
+    if body.starter:
+        if body.deck_id is None or body.deck is not None or body.deck_list is not None:
+            raise ApiError(
+                422, "not_a_starter_deck", "A starter-deck game takes a starter deck bought for it."
+            )
+        if any(bot is not None and bot != SeatChoice() for bot in bots):
+            raise ApiError(
+                422, "invalid_seat", "At a starter-deck game the table deals the bots' decks."
+            )
+        purchase = starter_tables.bought_for(db, principal.user, body.deck_id, fmt)
     human: tuple[str, str | None, UUID | None, str | None] = (
         "human",
         body.deck,
@@ -2226,8 +2253,17 @@ def plan_seats(
             if not principal.can("decks.edit"):
                 raise ApiError(403, "forbidden", "Your account cannot play its own decks.")
             seat, revision, title = own_deck(
-                db, principal.user, principal.permissions, deck_id, deck_format, library, body.rules
+                db,
+                principal.user,
+                principal.permissions,
+                deck_id,
+                deck_format,
+                library,
+                body.rules,
+                starter=purchase is not None,
             )
+            if purchase is not None:
+                starter_tables.as_bought(purchase, revision)
             if fmt == "two_headed_giant":
                 # MTR 9.5: Two-Headed Giant Constructed has no sideboards; a deck's stays home.
                 cast(dict[str, object], seat["deck_list"]).pop("sideboard", None)
@@ -2238,6 +2274,15 @@ def plan_seats(
             planned = starter_seat(db, starters.pop())
             if planned is not None:
                 plans.append(planned)
+                continue
+        if player == "bot" and fmt == "legacy" and purchase is not None:
+            rolled = starter_tables.rolled_deck(db, request)
+            if rolled is not None:
+                plans.append(
+                    SeatPlan(
+                        {"player": "bot", "deck_list": rolled[0]}, title=rolled[1], starter=True
+                    )
+                )
                 continue
         seat = engine_seat(player, deck, deck_list, seat_format, principal)
         if isinstance(seat.get("deck_list"), dict):
@@ -2560,6 +2605,14 @@ async def create_practice_game(
         )
     if body.best_of not in BEST_OF[fmt]:
         raise ApiError(422, "invalid_table", "Only Legacy plays best of three.")
+    if body.starter:
+        # A starter-deck game (v1.0.0): behind its workflow's gate, Legacy or Commander, one game,
+        # by casual rules, which its deck needs to play as it came.
+        from api import starter_tables
+
+        await run_in_threadpool(starter_tables.require, db, principal.user)
+        starter_tables.casual_only(fmt, body.best_of)
+        body = body.model_copy(update={"rules": casual()})
     # The turn limit the game plays (v0.9.7): kept whole with it, for its rematch.
     body = body.model_copy(update={"turn_cap": turn_cap_of(body, len(bots) + 1)})
     plans = await run_in_threadpool(plan_seats, db, request, principal, body, bots)

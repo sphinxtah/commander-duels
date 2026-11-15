@@ -104,6 +104,12 @@
   text-decoration: none;
 }
 
+/* A line that says how a slide stands: what a starter-deck game is, what was bought. */
+.note {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #c9d0c6;
+}
 /* The account's last setup, offered on the first slide. */
 .again {
   grid-column: 1 / -1;

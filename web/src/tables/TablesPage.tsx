@@ -9,6 +9,7 @@ import {
   type RefObject,
 } from "react";
 import { client, describe, type Me } from "../api";
+import { useWorkflow } from "../app/rollout";
 import game from "../game/game.module.css";
 import { FindGame } from "../queues/FindGame";
 import { useQueue } from "../queues/queue";
@@ -45,6 +46,18 @@ import {
   type TableView,
 } from "./tables";
 import { LIVE_POLL_MS, useLobby } from "./lobby";
+import {
+  STARTER_TABLES,
+  StarterOfferFields,
+  StarterReveal,
+  buyStarter,
+  purchaseKey,
+  revealOf,
+  starterFormat,
+  tokens,
+  useStarterOffers,
+  type StarterBought,
+} from "./starterDecks";
 import styles from "./tables.module.css";
 
 // Human tables (v0.4.0, docs/tables.md): the lobby lists the open tables and opens new ones; a
@@ -705,6 +718,23 @@ function OpenTable({
   const [deck, setDeck] = useState("");
   const [error, setError] = useState("");
   const [opening, setOpening] = useState(false);
+  // A starter-deck table (v1.0.0, the owner's request), where the account may reach it: every
+  // player buys one of Leng's starter decks to sit down. The host's own purchase is kept, so a
+  // table the server refused is opened again without buying twice; its cards are revealed, in
+  // a window that can be skipped, before the table's page opens.
+  const starterAllowed = useWorkflow(STARTER_TABLES);
+  const [starterTable, setStarterTable] = useState(false);
+  const starter = starterAllowed && starterTable && starterFormat(format);
+  const offers = useStarterOffers(format, starter);
+  const [offerId, setOfferId] = useState("");
+  const [bought, setBought] = useState<StarterBought | null>(null);
+  const [reveal, setReveal] = useState<{
+    opening: Parameters<typeof StarterReveal>[0]["opening"];
+    title: string;
+    code: string;
+  } | null>(null);
+  const buyKey = useRef(purchaseKey());
+  const offer = offers?.offers.find((found) => found.id === offerId);
 
   const teams = format === TEAM_FORMAT;
   const kingsTable = format === KINGS_TABLE;
@@ -723,6 +753,9 @@ function OpenTable({
   function chooseFormat(next: Format) {
     setFormat(next);
     setDeck("");
+    // A starter deck is of one format.
+    setOfferId("");
+    setBought(null);
     setSeats(next === "legacy" ? 2 : next === KINGS_TABLE ? 6 : 4);
     setBots(0);
     setTeammateBot(false);
@@ -740,6 +773,20 @@ function OpenTable({
     event.preventDefault();
     setError("");
     setOpening(true);
+    // At a starter-deck table the host's deck is bought first: once, whatever is retried.
+    let deal = bought;
+    if (starter && !deal) {
+      if (!offer) return setOpening(false);
+      const answer = await buyStarter(offer, buyKey.current);
+      if (typeof answer === "string") {
+        setOpening(false);
+        setError(answer);
+        return onRefused();
+      }
+      buyKey.current = purchaseKey();
+      setBought(answer);
+      deal = answer;
+    }
     const { data, error: failure } = await client.POST("/api/v1/tables", {
       body: {
         format,
@@ -749,9 +796,11 @@ function OpenTable({
         bot_skill: skill,
         // No turn limit is named: the API gives the table 40 turns for each seat (v0.9.7).
         visibility,
-        rules,
-        best_of: format === "legacy" ? bestOf : 1,
-        deck_id: chosen,
+        // A starter-deck table is one game by casual rules: its decks play as they came.
+        rules: starter ? casualRules : rules,
+        best_of: format === "legacy" && !starter ? bestOf : 1,
+        deck_id: starter && deal ? deal.deck_id : chosen,
+        starter,
         invite,
         ...(kingsTable
           ? {
@@ -763,6 +812,16 @@ function OpenTable({
       },
     });
     setOpening(false);
+    if (data && starter && deal && offer) {
+      // The seat is taken and ready: the cards are revealed on the way to the table's page.
+      const shown = await revealOf(offer, deal);
+      if (shown)
+        return setReveal({
+          opening: shown,
+          title: deal.title,
+          code: data.code,
+        });
+    }
     if (data) return onOpened(data.code);
     setError(describe(failure));
     onRefused();
@@ -964,7 +1023,27 @@ function OpenTable({
             </option>
           </select>
         </label>
-        {format === "legacy" && (
+        {starterAllowed && starterFormat(format) && (
+          <fieldset>
+            <legend>Decks</legend>
+            <label className={game.choice}>
+              <input
+                type="checkbox"
+                checked={starterTable}
+                onChange={(event) => setStarterTable(event.target.checked)}
+              />
+              <span>
+                <strong>A starter-deck table</strong>
+                <small>
+                  Every player buys one of Leng&apos;s {formatNames[format]}{" "}
+                  starter decks to sit down, at his price, plays it as it came
+                  and keeps its cards. One game, by casual rules.
+                </small>
+              </span>
+            </label>
+          </fieldset>
+        )}
+        {format === "legacy" && !starter && (
           <fieldset>
             <legend>Games</legend>
             <label className={game.choice}>
@@ -993,13 +1072,33 @@ function OpenTable({
             </label>
           </fieldset>
         )}
-        <RulesFields
-          rules={rules}
-          format={format}
-          kings={kings}
-          onChange={setRules}
-        />
-        {decks !== null && here.every((d) => !d.playable) ? (
+        {!starter && (
+          <RulesFields
+            rules={rules}
+            format={format}
+            kings={kings}
+            onChange={setRules}
+          />
+        )}
+        {starter ? (
+          bought ? (
+            <div className={game.field}>
+              <span>Your deck</span>
+              <span>
+                You bought {bought.title} for {tokens(bought.tokens)}: it is the
+                deck you play at this table.
+              </span>
+            </div>
+          ) : (
+            <StarterOfferFields
+              offers={offers}
+              format={format}
+              chosen={offerId}
+              onChoose={setOfferId}
+              name="table-starter-offer"
+            />
+          )
+        ) : decks !== null && here.every((d) => !d.playable) ? (
           <div className={game.field} data-no-deck>
             <span>Your deck</span>
             <span>
@@ -1036,13 +1135,17 @@ function OpenTable({
           <button
             type="submit"
             className={game.primaryButton}
-            disabled={opening || !chosen}
+            disabled={
+              opening || (starter ? !bought && !offer?.affordable : !chosen)
+            }
           >
             {opening
               ? "Opening…"
-              : invite.length
-                ? `Open the table and invite ${invite.length === 1 ? "1 friend" : `${invite.length} friends`}`
-                : "Open the table"}
+              : starter && !bought && offer
+                ? `Buy the deck and open the table · ${tokens(offer.price)}`
+                : invite.length
+                  ? `Open the table and invite ${invite.length === 1 ? "1 friend" : `${invite.length} friends`}`
+                  : "Open the table"}
           </button>
           {error && (
             <p role="alert" className={game.refusal}>
@@ -1051,6 +1154,14 @@ function OpenTable({
           )}
         </div>
       </form>
+      {reveal && (
+        <StarterReveal
+          opening={reveal.opening}
+          title={reveal.title}
+          doneLabel="Go to the table"
+          onDone={() => onOpened(reveal.code)}
+        />
+      )}
     </section>
   );
 }

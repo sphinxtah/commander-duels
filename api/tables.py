@@ -71,7 +71,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from api import kings_table, matches, table_profiles, teams
+from api import kings_table, matches, starter_tables, table_profiles, teams
 from api.auth import INPUT_ERRORS
 from api.custom_play import custom_in_seats
 from api.decks import entries_of, revision_entries, starters_of
@@ -228,6 +228,14 @@ class TableRequest(Contract):
         description="Since v0.9.12: the table's Rule Zero profile (what kind of game it is for, "
         "and the restrictions on its decks the server enforces); none when left out.",
     )
+    starter: bool = Field(
+        default=False,
+        description="Since v1.0.0: a starter-deck table (docs/tables.md), in Legacy or "
+        "Commander, one game, by casual rules and with no profile: every player sits down with "
+        "a starter deck bought for it (POST /starter-decks/purchases), deck_id here being the "
+        "host's, and plays it as it came. Refused while the workflow is not the account's to "
+        "reach.",
+    )
 
 
 class TableInviting(Contract):
@@ -251,7 +259,10 @@ TEAM_TEXT = (
 
 
 class SeatTaking(Contract):
-    deck_id: UUID = Field(description="One of your decks, in the table's format.")
+    deck_id: UUID = Field(
+        description="One of your decks, in the table's format; at a starter-deck table "
+        "(v1.0.0) a starter deck bought for it, and the seat is ready at once."
+    )
     team: Team | None = Field(
         default=None,
         description=f"{TEAM_TEXT} The team to join; the first free seat when left out.",
@@ -372,6 +383,11 @@ class TableView(Contract):
         default=None,
         description="Since v0.9.12: the table's Rule Zero profile: what it describes, and every "
         "rule the server enforces on its decks. Null when its host gave none.",
+    )
+    starter: bool = Field(
+        default=False,
+        description="Since v1.0.0: a starter-deck table: a seat is taken with a starter deck "
+        "bought for it, which plays as it came.",
     )
 
 
@@ -646,6 +662,7 @@ def view_of(db: Session, table: GameTable, principal: Principal) -> TableView:
         open_seats=sum(1 for player in players if player.player == "human" and not player.taken),
         campaign=str(table.campaign.get("title")) if table.campaign else None,
         profile=table_profiles.view(table_profiles.profile_of(table), rules_of(table)),
+        starter=table.starter,
     )
 
 
@@ -733,19 +750,24 @@ def check_deck(
     rules: TableRules,
     kings: object = None,
     profile: TableProfile | None = None,
+    *,
+    starter: bool = False,
 ) -> UUID:
     """A deck the player may sit down with: theirs, of the table's format, playable with their
     library now (as at the practice table), and holding no card the table's rules do not allow.
     Two-Headed Giant (v0.5.1) takes a Legacy deck, and refuses its own banned card where banned
     cards are refused; King's Table (v0.8.7) a deck of its settings' (kings) deck format. Since
     v0.9.12 the table's Rule Zero profile's restrictions hold too, for every account (SysOp's
-    included: they are what the table promised its players). Returns the revision the deck is
-    bound to, as checked (v0.5.1)."""
+    included: they are what the table promised its players). At a starter-deck table (starter,
+    v1.0.0) the deck plays as it came, more than four copies of a card included. Returns the
+    revision the deck is bound to, as checked (v0.5.1)."""
     if "decks.edit" not in permissions:
         raise ApiError(403, "forbidden", "Your account cannot play its own decks.")
     library = library_of(db, user, permissions, roster_of(request))
     deck_format = deck_format_of(fmt, kings)
-    seat, revision, _ = own_deck(db, user, permissions, deck_id, deck_format, library, rules)
+    seat, revision, _ = own_deck(
+        db, user, permissions, deck_id, deck_format, library, rules, starter=starter
+    )
     if fmt == TEAM_FORMAT:
         refused = team_banned(teams.cards_of(seat) or set(), rules, permissions)
         if refused is not None:
@@ -1017,6 +1039,19 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
         )
     if fmt == TEAM_FORMAT:
         bot_seats = team_bot_seats(body.bots, body.bot_teammate)
+    purchase = None
+    rules = body.rules
+    if body.starter:
+        # A starter-deck table (v1.0.0): behind its workflow's gate, Legacy or Commander, one
+        # game, by casual rules, and with no profile to refuse a deck that was already bought.
+        starter_tables.require(db, principal.user)
+        starter_tables.casual_only(fmt, body.best_of)
+        if body.profile is not None:
+            raise ApiError(
+                422, "invalid_table", "A starter-deck table has no profile: its decks are dealt."
+            )
+        rules = casual()
+        purchase = starter_tables.claim(db, principal.user, body.deck_id, fmt)
     invitees = friends_to_invite(db, principal.user, body.invite)
     revision = check_deck(
         db,
@@ -1025,10 +1060,13 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
         principal.permissions,
         body.deck_id,
         fmt,
-        body.rules,
+        rules,
         kings,
         body.profile,
+        starter=purchase is not None,
     )
+    if purchase is not None:
+        starter_tables.as_bought(purchase, revision)
     may_sit(db, request, principal)
     now = utcnow()
     table = GameTable(
@@ -1045,16 +1083,19 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
         turn_cap=(
             body.turn_cap if body.turn_cap is not None else default_turn_cap(fmt, body.seats)
         ),
-        allow_banned=body.rules.banned,
-        allow_not_legal=body.rules.not_legal,
-        allow_stand_in=body.rules.stand_in,
+        allow_banned=rules.banned,
+        allow_not_legal=rules.not_legal,
+        allow_stand_in=rules.stand_in,
         best_of=body.best_of,
+        starter=purchase is not None,
         status="open",
         created_at=now,
     )
     table_profiles.keep(table, body.profile)
     db.add(table)
     db.flush()
+    if purchase is not None:
+        starter_tables.sit(purchase, table)
     db.add(
         TableSeat(
             table_id=table.id,
@@ -1192,6 +1233,12 @@ def join_table(
         free = free_in_team(table, free, body.team)
     if body.seat is not None:
         free = [open_seat(table, free, body.seat)]
+    # A starter-deck table (v1.0.0) takes a starter deck bought for it, as it came.
+    purchase = (
+        starter_tables.claim(db, principal.user, body.deck_id, table.format, table)
+        if table.starter
+        else None
+    )
     revision = check_deck(
         db,
         request,
@@ -1202,8 +1249,13 @@ def join_table(
         rules_of(table),
         table.kings_table,
         table_profiles.profile_of(table),
+        starter=table.starter,
     )
+    if purchase is not None:
+        starter_tables.as_bought(purchase, revision)
     may_sit(db, request, principal)
+    if purchase is not None:
+        starter_tables.sit(purchase, table)
     db.add(
         TableSeat(
             table_id=table.id,
@@ -1211,7 +1263,8 @@ def join_table(
             user_id=principal.user.id,
             deck_id=body.deck_id,
             deck_revision_id=revision,
-            ready=False,
+            # At a starter-deck table a seat is ready once it has bought (the owner's decision).
+            ready=table.starter,
             joined_at=utcnow(),
         )
     )
@@ -1321,6 +1374,13 @@ def change_seat(
             raise ApiError(409, "team_full", "That seat was just taken. Try again.") from None
         unready_teammate(db, table, row)
     if body.deck_id is not None and body.deck_id != row.deck_id:
+        if table.starter:
+            raise ApiError(
+                409,
+                "starter_table",
+                "At a starter-deck table you play the deck you bought for it. To play another, "
+                "leave the table and buy one to sit down again.",
+            )
         row.deck_revision_id = check_deck(
             db,
             request,
@@ -1387,6 +1447,10 @@ def change_table(code: Code, body: TableChange, principal: Player, db: Db) -> Ta
         raise ApiError(422, "invalid_table", "Only King's Table tables have settings to change.")
     if table.queued and profiled:
         raise ApiError(409, "queue_table", "A table the queue opened has no profile to change.")
+    if table.starter and profiled and body.profile is not None:
+        raise ApiError(
+            409, "starter_table", "A starter-deck table has no profile: its decks are dealt."
+        )
     court = set(campaign_names(table))
     if table.campaign and (
         profiled
@@ -1545,6 +1609,13 @@ def plan_table(
     for index in range(table.seats):
         if index in bots:
             planned = starter_seat(db, starters.pop()) if starters else None
+            if planned is None and table.starter and table.format == "legacy":
+                # A Legacy starter-deck table's bot plays a starter rolled for the game (v1.0.0).
+                rolled = starter_tables.rolled_deck(db, request)
+                if rolled is not None:
+                    planned = SeatPlan(
+                        {"player": "bot", "deck_list": rolled[0]}, title=rolled[1], starter=True
+                    )
             plans.append(planned or SeatPlan({"player": "bot"}))
             users.append(None)
             continue
@@ -1564,7 +1635,13 @@ def plan_table(
                 deck_format_for(table),
                 library,
                 rules_of(table),
+                starter=table.starter,
             )
+            if table.starter:
+                # Only the deck as it was bought plays here (v1.0.0).
+                starter_tables.as_bought(
+                    starter_tables.bought_for(db, user, row.deck_id, table.format), revision
+                )
             # The seat is bound to it now (v0.5.1): a ready check after a refused start compares
             # the decks the start compared.
             row.deck_revision_id = revision

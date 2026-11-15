@@ -93,6 +93,7 @@ from api.models import (
     MatchPlayer,
     QueueEntry,
     SiteSetting,
+    StarterPurchase,
     TableSeat,
     User,
     WishlistEntry,
@@ -684,7 +685,8 @@ def count_decks(db: Session, user_id: UUID) -> int:
 
 def purge(db: Session, deck: Deck) -> None:
     """Deletes a deck from the trash for good (v0.9.3). Its revisions that no game, match or
-    table used go, entries and all; if none was used, the deck goes too. A used revision stays,
+    table used go, entries and all (and with one, the purchase that made it for a starter-deck
+    table, v1.0.0); if none was used, the deck goes too. A used revision stays,
     since games keep the copy they played (DECK01), and so does the deck it names: purged, out of
     every list and the deck limit, its draft emptied. A deck a table seat or a queue still holds is
     refused."""
@@ -732,6 +734,13 @@ def purge(db: Session, deck: Deck) -> None:
         execution_options=quiet,
     )
     if unused:
+        # A starter deck bought for a table and never played (v1.0.0): its purchase goes with the
+        # revision it names. The tokens it spent stay in the ledger, and a Legacy product's pack
+        # among the opened packs.
+        db.execute(
+            sql_delete(StarterPurchase).where(StarterPurchase.revision_id.in_(unused)),
+            execution_options=quiet,
+        )
         db.execute(
             sql_delete(DeckEntryRow).where(DeckEntryRow.revision_id.in_(unused)),
             execution_options=quiet,

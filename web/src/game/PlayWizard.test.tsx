@@ -2,9 +2,11 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Me } from "../api";
+import { forgetRollout } from "../app/rollout";
 import { mockApi, reply } from "../decks/fixtures";
 import type { components } from "../generated/api";
 import { GamesList } from "./GamesList";
+import { boughtDeck, offersOf } from "../tables/starterFixtures";
 import { PlayWizard } from "./PlayWizard";
 
 type DeckSummary = components["schemas"]["DeckSummary"];
@@ -1280,5 +1282,232 @@ describe("the Play wizard's slides (v1.0.0)", () => {
     expect(
       screen.queryByRole("link", { name: "Return to your game" }),
     ).toBeNull();
+  });
+});
+
+describe("a starter deck bought at the table, from the Play wizard (v1.0.0)", () => {
+  const player = {
+    ...sysop,
+    id: "00000000-0000-4000-8000-000000000003",
+    kind: "player",
+    handle: "pat",
+    permissions: ["games.play", "decks.edit", "profile.edit"],
+    roles: ["player"],
+  } as unknown as Me;
+  const formats = [
+    ...options.formats.map((f) => ({ ...f, decks: [], best_of: [1] })),
+    {
+      id: "kings_table",
+      name: "King's Table",
+      bots: [5],
+      default_bots: 5,
+      decks: [],
+      best_of: [1],
+    },
+  ];
+  const GAME = "00000000-0000-4000-8000-00000000beef";
+
+  async function open(available: boolean) {
+    forgetRollout();
+    await navigate("#play");
+    const api = mockApi();
+    api.on("GET /api/v1/rollout", () =>
+      reply(200, {
+        workflows: [{ id: "starter_tables", name: "Starter decks", available }],
+      }),
+    );
+    api.on("GET /api/v1/practice-games/options", () =>
+      reply(200, { formats, deck_lists: false, own_decks: true }),
+    );
+    api.on("GET /api/v1/decks", () =>
+      reply(200, [
+        summary({ id: "deck-a", title: "Skyward Patrol", format: "commander" }),
+      ]),
+    );
+    api.on("GET /api/v1/games", () => reply(200, []));
+    api.on("GET /api/v1/matches", () => reply(200, []));
+    api.on("GET /api/v1/starter-decks", () => reply(200, offersOf()));
+    api.on("POST /api/v1/starter-decks/purchases", () =>
+      reply(201, boughtDeck()),
+    );
+    api.on("POST /api/v1/practice-games", () => reply(201, { id: GAME }));
+    render(<PlayWizard me={player} />);
+    await settle();
+    return api;
+  }
+  const calls = (api: ReturnType<typeof mockApi>, route: string) =>
+    api.calls
+      .filter((c) => c.route === route)
+      .map((c) => (c.options as { body: Record<string, unknown> }).body);
+
+  it("is not offered while the workflow is not the account's to reach", async () => {
+    await open(false);
+    expect(slideNames()).not.toContain("Way to play");
+  });
+
+  it("asks the way to play in Legacy and Commander, and not at King's Table", async () => {
+    await open(true);
+    expect(slideNames()).toEqual([
+      "Format",
+      "Way to play",
+      "The table's rules",
+      "The bots",
+      "Start Game",
+    ]);
+    await act(async () =>
+      screen.getByRole("radio", { name: /King's Table/ }).click(),
+    );
+    expect(slideNames()).not.toContain("Way to play");
+    await act(async () =>
+      screen.getByRole("radio", { name: /Legacy/ }).click(),
+    );
+    expect(slideNames()).toContain("Way to play");
+  });
+
+  it("buys the deck chosen, then starts the game with it against bots the table deals", async () => {
+    const api = await open(true);
+    await goTo("Way to play");
+    expect(screen.getByRole("radio", { name: /^Your own deck/ })).toBeChecked();
+    await act(async () =>
+      screen
+        .getByRole("radio", { name: /^A starter deck bought at the table/ })
+        .click(),
+    );
+    await settle();
+    // A starter-deck game always asks which deck to buy, and plays by casual rules.
+    expect(slideNames()).toEqual([
+      "Format",
+      "Way to play",
+      "The table's rules",
+      "Your deck",
+      "The bots",
+      "Start Game",
+    ]);
+    await goTo("The table's rules");
+    expect(
+      screen.queryByRole("checkbox", { name: /^Banned cards/ }),
+    ).toBeNull();
+    expect(
+      screen.getByText(/A starter-deck game plays by casual rules/),
+    ).toBeInTheDocument();
+    // No deck is chosen yet: the slide does not move on, and says why.
+    await goTo("Your deck");
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+    expect(
+      screen.getByText("Choose the deck you buy to go on."),
+    ).toBeInTheDocument();
+    await act(async () =>
+      screen.getByRole("radio", { name: /^Blue Test · 250 tokens/ }).click(),
+    );
+    expect(screen.getByRole("button", { name: "Next" })).toBeEnabled();
+    await goTo("The bots");
+    expect(screen.queryByLabelText("Bot 1's deck")).toBeNull();
+    expect(
+      screen.getByText(/The table deals each bot a starter deck/),
+    ).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Bots"), { target: { value: "2" } });
+    await goTo("Start Game");
+    expect(chosen("Way to play")).toHaveTextContent(
+      "A starter deck bought at the table",
+    );
+    expect(chosen("The table's rules")).toHaveTextContent("Casual · 120 turns");
+    expect(chosen("Your deck")).toHaveTextContent(
+      "Blue Test · 250 tokensBought from Leng as the game starts; you have 600 tokens",
+    );
+    // The button says what it spends. A retry of the purchase would carry the same key.
+    await act(async () =>
+      screen.getByRole("button", { name: "Start Game · 250 tokens" }).click(),
+    );
+    await settle();
+    const purchases = calls(api, "POST /api/v1/starter-decks/purchases");
+    expect(purchases).toHaveLength(1);
+    expect(purchases[0]).toMatchObject({
+      format: "commander",
+      offer: "starter_blue",
+    });
+    expect(String(purchases[0]!.key)).toMatch(/^[0-9a-f]{32}$/);
+    // Nothing to reveal in this answer: the game starts at once, with the deck just bought.
+    expect(calls(api, "POST /api/v1/practice-games")).toEqual([
+      expect.objectContaining({
+        format: "commander",
+        deck_id: boughtDeck().deck_id,
+        starter: true,
+        bots: [{}, {}],
+        best_of: 1,
+      }),
+    ]);
+    expect(window.location.hash).toBe(`#game/${GAME}`);
+    // A starter-deck game is bought anew each time: it is not the setup to play again.
+    expect(localStorage.length).toBe(0);
+  });
+
+  it("starts a game the server refused again without buying twice", async () => {
+    const api = await open(true);
+    api.on(
+      "POST /api/v1/practice-games",
+      () => reply(503, { code: "games_busy", message: "Busy." }),
+      () => reply(201, { id: GAME }),
+    );
+    await goTo("Way to play");
+    await act(async () =>
+      screen
+        .getByRole("radio", { name: /^A starter deck bought at the table/ })
+        .click(),
+    );
+    await settle();
+    await goTo("Your deck");
+    await act(async () =>
+      screen.getByRole("radio", { name: /^Red Test · 500 tokens/ }).click(),
+    );
+    await goTo("Start Game");
+    await act(async () =>
+      screen.getByRole("button", { name: "Start Game · 500 tokens" }).click(),
+    );
+    await settle();
+    expect(screen.getByRole("alert")).toHaveTextContent(/busy/);
+    // The deck is bought: the slide says so, and its button starts the game alone.
+    expect(chosen("Your deck")).toHaveTextContent(
+      "Red TestBought for 500 tokens: it is in your decks and your library",
+    );
+    await act(async () =>
+      screen.getByRole("button", { name: "Start Game" }).click(),
+    );
+    await settle();
+    expect(calls(api, "POST /api/v1/starter-decks/purchases")).toHaveLength(1);
+    expect(calls(api, "POST /api/v1/practice-games")).toHaveLength(2);
+    expect(window.location.hash).toBe(`#game/${GAME}`);
+  });
+
+  it("does not sit a player down who can buy no deck on offer", async () => {
+    const api = await open(true);
+    api.on("GET /api/v1/starter-decks", () =>
+      reply(
+        200,
+        offersOf({
+          balance: 100,
+          short: 150,
+          offers: offersOf().offers.map((found) => ({
+            ...found,
+            affordable: false,
+          })),
+        }),
+      ),
+    );
+    await goTo("Way to play");
+    await act(async () =>
+      screen
+        .getByRole("radio", { name: /^A starter deck bought at the table/ })
+        .click(),
+    );
+    await settle();
+    await goTo("Your deck");
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+    expect(
+      screen.getByText(
+        "You need 150 tokens more to buy the cheapest deck on offer.",
+      ),
+    ).toBeInTheDocument();
+    await goTo("Start Game");
+    expect(screen.getByRole("button", { name: "Start Game" })).toBeDisabled();
   });
 });

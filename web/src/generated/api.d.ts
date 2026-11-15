@@ -3687,6 +3687,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/starter-decks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Starter Decks
+         * @description The starter decks a starter-deck table of the format takes, each at what it costs now,
+         *     with the account's tokens and what it lacks for the cheapest.
+         */
+        get: operations["starter_decks_api_v1_starter_decks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/starter-decks/purchases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Buy Starter Deck
+         * @description Buys a starter deck to play at a starter-deck table, or against the bots from the Play
+         *     wizard: the tokens are spent, the cards join the library and a deck is made of them, together.
+         *     A Commander starter already owned is bought again. The deck then sits down by its ID.
+         */
+        post: operations["buy_starter_deck_api_v1_starter_decks_purchases_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tables": {
         parameters: {
             query?: never;
@@ -7981,6 +8024,12 @@ export interface components {
              */
             seat?: number | null;
             /**
+             * Starter
+             * @description Since v1.0.0: a starter-deck game (docs/tables.md), in Legacy or Commander: deck_id is a starter deck bought for one (POST /starter-decks/purchases), which plays as it came under casual rules, and each bot plays a starter deck of the same kind, so bots names none. Refused while the workflow is not the account's to reach.
+             * @default false
+             */
+            starter: boolean;
+            /**
              * Turn Cap
              * @description The game's turn limit: it ends with no result at the untap step after this many turns, counting every player's. Left out (since v0.9.7): 40 turns for each player, so 80 in a duel and in Two-Headed Giant (whose teams take their turns together), 120 or 160 at a Commander table of three or four, 240 at King's Table. At most 400 (200 before v0.9.7).
              */
@@ -9522,7 +9571,7 @@ export interface components {
             /**
              * Deck Id
              * Format: uuid
-             * @description One of your decks, in the table's format.
+             * @description One of your decks, in the table's format; at a starter-deck table (v1.0.0) a starter deck bought for it, and the seat is ready at once.
              */
             deck_id: string;
             /**
@@ -9920,7 +9969,7 @@ export interface components {
             name: string;
             /**
              * Section
-             * @description The specification's section the workflow delivers.
+             * @description The specification's section the workflow delivers; 0 for one the owner asked for himself.
              */
             section: number;
             /**
@@ -9956,6 +10005,53 @@ export interface components {
              * @default false
              */
             loaner: boolean;
+        };
+        /** StarterBought */
+        StarterBought: {
+            /** Balance */
+            balance: number;
+            /**
+             * Cards
+             * @description A Commander starter's cards as a pack reveals them, the commander last; empty for a Legacy product, whose opening holds them, and on a retry.
+             */
+            cards?: components["schemas"]["DeckCard"][];
+            /**
+             * Deck Id
+             * Format: uuid
+             * @description The deck it made, which the table plays as it came.
+             */
+            deck_id: string;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Offer */
+            offer: string;
+            /**
+             * Opening Id
+             * @description A Legacy product's opening, to reveal as a pack is (GET /shop/openings/{id}); null for a Commander starter.
+             */
+            opening_id: string | null;
+            /**
+             * Repeated
+             * @description A retry: it was bought already.
+             */
+            repeated: boolean;
+            /** Sale */
+            sale: boolean;
+            /** Title */
+            title: string;
+            /**
+             * Tokens
+             * @description The price paid.
+             */
+            tokens: number;
         };
         /** StarterChoice */
         StarterChoice: {
@@ -10006,6 +10102,97 @@ export interface components {
             teaches: string;
             /** Title */
             title: string;
+        };
+        /**
+         * StarterOffer
+         * @description A deck Leng sells that a starter-deck table of the format takes.
+         */
+        StarterOffer: {
+            /**
+             * Affordable
+             * @description Whether the account's tokens buy it now.
+             */
+            affordable: boolean;
+            /**
+             * Commander Printing Id
+             * @description A Commander starter's commander's picture.
+             */
+            commander_printing_id?: string | null;
+            /**
+             * Detail
+             * @description A Commander starter's commander and colours; a Legacy product's edition and size.
+             */
+            detail: string;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+            /**
+             * Id
+             * @description A Commander starter deck's ID, or a Legacy deck product's.
+             */
+            id: string;
+            /**
+             * List Price
+             * @description Leng's price, the sale aside.
+             */
+            list_price: number;
+            /**
+             * On Sale
+             * @description In this week's sale.
+             */
+            on_sale: boolean;
+            /**
+             * Owned
+             * @description A Commander starter the account has already: here it is bought again.
+             * @default false
+             */
+            owned: boolean;
+            /**
+             * Price
+             * @description What it costs now, in tokens: Leng's price, or the week's sale price.
+             */
+            price: number;
+            /** @description A Legacy product, as the shop shows it. */
+            product?: components["schemas"]["ProductRef"] | null;
+            /** Title */
+            title: string;
+        };
+        /** StarterOffers */
+        StarterOffers: {
+            /** Balance */
+            balance: number;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+            /** Offers */
+            offers: components["schemas"]["StarterOffer"][];
+            /**
+             * Short
+             * @description The tokens the account lacks for the cheapest deck on offer; 0 when it can buy one, or none is on offer. A player who can buy none cannot sit down.
+             */
+            short: number;
+        };
+        /** StarterPurchaseRequest */
+        StarterPurchaseRequest: {
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+            /**
+             * Key
+             * @description The client's key for this purchase: a retry buys once.
+             */
+            key: string;
+            /**
+             * Offer
+             * @description The offer's ID.
+             */
+            offer: string;
         };
         /** StarterResult */
         StarterResult: {
@@ -10418,6 +10605,12 @@ export interface components {
              */
             seats: number;
             /**
+             * Starter
+             * @description Since v1.0.0: a starter-deck table (docs/tables.md), in Legacy or Commander, one game, by casual rules and with no profile: every player sits down with a starter deck bought for it (POST /starter-decks/purchases), deck_id here being the host's, and plays it as it came. Refused while the workflow is not the account's to reach.
+             * @default false
+             */
+            starter: boolean;
+            /**
              * Turn Cap
              * @description The game's turn limit: it ends with no result at the untap step after this many turns, counting every player's. Left out (since v0.9.7): 40 turns for each player, so 80 in a duel and in Two-Headed Giant (whose teams take their turns together), 120 or 160 at a Commander table of three or four, 240 at King's Table. At most 400 (200 before v0.9.7).
              */
@@ -10528,6 +10721,12 @@ export interface components {
             rules: components["schemas"]["TableRules"];
             /** Seats */
             seats: number;
+            /**
+             * Starter
+             * @description Since v1.0.0: a starter-deck table: a seat is taken with a starter deck bought for it, which plays as it came.
+             * @default false
+             */
+            starter: boolean;
             /**
              * Status
              * @enum {string}
@@ -30108,6 +30307,196 @@ export interface operations {
                 };
                 content: {
                     "image/webp": unknown;
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    starter_decks_api_v1_starter_decks_get: {
+        parameters: {
+            query?: {
+                format?: "legacy" | "commander";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StarterOffers"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    buy_starter_deck_api_v1_starter_decks_purchases_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StarterPurchaseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StarterBought"];
                 };
             };
             /** @description Bad Request */
