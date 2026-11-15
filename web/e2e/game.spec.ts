@@ -624,6 +624,101 @@ async function concede(page: Page) {
     .click();
 }
 
+/** Save and resume is behind its gate (v1.0.0): SysOp opens it to the staff for a journey and
+ * closes it again afterwards, whatever the journey came to. */
+async function stageSaves(page: Page, to: "staff" | "off"): Promise<number> {
+  return page.evaluate(async (wanted) => {
+    const me = (await (await fetch("/api/v1/me")).json()) as {
+      csrf_token: string;
+    };
+    const changed = await fetch("/api/v1/admin/rollout/save_resume", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": me.csrf_token,
+      },
+      body: JSON.stringify({ stage: wanted }),
+    });
+    return changed.status;
+  }, to);
+}
+
+/**
+ * A hook for play(): once, between two answers at `fromTurn` or later, the game is saved from the
+ * Game menu (after the dialog said what a save is), found under Saved games on Your games,
+ * resumed there, and found where it stood: the same turn, the same hand, the same question with
+ * the same choices, at revisions a million on. `at` says where it was saved, once it was.
+ */
+function savedOnce(
+  page: Page,
+  table: Table,
+  gameId: string,
+  fromTurn = 2,
+): {
+  hook: (now: Snapshot) => Promise<void>;
+  at: { turn: number; hand: number; revision: number } | null;
+} {
+  const save: ReturnType<typeof savedOnce> = {
+    at: null,
+    hook: async (now) => {
+      if (save.at || (now.view?.turn ?? 0) < fromTurn) return;
+      const saved = (save.at = {
+        turn: now.view!.turn,
+        hand: now.view!.hand.length,
+        revision: now.revision,
+      });
+      await page.getByRole("button", { name: "Game menu" }).click();
+      await page.getByRole("button", { name: "Save and leave" }).click();
+      const asking = page.getByRole("dialog", {
+        name: "Save this game and leave?",
+      });
+      await expect(asking).toContainText("A saved game waits 30 days");
+      await expect(asking).toContainText(
+        "A save ends when the game is upgraded",
+      );
+      await asking.getByRole("button", { name: "Save and leave" }).click();
+
+      // The table is left for the list the game waits in.
+      await expect(page).toHaveURL(/#play\/games$/, { timeout: 30_000 });
+      const waiting = page.getByRole("region", { name: "Saved games" });
+      await expect(waiting).toContainText("1 of 5");
+      await expect(waiting).toContainText(`Turn ${saved.turn}`);
+      await expect(waiting).toContainText("runs out in 2");
+      const status = await page.evaluate(
+        async (id) =>
+          (
+            (await (await fetch(`/api/v1/games/${id}`)).json()) as {
+              game: { status: string };
+            }
+          ).game.status,
+        gameId,
+      );
+      expect(status).toBe("saved");
+
+      await waiting.getByRole("button", { name: "Resume" }).click();
+      await expect(page).toHaveURL(new RegExp(`#game/${gameId}$`), {
+        timeout: 30_000,
+      });
+      // The game the engine took up from its recording.
+      const panel = page.locator('section[aria-labelledby="prompt-title"]');
+      await expect
+        .poll(
+          async () => Number((await panel.getAttribute("data-revision")) ?? 0),
+          { timeout: 60_000 },
+        )
+        .toBeGreaterThanOrEqual(1_000_000);
+      const back = table.latest!;
+      expect(back.view?.turn).toBe(saved.turn);
+      expect(back.view?.hand.length).toBe(saved.hand);
+      expect(back.prompt?.kind).toBe(now.prompt?.kind);
+      expect(back.prompt?.options.map((option) => option.id)).toEqual(
+        now.prompt?.options.map((option) => option.id),
+      );
+    },
+  };
+  return save;
+}
+
 test.describe("practice games in the browser", () => {
   test.skip(
     !gamesOn || !sysopPassword,
@@ -755,24 +850,7 @@ test.describe("practice games in the browser", () => {
       new Set([...theirs].filter((n) => !mine.has(n))),
     );
     await signInSysop(page);
-    // Save and resume is behind its gate: SysOp opens it to the staff for this journey, and
-    // closes it again whatever the journey comes to.
-    const stage = (to: "staff" | "off") =>
-      page.evaluate(async (wanted) => {
-        const me = (await (await fetch("/api/v1/me")).json()) as {
-          csrf_token: string;
-        };
-        const changed = await fetch("/api/v1/admin/rollout/save_resume", {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRF-Token": me.csrf_token,
-          },
-          body: JSON.stringify({ stage: wanted }),
-        });
-        return changed.status;
-      }, to);
-    expect(await stage("staff")).toBe(200);
+    expect(await stageSaves(page, "staff")).toBe(200);
     try {
       const gameId = await startGame(page, {
         format: "Legacy",
@@ -780,71 +858,12 @@ test.describe("practice games in the browser", () => {
         turnCap: 20,
       });
       // On the second turn, between two answers: saved, found among the saved games, resumed.
-      // Held in an object: the hook below sets it, and the journey reads it afterwards.
-      const save: {
-        at: { turn: number; hand: number; revision: number } | null;
-      } = { at: null };
+      const save = savedOnce(page, table, gameId);
       const { snapshot, answered } = await play(
         page,
         table,
         "mouse",
-        async (now) => {
-          if (save.at || (now.view?.turn ?? 0) < 2) return;
-          const saved = (save.at = {
-            turn: now.view!.turn,
-            hand: now.view!.hand.length,
-            revision: now.revision,
-          });
-          await page.getByRole("button", { name: "Game menu" }).click();
-          await page.getByRole("button", { name: "Save and leave" }).click();
-          const asking = page.getByRole("dialog", {
-            name: "Save this game and leave?",
-          });
-          await expect(asking).toContainText("A saved game waits 30 days");
-          await expect(asking).toContainText(
-            "A save ends when the game is upgraded",
-          );
-          await asking.getByRole("button", { name: "Save and leave" }).click();
-
-          // The table is left for the list the game waits in.
-          await expect(page).toHaveURL(/#play\/games$/, { timeout: 30_000 });
-          const waiting = page.getByRole("region", { name: "Saved games" });
-          await expect(waiting).toContainText("1 of 5");
-          await expect(waiting).toContainText(`Turn ${saved.turn}`);
-          await expect(waiting).toContainText("runs out in 2");
-          const status = await page.evaluate(
-            async (id) =>
-              (
-                (await (await fetch(`/api/v1/games/${id}`)).json()) as {
-                  game: { status: string };
-                }
-              ).game.status,
-            gameId,
-          );
-          expect(status).toBe("saved");
-
-          await waiting.getByRole("button", { name: "Resume" }).click();
-          await expect(page).toHaveURL(new RegExp(`#game/${gameId}$`), {
-            timeout: 30_000,
-          });
-          // The game the engine took up from its recording: the same turn, the same hand, the
-          // same question, at revisions a million on.
-          const panel = page.locator('section[aria-labelledby="prompt-title"]');
-          await expect
-            .poll(
-              async () =>
-                Number((await panel.getAttribute("data-revision")) ?? 0),
-              { timeout: 60_000 },
-            )
-            .toBeGreaterThanOrEqual(1_000_000);
-          const back = table.latest!;
-          expect(back.view?.turn).toBe(saved.turn);
-          expect(back.view?.hand.length).toBe(saved.hand);
-          expect(back.prompt?.kind).toBe(now.prompt?.kind);
-          expect(back.prompt?.options.map((option) => option.id)).toEqual(
-            now.prompt?.options.map((option) => option.id),
-          );
-        },
+        save.hook,
       );
       note(
         testInfo,
@@ -861,7 +880,7 @@ test.describe("practice games in the browser", () => {
         page.getByRole("region", { name: "Saved games" }),
       ).toHaveCount(0);
     } finally {
-      await stage("off");
+      await stageSaves(page, "off");
     }
   });
 
@@ -909,7 +928,10 @@ test.describe("practice games in the browser", () => {
     // The commanders themselves are public from the start.
     const table = new Table(page, mine, concealed);
     await signInSysop(page);
-    await startGame(page, {
+    // Since v1.0.0 the table is also saved and resumed on its second turn: a four-seat game
+    // comes back from its recording as a duel does, every bot's deck still concealed.
+    expect(await stageSaves(page, "staff")).toBe(200);
+    const gameId = await startGame(page, {
       format: "Commander",
       deck: "commander-mono-red-raiders",
       bots: 3,
@@ -917,10 +939,18 @@ test.describe("practice games in the browser", () => {
     });
     await expect(page.getByRole("article")).toHaveCount(3);
     await sizeChecks(page, { width: 2560, height: 1440, dpr: 1 });
-    const { snapshot, answered, kinds } = await play(page, table, "mouse");
+    const save = savedOnce(page, table, gameId);
+    const { snapshot, answered, kinds } = await play(
+      page,
+      table,
+      "mouse",
+      save.hook,
+    ).finally(() => stageSaves(page, "off"));
+    expect(save.at).not.toBeNull();
+    await expect(page.getByRole("article")).toHaveCount(3);
     note(
       testInfo,
-      `${snapshot.result!.kind} after ${snapshot.result!.turns} turns; ${answered} prompts (${JSON.stringify(kinds)})`,
+      `saved at turn ${save.at?.turn}; ${snapshot.result!.kind} after ${snapshot.result!.turns} turns; ${answered} prompts (${JSON.stringify(kinds)})`,
     );
     // The ended table, reviewed: the result dialog closed, every control reachable at each size.
     await page
@@ -957,7 +987,10 @@ test.describe("practice games in the browser", () => {
     );
     const table = new Table(page, new Set([...mine, ...teammate]), concealed);
     await signInSysop(page);
-    await startGame(page, {
+    // Since v1.0.0 the game is also saved and resumed on its second turn: the teams, the shared
+    // life and the teammate's hand come back as they were.
+    expect(await stageSaves(page, "staff")).toBe(200);
+    const gameId = await startGame(page, {
       format: "Two-Headed Giant",
       deck: "legacy-mono-red-burn",
       turnCap: 4,
@@ -968,10 +1001,18 @@ test.describe("practice games in the browser", () => {
     await expect(
       page.getByRole("article", { name: /seat 2, your teammate$/ }),
     ).toHaveCount(1);
-    const { snapshot, answered } = await play(page, table, "mouse");
+    const save = savedOnce(page, table, gameId);
+    const { snapshot, answered } = await play(
+      page,
+      table,
+      "mouse",
+      save.hook,
+    ).finally(() => stageSaves(page, "off"));
+    expect(save.at).not.toBeNull();
+    await expect(page.getByText("Teammate", { exact: true })).toBeVisible();
     note(
       testInfo,
-      `${snapshot.result!.kind} after ${snapshot.result!.turns} turns; ${answered} prompts`,
+      `saved at turn ${save.at?.turn}; ${snapshot.result!.kind} after ${snapshot.result!.turns} turns; ${answered} prompts`,
     );
     const view = snapshot.view!;
     // One life total a team: teammates always show the same.
