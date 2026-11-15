@@ -17,6 +17,7 @@ Every game the engine plays now keeps an ordered record of what happened in it, 
 | `object`, `target`, `cause` | An object: `ref` (the id the seat views show it under, `o` and sixteen hex digits), `name`, `owner` (a seat), `seen_by` (`"all"` or the seats that may see it), and for a zone change `was` (its id where it was). Or a player: `{"seat": n}` |
 | `from`, `to` | A zone change's zones (`library`, `hand`, `battlefield`, `graveyard`, `stack`, `exiled`, `command`) |
 | `amount`, `combat`, `counter` | Damage, life and counters: how much, whether combat damage, which counter |
+| `tally` | Since v1.0.0, on the events that changed them: every seat's public counts ([below](#every-seats-counts-v100)) |
 
 Nothing XMage keeps for itself reaches an event: no XMage id (`GameEventsTest` checks every event of real games), no presentation text. Objects are named by the seat views' ids (`ObjectRefs`), which are stable across a recovery since v0.9.9.
 
@@ -67,6 +68,28 @@ The owner's decision of 2026-11-15 ([the timeline](../timeline.md#the-owners-dec
 **Measured** on games played through the prompts (`TimelineEventsTest`, `CommanderScenarioTest`): Lightning Bolt under Sphere of Resistance is `paid` `{1}{R}` with one change by the Sphere; three Grizzly Bears die by `lethal_damage`, `destroyed` (by Doom Blade) and `toughness` (Disfigure); a Bolt and a Prodigal Pyromancer's ability whose targets were sacrificed in response are `fizzled` by `targets`, and Viscera Seer's own ability is not; the second Isamaru leaves by `legend_rule`; a commander's second cast is `{2}{W}` with a tax of 2 and its first has no change; a Mountain's mana is `immediate` and the Bolt's resolution is not.
 
 **Not told:** the cost of an activated ability; why an optional ability did nothing; which replacement sent a card elsewhere; a cost's change by an effect that stopped applying as the spell was cast. A game the engine takes up again is followed from what its checkpoint had on the stack, so a spell cast before the checkpoint that fizzles after it is told as it was the first time.
+
+### Every seat's counts (v1.0.0)
+
+What [a replay](../replays.md#the-scoreboard)'s scoreboard reads. An event carries `tally` when the counts are no longer what an event last told: one array a seat, in the seats' order, of five numbers:
+
+| Place | Count |
+| --- | --- |
+| 0 | Life |
+| 1 | Cards in hand |
+| 2 | Cards in library |
+| 3 | Cards in graveyard |
+| 4 | Permanents the player controls (phased out ones left out) |
+
+`"tally": [[20, 6, 53, 0, 1], [17, 7, 53, 0, 0]]`: seat 0 at 20 life with six cards in hand, seat 1 at 17 with seven.
+
+- **Public.** Each is what any player may count at a table (402.3, 401.3), and what every seat's view already shows. The perspective filter passes it unchanged.
+- **Why the events tell them.** The opening hands and their mulligans are dealt before a game's first event (measured on a real Legacy game: its first event is turn 1's first main phase), so no count of the moves that are told would find a hand's size. Control changes and phasing are not moves either.
+- **When.** They are read from the game as the event is made (`GameEvents.tally`), and told only when they differ from the last telling, so the game's first event after its first step marker always carries them and a life change always does. A step's marker carries none: it stands before the event that brought it, and that event tells them.
+- **A step ahead within an action.** XMage tells the moves of a simultaneous action after making all of them, so the first of three draws already tells a hand three larger. Life is told exactly: XMage tells each gain and loss as it happens (`GameEventsTest` checks every life event of a Commander game against the counts).
+- **Across a recovery.** A game taken up again remembers the last telling among the events it kept, so the events made again carry the counts where the first telling did.
+
+Events made before this (the live site's, up to v0.9.14) carry none; a replay then counts life from each seat's start and says that the other counts are not known.
 
 ## Across a recovery
 

@@ -155,6 +155,8 @@ final class GameEvents {
     private final Map<UUID, Pending> pending = new LinkedHashMap<>();
     /** Permanents XMage said were destroyed or sacrificed, until their zone change is told. */
     private final Map<UUID, Leaving> leaving = new HashMap<>();
+    /** Each seat's public counts as an event last told them: told again only when they change. */
+    private String lastTally;
 
     /**
      * @param folder the game's recording folder, or null for a game that keeps no recording
@@ -180,6 +182,14 @@ final class GameEvents {
         events.clear();
         events.addAll(kept);
         epoch = highest + 1;
+        // The counts as the kept events last told them, so that the events made again carry them
+        // where the first telling did.
+        lastTally = null;
+        for (JsonObject event : kept) {
+            if (event.has("tally")) {
+                lastTally = event.get("tally").toString();
+            }
+        }
         if (!kept.isEmpty()) {
             JsonObject last = kept.get(kept.size() - 1);
             lastTurn = last.get("turn").getAsInt();
@@ -310,10 +320,16 @@ final class GameEvents {
         JsonObject marker = new JsonObject();
         marker.addProperty("type", "step");
         marker.add("active", seatOf(game.getActivePlayerId()));
-        add(marker, game);
+        // The marker stands before the event that brought it: that event tells the counts, which
+        // are already what it made them.
+        add(marker, game, false);
     }
 
     private void add(JsonObject body, Game game) {
+        add(body, game, true);
+    }
+
+    private void add(JsonObject body, Game game, boolean counts) {
         JsonObject event = new JsonObject();
         event.addProperty("v", VERSION);
         event.addProperty("seq", seq() + 1);
@@ -322,8 +338,44 @@ final class GameEvents {
         PhaseStep step = game.getTurnStepType();
         event.addProperty("step", step == null ? null : step.name().toLowerCase(Locale.ROOT));
         body.entrySet().forEach(entry -> event.add(entry.getKey(), entry.getValue()));
+        if (counts) {
+            JsonArray tally = tally(game);
+            String told = tally.toString();
+            if (!told.equals(lastTally)) {
+                event.add("tally", tally);
+                lastTally = told;
+            }
+        }
         events.add(event);
         write(event);
+    }
+
+    /**
+     * Each seat's public counts as the game stands while the event is made, in the seats' order:
+     * life, cards in hand, cards in library, cards in graveyard, permanents controlled. All of it
+     * is what any player may count at a table (402.3, 401.3), and it is how a replay knows them:
+     * the opening hands and their mulligans are dealt before the game's first event, so no count
+     * of the moves that are told would find a hand's size.
+     */
+    private JsonArray tally(Game game) {
+        JsonArray seats = new JsonArray();
+        for (UUID id : seatIds) {
+            JsonArray counts = new JsonArray();
+            mage.players.Player player = game.getPlayer(id);
+            if (player == null) {
+                for (int count = 0; count < 5; count++) {
+                    counts.add(0);
+                }
+            } else {
+                counts.add(player.getLife());
+                counts.add(player.getHand().size());
+                counts.add(player.getLibrary().size());
+                counts.add(player.getGraveyard().size());
+                counts.add(game.getBattlefield().getAllActivePermanents(id).size());
+            }
+            seats.add(counts);
+        }
+        return seats;
     }
 
     private void write(JsonObject event) {

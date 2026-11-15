@@ -66,6 +66,8 @@ def test_migration_upgrade_and_downgrade(tmp_path, monkeypatch):
         "starter_purchases",
         # v1.0.0 (0052): games saved to be played on later.
         "game_saves",
+        # v1.0.0 (0053): a reader's bookmarks and notes on a replay.
+        "replay_marks",
         "game_tables",
         "table_seats",
         "table_invites",

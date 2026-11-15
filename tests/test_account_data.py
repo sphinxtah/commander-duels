@@ -74,6 +74,8 @@ TRANSIENT = {
     "auction_watches": "a watched auction; no asset",
     "game_saves": "a saved game; it ends at the upgrade (the owner's decision, 2026-11-14), and "
     "its game is the record",
+    "replay_marks": "a reader's bookmarks and notes on a replay; they go with the game's events, "
+    "90 days after the game",
 }
 
 

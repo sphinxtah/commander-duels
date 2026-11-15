@@ -2414,6 +2414,121 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/games/{game_id}/replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Replay
+         * @description A replay's header: the game, whose eyes it is read through, the deck played, what the
+         *     scoreboard starts from, how long it is and until when it is kept, and the reader's own
+         *     bookmarks, note and shares. Your own seat's, or with ``shared_by`` the replay that player
+         *     shared with you. Anyone else is answered 404.
+         */
+        get: operations["read_replay_api_v1_games__game_id__replay_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/replay/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Replay Events
+         * @description The replay's events after ``since``, oldest first, through the replay's seat: the one
+         *     filter every reading of a game's events goes through, so that neither sharing nor seeking
+         *     shows more than that seat saw.
+         */
+        get: operations["replay_events_api_v1_games__game_id__replay_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/replay/marks/{seq}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Mark
+         * @description Keeps the reader's bookmark at an event, with its label and its note, or changes it; at 0,
+         *     the reader's note on the game as a whole, which an empty note removes. Their own, on any
+         *     replay they may read, and nobody else's to see.
+         */
+        put: operations["put_mark_api_v1_games__game_id__replay_marks__seq__put"];
+        post?: never;
+        /**
+         * Delete Mark
+         * @description Removes the reader's bookmark at an event (or, at 0, their note on the game). Removing
+         *     what is not there changes nothing.
+         */
+        delete: operations["delete_mark_api_v1_games__game_id__replay_marks__seq__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/replay/shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Share Replay
+         * @description Shares the caller's replay of a game they played with a friend: the game through the
+         *     caller's own seat, their hand as they saw it, until the replay goes or they take it back.
+         *     Friends only (the owner's decision, 2026-11-15). Sharing twice shares once.
+         */
+        post: operations["share_replay_api_v1_games__game_id__replay_shares_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/replay/shares/{grant_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unshare Replay
+         * @description Ends a share: its player takes it back, or the friend it was shared with gives it up.
+         *     From then on the friend reads nothing of it. Ending what has ended changes nothing.
+         */
+        delete: operations["unshare_replay_api_v1_games__game_id__replay_shares__grant_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/games/{game_id}/save": {
         parameters: {
             query?: never;
@@ -3417,6 +3532,27 @@ export interface paths {
         };
         /** Ready */
         get: operations["ready_api_v1_ready_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/replays": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Replays
+         * @description The replays the account may read: of the games it played that are over and still have
+         *     their events, newest first, and the ones friends shared with it.
+         */
+        get: operations["list_replays_api_v1_replays_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7305,6 +7441,19 @@ export interface components {
             /** Starting Bid */
             starting_bid: number;
         };
+        /** MarkBody */
+        MarkBody: {
+            /**
+             * Label
+             * @default
+             */
+            label: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
         /** MatchGameView */
         MatchGameView: {
             /** Game */
@@ -7589,7 +7738,7 @@ export interface components {
             created_at: string;
             /**
              * Game Id
-             * @description For a rematch (v0.5.0): the finished game, whose result screen holds the offer.
+             * @description For a rematch (v0.5.0): the finished game, whose result screen holds the offer. For a replay a friend shared (v1.0.0): the game, which the bell links to (#replay/<game>/<the friend>).
              */
             game_id?: string | null;
             /**
@@ -7601,7 +7750,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "friend_request" | "friend_accepted" | "friend_online" | "message" | "quest_completed" | "achievement_earned" | "rematch" | "team_invite" | "auction_outbid" | "auction_won" | "auction_sold" | "auction_unsold" | "auction_cancelled" | "table_invite" | "warden_deck";
+            kind: "friend_request" | "friend_accepted" | "friend_online" | "message" | "quest_completed" | "achievement_earned" | "rematch" | "team_invite" | "auction_outbid" | "auction_won" | "auction_sold" | "auction_unsold" | "auction_cancelled" | "table_invite" | "warden_deck" | "replay_shared";
             /**
              * Messages
              * @description For new messages (v0.4.4): how many from this friend are still unread.
@@ -9210,6 +9359,187 @@ export interface components {
             removed_at: string;
         };
         /**
+         * Replay
+         * @description A replay's header: everything but its events.
+         */
+        Replay: {
+            deck: components["schemas"]["ReplayDeck"] | null;
+            /**
+             * Events
+             * @description The last event's number: how long the replay is.
+             */
+            events: number;
+            game: components["schemas"]["GameSummary"];
+            /**
+             * Kept Until
+             * Format: date-time
+             * @description When the replay goes: its events are kept 90 days after the game.
+             */
+            kept_until: string;
+            /**
+             * Marks
+             * @description The reader's own bookmarks, in order.
+             */
+            marks: components["schemas"]["ReplayMarkView"][];
+            /**
+             * Note
+             * @description The reader's own note on the game.
+             */
+            note: string;
+            /**
+             * Shares
+             * @description The friends the reader shared their own replay with; empty for a shared one.
+             */
+            shares: components["schemas"]["ReplayShare"][];
+            /** Starting */
+            starting: components["schemas"]["ReplayStart"][];
+            through: components["schemas"]["ReplayThrough"];
+            /**
+             * Turns
+             * @description The game's last turn.
+             */
+            turns: number;
+        };
+        /**
+         * ReplayDeck
+         * @description The deck the replay's seat played, as it was when the game began.
+         */
+        ReplayDeck: {
+            /**
+             * Deck Id
+             * @description The deck, when it is the reader's own and still there: to open it.
+             */
+            deck_id: string | null;
+            /** Title */
+            title: string;
+            /**
+             * Version
+             * @description The saved version played; null for a deck that has none (a bot's, a starter's list, a deck list pasted for one game).
+             */
+            version: number | null;
+        };
+        /**
+         * ReplayEntry
+         * @description A replay in the account's list.
+         */
+        ReplayEntry: {
+            game: components["schemas"]["GameSummary"];
+            /**
+             * Kept Until
+             * Format: date-time
+             */
+            kept_until: string;
+            /**
+             * Marks
+             * @description How many bookmarks the reader keeps on it.
+             */
+            marks: number;
+            /**
+             * Noted
+             * @description Whether the reader keeps a note on it.
+             */
+            noted: boolean;
+            /**
+             * Shares
+             * @description How many friends the reader shared it with.
+             */
+            shares: number;
+            through: components["schemas"]["ReplayThrough"];
+            /** Turns */
+            turns: number;
+        };
+        /** ReplayList */
+        ReplayList: {
+            /**
+             * More
+             * @description Whether older games of its own were left out.
+             */
+            more: boolean;
+            /**
+             * Own
+             * @description Games the account played, newest first.
+             */
+            own: components["schemas"]["ReplayEntry"][];
+            /**
+             * Shared
+             * @description Replays friends shared with it, newest first.
+             */
+            shared: components["schemas"]["ReplayEntry"][];
+        };
+        /** ReplayMarkView */
+        ReplayMarkView: {
+            /** Label */
+            label: string;
+            /** Note */
+            note: string;
+            /**
+             * Seq
+             * @description The marked event's number.
+             */
+            seq: number;
+            /** Turn */
+            turn: number | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ReplayShare */
+        ReplayShare: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            player: components["schemas"]["PlayerRef"];
+            /**
+             * Shared At
+             * Format: date-time
+             */
+            shared_at: string;
+        };
+        /**
+         * ReplayStart
+         * @description What a seat starts the game with, for the scoreboard.
+         */
+        ReplayStart: {
+            /** Life */
+            life: number;
+            /** Seat */
+            seat: number;
+            /**
+             * Shared Life
+             * @description Whether the seat's life total is its team's.
+             */
+            shared_life: boolean;
+            /**
+             * Team
+             * @description Two-Headed Giant and King's Table: the seat's team. In Two-Headed Giant a team has one life total, so a life change of either player is the team's.
+             */
+            team: number | null;
+        };
+        /**
+         * ReplayThrough
+         * @description Whose eyes the replay is read through.
+         */
+        ReplayThrough: {
+            /**
+             * Grant Id
+             * @description A shared replay's grant, which its reader may give up.
+             */
+            grant_id: string | null;
+            /** Seat */
+            seat: number;
+            /** @description Who shared it, for a shared replay. */
+            shared_by: components["schemas"]["PlayerRef"] | null;
+            /**
+             * Yours
+             * @description The reader's own seat; false for a replay shared with them.
+             */
+            yours: boolean;
+        };
+        /**
          * ReportContext
          * @description What the page attaches on its own. Context only: nothing in it is checked against the
          *     account or decides anything.
@@ -10000,6 +10330,14 @@ export interface components {
             released_at: string | null;
             /** Type */
             type: string;
+        };
+        /** ShareBody */
+        ShareBody: {
+            /**
+             * Player Id
+             * Format: uuid
+             */
+            player_id: string;
         };
         /** SharedDeck */
         SharedDeck: {
@@ -24218,6 +24556,589 @@ export interface operations {
             };
         };
     };
+    read_replay_api_v1_games__game_id__replay_get: {
+        parameters: {
+            query?: {
+                shared_by?: string | null;
+            };
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Replay"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    replay_events_api_v1_games__game_id__replay_events_get: {
+        parameters: {
+            query?: {
+                shared_by?: string | null;
+                since?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventsPage"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_mark_api_v1_games__game_id__replay_marks__seq__put: {
+        parameters: {
+            query?: {
+                shared_by?: string | null;
+            };
+            header?: never;
+            path: {
+                game_id: string;
+                seq: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Replay"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_mark_api_v1_games__game_id__replay_marks__seq__delete: {
+        parameters: {
+            query?: {
+                shared_by?: string | null;
+            };
+            header?: never;
+            path: {
+                game_id: string;
+                seq: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Replay"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    share_replay_api_v1_games__game_id__replay_shares_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShareBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Replay"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    unshare_replay_api_v1_games__game_id__replay_shares__grant_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+                grant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     save_game_api_v1_games__game_id__save_post: {
         parameters: {
             query?: never;
@@ -29570,6 +30491,100 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Readiness-Output"];
+                };
+            };
+        };
+    };
+    list_replays_api_v1_replays_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplayList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };

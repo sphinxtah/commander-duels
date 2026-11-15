@@ -54,6 +54,7 @@ export function GamesList({ me }: { me: Me }) {
   const { games, refresh } = useGames(everyone);
   // Saved games (v1.0.0, saves.tsx): the account's own, whoever's games are listed below.
   const saving = useWorkflow("save_resume");
+  const replays = useWorkflow("replays");
   const { saves, refresh: refreshSaves } = useSaves(saving);
   // The campaign's court closed by its own player is the court lost (v0.9.8): closing it asks first.
   const [closingCourt, setClosingCourt] = useState<GameSummary | null>(null);
@@ -95,6 +96,11 @@ export function GamesList({ me }: { me: Me }) {
       )}
       <div className={styles.gamesHead}>
         <h2>{everyone ? "Every player's games" : "Running and recent"}</h2>
+        {replays && !everyone && (
+          <a className={styles.secondaryButton} href="#replays">
+            Replays
+          </a>
+        )}
         {sysop && (
           <label className={styles.switch}>
             <input
@@ -150,6 +156,15 @@ export function GamesList({ me }: { me: Me }) {
                       >
                         Timeline
                       </a>
+                      {/* And its replay (v1.0.0), where replays are open to the account. */}
+                      {replays && (
+                        <a
+                          className={styles.secondaryButton}
+                          href={`#replay/${game.id}`}
+                        >
+                          Replay
+                        </a>
+                      )}
                     </div>
                   )}
                 {game.status === "active" && (

@@ -1,5 +1,6 @@
 import { useEffect, useState, type RefObject } from "react";
 import { client, describe } from "../api";
+import { useWorkflow } from "../app/rollout";
 import type { components } from "../generated/api";
 import shell from "../App.module.css";
 import { Timeline, type TimelineSeat } from "./Timeline";
@@ -85,6 +86,8 @@ export function TimelinePage({
     };
   }, []);
 
+  // The game played back (v1.0.0, ../replay), where replays are open to the account.
+  const replays = useWorkflow("replays");
   const game = loaded.id === gameId ? loaded.game : undefined;
   const error = loaded.id === gameId ? loaded.error : undefined;
   const running = game?.status === "active";
@@ -110,6 +113,12 @@ export function TimelinePage({
                 : ""}
             . You see what your own seat saw, and nothing that was hidden from
             it. <a href="#play/games">Your games</a>
+            {replays && game.status !== "active" && game.status !== "saved" && (
+              <>
+                {" · "}
+                <a href={`#replay/${game.id}`}>Play it back as a replay</a>
+              </>
+            )}
             {running && (
               <>
                 {" · "}

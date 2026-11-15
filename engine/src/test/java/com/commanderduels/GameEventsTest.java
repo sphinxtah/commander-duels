@@ -55,6 +55,15 @@ class GameEventsTest {
             lastTurn = event.get("turn").getAsInt();
             assertTrue(event.has("type"), event.toString());
             assertFalse(XMAGE_ID.matcher(event.toString()).find(), "no XMage id: " + event);
+            if (event.has("tally")) {
+                JsonArray tally = event.getAsJsonArray("tally");
+                assertEquals(seats, tally.size(), "the counts of every seat: " + event);
+                for (JsonElement counts : tally) {
+                    assertEquals(5, counts.getAsJsonArray().size(), event.toString());
+                    counts.getAsJsonArray().forEach(count -> assertTrue(
+                        count.getAsJsonPrimitive().isNumber(), event.toString()));
+                }
+            }
             for (String key : List.of("object", "target", "cause")) {
                 JsonElement value = event.get(key);
                 if (value == null || !value.isJsonObject() || value.getAsJsonObject().has("seat")) {
@@ -126,6 +135,83 @@ class GameEventsTest {
             }
         }
         assertTrue(found);
+    }
+
+    /**
+     * Every seat's public counts ride on the events (v1.0.0, for the replay's scoreboard): from the
+     * game's first event on, again whenever they change, and never twice the same. The opening hands are
+     * dealt before the first event, so the counts are the only way a reader learns a hand's size.
+     */
+    @Test
+    void everySeatsCountsAreToldFromTheFirstEventAndWheneverTheyChange() throws Exception {
+        var request = new HumanGameRequest(4405L, GameFormat.COMMANDER,
+            seats(GameFormat.COMMANDER), 1, 10, 900, 0, 0);
+        HumanGame game = Tables.start(request, HumanGame.Hooks.NONE);
+        var player = new ScriptedPlayer(4405L);
+        Tables.Played played = Tables.play(game, (seat, prompt, view) -> player.choose(prompt, view), 6,
+            new Tables.Coverage());
+        List<JsonObject> events = game.events().since(0, Integer.MAX_VALUE);
+        wellFormed(events, 4);
+
+        // A step's marker tells none: the first event after the first marker does.
+        assertEquals("step", events.get(0).get("type").getAsString());
+        assertFalse(events.get(0).has("tally"), events.get(0).toString());
+        JsonArray first = events.get(1).getAsJsonArray("tally");
+        assertNotNull(first, "the first event of the game tells the counts: " + events.get(1));
+        for (JsonElement seat : first) {
+            JsonArray counts = seat.getAsJsonArray();
+            assertEquals(40, counts.get(0).getAsInt(), "a Commander table starts at 40 life: " + first);
+            int hand = counts.get(1).getAsInt();
+            assertTrue(hand >= 1 && hand <= 8, "an opening hand, as it was kept: " + first);
+            assertTrue(hand + counts.get(2).getAsInt() + counts.get(4).getAsInt() <= 99,
+                "the ninety-nine, between hand, library and battlefield: " + first);
+        }
+
+        // Life follows the life events exactly: XMage tells each one as it happens.
+        int[] life = new int[4];
+        String before = null;
+        int told = 0;
+        JsonArray last = null;
+        for (JsonObject event : events) {
+            String type = event.get("type").getAsString();
+            if (event.has("tally")) {
+                String now = event.get("tally").toString();
+                assertFalse(now.equals(before), "told only when something changed: " + event);
+                before = now;
+                told++;
+                boolean lifeEvent = type.equals("life_lost") || type.equals("life_gained");
+                JsonArray tally = event.getAsJsonArray("tally");
+                for (int seat = 0; seat < 4; seat++) {
+                    int next = tally.get(seat).getAsJsonArray().get(0).getAsInt();
+                    if (last != null) {
+                        int expected = life[seat];
+                        if (lifeEvent && event.get("player").getAsInt() == seat) {
+                            expected += (type.equals("life_gained") ? 1 : -1) * event.get("amount").getAsInt();
+                        }
+                        assertEquals(expected, next, "seat " + seat + "'s life at " + event);
+                    }
+                    life[seat] = next;
+                }
+                last = tally;
+            } else {
+                assertFalse(type.equals("life_lost") || type.equals("life_gained"),
+                    "a life change changes the counts: " + event);
+            }
+        }
+        assertTrue(told > 20, "the counts changed as the game went on: " + told);
+
+        // And the last telling is the game as it ended, for every player still in it.
+        SeatView view = played.last().view();
+        List<SeatView.PlayerState> players = new java.util.ArrayList<>(view.opponents());
+        players.add(view.you());
+        for (SeatView.PlayerState state : players) {
+            JsonArray counts = last.get(state.seat()).getAsJsonArray();
+            assertEquals(state.life(), counts.get(0).getAsInt(), "life of seat " + state.seat());
+            if (!state.lost()) {
+                assertEquals(state.handCount(), counts.get(1).getAsInt(), "hand of seat " + state.seat());
+                assertEquals(state.libraryCount(), counts.get(2).getAsInt(), "library of seat " + state.seat());
+            }
+        }
     }
 
     /**

@@ -49,6 +49,8 @@ and `access.deck_usable` answers whether an account may play a deck: its own, or
 
 No route makes a grant in v0.9.10: the workflows that offer, accept and show them (lending, spectating, coaching, sharing a replay) are v1.0.0's, so nothing unfinished can be reached.
 
+**Since v1.0.0 a replay is shared by one** ([replays](replays.md#sharing)): `POST /api/v1/games/{id}/replay/shares` gives a friend the `replay` grant for the sharer's own seat, expiring with the game's events; `DELETE …/shares/{grant}` revokes it, by its player or by the friend. The replay's routes read the game through the grant's seat and nothing else; the timeline's route honours the same grant.
+
 ## Tested
 
 `tests/test_access.py`, across accounts for each kind: who may give what; a lent deck usable only between its acceptance and its expiry or revocation, by its subject alone, and not across a block, a disabled account or a deleted deck; every change audited; a revocation changing no game started with the deck; a sandbox grant writing nothing where ownership lives; and spectator, coach and replay grants opening a game's events through the right perspective, and closing it again when revoked or blocked. The account-data test writes grants at migration 0046 and compares them across every migration after it.

@@ -207,6 +207,8 @@ export function GameScreen({
   const saveDialog = useRef<HTMLDialogElement>(null);
   const suspendDialog = useRef<HTMLDialogElement>(null);
   const saving = useWorkflow("save_resume");
+  // "Watch the replay" on the result (v1.0.0, ../replay), where replays are open to the account.
+  const replays = useWorkflow("replays");
   // "Review the board" after a match's game keeps the screen here instead of going on to
   // sideboarding (v0.5.0).
   const [reviewing, setReviewing] = useState(false);
@@ -1461,6 +1463,17 @@ export function GameScreen({
                   >
                     See the timeline
                   </button>
+                )}
+                {/* The game played back (v1.0.0), where replays are open to the account: the
+                    player's own seat's, on a page of its own. */}
+                {hasTimeline && replays && state.seat !== null && (
+                  <a
+                    href={`#replay/${gameId}`}
+                    className={styles.secondaryButton}
+                    onClick={leave}
+                  >
+                    Watch the replay
+                  </a>
                 )}
                 <a
                   href={back.href}

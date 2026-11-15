@@ -369,6 +369,164 @@ function WhatChanged({
   );
 }
 
+/** What a line shows beside its sentence, for whoever lists the lines (a replay's bookmark). */
+export type LineExtra = (line: Line) => ReactNode;
+
+/**
+ * The lines of a game by turn and step: each a sentence with its explanations, a card's picture
+ * under the line that names it, and "What changed?" after a large resolution. The timeline lists
+ * every line it has read; a replay (web/src/replay) lists the ones up to where it stands, marks
+ * that one as the current line, and puts its own control beside each.
+ */
+export function TimelineLines({
+  lines,
+  owners,
+  large,
+  seatName,
+  you,
+  focus = null,
+  newTab = false,
+  current = null,
+  extra,
+}: {
+  lines: readonly Line[];
+  /** Whose turn each turn was. */
+  owners: ReadonlyMap<number, number>;
+  /** What each large resolution changed, by its event's number. */
+  large: ReadonlyMap<number, Summary>;
+  seatName(seat: number): string;
+  you: number | null;
+  focus?: number | null;
+  newTab?: boolean;
+  /** The line a replay stands at, by its event's number. */
+  current?: number | null;
+  extra?: LineExtra;
+}) {
+  const [shown, setShown] = useState<{ seq: number; card: Card } | null>(null);
+  const id = useId();
+
+  const turns: { turn: number; lines: Line[] }[] = [];
+  for (const line of lines) {
+    const open = turns.at(-1);
+    if (open && open.turn === line.turn) open.lines.push(line);
+    else turns.push({ turn: line.turn, lines: [line] });
+  }
+
+  const render = (seq: number) => (pieces: readonly Piece[]) => (
+    <Pieces
+      pieces={pieces}
+      seatName={seatName}
+      you={you}
+      shown={shown?.seq === seq ? shown.card.ref : null}
+      onCard={(card) =>
+        setShown((before) =>
+          before?.seq === seq && before.card.ref === card.ref
+            ? null
+            : { seq, card },
+        )
+      }
+      newTab={newTab}
+      owner={`${id}-card-${seq}`}
+    />
+  );
+
+  return (
+    <>
+      {turns.map(({ turn, lines: turnLines }, index) => {
+        const owner = owners.get(turn);
+        const title =
+          turn < 1
+            ? "Before the first turn"
+            : `Turn ${turn}${owner !== undefined ? ` · ${seatName(owner)}` : ""}`;
+        let step: string | null | undefined;
+        return (
+          <section
+            key={`${turn}-${index}`}
+            className={styles.turn}
+            aria-label={title}
+          >
+            <h3>{title}</h3>
+            <ol>
+              {turnLines.map((line) => {
+                const heading = line.step !== step ? stepWords(line.step) : "";
+                step = line.step;
+                const summary = line.resolution
+                  ? large.get(line.seq)
+                  : undefined;
+                const picture = shown?.seq === line.seq ? shown.card : null;
+                return (
+                  <Fragment key={line.seq}>
+                    {heading && (
+                      <li className={styles.step} role="presentation">
+                        <h4>{heading}</h4>
+                      </li>
+                    )}
+                    <li
+                      className={styles.line}
+                      data-seq={line.seq}
+                      data-group={line.group}
+                      data-quiet={line.quiet || undefined}
+                      data-current={line.seq === current || undefined}
+                      aria-current={line.seq === current ? "step" : undefined}
+                    >
+                      <p>
+                        {render(line.seq)(line.text)}
+                        {extra?.(line)}
+                      </p>
+                      {line.notes.map((note, at) => (
+                        <p
+                          key={at}
+                          className={styles.note}
+                          data-unknown={note.unknown || undefined}
+                        >
+                          {render(line.seq)(note.text)}
+                        </p>
+                      ))}
+                      {summary && (
+                        <WhatChanged
+                          summary={summary}
+                          open={focus === line.seq}
+                        >
+                          {render(line.seq)}
+                        </WhatChanged>
+                      )}
+                      <div id={`${id}-card-${line.seq}`}>
+                        {picture?.name && (
+                          <figure className={styles.picture}>
+                            <RetryingImage
+                              src={cardImageUrl(picture.name, "normal")}
+                              width={244}
+                              height={340}
+                              fallback={
+                                <span className={styles.noPicture}>
+                                  No picture of this card is at hand.
+                                </span>
+                              }
+                            />
+                            <figcaption>
+                              {picture.name}{" "}
+                              <button
+                                type="button"
+                                onClick={() => setShown(null)}
+                              >
+                                Close
+                              </button>
+                            </figcaption>
+                          </figure>
+                        )}
+                      </div>
+                    </li>
+                  </Fragment>
+                );
+              })}
+            </ol>
+          </section>
+        );
+      })}
+    </>
+  );
+}
+
 export function Timeline({
   gameId,
   seats,
@@ -396,7 +554,6 @@ export function Timeline({
   const [typed, setTyped] = useState("");
   const [text, setText] = useState("");
   const [everything, setEverything] = useState(false);
-  const [shown, setShown] = useState<{ seq: number; card: Card } | null>(null);
   const id = useId();
   // The search waits for the typing to pause.
   useEffect(() => {
@@ -451,31 +608,6 @@ export function Timeline({
     if (stick.current && !earlier && focus === null)
       element.scrollTop = element.scrollHeight;
   }, [last, first, focus]);
-
-  const turns: { turn: number; lines: Line[] }[] = [];
-  for (const line of visible) {
-    const open = turns.at(-1);
-    if (open && open.turn === line.turn) open.lines.push(line);
-    else turns.push({ turn: line.turn, lines: [line] });
-  }
-
-  const render = (seq: number) => (pieces: readonly Piece[]) => (
-    <Pieces
-      pieces={pieces}
-      seatName={seatName}
-      you={you}
-      shown={shown?.seq === seq ? shown.card.ref : null}
-      onCard={(card) =>
-        setShown((before) =>
-          before?.seq === seq && before.card.ref === card.ref
-            ? null
-            : { seq, card },
-        )
-      }
-      newTab={newTab}
-      owner={`${id}-card-${seq}`}
-    />
-  );
 
   return (
     <div className={styles.timeline} data-fill={fill || undefined}>
@@ -595,93 +727,15 @@ export function Timeline({
             </button>
           </p>
         )}
-        {turns.map(({ turn, lines: turnLines }, index) => {
-          const owner = owners.get(turn);
-          const title =
-            turn < 1
-              ? "Before the first turn"
-              : `Turn ${turn}${owner !== undefined ? ` · ${seatName(owner)}` : ""}`;
-          let step: string | null | undefined;
-          return (
-            <section
-              key={`${turn}-${index}`}
-              className={styles.turn}
-              aria-label={title}
-            >
-              <h3>{title}</h3>
-              <ol>
-                {turnLines.map((line) => {
-                  const heading =
-                    line.step !== step ? stepWords(line.step) : "";
-                  step = line.step;
-                  const summary = line.resolution
-                    ? large.get(line.seq)
-                    : undefined;
-                  const picture = shown?.seq === line.seq ? shown.card : null;
-                  return (
-                    <Fragment key={line.seq}>
-                      {heading && (
-                        <li className={styles.step} role="presentation">
-                          <h4>{heading}</h4>
-                        </li>
-                      )}
-                      <li
-                        className={styles.line}
-                        data-seq={line.seq}
-                        data-group={line.group}
-                        data-quiet={line.quiet || undefined}
-                      >
-                        <p>{render(line.seq)(line.text)}</p>
-                        {line.notes.map((note, at) => (
-                          <p
-                            key={at}
-                            className={styles.note}
-                            data-unknown={note.unknown || undefined}
-                          >
-                            {render(line.seq)(note.text)}
-                          </p>
-                        ))}
-                        {summary && (
-                          <WhatChanged
-                            summary={summary}
-                            open={focus === line.seq}
-                          >
-                            {render(line.seq)}
-                          </WhatChanged>
-                        )}
-                        <div id={`${id}-card-${line.seq}`}>
-                          {picture?.name && (
-                            <figure className={styles.picture}>
-                              <RetryingImage
-                                src={cardImageUrl(picture.name, "normal")}
-                                width={244}
-                                height={340}
-                                fallback={
-                                  <span className={styles.noPicture}>
-                                    No picture of this card is at hand.
-                                  </span>
-                                }
-                              />
-                              <figcaption>
-                                {picture.name}{" "}
-                                <button
-                                  type="button"
-                                  onClick={() => setShown(null)}
-                                >
-                                  Close
-                                </button>
-                              </figcaption>
-                            </figure>
-                          )}
-                        </div>
-                      </li>
-                    </Fragment>
-                  );
-                })}
-              </ol>
-            </section>
-          );
-        })}
+        <TimelineLines
+          lines={visible}
+          owners={owners}
+          large={large}
+          seatName={seatName}
+          you={you}
+          focus={focus}
+          newTab={newTab}
+        />
         {old && timeline.state === "ready" && (
           <p className={styles.status}>
             Part of this game was recorded before the timeline could ask the

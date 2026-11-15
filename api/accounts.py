@@ -52,6 +52,7 @@ from api.models import (
     GameTable,
     Match,
     MatchPlayer,
+    ReplayMark,
     RoleGrant,
     ScheduledJob,
     StarterPurchase,
@@ -311,6 +312,9 @@ def delete_account(
     db.execute(delete(WishlistEntry).where(WishlistEntry.user_id == user.id))
     # So are the tables it saved to open again (v0.9.12, api/table_profiles.py).
     db.execute(delete(TablePreset).where(TablePreset.user_id == user.id))
+    # And its bookmarks and notes on replays (v1.0.0, api/replays.py). What it shared ends with
+    # the account: a grant works only between two active accounts (api/access.py).
+    db.execute(delete(ReplayMark).where(ReplayMark.user_id == user.id))
     remove_decks(db, user.id, now, removed)
     removed.sessions = db.execute(
         delete(UserSession).where(UserSession.user_id == user.id)
@@ -403,6 +407,17 @@ def prune_events(engine: Engine, now: datetime) -> int:
     return removed
 
 
+def prune_replay_marks(engine: Engine, now: datetime) -> int:
+    """Readers' bookmarks and notes on games whose events are gone (api/replays.py sweep), since
+    v1.0.0 in the same run."""
+    from api.replays import sweep
+
+    with Session(engine) as db:
+        removed = sweep(db, now)
+        db.commit()
+    return removed
+
+
 def expire_saved_games(engine: Engine, now: datetime) -> int:
     """Saved games past their time (api/saves.py expire_due), since v1.0.0 in the same run."""
     from api.saves import expire_saves
@@ -416,6 +431,7 @@ def handle(engine: Engine, now: datetime) -> Outcome:
         count = remove_unapproved(engine, now)
         messages = prune_messages(engine, now)
         events = prune_events(engine, now)
+        marks = prune_replay_marks(engine, now)
         saves = expire_saved_games(engine, now)
     except Exception:
         # Tomorrow's run tries again; the accounts and messages wait one more day.
@@ -427,8 +443,11 @@ def handle(engine: Engine, now: datetime) -> Outcome:
         log.info("Deleted %s chat messages past their time", messages)
     if events:
         log.info("Deleted %s game events past their time", events)
+    if marks:
+        log.info("Deleted %s replay bookmarks and notes past their time", marks)
     if saves:
         log.info("Ended %s saved games past their time", saves)
     return Outcome(
-        "completed", "deleted" if count or messages or events or saves else "nothing_due"
+        "completed",
+        "deleted" if count or messages or events or marks or saves else "nothing_due",
     )

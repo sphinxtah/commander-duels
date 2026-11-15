@@ -60,6 +60,8 @@ import { PageBand } from "./shell/PageBand";
 import { pages, type Page } from "./shell/pages";
 import { PLAY_GAMES_ROUTE, PlayPage } from "./shell/PlayPage";
 import { TIMELINE_ROUTE, TimelinePage } from "./timeline/TimelinePage";
+import { REPLAY_ROUTE, REPLAYS_ROUTE } from "./replay/replay";
+import { ReplayPage, ReplaysPage } from "./replay/ReplayPage";
 import { MusicBox } from "./shell/music/MusicBox";
 import { TopBar } from "./shell/TopBar";
 import {
@@ -139,6 +141,22 @@ function currentPlayGames(): boolean {
 function currentTimeline(): string | undefined {
   return TIMELINE_ROUTE.exec(window.location.hash)?.[1]?.toLowerCase();
 }
+/** #replay/<game> and #replay/<game>/<player> (v1.0.0): a replay on a page of its own, the
+ * reader's own or the one that player shared with them. */
+function currentReplay():
+  { game: string; sharedBy: string | null } | undefined {
+  const match = REPLAY_ROUTE.exec(window.location.hash);
+  return match?.[1]
+    ? {
+        game: match[1].toLowerCase(),
+        sharedBy: match[2]?.toLowerCase() ?? null,
+      }
+    : undefined;
+}
+/** #replays (v1.0.0): the replays the account may watch. */
+function currentReplays(): boolean {
+  return REPLAYS_ROUTE.test(window.location.hash);
+}
 /** #player/<id> opens a player's profile (v0.4.3), under Friends. */
 function currentPlayer(): string | undefined {
   return PLAYER_ROUTE.exec(window.location.hash)?.[1]?.toLowerCase();
@@ -157,6 +175,8 @@ function currentPage(): Page {
   if (
     path.startsWith("match/") ||
     path.startsWith("timeline/") ||
+    path.startsWith("replay/") ||
+    path === "replays" ||
     path === "play/games"
   )
     return "Play";
@@ -180,6 +200,8 @@ export function App() {
   const [matchRoute, setMatchRoute] = useState(currentMatch);
   const [playGames, setPlayGames] = useState(currentPlayGames);
   const [timelineRoute, setTimelineRoute] = useState(currentTimeline);
+  const [replayRoute, setReplayRoute] = useState(currentReplay);
+  const [replaysRoute, setReplaysRoute] = useState(currentReplays);
   const [playerRoute, setPlayerRoute] = useState(currentPlayer);
   const [campaignRoute, setCampaignRoute] = useState(currentCampaign);
   const [messagesRoute, setMessagesRoute] = useState(currentMessages);
@@ -330,6 +352,8 @@ export function App() {
       setMatchRoute(currentMatch());
       setPlayGames(currentPlayGames());
       setTimelineRoute(currentTimeline());
+      setReplayRoute(currentReplay());
+      setReplaysRoute(currentReplays());
       setPlayerRoute(currentPlayer());
       setCampaignRoute(currentCampaign());
       setMessagesRoute(currentMessages());
@@ -769,6 +793,15 @@ export function App() {
                 gameId={timelineRoute}
                 heading={heading}
               />
+            ) : page === "Play" && replayRoute ? (
+              <ReplayPage
+                key={`${replayRoute.game}/${replayRoute.sharedBy ?? ""}`}
+                gameId={replayRoute.game}
+                sharedBy={replayRoute.sharedBy}
+                heading={heading}
+              />
+            ) : page === "Play" && replaysRoute ? (
+              <ReplaysPage heading={heading} />
             ) : page === "Play" && matchRoute ? (
               <MatchPage
                 key={matchRoute}

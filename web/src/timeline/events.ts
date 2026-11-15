@@ -58,6 +58,9 @@ export interface GameEvent {
   why?: string;
   of?: "spell" | "ability";
   immediate?: boolean;
+  /** Each seat's public counts once the event had happened, in the seats' order (v1.0.0):
+   * life, hand, library, graveyard, permanents. Told only on the events that changed them. */
+  tally?: number[][];
 }
 
 export function isSeat(thing: Thing | null | undefined): thing is SeatRef {

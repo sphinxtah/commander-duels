@@ -73,7 +73,7 @@ Every workflow is `off` until it is set.
 | `save_resume` | Save and resume (17) | Since v1.0.0 saving, resuming and discarding a game against the bots, and a private table's suspension by its players' vote ([games](games.md#save-and-resume-v100)); recovery itself is on for everyone | `/saves`, `/games/{id}/save`, `/tables/{id}/suspension` |
 | `sandbox` | The practice sandbox (19) | Sandbox access; the `sandbox` mode | `/sandbox` |
 | `deck_lending` | Friend deck lending (20) | A lent deck's access; the `borrowed` mode | `/loans`, `/decks/{id}/loans` |
-| `replays` | Replays and review (23) | A shared replay's access | `/replays`, `/games/{id}/replay` |
+| `replays` | Replays and review (23) | Since v1.0.0 a game played back, a reader's bookmarks and notes, and a replay shared with a friend ([replays](replays.md)); a shared replay's access | `/replays`, `/games/{id}/replay` |
 | `spectators` | Spectators (24) | A spectator's access | `/games/{id}/spectators`, `/tables/{id}/spectators` |
 | `coaching` | Coaching (24) | A coach's access to a seat's hand | `/games/{id}/coaches` |
 | `starter_tables` | A starter deck bought at the table (the owner's own request, 2026-11-14) | A table or a practice game asked to be one (`starter`) | `/starter-decks` |

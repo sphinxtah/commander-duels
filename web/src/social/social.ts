@@ -79,6 +79,9 @@ export function notificationLink(item: NotificationItem): string | null {
   // A warden's deck to open (v0.9.5) waits on the campaign's map; a quest, on the Quests page.
   if (item.kind === "warden_deck") return "#campaign";
   if (item.kind === "quest_completed") return "#quests";
+  // A replay a friend shared (v1.0.0): the game through that friend's seat.
+  if (item.kind === "replay_shared" && item.game_id && item.actor)
+    return `#replay/${item.game_id}/${item.actor.id}`;
   if (!item.actor) return null;
   return playerLink(item.actor.id);
 }
@@ -137,6 +140,8 @@ export function notificationWords(item: NotificationItem): string {
         return `${who} invited you to ${table}, which is no longer open.`;
       return `${who} invited you to ${table}.`;
     }
+    case "replay_shared":
+      return `${who} shared a replay with you.`;
     case "auction_outbid":
     case "auction_won":
     case "auction_sold":

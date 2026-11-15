@@ -7893,6 +7893,25 @@
         "title": "Listing",
         "type": "object"
       },
+      "MarkBody": {
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "default": "",
+            "maxLength": 80,
+            "title": "Label",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "title": "MarkBody",
+        "type": "object"
+      },
       "MatchGameView": {
         "additionalProperties": false,
         "properties": {
@@ -8646,7 +8665,7 @@
                 "type": "null"
               }
             ],
-            "description": "For a rematch (v0.5.0): the finished game, whose result screen holds the offer.",
+            "description": "For a rematch (v0.5.0): the finished game, whose result screen holds the offer. For a replay a friend shared (v1.0.0): the game, which the bell links to (#replay/<game>/<the friend>).",
             "title": "Game Id"
           },
           "id": {
@@ -8670,7 +8689,8 @@
               "auction_unsold",
               "auction_cancelled",
               "table_invite",
-              "warden_deck"
+              "warden_deck",
+              "replay_shared"
             ],
             "title": "Kind",
             "type": "string"
@@ -12514,6 +12534,362 @@
         "title": "RemovedSleeve",
         "type": "object"
       },
+      "Replay": {
+        "additionalProperties": false,
+        "description": "A replay's header: everything but its events.",
+        "properties": {
+          "deck": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplayDeck"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "events": {
+            "description": "The last event's number: how long the replay is.",
+            "title": "Events",
+            "type": "integer"
+          },
+          "game": {
+            "$ref": "#/components/schemas/GameSummary"
+          },
+          "kept_until": {
+            "description": "When the replay goes: its events are kept 90 days after the game.",
+            "format": "date-time",
+            "title": "Kept Until",
+            "type": "string"
+          },
+          "marks": {
+            "description": "The reader's own bookmarks, in order.",
+            "items": {
+              "$ref": "#/components/schemas/ReplayMarkView"
+            },
+            "title": "Marks",
+            "type": "array"
+          },
+          "note": {
+            "description": "The reader's own note on the game.",
+            "title": "Note",
+            "type": "string"
+          },
+          "shares": {
+            "description": "The friends the reader shared their own replay with; empty for a shared one.",
+            "items": {
+              "$ref": "#/components/schemas/ReplayShare"
+            },
+            "title": "Shares",
+            "type": "array"
+          },
+          "starting": {
+            "items": {
+              "$ref": "#/components/schemas/ReplayStart"
+            },
+            "title": "Starting",
+            "type": "array"
+          },
+          "through": {
+            "$ref": "#/components/schemas/ReplayThrough"
+          },
+          "turns": {
+            "description": "The game's last turn.",
+            "title": "Turns",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "game",
+          "through",
+          "deck",
+          "starting",
+          "events",
+          "turns",
+          "kept_until",
+          "marks",
+          "note",
+          "shares"
+        ],
+        "title": "Replay",
+        "type": "object"
+      },
+      "ReplayDeck": {
+        "additionalProperties": false,
+        "description": "The deck the replay's seat played, as it was when the game began.",
+        "properties": {
+          "deck_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The deck, when it is the reader's own and still there: to open it.",
+            "title": "Deck Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The saved version played; null for a deck that has none (a bot's, a starter's list, a deck list pasted for one game).",
+            "title": "Version"
+          }
+        },
+        "required": [
+          "title",
+          "version",
+          "deck_id"
+        ],
+        "title": "ReplayDeck",
+        "type": "object"
+      },
+      "ReplayEntry": {
+        "additionalProperties": false,
+        "description": "A replay in the account's list.",
+        "properties": {
+          "game": {
+            "$ref": "#/components/schemas/GameSummary"
+          },
+          "kept_until": {
+            "format": "date-time",
+            "title": "Kept Until",
+            "type": "string"
+          },
+          "marks": {
+            "description": "How many bookmarks the reader keeps on it.",
+            "title": "Marks",
+            "type": "integer"
+          },
+          "noted": {
+            "description": "Whether the reader keeps a note on it.",
+            "title": "Noted",
+            "type": "boolean"
+          },
+          "shares": {
+            "description": "How many friends the reader shared it with.",
+            "title": "Shares",
+            "type": "integer"
+          },
+          "through": {
+            "$ref": "#/components/schemas/ReplayThrough"
+          },
+          "turns": {
+            "title": "Turns",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "game",
+          "through",
+          "kept_until",
+          "turns",
+          "marks",
+          "noted",
+          "shares"
+        ],
+        "title": "ReplayEntry",
+        "type": "object"
+      },
+      "ReplayList": {
+        "additionalProperties": false,
+        "properties": {
+          "more": {
+            "description": "Whether older games of its own were left out.",
+            "title": "More",
+            "type": "boolean"
+          },
+          "own": {
+            "description": "Games the account played, newest first.",
+            "items": {
+              "$ref": "#/components/schemas/ReplayEntry"
+            },
+            "title": "Own",
+            "type": "array"
+          },
+          "shared": {
+            "description": "Replays friends shared with it, newest first.",
+            "items": {
+              "$ref": "#/components/schemas/ReplayEntry"
+            },
+            "title": "Shared",
+            "type": "array"
+          }
+        },
+        "required": [
+          "own",
+          "shared",
+          "more"
+        ],
+        "title": "ReplayList",
+        "type": "object"
+      },
+      "ReplayMarkView": {
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "seq": {
+            "description": "The marked event's number.",
+            "title": "Seq",
+            "type": "integer"
+          },
+          "turn": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "seq",
+          "turn",
+          "label",
+          "note",
+          "updated_at"
+        ],
+        "title": "ReplayMarkView",
+        "type": "object"
+      },
+      "ReplayShare": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "player": {
+            "$ref": "#/components/schemas/PlayerRef"
+          },
+          "shared_at": {
+            "format": "date-time",
+            "title": "Shared At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "player",
+          "shared_at"
+        ],
+        "title": "ReplayShare",
+        "type": "object"
+      },
+      "ReplayStart": {
+        "additionalProperties": false,
+        "description": "What a seat starts the game with, for the scoreboard.",
+        "properties": {
+          "life": {
+            "title": "Life",
+            "type": "integer"
+          },
+          "seat": {
+            "title": "Seat",
+            "type": "integer"
+          },
+          "shared_life": {
+            "description": "Whether the seat's life total is its team's.",
+            "title": "Shared Life",
+            "type": "boolean"
+          },
+          "team": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Two-Headed Giant and King's Table: the seat's team. In Two-Headed Giant a team has one life total, so a life change of either player is the team's.",
+            "title": "Team"
+          }
+        },
+        "required": [
+          "seat",
+          "life",
+          "team",
+          "shared_life"
+        ],
+        "title": "ReplayStart",
+        "type": "object"
+      },
+      "ReplayThrough": {
+        "additionalProperties": false,
+        "description": "Whose eyes the replay is read through.",
+        "properties": {
+          "grant_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A shared replay's grant, which its reader may give up.",
+            "title": "Grant Id"
+          },
+          "seat": {
+            "title": "Seat",
+            "type": "integer"
+          },
+          "shared_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlayerRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who shared it, for a shared replay."
+          },
+          "yours": {
+            "description": "The reader's own seat; false for a replay shared with them.",
+            "title": "Yours",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "seat",
+          "yours",
+          "shared_by",
+          "grant_id"
+        ],
+        "title": "ReplayThrough",
+        "type": "object"
+      },
       "ReportContext": {
         "additionalProperties": false,
         "description": "What the page attaches on its own. Context only: nothing in it is checked against the\naccount or decides anything.",
@@ -14354,6 +14730,21 @@
           "cards"
         ],
         "title": "SetSummary",
+        "type": "object"
+      },
+      "ShareBody": {
+        "additionalProperties": false,
+        "properties": {
+          "player_id": {
+            "format": "uuid",
+            "title": "Player Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "player_id"
+        ],
+        "title": "ShareBody",
         "type": "object"
       },
       "SharedDeck": {
@@ -33653,6 +34044,824 @@
         "summary": "Decline Rematch"
       }
     },
+    "/api/v1/games/{game_id}/replay": {
+      "get": {
+        "description": "A replay's header: the game, whose eyes it is read through, the deck played, what the\nscoreboard starts from, how long it is and until when it is kept, and the reader's own\nbookmarks, note and shares. Your own seat's, or with ``shared_by`` the replay that player\nshared with you. Anyone else is answered 404.",
+        "operationId": "read_replay_api_v1_games__game_id__replay_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "shared_by",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Shared By"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Replay"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Read Replay",
+        "tags": [
+          "replays"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/replay/events": {
+      "get": {
+        "description": "The replay's events after ``since``, oldest first, through the replay's seat: the one\nfilter every reading of a game's events goes through, so that neither sharing nor seeking\nshows more than that seat saw.",
+        "operationId": "replay_events_api_v1_games__game_id__replay_events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "shared_by",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Shared By"
+            }
+          },
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Since",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventsPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Replay Events",
+        "tags": [
+          "replays"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/replay/marks/{seq}": {
+      "delete": {
+        "description": "Removes the reader's bookmark at an event (or, at 0, their note on the game). Removing\nwhat is not there changes nothing.",
+        "operationId": "delete_mark_api_v1_games__game_id__replay_marks__seq__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "seq",
+            "required": true,
+            "schema": {
+              "maximum": 10000000,
+              "minimum": 0,
+              "title": "Seq",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "shared_by",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Shared By"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Replay"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Delete Mark",
+        "tags": [
+          "replays"
+        ]
+      },
+      "put": {
+        "description": "Keeps the reader's bookmark at an event, with its label and its note, or changes it; at 0,\nthe reader's note on the game as a whole, which an empty note removes. Their own, on any\nreplay they may read, and nobody else's to see.",
+        "operationId": "put_mark_api_v1_games__game_id__replay_marks__seq__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "seq",
+            "required": true,
+            "schema": {
+              "maximum": 10000000,
+              "minimum": 0,
+              "title": "Seq",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "shared_by",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Shared By"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Replay"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Put Mark",
+        "tags": [
+          "replays"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/replay/shares": {
+      "post": {
+        "description": "Shares the caller's replay of a game they played with a friend: the game through the\ncaller's own seat, their hand as they saw it, until the replay goes or they take it back.\nFriends only (the owner's decision, 2026-11-15). Sharing twice shares once.",
+        "operationId": "share_replay_api_v1_games__game_id__replay_shares_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShareBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Replay"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Share Replay",
+        "tags": [
+          "replays"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/replay/shares/{grant_id}": {
+      "delete": {
+        "description": "Ends a share: its player takes it back, or the friend it was shared with gives it up.\nFrom then on the friend reads nothing of it. Ending what has ended changes nothing.",
+        "operationId": "unshare_replay_api_v1_games__game_id__replay_shares__grant_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "grant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Grant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Unshare Replay",
+        "tags": [
+          "replays"
+        ]
+      }
+    },
     "/api/v1/games/{game_id}/save": {
       "post": {
         "description": "Saves your game against the bots to be played on later: it stops where it is and waits in\nYour games. It lasts 30 days, an account holds five, and a save ends at the next upgrade of\nthe game. A refused game plays on untouched.",
@@ -39895,6 +41104,122 @@
           }
         },
         "summary": "Ready"
+      }
+    },
+    "/api/v1/replays": {
+      "get": {
+        "description": "The replays the account may read: of the games it played that are over and still have\ntheir events, newest first, and the ones friends shared with it.",
+        "operationId": "list_replays_api_v1_replays_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "List Replays",
+        "tags": [
+          "replays"
+        ]
       }
     },
     "/api/v1/reports": {

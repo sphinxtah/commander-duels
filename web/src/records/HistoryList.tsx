@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { client, describe } from "../api";
+import { useWorkflow } from "../app/rollout";
 import {
   duration,
   formatName,
@@ -62,6 +63,8 @@ export function HistoryList({ playerId }: { playerId?: string }) {
   const [next, setNext] = useState<string | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState("");
+  // A game's replay (v1.0.0), where replays are open to the account.
+  const replays = useWorkflow("replays");
   // Only the shown player's answers land: another player's page, or none once gone.
   const generation = useRef(0);
 
@@ -128,6 +131,12 @@ export function HistoryList({ playerId }: { playerId?: string }) {
                     <>
                       {" · "}
                       <a href={`#timeline/${item.game_id}`}>Timeline</a>
+                      {replays && (
+                        <>
+                          {" · "}
+                          <a href={`#replay/${item.game_id}`}>Replay</a>
+                        </>
+                      )}
                     </>
                   )}
                 </small>

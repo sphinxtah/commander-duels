@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { client } from "../api";
+import { forgetRollout } from "../app/rollout";
 import { AchievementsPanel } from "./AchievementsPanel";
 import { Badge } from "./Badge";
 import {
@@ -19,7 +20,10 @@ import { duration, formatName, opponentsWords, winRate } from "./records";
 
 const ADA = "00000000-0000-4000-8000-0000000000ad";
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  forgetRollout();
+});
 
 async function settle() {
   await act(() => new Promise((done) => setTimeout(done, 20)));
@@ -292,21 +296,31 @@ describe("the games one by one (v0.5.0)", () => {
         },
       ],
     });
+    // Answered by path: the page also asks which workflows are open to the account (v1.0.0),
+    // and here replays are.
+    const pages = [history([game()], "next-page"), history([older])];
     const get = vi
       .spyOn(client, "GET")
-      .mockResolvedValueOnce(ok(history([game()], "next-page")))
-      .mockResolvedValueOnce(ok(history([older])));
+      .mockImplementation((async (path: string) =>
+        path === "/api/v1/rollout"
+          ? ok({ workflows: [{ id: "replays", available: true }] })
+          : ok(pages.shift())) as never);
     // Ten days after the fixture's game: its events are kept (90 days), so its timeline is linked.
     vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-01T00:00:00Z"));
     render(<HistoryList />);
     await settle();
     const list = screen.getByRole("list", { name: "Games, newest first" });
     expect(within(list).getAllByRole("listitem")[0]).toHaveTextContent(
-      "WonCommander against two skill-3 botsRed Test, revision 2 · 9 turns · 24 min · TimelineOct 22, 2026",
+      "WonCommander against two skill-3 botsRed Test, revision 2 · 9 turns · 24 min · Timeline · ReplayOct 22, 2026",
     );
     expect(
       within(list).getByRole("link", { name: "Timeline" }),
     ).toHaveAttribute("href", `#timeline/${game().game_id}`);
+    // And its replay (v1.0.0), since replays are open to this account.
+    expect(within(list).getByRole("link", { name: "Replay" })).toHaveAttribute(
+      "href",
+      `#replay/${game().game_id}`,
+    );
     fireEvent.click(screen.getByRole("button", { name: "Show older games" }));
     await settle();
     expect(get).toHaveBeenLastCalledWith("/api/v1/me/history", {

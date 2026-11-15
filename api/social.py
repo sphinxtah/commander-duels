@@ -115,6 +115,7 @@ NotificationKind = Literal[
     "auction_cancelled",
     "table_invite",
     "warden_deck",
+    "replay_shared",
 ]
 AuctionKind = Literal[
     "auction_outbid", "auction_won", "auction_sold", "auction_unsold", "auction_cancelled"
@@ -313,7 +314,8 @@ class NotificationItem(Contract):
     game_id: UUID | None = Field(
         default=None,
         description="For a rematch (v0.5.0): the finished game, whose result screen holds the "
-        "offer.",
+        "offer. For a replay a friend shared (v1.0.0): the game, which the bell links to "
+        "(#replay/<game>/<the friend>).",
     )
     auction: AuctionNotice | None = Field(
         default=None,
@@ -880,7 +882,7 @@ def items_of(db: Session, viewer: Viewer, rows: list[Notification]) -> list[Noti
                 if row.kind == "message" and row.actor_id
                 else 0,
                 award=award_of(row.kind, row.subject),
-                game_id=row.game_id if row.kind == "rematch" else None,
+                game_id=row.game_id if row.kind in ("rematch", "replay_shared") else None,
                 auction=auctions.get(row.id),
                 table=tables[row.subject][0]
                 if row.kind == "table_invite" and row.subject in tables

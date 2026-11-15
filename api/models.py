@@ -313,6 +313,30 @@ class GameSave(Base):
     ended_reason: Mapped[str | None] = mapped_column(String(16))
 
 
+class ReplayMark(Base):
+    """A reader's own marks on a game's replay (v1.0.0, api/replays.py; docs/replays.md): a
+    bookmark at one of the game's events (``seq``, the event's number) with a label and a note,
+    or, at ``seq`` 0, the reader's note on the game as a whole. The account's alone: nobody else
+    reads them, a shared replay carries none of them, and they go with the game's events (90 days
+    after the game) and with the account."""
+
+    __tablename__ = "replay_marks"
+    __table_args__ = (
+        UniqueConstraint("user_id", "game_id", "seq", name="uq_replay_marks_place"),
+        CheckConstraint("seq >= 0", name="ck_replay_marks_seq"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    game_id: Mapped[UUID] = mapped_column(ForeignKey("games.id"), index=True)
+    seq: Mapped[int]
+    # The turn the marked event was in, kept so that the list reads without the events.
+    turn: Mapped[int | None]
+    label: Mapped[str] = mapped_column(String(80), default="", server_default="")
+    note: Mapped[str] = mapped_column(Text, default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
 class AccessGrant(Base):
     """Access one account gives another, for a while (v0.9.10, api/access.py; docs/access.md): to
     use a deck it owns, to watch or replay a game, to see a seat's hand, to a group or a league's
@@ -1725,7 +1749,7 @@ class Notification(Base):
             "kind IN ('friend_request', 'friend_accepted', 'friend_online', 'message', "
             "'quest_completed', 'achievement_earned', 'rematch', 'team_invite', "
             "'auction_outbid', 'auction_won', 'auction_sold', 'auction_unsold', "
-            "'auction_cancelled', 'table_invite', 'warden_deck')",
+            "'auction_cancelled', 'table_invite', 'warden_deck', 'replay_shared')",
             name="ck_notifications_kind",
         ),
         # The bell's list, newest first, and its unread count.

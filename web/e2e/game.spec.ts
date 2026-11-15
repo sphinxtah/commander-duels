@@ -649,6 +649,25 @@ async function openSaves(page: Page): Promise<number> {
   }, "on");
 }
 
+/** Replays are behind their gate too (v1.0.0): opened to everyone and left open, as the saves'
+ * is, for the journey that plays a game back. */
+async function openReplays(page: Page): Promise<number> {
+  return page.evaluate(async () => {
+    const me = (await (await fetch("/api/v1/me")).json()) as {
+      csrf_token: string;
+    };
+    const changed = await fetch("/api/v1/admin/rollout/replays", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": me.csrf_token,
+      },
+      body: JSON.stringify({ stage: "on" }),
+    });
+    return changed.status;
+  });
+}
+
 /**
  * A hook for play(): once, between two answers at `fromTurn` or later, the game is saved from the
  * Game menu (after the dialog said what a save is), found under Saved games on Your games,
@@ -865,6 +884,58 @@ test.describe("practice games in the browser", () => {
     await expect(timeline.locator("li[data-quiet]").first()).toBeVisible();
     await page.screenshot({
       path: testInfo.outputPath("game-timeline.jpg"),
+      type: "jpeg",
+      quality: 80,
+    });
+
+    // The game played back (v1.0.0, docs/replays.md): the same events as a replay, on a page of
+    // its own. It starts at the first step with every count the engine told; at its last step
+    // the scoreboard is the game as it ended, which the table's last view knows.
+    const gameId = /#game\/([0-9a-f-]{36})/.exec(page.url())![1]!;
+    expect(await openReplays(page)).toBe(200);
+    await page.goto("about:blank");
+    await page.goto(`/#replay/${gameId}`);
+    await expect(
+      page.getByRole("heading", { name: "The game, played back", level: 1 }),
+    ).toBeVisible();
+    const steps = page.locator("li[data-seq]");
+    await expect(steps).toHaveCount(1, { timeout: 30_000 });
+    // The whole game is read before its end is gone to.
+    await expect(page.getByText(/reading the game/)).toHaveCount(0, {
+      timeout: 30_000,
+    });
+    const counts = async (seat: number) =>
+      (
+        await page
+          .locator("tbody tr")
+          .nth(seat)
+          .getByRole("cell")
+          .allTextContents()
+      ).map(Number);
+    // The first step: an opening hand, whatever was kept, and a library that is the rest.
+    const [life, hand, library] = await counts(0);
+    expect(life).toBe(20);
+    expect(hand).toBeGreaterThanOrEqual(1);
+    expect(hand).toBeLessThanOrEqual(8);
+    expect(hand! + library!).toBeGreaterThanOrEqual(58);
+    await page.getByRole("region", { name: "The game so far" }).focus();
+    await page.keyboard.press("End");
+    const end = snapshot.view!;
+    for (const player of [end.you!, ...end.opponents]) {
+      const [lifeNow, handNow, libraryNow] = await counts(player.seat);
+      expect(lifeNow, `life of seat ${player.seat}`).toBe(player.life);
+      if (!player.lost) {
+        expect(handNow, `hand of seat ${player.seat}`).toBe(player.hand_count);
+        expect(libraryNow, `library of seat ${player.seat}`).toBe(
+          player.library_count,
+        );
+      }
+    }
+    await expect(
+      page.getByRole("button", { name: "One step on" }),
+    ).toBeDisabled();
+    await page.screenshot({
+      path: testInfo.outputPath("game-replay.jpg"),
       type: "jpeg",
       quality: 80,
     });

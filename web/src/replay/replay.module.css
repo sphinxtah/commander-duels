@@ -1,0 +1,428 @@
+/* Replays (v1.0.0, docs/replays.md): the player, the list and the pages. Sizes are in rem and em,
+   so the player's text size scales it; nothing is told by colour alone. */
+.page {
+  max-width: 72rem;
+}
+.page h2 {
+  margin: 0 0 8px;
+  color: var(--cd-gold, #d5b77c);
+  font:
+    600 1.05em Georgia,
+    serif;
+}
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.small {
+  margin: 6px 0;
+  color: var(--cd-muted, #a3aea7);
+  font-size: 0.9em;
+}
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--cd-gold-hi, #f4dca6);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.player {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  color: var(--cd-text, #ebece6);
+}
+.player select,
+.player input,
+.player textarea {
+  font: inherit;
+  color: inherit;
+}
+/* The player's own buttons. A card's name in a step is the timeline's button, and stays text. */
+.buttons button,
+.find button,
+.panel button,
+.dialog button,
+.action {
+  min-height: 2.75em;
+  padding: 0 0.9em;
+  border: 1px solid var(--cd-gold-line, #d5b77c3d);
+  border-radius: 6px;
+  background: #0a1213;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.buttons button:disabled,
+.find button:disabled,
+.panel button:disabled,
+.dialog button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.buttons button:focus-visible,
+.find button:focus-visible,
+.panel button:focus-visible,
+.player select:focus-visible,
+.player input:focus-visible,
+.player textarea:focus-visible,
+.dialog button:focus-visible,
+.action:focus-visible,
+.link:focus-visible {
+  outline: 2px solid var(--cd-gold-hi, #f4dca6);
+  outline-offset: 2px;
+}
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-color: var(--cd-gold, #d5b77c);
+  background: #d5b77c1f;
+  color: var(--cd-gold-hi, #f4dca6) !important;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* The scoreboard. */
+.scores {
+  overflow-x: auto;
+}
+.scores table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95em;
+  font-variant-numeric: tabular-nums;
+}
+.scores th,
+.scores td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #ffffff14;
+  text-align: right;
+  white-space: nowrap;
+}
+.scores th:first-child {
+  text-align: left;
+  white-space: normal;
+}
+.scores thead th {
+  color: var(--cd-muted, #a3aea7);
+  font-size: 0.82em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.scores abbr {
+  text-decoration: none;
+}
+.scores tbody th {
+  font-weight: 400;
+}
+.scores tr[data-active] {
+  background: #d5b77c14;
+}
+/* Out of the game: said by its tag; the name is struck through and the row stands back. */
+.scores tr[data-out] td {
+  color: var(--cd-muted, #a3aea7);
+}
+.scores tr[data-out] th > span:first-child {
+  color: var(--cd-muted, #a3aea7);
+  text-decoration: line-through;
+}
+.life {
+  font-size: 1.2em;
+  font-weight: 700;
+}
+.tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 0.5em;
+  border: 1px solid var(--cd-gold-line, #d5b77c3d);
+  border-radius: 999px;
+  color: var(--cd-gold-hi, #f4dca6);
+  font-size: 0.78em;
+  text-decoration: none;
+}
+
+/* Playback. */
+.transport {
+  display: grid;
+  grid-template-columns: auto auto auto minmax(12em, 1fr);
+  gap: 10px 14px;
+  align-items: end;
+  padding: 10px 12px;
+  border: 1px solid var(--cd-gold-line, #d5b77c3d);
+  border-radius: 8px;
+  background: #0a1213;
+}
+.buttons {
+  display: flex;
+  gap: 6px;
+}
+.buttons button {
+  min-width: 2.75em;
+  padding: 0 0.6em;
+}
+.buttons .play {
+  min-width: 6.5em;
+  border-color: var(--cd-gold, #d5b77c);
+  background: #d5b77c26;
+  color: var(--cd-gold-hi, #f4dca6);
+  font-weight: 700;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.field label,
+.find label,
+.form label {
+  color: var(--cd-muted, #a3aea7);
+  font-size: 0.82em;
+}
+.field select,
+.find input,
+.form input,
+.form textarea,
+.panel textarea {
+  min-height: 2.75em;
+  padding: 0 0.6em;
+  border: 1px solid var(--cd-gold-line, #d5b77c3d);
+  border-radius: 6px;
+  background: #060c0d;
+}
+.form textarea,
+.panel textarea {
+  width: 100%;
+  padding: 0.5em 0.6em;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.place {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.place input {
+  width: 100%;
+  min-height: 1.75em;
+  accent-color: var(--cd-gold, #d5b77c);
+}
+.place span {
+  color: var(--cd-muted, #a3aea7);
+  font-size: 0.86em;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(15em, 20em);
+  gap: 16px;
+  align-items: start;
+}
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.find {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: center;
+}
+.find input {
+  flex: 1 1 10em;
+  min-width: 0;
+}
+.find span {
+  flex-basis: 100%;
+  min-height: 1.3em;
+  color: var(--cd-muted, #a3aea7);
+  font-size: 0.86em;
+}
+.list {
+  max-height: min(60vh, 34rem);
+  min-height: 12rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding: 0 8px 8px 0;
+}
+/* The line the replay stands at: a frame and a mark, not only a shade. */
+.list li[data-current] {
+  border-left-width: 5px;
+  background: #d5b77c1a;
+  outline: 1px solid var(--cd-gold-line, #d5b77c3d);
+}
+.list li[data-current] > p:first-child::before {
+  content: "▸ ";
+  color: var(--cd-gold-hi, #f4dca6);
+}
+.star {
+  color: var(--cd-gold-hi, #f4dca6);
+  font-size: 0.86em;
+  white-space: nowrap;
+}
+
+.panel {
+  padding: 10px 12px;
+  border: 1px solid #ffffff1f;
+  border-radius: 8px;
+}
+.panel h2 {
+  margin: 0 0 8px;
+  color: var(--cd-gold, #d5b77c);
+  font:
+    600 1em Georgia,
+    serif;
+}
+.panel h2 label {
+  color: inherit;
+  font: inherit;
+}
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+.marks,
+.shares,
+.entries {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.marks li {
+  padding: 8px 0;
+  border-top: 1px solid #ffffff14;
+}
+.marks li[data-here] .go::after {
+  content: " · here";
+  color: var(--cd-muted, #a3aea7);
+  font-weight: 400;
+}
+.marks p {
+  margin: 4px 0 0;
+  color: var(--cd-muted, #a3aea7);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.marks .go {
+  width: 100%;
+  padding: 0.4em 0.7em;
+  text-align: left;
+  font-weight: 600;
+  white-space: normal;
+}
+.shares li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-top: 1px solid #ffffff14;
+}
+
+.dialog {
+  width: min(32rem, calc(100vw - 2rem));
+  padding: 18px 20px;
+  border: 1px solid var(--cd-gold-line, #d5b77c3d);
+  border-radius: 10px;
+  background: #0c1314;
+  color: var(--cd-text, #ebece6);
+}
+.dialog::backdrop {
+  background: #000000a6;
+}
+.dialog h2 {
+  margin: 0 0 8px;
+}
+.dialog form {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* The list of replays. */
+.entries li {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-top: 1px solid #ffffff14;
+}
+.entries li:first-child {
+  border-top: 0;
+}
+.entries small {
+  display: block;
+  margin-top: 2px;
+  color: var(--cd-muted, #a3aea7);
+}
+
+@media (max-width: 760px) {
+  /* Six columns on a phone: closer together, so that the table need not scroll sideways. */
+  .scores table {
+    font-size: 0.88em;
+  }
+  .scores th,
+  .scores td {
+    padding: 6px 4px;
+  }
+  .scores thead th {
+    letter-spacing: 0;
+  }
+  .tag {
+    margin-left: 4px;
+  }
+  .transport {
+    grid-template-columns: 1fr 1fr;
+  }
+  .buttons,
+  .place {
+    grid-column: 1 / -1;
+  }
+  .buttons {
+    justify-content: space-between;
+  }
+  .buttons .play {
+    flex: 1;
+  }
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .list {
+    max-height: 50vh;
+  }
+  .entries li {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

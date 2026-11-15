@@ -158,6 +158,21 @@ def test_what_changed_a_cost_is_shown_as_any_other_object() -> None:
     assert filtered(FACE_DOWN_CAST, Perspective.of_seat(2))["object"]["mana_cost"] == "{4}{G}{G}"
 
 
+def test_every_seats_counts_are_everyones() -> None:
+    """The counts an event tells since v1.0.0 (life, hand, library, graveyard and permanents of
+    each seat) are what any player may count at a table: every perspective reads them as they
+    are, beside an object it may not see."""
+    told = dict(DRAW, tally=[[20, 7, 53, 0, 0], [17, 6, 52, 1, 2]])
+    for perspective in (
+        Perspective.of_seat(0),
+        Perspective.of_seat(1),
+        Perspective.spectator(),
+        Perspective.inspection(),
+    ):
+        assert filtered(told, perspective)["tally"] == told["tally"]
+    assert filtered(told, Perspective.spectator())["object"] == {"hidden": True, "owner": 0}
+
+
 def until(check: Any, timeout: float = 10.0) -> Any:
     deadline = time.monotonic() + timeout
     while True:

@@ -110,5 +110,5 @@ Tests: `TimelineEventsTest` and `CommanderScenarioTest` (engine, games played th
 - **Activated abilities' costs** are not explained: only a spell's cast carries a cost.
 - **Why an optional ability did nothing** when its player declined it is not an event; the timeline says nothing rather than guess.
 - **A replacement** ("instead") is told by its outcome: a destroyed commander's line says it went to the command zone, not which choice sent it there.
-- **Replays, bookmarks and notes** are [feature 3](plans/1.0.0.md#3-native-replays-and-review-23), built from these parts.
+- **Playing a game back, bookmarks and notes** are [replays](replays.md), built from these parts: the timeline's lines are a replay's steps (`TimelineLines`), and the timeline's page links to the game's replay where replays are open to the account.
 - **Inspection** (SysOp reading everything) stays in the console's `python -m api.cli timeline`; the screen reads a seat's perspective only.
