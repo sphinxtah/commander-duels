@@ -271,7 +271,22 @@ A game against the bots can be closed into its recording and played on later ([r
 
 **A saved game** has the status `saved`. It runs nowhere and holds no slot, in the engine or under `CD_GAMES_MAX`; it is not its player's running game, so they may start another; it has no result, no rematch and no socket (4410 `game_not_live`); its events wait with it. A restart of the API asks the engine for nothing on its account, and an attach that does not say `resume` never brings it back. Resumed, it is an ordinary running game again and ends as any game does. A save that ends otherwise ends its game `interrupted`, as a game the engine could not give back ends: a campaign duel is recorded unfinished, which is no loss.
 
-**Not saved:** a table's game (its players suspend it together, by vote; not built yet) and a game of a best-of-three match (the match would stand between its games for as long as the save lasts).
+**A private table's game is suspended by its players together**, never by one player's word ([tables](tables.md#suspending-a-tables-game-v100)), with the owner's rules of 2026-11-14:
+
+| Request | Who | Returns |
+| --- | --- | --- |
+| `POST /api/v1/tables/{code}/suspension` | A player still in the table's game | Proposes to suspend it, or agrees to the proposal: `status` `voting` with `proposed_by`, `agreed` and `needed`, or `suspended` with the `save_id` once every player who must has agreed. 409 `not_private` for a public table's or a queue's game, `match_game`, `not_in_game`, `game_not_running`, `save_limit` when the host holds five saves |
+| `DELETE /api/v1/tables/{code}/suspension` | A player still in the game | 204: declines the proposal, or withdraws it. It is over for everyone |
+| `POST /api/v1/tables/{code}/suspension/ready` | A player still in the suspended game | The table: you are back and ready. Once every player still in the game is, the engine takes the game up and the table is `started` again, with its `game_id`. 409 `game_limit` while you play another game, `not_suspended`, `not_in_game`; 410 `save_ended` |
+| `DELETE /api/v1/tables/{code}/suspension/ready` | The same | The table: not ready after all |
+
+- **Who must agree:** every player still in the game who is present. A player with no tab connected for two minutes or longer does not vote, so a table can pause when someone drops; a proposal waiting on such a player is carried out once they have been away that long. One who declines ends it.
+- **Whose save it is:** the host's. It is one of the host's five, lasts the same 30 days, ends at an upgrade as any save, and is discarded by the host alone (`DELETE /api/v1/saves/{id}`): the game then ends `interrupted` for everyone, with no result. `POST /saves/{id}/resume` refuses it (409 `table_save`): it is played on at its table.
+- **Playing on:** only once every player still in the game is back at the table and ready. Nobody is voted out for missing the restart; a player who conceded, was removed or lost is not waited for.
+- **What each player sees:** the table as `suspended` (`GET /api/v1/tables/{code}`, with `suspended`: the save's dates, the turn, and each player's `needed` and `ready`), and `GET /api/v1/saves` lists under `tables` every suspended table the account sits at. A table's game's summary names its table (`table`: its `code`, and whether it is `suspendable`).
+- **Over the game's socket** every tab at the table is told where the proposal stands: `{"type": "suspension", "proposed_by", "agreed", "needed", "declined_by"}`, with `refused` in words when it could not be carried out; and once suspended, `{"type": "saved", "game_id", "save_id", "table"}`.
+
+**Not saved at all:** a game of a best-of-three match, against the bots or at a table (the owner's decision: the match would stand between its games for as long as the save lasts).
 
 Migration `0052_game_saves` lets a game's status be `saved` and adds `game_saves`: each time a game was saved, until when, the engine build that holds it, and how the save ended. Its downgrade is refused while a game is saved.
 

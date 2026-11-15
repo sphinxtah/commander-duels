@@ -57,6 +57,7 @@ import {
 } from "./model";
 import { PriorityPanel } from "./PriorityPanel";
 import { SaveDialog } from "./saves";
+import { SuspendDialog, SuspensionVote } from "./Suspension";
 import { PromptPanel } from "./PromptPanel";
 import { useGameMusic } from "./music/useGameMusic";
 import { useTableSound } from "./sound/useTableSound";
@@ -200,6 +201,7 @@ export function GameScreen({
   const concedeMatchDialog = useRef<HTMLDialogElement>(null);
   // "Save and leave" (v1.0.0, saves.tsx), where save and resume is open to the account.
   const saveDialog = useRef<HTMLDialogElement>(null);
+  const suspendDialog = useRef<HTMLDialogElement>(null);
   const saving = useWorkflow("save_resume");
   // "Review the board" after a match's game keeps the screen here instead of going on to
   // sideboarding (v0.5.0).
@@ -726,6 +728,20 @@ export function GameScreen({
     state.seat !== null &&
     state.role === "controller" &&
     live;
+  // A private table's single game is suspended by its players together (v1.0.0): any player
+  // still in it proposes, where no proposal stands already.
+  const tableCode = state.savedTable ?? summary?.table?.code ?? null;
+  const canSuspend =
+    saving &&
+    !scripted &&
+    atTable &&
+    summary?.table?.suspendable === true &&
+    state.seat !== null &&
+    state.phase === "open" &&
+    live &&
+    state.suspension === null &&
+    state.presence?.seats.find((entry) => entry.seat === state.seat)?.left ==
+      null;
   // A game the engine could not give back (v0.9.9): told as it happens, and to a player who
   // comes back to it later.
   const unrecoverable =
@@ -878,6 +894,14 @@ export function GameScreen({
                       }
                     : undefined
                 }
+                onSuspend={
+                  canSuspend
+                    ? () => {
+                        closeMenu(false);
+                        suspendDialog.current?.showModal();
+                      }
+                    : undefined
+                }
                 onLeave={leave}
                 rules={kingsSettings ? settingsLine(kingsSettings) : null}
               />
@@ -891,14 +915,35 @@ export function GameScreen({
                 <div className={screen.alerts} style={boxStyle(REGIONS.alerts)}>
                   {savedGame && state.ended && (
                     <div className={screen.alert} role="alert">
-                      <p>{ended.saved}</p>
-                      <a
-                        href="#play/games"
-                        className={styles.secondaryButton}
-                        onClick={leave}
-                      >
-                        Your games
-                      </a>
+                      {atTable || state.savedTable ? (
+                        <>
+                          <p>
+                            This game is suspended. It is played on at its
+                            table, once every player still in it is back and
+                            ready.
+                          </p>
+                          <a
+                            href={
+                              tableCode ? `#tables/${tableCode}` : "#play/games"
+                            }
+                            className={styles.secondaryButton}
+                            onClick={leave}
+                          >
+                            {tableCode ? "Go to the table" : "Your games"}
+                          </a>
+                        </>
+                      ) : (
+                        <>
+                          <p>{ended.saved}</p>
+                          <a
+                            href="#play/games"
+                            className={styles.secondaryButton}
+                            onClick={leave}
+                          >
+                            Your games
+                          </a>
+                        </>
+                      )}
                     </div>
                   )}
                   {state.ended && !savedGame && !unrecoverable && (
@@ -1012,6 +1057,11 @@ export function GameScreen({
                     state={state}
                     name={seatName}
                     onVote={(seat, remove) => connection?.vote(seat, remove)}
+                  />
+                  <SuspensionVote
+                    state={state}
+                    code={summary?.table?.code ?? null}
+                    name={seatName}
                   />
                   <PromptPanel
                     state={shown}
@@ -1262,6 +1312,9 @@ export function GameScreen({
                   window.location.hash = "#play/games";
                 }}
               />
+            )}
+            {!scripted && summary?.table && (
+              <SuspendDialog dialog={suspendDialog} code={summary.table.code} />
             )}
             <ReportDialog
               open={reporting}

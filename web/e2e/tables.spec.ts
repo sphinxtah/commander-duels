@@ -398,4 +398,218 @@ test.describe("a human table in two browsers", () => {
       for (const context of contexts) await context.close();
     }
   });
+
+  test("the players of a private table suspend its game together and play it on (v1.0.0)", async ({
+    browser,
+  }, testInfo) => {
+    const settings = {
+      fullscreenOnStart: false,
+      responseTimerSeconds: 0,
+      animationSpeed: "faster",
+      effectsVolume: 0,
+      muted: true,
+      painter: "auto",
+    };
+    const contexts = await Promise.all([
+      browser.newContext({ viewport: { width: 1600, height: 900 } }),
+      browser.newContext({ viewport: { width: 1600, height: 900 } }),
+    ]);
+    for (const context of contexts)
+      await context.addInitScript((value) => {
+        localStorage.setItem("cd.table.v1", value);
+      }, JSON.stringify(settings));
+    const [hostContext, guestContext] = contexts;
+    const origin = new URL(testInfo.project.use.baseURL!).hostname;
+    await guestContext.addCookies([
+      {
+        name: "__Host-cd_session",
+        value: playerSession!,
+        domain: origin,
+        path: "/",
+        httpOnly: true,
+        secure: true,
+        sameSite: "Lax",
+      },
+    ]);
+    const host = await hostContext.newPage();
+    const guest = await guestContext.newPage();
+    const hostNames = new Set(["Lightning Bolt", "Hill Giant", "Mountain"]);
+    const guestNames = new Set(["Forest"]);
+    const hostFrames = new Frames(host, hostNames, guestNames);
+    const guestFrames = new Frames(guest, guestNames, hostNames);
+    const stamp = Date.now();
+    // Save and resume is behind its gate: SysOp opens it to everyone for this journey (the
+    // second player is no staff), and closes it again whatever the journey comes to.
+    const stage = (to: "on" | "off") =>
+      host.evaluate(async (wanted) => {
+        const me = (await (await fetch("/api/v1/me")).json()) as {
+          csrf_token: string;
+        };
+        const changed = await fetch("/api/v1/admin/rollout/save_resume", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": me.csrf_token,
+          },
+          body: JSON.stringify({ stage: wanted }),
+        });
+        return changed.status;
+      }, to);
+    try {
+      await signInSysop(host);
+      expect(await stage("on")).toBe(200);
+      await importDeck(host, `Paused host ${stamp}`, HOST_DECK);
+      await importDeck(guest, `Paused guest ${stamp}`, GUEST_DECK);
+
+      // SysOp opens a private Legacy table; the player sits down by its link; the game starts.
+      await host.goto("/#tables");
+      await host
+        .getByRole("button", { name: "Open a table", exact: true })
+        .click();
+      const form = host.getByRole("region", { name: "Open a table" });
+      await form.getByRole("radio", { name: /^Legacy/ }).check();
+      await form.getByLabel("Your deck").selectOption({
+        label: `Paused host ${stamp}`,
+      });
+      await form.getByLabel("Who may join").selectOption("private");
+      await form.getByRole("button", { name: "Open the table" }).click();
+      await expect(host).toHaveURL(/#tables\/[A-Za-z0-9_-]{8,32}$/);
+      const invite = await host.getByLabel("Invite link").inputValue();
+      const code = invite.split("#tables/")[1];
+      await guest.goto(invite);
+      await guest.getByRole("button", { name: "Take a seat" }).click();
+      await guest.getByRole("button", { name: "Ready" }).click();
+      const start = host.getByRole("button", { name: "Start the game" });
+      await expect(start).toBeEnabled({ timeout: 15_000 });
+      await start.click();
+      await expect(host).toHaveURL(/#game\/[0-9a-f-]{36}$/, {
+        timeout: 30_000,
+      });
+      const gameId = host.url().split("#game/")[1];
+      await expect(guest).toHaveURL(new RegExp(`#game/${gameId}$`), {
+        timeout: 15_000,
+      });
+      await Promise.all([
+        playUntil(host, hostFrames, 2),
+        playUntil(guest, guestFrames, 2),
+      ]);
+      const turn = hostFrames.latest!.view!.turn;
+      const hostHand = hostFrames.latest!.view!.hand.length;
+
+      // SysOp proposes to suspend, after being told what that means; the player is asked.
+      await host.getByRole("button", { name: "Game menu" }).click();
+      await host.getByRole("button", { name: "Suspend the game" }).click();
+      const asking = host.getByRole("dialog", {
+        name: "Propose to suspend this game?",
+      });
+      await expect(asking).toContainText("Every player still in the game");
+      await asking.getByRole("button", { name: "Propose to suspend" }).click();
+      const vote = guest.getByRole("region", { name: "Suspending the game" });
+      await expect(vote).toContainText("sysop proposes to suspend this game", {
+        timeout: 15_000,
+      });
+      await expect(vote).toContainText("1 of 2 agreed");
+      await vote.getByRole("button", { name: "Agree to suspend" }).click();
+
+      // Both are told, and led to the table, where the game waits for both of them.
+      for (const page of [host, guest]) {
+        await expect(
+          page.getByText(
+            /This game is suspended\. It is played on at its table/,
+          ),
+        ).toBeVisible({ timeout: 30_000 });
+        await page.getByRole("link", { name: "Go to the table" }).click();
+        await expect(page).toHaveURL(new RegExp(`#tables/${code}$`));
+        await expect(
+          page.getByRole("region", { name: "This table's game is suspended" }),
+        ).toContainText(`Turn ${turn}.`, { timeout: 15_000 });
+      }
+      const saved = await host.evaluate(
+        async (id) =>
+          (
+            (await (await fetch(`/api/v1/games/${id}`)).json()) as {
+              game: { status: string };
+            }
+          ).game.status,
+        gameId,
+      );
+      expect(saved).toBe("saved");
+      // It is the host's save, shown to both among their games.
+      await guest.goto("/#play/games");
+      await expect(
+        guest.getByRole("list", { name: "Suspended tables" }),
+      ).toContainText("Hosted by sysop");
+      await guest.getByRole("link", { name: "Go to the table" }).click();
+
+      // The player is back first, and waits; with SysOp ready too, both go to the game.
+      const guestPanel = guest.getByRole("region", {
+        name: "This table's game is suspended",
+      });
+      await guestPanel
+        .getByRole("button", { name: "Ready to play on" })
+        .click();
+      await expect(guestPanel).toContainText("1 of 2 ready.");
+      await expect(guest).toHaveURL(new RegExp(`#tables/${code}$`));
+      await host
+        .getByRole("region", { name: "This table's game is suspended" })
+        .getByRole("button", { name: "Ready to play on" })
+        .click();
+      for (const page of [host, guest])
+        await expect(page).toHaveURL(new RegExp(`#game/${gameId}$`), {
+          timeout: 30_000,
+        });
+
+      // The same game, where it stood: the same turn and hand, at revisions a million on.
+      await expect
+        .poll(() => hostFrames.latest?.revision ?? 0, { timeout: 60_000 })
+        .toBeGreaterThanOrEqual(1_000_000);
+      expect(hostFrames.latest!.view!.turn).toBe(turn);
+      expect(hostFrames.latest!.view!.hand.length).toBe(hostHand);
+      await expect
+        .poll(() => guestFrames.latest?.revision ?? 0, { timeout: 60_000 })
+        .toBeGreaterThanOrEqual(1_000_000);
+      // And it is played on, by both.
+      await Promise.all([
+        playUntil(host, hostFrames, turn + 1),
+        playUntil(guest, guestFrames, turn + 1),
+      ]);
+      expect(hostFrames.latest!.view!.turn).toBeGreaterThan(turn);
+
+      // The player concedes, and the game ends as any table's game.
+      await guest.getByRole("button", { name: "Game menu" }).click();
+      await guest
+        .getByRole("group", { name: "Game menu" })
+        .getByRole("button", { name: "Concede" })
+        .click();
+      await guest
+        .getByRole("dialog", { name: "Concede this game?" })
+        .getByRole("button", { name: "Concede" })
+        .click();
+      await expect(host.getByRole("dialog", { name: "Victory" })).toBeVisible({
+        timeout: 60_000,
+      });
+      console.log(
+        `[tables] suspended game ${gameId} at turn ${turn}: host ${hostFrames.frames} frames, ` +
+          `guest ${guestFrames.frames} frames, result ${hostFrames.latest?.result?.kind}`,
+      );
+      expect(hostFrames.check()).toEqual([]);
+      expect(guestFrames.check()).toEqual([]);
+    } finally {
+      await stage("off").catch(() => undefined);
+      await host
+        .evaluate(async () => {
+          const id = /#game\/([0-9a-f-]{36})/.exec(location.hash)?.[1];
+          if (!id) return;
+          const me = (await (await fetch("/api/v1/me")).json()) as {
+            csrf_token: string;
+          };
+          await fetch(`/api/v1/games/${id}/close`, {
+            method: "POST",
+            headers: { "X-CSRF-Token": me.csrf_token },
+          });
+        })
+        .catch(() => undefined);
+      for (const context of contexts) await context.close();
+    }
+  });
 });

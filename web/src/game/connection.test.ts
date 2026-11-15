@@ -454,6 +454,71 @@ describe("recovery and saving (v1.0.0)", () => {
   });
 });
 
+describe("suspending a private table's game (v1.0.0)", () => {
+  it("keeps the proposal as the table is told it, how it ended, and the table to play on at", () => {
+    const socket = playing();
+    socket.deliver({
+      type: "suspension",
+      proposed_by: 1,
+      agreed: [1],
+      needed: [0, 1, 2],
+      declined_by: null,
+    });
+    expect(state.suspension).toEqual({
+      proposedBy: 1,
+      agreed: [1],
+      needed: [0, 1, 2],
+    });
+    // Declined: no proposal, and who ended it.
+    socket.deliver({
+      type: "suspension",
+      proposed_by: null,
+      agreed: [],
+      needed: [0, 1, 2],
+      declined_by: 2,
+    });
+    expect(state.suspension).toBeNull();
+    expect(state.suspensionEnded).toEqual({ declinedBy: 2, refused: null });
+    // Proposed again, the old ending is forgotten; refused, it says why.
+    socket.deliver({
+      type: "suspension",
+      proposed_by: 0,
+      agreed: [0],
+      needed: [0, 1],
+      declined_by: null,
+    });
+    expect(state.suspensionEnded).toBeNull();
+    socket.deliver({
+      type: "suspension",
+      proposed_by: null,
+      agreed: [],
+      needed: [0, 1],
+      declined_by: null,
+      refused: "The table's host holds 5 saved games.",
+    });
+    expect(state.suspensionEnded).toEqual({
+      declinedBy: null,
+      refused: "The table's host holds 5 saved games.",
+    });
+
+    // Agreed by all: saved, with the table it is played on from.
+    socket.deliver({
+      type: "saved",
+      game_id: "g1",
+      save_id: "s1",
+      table: "TABLECODE1234",
+    });
+    socket.drop(1000);
+    expect(state).toMatchObject({
+      phase: "ended",
+      ended: "saved",
+      savedTable: "TABLECODE1234",
+      suspension: null,
+      suspensionEnded: null,
+    });
+  });
+});
+
 describe("one socket at a time", () => {
   it("coming back online while a reconnect is opening opens no second socket", () => {
     const first = playing();

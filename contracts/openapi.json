@@ -6698,6 +6698,17 @@
             "title": "Status",
             "type": "string"
           },
+          "table": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GameTableRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Since v1.0.0: a table's game names its table, to its own players and the staff; null for any other game."
+          },
           "tokens": {
             "anyOf": [
               {
@@ -6739,6 +6750,28 @@
           "result"
         ],
         "title": "GameSummary",
+        "type": "object"
+      },
+      "GameTableRef": {
+        "additionalProperties": false,
+        "description": "The table a table's game was started at (v1.0.0), for its players and the staff.",
+        "properties": {
+          "code": {
+            "description": "The table's code: #tables/<code>.",
+            "title": "Code",
+            "type": "string"
+          },
+          "suspendable": {
+            "description": "Whether its players may suspend the game together to play it on later: a private table's single game (not a queue's, not a match's).",
+            "title": "Suspendable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "suspendable"
+        ],
+        "title": "GameTableRef",
         "type": "object"
       },
       "GamesEnded": {
@@ -13762,17 +13795,31 @@
             "title": "Ends At Upgrade",
             "type": "boolean"
           },
+          "held": {
+            "default": 0,
+            "description": "How many saves count against your limit: your own games and the suspended tables you host.",
+            "title": "Held",
+            "type": "integer"
+          },
           "limit": {
             "description": "How many saves an account holds at once.",
             "title": "Limit",
             "type": "integer"
           },
           "saves": {
-            "description": "Waiting to be resumed, newest first.",
+            "description": "Your games against the bots waiting to be resumed, newest first.",
             "items": {
               "$ref": "#/components/schemas/SavedGame"
             },
             "title": "Saves",
+            "type": "array"
+          },
+          "tables": {
+            "description": "The suspended tables you sit at, whoever hosts them, newest first: each is played on at its table.",
+            "items": {
+              "$ref": "#/components/schemas/SuspendedTable"
+            },
+            "title": "Tables",
             "type": "array"
           }
         },
@@ -15557,6 +15604,203 @@
         "title": "Suggestion",
         "type": "object"
       },
+      "SuspendedPlayer": {
+        "additionalProperties": false,
+        "properties": {
+          "handle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handle"
+          },
+          "needed": {
+            "description": "Whether the player is still in the game, and so must be back and ready for it to be played on; a player who conceded, was removed or lost is not.",
+            "title": "Needed",
+            "type": "boolean"
+          },
+          "ready": {
+            "description": "Back at the table and ready to play on.",
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "seat": {
+            "title": "Seat",
+            "type": "integer"
+          },
+          "you": {
+            "title": "You",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "seat",
+          "handle",
+          "you",
+          "needed",
+          "ready"
+        ],
+        "title": "SuspendedPlayer",
+        "type": "object"
+      },
+      "SuspendedTable": {
+        "additionalProperties": false,
+        "description": "A private table whose game its players suspended together (v1.0.0, api/saves.py): it is\nplayed on once every player still in it is back at the table and ready.",
+        "properties": {
+          "code": {
+            "description": "The table's code: #tables/<code>.",
+            "title": "Code",
+            "type": "string"
+          },
+          "expires_at": {
+            "description": "When the save runs out: the game then ends interrupted, with no result.",
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "format": {
+            "enum": [
+              "legacy",
+              "commander",
+              "two_headed_giant",
+              "kings_table"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "game_id": {
+            "format": "uuid",
+            "title": "Game Id",
+            "type": "string"
+          },
+          "host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The host's handle: the save counts as one of theirs.",
+            "title": "Host"
+          },
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/SuspendedPlayer"
+            },
+            "title": "Players",
+            "type": "array"
+          },
+          "save_id": {
+            "description": "The save; its owner, the host, may discard it.",
+            "format": "uuid",
+            "title": "Save Id",
+            "type": "string"
+          },
+          "saved_at": {
+            "format": "date-time",
+            "title": "Saved At",
+            "type": "string"
+          },
+          "turn": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn"
+          },
+          "you_host": {
+            "title": "You Host",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "format",
+          "host",
+          "you_host",
+          "save_id",
+          "game_id",
+          "saved_at",
+          "expires_at",
+          "turn",
+          "players"
+        ],
+        "title": "SuspendedTable",
+        "type": "object"
+      },
+      "SuspensionVote": {
+        "additionalProperties": false,
+        "description": "Where a proposal to suspend a table's game stands, after the caller agreed to it.",
+        "properties": {
+          "agreed": {
+            "description": "The seats that agreed, of those that must.",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Agreed",
+            "type": "array"
+          },
+          "needed": {
+            "description": "The seats that must agree: every player still in the game who is present. A player away for two minutes or longer does not vote.",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Needed",
+            "type": "array"
+          },
+          "proposed_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The seat that proposed it.",
+            "title": "Proposed By"
+          },
+          "save_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The save, once the game is suspended: one of the host's.",
+            "title": "Save Id"
+          },
+          "status": {
+            "enum": [
+              "voting",
+              "suspended"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "proposed_by",
+          "agreed",
+          "needed"
+        ],
+        "title": "SuspensionVote",
+        "type": "object"
+      },
       "SwitchedEdition": {
         "additionalProperties": false,
         "description": "Copies of a card the draft moved to an edition the library holds, when v0.5.0 deployed.",
@@ -16427,13 +16671,26 @@
             "type": "boolean"
           },
           "status": {
+            "description": "open (the lobby), started (its game holds the rest), closed, or since v1.0.0 suspended: its players paused the game together, and it is played on once everyone still in it is back and ready (suspended says who).",
             "enum": [
               "open",
               "started",
-              "closed"
+              "closed",
+              "suspended"
             ],
             "title": "Status",
             "type": "string"
+          },
+          "suspended": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SuspendedTable"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Since v1.0.0: the suspended game and who is ready to play it on, for the table's players and the staff; null unless the table is suspended."
           },
           "turn_cap": {
             "title": "Turn Cap",
@@ -39911,7 +40168,7 @@
     },
     "/api/v1/saves/{save_id}/resume": {
       "post": {
-        "description": "Plays a saved game on: the engine takes it up where it stopped, and it is your running\ngame again. 410 when the save has ended (it ran out, the game was upgraded, or it could not\nbe read back); the game then ends interrupted, with no result.",
+        "description": "Plays a saved game on: the engine takes it up where it stopped, and it is your running\ngame again. 410 when the save has ended (it ran out, the game was upgraded, or it could not\nbe read back); the game then ends interrupted, with no result. A table's suspended game is\nplayed on at its table instead (409 ``table_save``).",
         "operationId": "resume_save_api_v1_saves__save_id__resume_post",
         "parameters": [
           {
@@ -42977,6 +43234,467 @@
           }
         },
         "summary": "Start Table"
+      }
+    },
+    "/api/v1/tables/{code}/suspension": {
+      "delete": {
+        "description": "Declines the proposal to suspend the table's game, or withdraws it: the proposal is over\nfor everyone, and the table is told who ended it.",
+        "operationId": "decline_to_suspend_api_v1_tables__code__suspension_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "maxLength": 32,
+              "minLength": 8,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Decline To Suspend"
+      },
+      "post": {
+        "description": "Proposes to suspend a private table's game, or agrees to the proposal: the game is saved\nto be played on later once every player still in it who is present has agreed. A player\naway for two minutes or longer does not vote. The save is one of the host's five.",
+        "operationId": "agree_to_suspend_api_v1_tables__code__suspension_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "maxLength": 32,
+              "minLength": 8,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuspensionVote"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Agree To Suspend"
+      }
+    },
+    "/api/v1/tables/{code}/suspension/ready": {
+      "delete": {
+        "description": "You are not ready to play the suspended game on after all.",
+        "operationId": "not_ready_to_play_on_api_v1_tables__code__suspension_ready_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "maxLength": 32,
+              "minLength": 8,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Gone"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Not Ready To Play On"
+      },
+      "post": {
+        "description": "You are back at the suspended table and ready to play on. Once every player still in the\ngame is, the engine takes the game up where it stopped and the table is started again: the\nreply's ``game_id`` is then the running game. A player with another game running cannot get\nready (409 ``game_limit``).",
+        "operationId": "ready_to_play_on_api_v1_tables__code__suspension_ready_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "maxLength": 32,
+              "minLength": 8,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Gone"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Ready To Play On"
       }
     }
   }

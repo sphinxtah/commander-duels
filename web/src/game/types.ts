@@ -497,7 +497,17 @@ export type ServerMessage =
   | { type: "inspection"; inspection: Inspection }
   | { type: "interrupted"; game_id: string }
   // The game's player saved it to be played on later (v1.0.0): the server closes the socket next.
-  | { type: "saved"; game_id: string; save_id: string }
+  | { type: "saved"; game_id: string; save_id: string; table?: string }
+  // At a private table (v1.0.0): where the proposal to suspend the game stands. With no proposer
+  // there is none: it was declined or withdrawn by a seat, or refused in words.
+  | {
+      type: "suspension";
+      proposed_by: number | null;
+      agreed: number[];
+      needed: number[];
+      declined_by: number | null;
+      refused?: string;
+    }
   | { type: "pong" }
   | {
       type: "error";

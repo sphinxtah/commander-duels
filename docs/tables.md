@@ -158,6 +158,21 @@ A profile's pace is a word. What it means in numbers (how long a decision stays 
 - **Six built in**, the specification's, as starting points a host changes: Learning game (relaxed, two hours, no Game Changers), Preconstructed decks (no Game Changers), Upgraded casual (at most three), High power, Competitive (brisk, one hour) and Custom. The limits on Game Changers follow the Commander format's brackets.
 - **A host's own.** `PUT /api/v1/me/table-presets` saves a profile under a name, with the table's other settings (format, seats, bots, bot skill, visibility, rules, best of) to open the same table again. A name the account already has, whatever its case, is replaced. At most 20 an account (`409 preset_limit`). They are the account's alone and are removed with it.
 
+## Suspending a table's game (v1.0.0)
+
+The players of a private table can pause its game and play it on later: the multiplayer form of "Save and leave" ([save and resume](games.md#save-and-resume-v100), `api/saves.py`). It is never one player's word. The rules are the owner's (2026-11-14); the routes and the socket's messages are listed with the saves'. Behind the gate `save_resume`.
+
+- **What.** A private table's single game: not a public table's (strangers sat down at it), not a queue's, not a match's.
+- **Proposing.** Any player still in the game, from the Game menu ("Suspend the game"), after a dialog that says what it means. The whole table sees the proposal in the prompt column: who made it, who agreed, who is still asked.
+- **Agreeing.** Every player still in the game who is present must agree; one who declines ends the proposal, and its proposer may withdraw it. A player with no tab connected for two minutes or longer (the same two minutes after which they may be voted out) is not asked, so a table can pause when someone drops, and a proposal waiting on such a player is carried out once they have been away that long. A player who conceded, was removed or lost has no say.
+- **Suspended.** The engine stops the game where it is, as it does for a game against the bots, and keeps its recording. Every tab is told and led to the table. The game is one of **the host's** five saves, lasts the same 30 days, and ends at an engine upgrade; the host alone may discard it, which ends it for everyone with no result. Meanwhile it is nobody's running game: each player may play something else.
+- **Playing on.** The table's page says the game is suspended, who is back and who is not. Each player still in the game says "Ready to play on" (a player with another game running cannot); when the last of them has, the engine takes the game up, every seat as it was, and each player's page goes to it. Nobody is voted out for missing the restart, and a player who is out of the game is not waited for.
+- **Finding it again.** Your games lists every suspended table the account sits at, whoever hosts it, with the link to the table.
+
+`TableView.status` is `suspended` while it is, with `suspended` (the save, the turn, each player's `needed` and `ready`); the table's own status stays `started`, and readiness is the seats' `ready`, cleared as the game is suspended. No migration: the save is a `game_saves` row whose owner is the host.
+
+Tests: `tests/test_table_suspension.py` (the vote, away players, who may, the host's limit, a refusing engine, playing on, another game running, the discard), `SuspendedPanel.test.tsx`, blocks in `GameScreen.test.tsx`, `connection.test.ts` and `saves.test.tsx`, and a two-browser journey against the real engine in `web/e2e/tables.spec.ts`.
+
 ## Starter-deck tables (v1.0.0)
 
 The owner, 2026-11-14: "I want a gameplay option where when you get to the table, you purchase a starter deck of whichever edition you want (Leng prices, no discounts, unless the deck is already on weekly discount), and you play that deck at the table. You can play humans or bots in that gameplay mode, with legacy or commander as the option, which will limit the starter decks allowed to purchase." His decisions on what he left open are in [the v1.0.0 plan](plans/1.0.0.md#the-owners-decisions-at-its-start-2026-11-14) (`api/starter_tables.py`).

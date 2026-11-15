@@ -135,7 +135,7 @@ Changing a control sends a `set_priority` command ([the human seat](engine/human
 
 ## The Game menu
 
-The band's first diamond opens it, above the HUD: **Table** (back to the Play page), since v1.0.0 **Save and leave** (in a single game against the bots, for its own player, where [save and resume](games.md#save-and-resume-v100) is open to the account: a dialog says what a save is, how long it lasts, how many an account holds and that an upgrade ends it, and then saves; the table is left for Your games), **Full screen**, **Mute**, **Table options** (the timer, animation speed, sound and how the table is drawn, in a drawer) and **Concede**. A click elsewhere or Escape closes it. Since v0.8.7 a King's Table game's menu starts with its settings, fixed for the game: "Commander decks · Generals 20, Kings 40 · King can attack anyone: off" ([below](#kings-table-v087)).
+The band's first diamond opens it, above the HUD: **Table** (back to the Play page), since v1.0.0 **Save and leave** (in a single game against the bots, for its own player, where [save and resume](games.md#save-and-resume-v100) is open to the account: a dialog says what a save is, how long it lasts, how many an account holds and that an upgrade ends it, and then saves; the table is left for Your games) or, in a private table's single game, **Suspend the game** (a dialog says what a suspension is, then proposes it to the other players; [tables](tables.md#suspending-a-tables-game-v100)), **Full screen**, **Mute**, **Table options** (the timer, animation speed, sound and how the table is drawn, in a drawer) and **Concede**. A click elsewhere or Escape closes it. Since v0.8.7 a King's Table game's menu starts with its settings, fixed for the game: "Commander decks · Generals 20, Kings 40 · King can attack anyone: off" ([below](#kings-table-v087)).
 
 ## Keyboard (UI04)
 
@@ -171,7 +171,7 @@ Since v1.0.0 the table says in words what happens to a game across a failure, fr
 | Recovering | The server refuses the tab with 4503: it restarted and is asking the engine for the game again | "The server restarted and is recovering this game. This tab reconnects by itself, and the game goes on from where it stood." |
 | Recovered | The tab reached a game it was told was being recovered, or the game's revisions jumped by a recovery's stride while the tab watched (the engine restarted under it) | A chip for twelve seconds: "Recovered after a restart: the game goes on where it stood" |
 | Unrecoverable | The server says `interrupted`, or the player comes back to a game recorded so | "This game could not be recovered after a server restart, so it cannot continue. It ended with no result: nobody won or lost.", with the way back |
-| Saved | The game's player saved it, in this tab or another, or the game is found saved | "This game is saved. It waits under Saved games on Your games", with the link there |
+| Saved | The game's player saved it, in this tab or another, or the game is found saved | "This game is saved. It waits under Saved games on Your games", with the link there. A table's suspended game says that it is played on at its table once every player still in it is back and ready, with the link to the table |
 
 ## The installable app (v0.3.0)
 

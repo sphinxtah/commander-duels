@@ -93,7 +93,15 @@ beforeAll(() => {
 beforeEach(() => {
   forgetRollout();
   open = true;
-  saves = { saves: [], ended: [], limit: 5, days: 30, ends_at_upgrade: true };
+  saves = {
+    saves: [],
+    ended: [],
+    tables: [],
+    held: 0,
+    limit: 5,
+    days: 30,
+    ends_at_upgrade: true,
+  };
   games = [];
   api.GET.mockReset();
   api.POST.mockReset();
@@ -136,6 +144,7 @@ describe("what a save is told as", () => {
 describe("saved games on Your games (v1.0.0)", () => {
   it("lists each save with when it runs out, apart from the other games, and resumes one", async () => {
     saves.saves = [save("s1")];
+    saves.held = 1;
     games = [
       saves.saves[0].game,
       game("g2", {
@@ -198,8 +207,9 @@ describe("saved games on Your games (v1.0.0)", () => {
 
   it("discards a save only after asking, and says that nobody loses", async () => {
     saves.saves = [save("s1"), save("s2")];
+    saves.held = 2;
     api.DELETE.mockImplementation(async () => {
-      saves = { ...saves, saves: saves.saves.slice(1) };
+      saves = { ...saves, saves: saves.saves.slice(1), held: 1 };
       return { data: undefined };
     });
     render(<GamesList me={me} />);
@@ -245,6 +255,46 @@ describe("saved games on Your games (v1.0.0)", () => {
     );
     expect(ended).toHaveTextContent("The save ran out.");
     expect(ended).toHaveTextContent("The game ended with no result.");
+    expect(screen.queryByRole("button", { name: "Resume" })).toBeNull();
+  });
+
+  it("lists a suspended table with who is ready, and leads to the table to play it on", async () => {
+    saves.held = 1;
+    saves.tables = [
+      {
+        code: "TABLECODE1234",
+        format: "commander",
+        host: "alice",
+        you_host: true,
+        save_id: "s9",
+        game_id: "g9",
+        saved_at: new Date(Date.now() - 3_600_000).toISOString(),
+        expires_at: new Date(Date.now() + 29.5 * 86_400_000).toISOString(),
+        turn: 5,
+        players: [
+          { seat: 0, handle: "alice", you: true, needed: true, ready: true },
+          { seat: 1, handle: "bob", you: false, needed: true, ready: false },
+          { seat: 2, handle: "cara", you: false, needed: false, ready: false },
+        ],
+      },
+    ];
+    render(<GamesList me={me} />);
+    const tables = await screen.findByRole("list", {
+      name: "Suspended tables",
+    });
+    expect(tables).toHaveTextContent("Commander table");
+    expect(tables).toHaveTextContent("alice · bob · cara");
+    expect(tables).toHaveTextContent("You host it");
+    expect(tables).toHaveTextContent("Turn 5");
+    // Only the players still in the game are waited for.
+    expect(tables).toHaveTextContent("1 of 2 ready to play on");
+    expect(
+      screen.getByRole("link", { name: "Go to the table" }),
+    ).toHaveAttribute("href", "#tables/TABLECODE1234");
+    // It counts against the host's five, and is not resumed by one player alone.
+    const saved = screen.getByRole("region", { name: "Saved games" });
+    expect(saved).toHaveTextContent("1 of 5");
+    expect(saved).toHaveTextContent("played on at its table");
     expect(screen.queryByRole("button", { name: "Resume" })).toBeNull();
   });
 

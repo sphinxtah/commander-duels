@@ -669,6 +669,45 @@ class GameMatch(Contract):
     draw: bool
 
 
+class SuspendedPlayer(Contract):
+    seat: int
+    handle: str | None
+    you: bool
+    needed: bool = Field(
+        description="Whether the player is still in the game, and so must be back and ready "
+        "for it to be played on; a player who conceded, was removed or lost is not."
+    )
+    ready: bool = Field(description="Back at the table and ready to play on.")
+
+
+class SuspendedTable(Contract):
+    """A private table whose game its players suspended together (v1.0.0, api/saves.py): it is
+    played on once every player still in it is back at the table and ready."""
+
+    code: str = Field(description="The table's code: #tables/<code>.")
+    format: GameFormatId
+    host: str | None = Field(description="The host's handle: the save counts as one of theirs.")
+    you_host: bool
+    save_id: UUID = Field(description="The save; its owner, the host, may discard it.")
+    game_id: UUID
+    saved_at: datetime
+    expires_at: datetime = Field(
+        description="When the save runs out: the game then ends interrupted, with no result."
+    )
+    turn: int | None
+    players: list[SuspendedPlayer]
+
+
+class GameTableRef(Contract):
+    """The table a table's game was started at (v1.0.0), for its players and the staff."""
+
+    code: str = Field(description="The table's code: #tables/<code>.")
+    suspendable: bool = Field(
+        description="Whether its players may suspend the game together to play it on later: a "
+        "private table's single game (not a queue's, not a match's)."
+    )
+
+
 class GameSummary(Contract):
     id: UUID
     kind: Literal["practice", "table"] = Field(
@@ -717,6 +756,11 @@ class GameSummary(Contract):
         description="Whether the viewer sees this game's concealed information, every hand and "
         "library (SysOp; since v0.8.9 an administrator, except in a game they play with another "
         "person).",
+    )
+    table: GameTableRef | None = Field(
+        default=None,
+        description="Since v1.0.0: a table's game names its table, to its own players and the "
+        "staff; null for any other game.",
     )
 
 

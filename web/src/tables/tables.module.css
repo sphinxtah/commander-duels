@@ -647,3 +647,18 @@
   width: 100%;
   max-width: 220px;
 }
+/* A suspended table (v1.0.0): who is back and ready to play its game on. */
+.suspendedTitle {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+.suspendedPlayers {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.suspendedPlayers li[data-ready="true"] strong {
+  color: #9fd6b8;
+}

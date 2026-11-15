@@ -1075,6 +1075,137 @@ describe("save, resume and recovery at the table (v1.0.0)", () => {
     }
   });
 
+  it("proposes, answers and follows the suspension of a private table's game", async () => {
+    const { client, restore } = await served(
+      {
+        kind: "table",
+        table: { code: "TABLECODE1234", suspendable: true },
+        seats: [
+          { seat: 0, player: "human", handle: "alice", left: null },
+          { seat: 1, player: "human", handle: "bob", left: null },
+        ],
+      },
+      true,
+    );
+    const post = vi.fn(async () => ({ data: { status: "voting" } }));
+    const remove = vi.fn(async () => ({ data: undefined }));
+    Object.assign(client, { POST: post, DELETE: remove });
+    try {
+      const socket = playing(view);
+      act(() =>
+        socket.deliver({
+          type: "presence",
+          away_after: 120,
+          seats: [0, 1].map((seat) => ({
+            seat,
+            connected: true,
+            away_seconds: null,
+            left: null,
+            removable: false,
+            yes: [],
+            no: [],
+            needed: 1,
+          })),
+        }),
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Game menu" }));
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Suspend the game" }),
+      );
+      // One player's own save is not offered at a table.
+      expect(
+        screen.queryByRole("button", { name: "Save and leave" }),
+      ).toBeNull();
+      const dialog = screen.getByRole("dialog", {
+        name: "Propose to suspend this game?",
+      });
+      expect(dialog).toHaveTextContent("Every player still in the game");
+      expect(dialog).toHaveTextContent("one of the host's saved games");
+      expect(dialog).toHaveTextContent("A save ends when the game is upgraded");
+      fireEvent.click(
+        screen.getByRole("button", { name: "Propose to suspend" }),
+      );
+      await waitFor(() =>
+        expect(post).toHaveBeenCalledWith("/api/v1/tables/{code}/suspension", {
+          params: { path: { code: "TABLECODE1234" } },
+        }),
+      );
+
+      // Another player's proposal: asked to agree or decline.
+      act(() =>
+        socket.deliver({
+          type: "suspension",
+          proposed_by: 1,
+          agreed: [1],
+          needed: [0, 1],
+          declined_by: null,
+        }),
+      );
+      const vote = screen.getByRole("region", { name: "Suspending the game" });
+      expect(vote).toHaveTextContent(
+        "bob proposes to suspend this game and play it on later. Waiting for you.",
+      );
+      expect(vote).toHaveTextContent("1 of 2 agreed");
+      // While a proposal stands, the menu offers no second one.
+      fireEvent.click(screen.getByRole("button", { name: "Game menu" }));
+      expect(
+        screen.queryByRole("button", { name: "Suspend the game" }),
+      ).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Decline" }));
+      await waitFor(() =>
+        expect(remove).toHaveBeenCalledWith(
+          "/api/v1/tables/{code}/suspension",
+          {
+            params: { path: { code: "TABLECODE1234" } },
+          },
+        ),
+      );
+      act(() =>
+        socket.deliver({
+          type: "suspension",
+          proposed_by: null,
+          agreed: [],
+          needed: [0, 1],
+          declined_by: 0,
+        }),
+      );
+      expect(vote).toHaveTextContent(
+        "You ended the proposal to suspend the game. It goes on.",
+      );
+
+      // Proposed again and agreed to by all: the table says where the game is played on.
+      act(() =>
+        socket.deliver({
+          type: "suspension",
+          proposed_by: 1,
+          agreed: [1],
+          needed: [0, 1],
+          declined_by: null,
+        }),
+      );
+      post.mockClear();
+      fireEvent.click(screen.getByRole("button", { name: "Agree to suspend" }));
+      await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+      act(() => {
+        socket.deliver({
+          type: "saved",
+          game_id: "g1",
+          save_id: "s1",
+          table: "TABLECODE1234",
+        });
+        socket.onclose?.({ code: 1000 });
+      });
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "This game is suspended. It is played on at its table",
+      );
+      expect(
+        screen.getByRole("link", { name: "Go to the table" }),
+      ).toHaveAttribute("href", "#tables/TABLECODE1234");
+    } finally {
+      restore();
+    }
+  });
+
   it("says that the game is being recovered, and that it came back", () => {
     vi.useFakeTimers();
     try {

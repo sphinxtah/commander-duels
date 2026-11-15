@@ -10,6 +10,7 @@ import { exitTableFullscreen } from "../app/fullscreen";
 import { tableFullscreen } from "../game/practice";
 import { getSoundEngine } from "../game/sound/engine";
 import { InviteFriendsButton } from "./InviteFriends";
+import { SuspendedPanel } from "./SuspendedPanel";
 import {
   StarterOfferFields,
   StarterReveal,
@@ -288,11 +289,13 @@ export function TableLobby({
   const status =
     table.status === "closed"
       ? "This table is closed."
-      : table.status === "started"
-        ? mine
-          ? "The game has started. Opening it…"
-          : "This table's game has started."
-        : null;
+      : table.status === "suspended"
+        ? null
+        : table.status === "started"
+          ? mine
+            ? "The game has started. Opening it…"
+            : "This table's game has started."
+          : null;
 
   return (
     <div className={styles.page}>
@@ -334,6 +337,13 @@ export function TableLobby({
         Others see your handle and portrait, never your deck.{" "}
         <a href="#tables">Back to the lobby</a>
       </p>
+      {table.status === "suspended" && table.suspended && (
+        <SuspendedPanel
+          suspended={table.suspended}
+          onTable={(next) => setTable(next)}
+          onChanged={refresh}
+        />
+      )}
       {status && (
         <p className={styles.notice} role="status">
           {status}

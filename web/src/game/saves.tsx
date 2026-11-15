@@ -25,6 +25,7 @@ import styles from "./game.module.css";
 
 export type SavedGame = components["schemas"]["SavedGame"];
 export type Saves = components["schemas"]["Saves"];
+export type SuspendedTable = components["schemas"]["SuspendedTable"];
 
 /** The rules as the owner set them, until the server names them (GET /saves). */
 export const SAVE_DAYS = 30;
@@ -209,7 +210,13 @@ export function SavedGames({
     onChanged();
   }
 
-  if (saves.saves.length === 0 && saves.ended.length === 0) return null;
+  const tables = saves.tables ?? [];
+  if (
+    saves.saves.length === 0 &&
+    saves.ended.length === 0 &&
+    tables.length === 0
+  )
+    return null;
   const line = (save: SavedGame) => {
     const game = save.game;
     const players = game.seats
@@ -233,7 +240,7 @@ export function SavedGames({
       <div className={styles.gamesHead}>
         <h2>Saved games</h2>
         <span className={styles.hint}>
-          {saves.saves.length} of {saves.limit}
+          {saves.held ?? saves.saves.length} of {saves.limit}
         </span>
       </div>
       {refusal && (
@@ -286,6 +293,43 @@ export function SavedGames({
           ))}
         </ul>
       )}
+      {tables.length > 0 && (
+        <ul className={styles.games} aria-label="Suspended tables">
+          {tables.map((table) => {
+            const needed = table.players.filter((player) => player.needed);
+            return (
+              <li key={table.code} data-status="saved">
+                <div>
+                  <strong>{formatNames[table.format]} table</strong>{" "}
+                  <span>
+                    {table.players
+                      .map((player) => player.handle ?? "Player")
+                      .join(" · ")}
+                  </span>
+                  <small>
+                    {table.you_host
+                      ? "You host it · "
+                      : `Hosted by ${table.host ?? "a player"} · `}
+                    {table.turn !== null ? `Turn ${table.turn} · ` : ""}
+                    suspended {ago(table.saved_at)} · runs out{" "}
+                    {expiresText(table.expires_at)} ·{" "}
+                    {needed.filter((player) => player.ready).length} of{" "}
+                    {needed.length} ready to play on
+                  </small>
+                </div>
+                <div className={styles.gameActions}>
+                  <a
+                    className={styles.primaryButton}
+                    href={`#tables/${table.code}`}
+                  >
+                    Go to the table
+                  </a>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
       {saves.ended.length > 0 && (
         <ul className={styles.games} aria-label="Saves that ended">
           {saves.ended.map((save) => (
@@ -305,6 +349,13 @@ export function SavedGames({
         {saveRules(saves.days, saves.limit).map((rule) => (
           <li key={rule}>{rule}</li>
         ))}
+        {tables.length > 0 && (
+          <li>
+            A suspended table&apos;s game is played on at its table, once every
+            player still in it is back and ready. It counts as one of its
+            host&apos;s saved games.
+          </li>
+        )}
       </ul>
       <dialog
         ref={discardDialog}

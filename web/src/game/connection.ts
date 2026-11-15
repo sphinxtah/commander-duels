@@ -47,6 +47,13 @@ export interface GameState {
   recovered: boolean;
   /** The save's id once the game's player saved it (v1.0.0): the game waits to be resumed. */
   saved: string | null;
+  /** The table a suspended table's game is played on from, by its code (v1.0.0). */
+  savedTable: string | null;
+  /** At a private table (v1.0.0): the proposal to suspend the game, while there is one. */
+  suspension: Suspension | null;
+  /** How the last proposal ended without the game being suspended: who declined it, or why it
+   * was refused. Null once another is made. */
+  suspensionEnded: { declinedBy: number | null; refused: string | null } | null;
   /** The server refused this tab: the account has the game open in too many tabs already. */
   crowded: boolean;
   /** The priority controls a set_priority reply reported, until the next view shows them. */
@@ -66,6 +73,14 @@ export interface GameState {
   alliances: Alliances | null;
   /** Why the server refused this tab's last alliance request, in words. */
   allianceRefusal: string | null;
+}
+
+/** A proposal to suspend a private table's game (v1.0.0): who made it, who agreed, and who must:
+ * every player still in the game who is present. */
+export interface Suspension {
+  proposedBy: number;
+  agreed: number[];
+  needed: number[];
 }
 
 /** A message or emote this tab sent, until the server sends it back with the same client_id. */
@@ -105,6 +120,9 @@ const initial: GameState = {
   recovering: false,
   recovered: false,
   saved: null,
+  savedTable: null,
+  suspension: null,
+  suspensionEnded: null,
   crowded: false,
   priority: null,
   presence: null,
@@ -612,7 +630,35 @@ export class GameConnection {
         this.update({ interrupted: true, recovering: false });
         break;
       case "saved":
-        this.update({ saved: message.save_id });
+        this.update({
+          saved: message.save_id,
+          savedTable: message.table ?? null,
+          suspension: null,
+          suspensionEnded: null,
+        });
+        break;
+      case "suspension":
+        this.update(
+          message.proposed_by === null
+            ? {
+                suspension: null,
+                suspensionEnded:
+                  message.declined_by !== null || message.refused
+                    ? {
+                        declinedBy: message.declined_by,
+                        refused: message.refused ?? null,
+                      }
+                    : null,
+              }
+            : {
+                suspension: {
+                  proposedBy: message.proposed_by,
+                  agreed: message.agreed,
+                  needed: message.needed,
+                },
+                suspensionEnded: null,
+              },
+        );
         break;
       case "presence":
         this.update({

@@ -27,6 +27,7 @@ export function GameMenu({
   concedeDisabled,
   onConcedeMatch,
   onSave,
+  onSuspend,
   onLeave,
   rules = null,
 }: {
@@ -47,6 +48,8 @@ export function GameMenu({
   onConcedeMatch?: () => void;
   /** A game against the bots, where its player may save it (v1.0.0): "Save and leave". */
   onSave?: () => void;
+  /** A private table's game (v1.0.0): propose to its players to suspend it together. */
+  onSuspend?: () => void;
   onLeave(): void;
   /** King's Table's settings in a line (v0.8.7): the decks, the life and the house rule. */
   rules?: string | null;
@@ -98,6 +101,13 @@ export function GameMenu({
           <li>
             <button type="button" aria-haspopup="dialog" onClick={onSave}>
               Save and leave
+            </button>
+          </li>
+        )}
+        {onSuspend && (
+          <li>
+            <button type="button" aria-haspopup="dialog" onClick={onSuspend}>
+              Suspend the game
             </button>
           </li>
         )}

@@ -105,8 +105,13 @@ class TableEngine(FakeEngine):
         parts = request.url.path.removeprefix("/v1/service/").split("/")
         if parts == ["games"]:
             return self.create(json.loads(request.content))
+        if len(parts) < 3:
+            return await super().__call__(request)
         game = self.games.get(parts[1])
-        if not isinstance(game, TableGame) or parts[2] in ("close", "inspection", "attach"):
+        # The service's own routes for a game, which need no seat's token (save and discard
+        # since v1.0.0).
+        service = ("close", "inspection", "attach", "save", "discard")
+        if not isinstance(game, TableGame) or parts[2] in service:
             return await super().__call__(request)
         given = request.headers.get("authorization", "")
         seat = next((s for s, token in game.tokens.items() if given == f"Bearer {token}"), None)

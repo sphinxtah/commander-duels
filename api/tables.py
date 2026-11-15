@@ -130,6 +130,7 @@ from api.schemas import (
     KingsTableChange,
     KingsTableRole,
     KingsTableSettings,
+    SuspendedTable,
     TableFormatId,
     TableRules,
     casual,
@@ -342,7 +343,11 @@ class TableView(Contract):
     code: str = Field(description="The invite link's code: #tables/<code>.")
     format: TableFormatId
     visibility: Visibility
-    status: Literal["open", "started", "closed"]
+    status: Literal["open", "started", "closed", "suspended"] = Field(
+        description="open (the lobby), started (its game holds the rest), closed, or since "
+        "v1.0.0 suspended: its players paused the game together, and it is played on once "
+        "everyone still in it is back and ready (suspended says who)."
+    )
     seats: int
     bots: int
     bot_skill: int
@@ -388,6 +393,11 @@ class TableView(Contract):
         default=False,
         description="Since v1.0.0: a starter-deck table: a seat is taken with a starter deck "
         "bought for it, which plays as it came.",
+    )
+    suspended: SuspendedTable | None = Field(
+        default=None,
+        description="Since v1.0.0: the suspended game and who is ready to play it on, for the "
+        "table's players and the staff; null unless the table is suspended.",
     )
 
 
@@ -641,6 +651,15 @@ def view_of(db: Session, table: GameTable, principal: Principal) -> TableView:
         )
     status = status_of(table)
     ready = all(player.taken and player.ready for player in players)
+    # A table whose players suspended its game (v1.0.0): it stays started, and says so here.
+    suspended: SuspendedTable | None = None
+    if status == "started" and (mine is not None or full_access(principal)):
+        # Imported here: api.saves reads tables through this module.
+        from api import saves
+
+        suspended = saves.suspended_view(db, table, you)
+        if suspended is not None:
+            status = "suspended"
     return TableView(
         code=table.code,
         format=table.format,  # type: ignore[arg-type]
@@ -663,6 +682,7 @@ def view_of(db: Session, table: GameTable, principal: Principal) -> TableView:
         campaign=str(table.campaign.get("title")) if table.campaign else None,
         profile=table_profiles.view(table_profiles.profile_of(table), rules_of(table)),
         starter=table.starter,
+        suspended=suspended,
     )
 
 

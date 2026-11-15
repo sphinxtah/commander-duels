@@ -96,6 +96,7 @@ from api.models import (
     FormatVersion,
     Game,
     GameSeat,
+    GameTable,
     Match,
     MatchPlayer,
     User,
@@ -113,6 +114,7 @@ from api.schemas import (
     GameResult,
     GameState,
     GameSummary,
+    GameTableRef,
     PracticeFormat,
     PracticeGameRequest,
     PracticeOptions,
@@ -530,6 +532,10 @@ class LiveGame:
     # can stop being followed; and whether it is being saved: its seats send nothing meanwhile.
     followers: list["asyncio.Task[None]"] = field(default_factory=list)
     saving: bool = False
+    # At a private table (v1.0.0, api/saves.py): the seats that agreed to suspend the game, and
+    # the seat that proposed it. Empty and None while nobody has.
+    suspension: set[int] = field(default_factory=set)
+    suspension_by: int | None = None
 
     def __post_init__(self) -> None:
         if self.teams:
@@ -1002,14 +1008,18 @@ class GameHub:
             for seat in game.seats.values():
                 game.followers.append(self.spawn(self.follow(game, seat)))
 
-    async def saved(self, game: LiveGame, save_id: UUID) -> None:
+    async def saved(self, game: LiveGame, save_id: UUID, table: str | None = None) -> None:
         """The engine stopped the game and the database holds its save (v1.0.0): its tabs are
         told, its last events are kept, and the game is no longer one of this process's. Nothing
-        is recorded as its end: it has none."""
+        is recorded as its end: it has none. A table's suspended game names its table, where it
+        is played on from."""
         game.ending = True
         game.finished = True
         game.recorded.set()
-        self.broadcast(game, {"type": "saved", "game_id": str(game.id), "save_id": str(save_id)})
+        told: dict[str, Any] = {"type": "saved", "game_id": str(game.id), "save_id": str(save_id)}
+        if table is not None:
+            told["table"] = table
+        self.broadcast(game, told)
         await self.read_events(game)
         for connection in list(game.connections.values()):
             connection.close(1000)
@@ -1177,6 +1187,9 @@ class GameHub:
             self.presence_changed(game)
         elif game.kind == "table":
             connection.send(self.presence(game))
+        if game.suspension:
+            # A proposal to suspend the game (v1.0.0) is told to the tab that just came.
+            connection.send(self.suspension_state(game))
 
     def departed(self, game: LiveGame, connection: Connection) -> None:
         """A connection closed. When it was its seat's last, the seat is away from now."""
@@ -1195,6 +1208,8 @@ class GameHub:
         await asyncio.sleep(AWAY_SECONDS)
         if seat.away_since == since and not game.finished and self.games.get(game.id) is game:
             self.presence_changed(game)
+            # A player away this long no longer votes on suspending the game (v1.0.0).
+            self.suspension_moved(game)
 
     def removable(self, game: LiveGame, seat: LiveSeat) -> bool:
         return (
@@ -1205,6 +1220,60 @@ class GameHub:
             and seat.away_since is not None
             and time.monotonic() - seat.away_since >= AWAY_SECONDS
         )
+
+    @staticmethod
+    def suspension_voters(game: LiveGame) -> list[int]:
+        """Who must agree to suspend a table's game (v1.0.0, the owner's rule): every player
+        still in it who is present. A player away for AWAY_SECONDS or longer does not vote, so
+        a table can pause when someone drops."""
+        now = time.monotonic()
+        return sorted(
+            seat.seat
+            for seat in game.seats.values()
+            if seat.left is None
+            and not seat.removing
+            and (seat.away_since is None or now - seat.away_since < AWAY_SECONDS)
+        )
+
+    def suspension_state(self, game: LiveGame, declined_by: int | None = None) -> dict[str, Any]:
+        """The proposal to suspend the game, as every tab at the table is told it."""
+        voters = self.suspension_voters(game)
+        return {
+            "type": "suspension",
+            "proposed_by": game.suspension_by if game.suspension else None,
+            "agreed": sorted(seat for seat in game.suspension if seat in voters),
+            "needed": voters,
+            "declined_by": declined_by,
+        }
+
+    def suspension_agreed(self, game: LiveGame) -> bool:
+        """Whether every player who must agree has."""
+        voters = self.suspension_voters(game)
+        return bool(game.suspension) and bool(voters) and set(voters) <= game.suspension
+
+    def suspension_ended(
+        self, game: LiveGame, declined_by: int | None = None, refused: str | None = None
+    ) -> None:
+        """The proposal is over: declined or withdrawn by a seat, or refused in words (the host
+        holds too many saves, the engine could not save the game). The table is told."""
+        game.suspension.clear()
+        game.suspension_by = None
+        told = self.suspension_state(game, declined_by)
+        if refused is not None:
+            told["refused"] = refused
+        self.broadcast(game, told)
+
+    def suspension_moved(self, game: LiveGame) -> None:
+        """Who must agree changed (a player went away for long, or left the game): the table is
+        told, and a proposal everyone left has agreed to is carried out."""
+        if not game.suspension or game.finished or game.saving:
+            return
+        self.broadcast(game, self.suspension_state(game))
+        if self.suspension_agreed(game):
+            # Imported here: api.saves imports this module.
+            from api import saves
+
+            self.spawn(saves.suspend_agreed(self, game))
 
     @staticmethod
     def voters(game: LiveGame, seat: LiveSeat) -> list[LiveSeat]:
@@ -1244,6 +1313,9 @@ class GameHub:
             return
         seat.left = reason
         seat.votes.clear()
+        # Out of the game, the seat no longer votes on suspending it (v1.0.0).
+        game.suspension.discard(seat.seat)
+        self.suspension_moved(game)
         # Imported here: api.table_chat imports api.chat, which imports api.admin, which imports
         # this module.
         from api import table_chat
@@ -1851,6 +1923,18 @@ def summary_of(
     yours = link is not None and link.user_id == principal.user.id
     # King's Table (v0.8.7): the settings it started with, and each seat's team, role and life.
     kings = kings_table.config_of(game.kings_table) if game.format == kings_table.FORMAT else None
+    # A table's game names its table (v1.0.0), to its players and the staff: where a suspended
+    # game is played on from.
+    table_ref: GameTableRef | None = None
+    if game.kind == "table" and (your_seat is not None or full_access(principal)):
+        table = db.scalar(select(GameTable).where(GameTable.game_id == game.id))
+        if table is not None:
+            table_ref = GameTableRef(
+                code=table.code,
+                suspendable=table.visibility == "private"
+                and not table.queued
+                and game.match_id is None,
+            )
     return GameSummary(
         id=game.id,
         kind=game.kind,  # type: ignore[arg-type]
@@ -1904,6 +1988,7 @@ def summary_of(
         kings_table=kings,
         passive_bots=(game.bots_passive if passive_switchable(game, rows, principal) else None),
         inspectable=everything,
+        table=table_ref,
         campaign=(
             CampaignRef(
                 encounter=link.encounter,

@@ -3517,7 +3517,8 @@ export interface paths {
          * Resume Save
          * @description Plays a saved game on: the engine takes it up where it stopped, and it is your running
          *     game again. 410 when the save has ended (it ran out, the game was upgraded, or it could not
-         *     be read back); the game then ends interrupted, with no result.
+         *     be read back); the game then ends interrupted, with no result. A table's suspended game is
+         *     played on at its table instead (409 ``table_save``).
          */
         post: operations["resume_save_api_v1_saves__save_id__resume_post"];
         delete?: never;
@@ -3989,6 +3990,60 @@ export interface paths {
          */
         post: operations["start_table_api_v1_tables__code__start_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tables/{code}/suspension": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Agree To Suspend
+         * @description Proposes to suspend a private table's game, or agrees to the proposal: the game is saved
+         *     to be played on later once every player still in it who is present has agreed. A player
+         *     away for two minutes or longer does not vote. The save is one of the host's five.
+         */
+        post: operations["agree_to_suspend_api_v1_tables__code__suspension_post"];
+        /**
+         * Decline To Suspend
+         * @description Declines the proposal to suspend the table's game, or withdraws it: the proposal is over
+         *     for everyone, and the table is told who ended it.
+         */
+        delete: operations["decline_to_suspend_api_v1_tables__code__suspension_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tables/{code}/suspension/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ready To Play On
+         * @description You are back at the suspended table and ready to play on. Once every player still in the
+         *     game is, the engine takes the game up where it stopped and the table is started again: the
+         *     reply's ``game_id`` is then the running game. A player with another game running cannot get
+         *     ready (409 ``game_limit``).
+         */
+        post: operations["ready_to_play_on_api_v1_tables__code__suspension_ready_post"];
+        /**
+         * Not Ready To Play On
+         * @description You are not ready to play the suspended game on after all.
+         */
+        delete: operations["not_ready_to_play_on_api_v1_tables__code__suspension_ready_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -6730,6 +6785,8 @@ export interface components {
              * @enum {string}
              */
             status: "active" | "finished" | "interrupted" | "saved";
+            /** @description Since v1.0.0: a table's game names its table, to its own players and the staff; null for any other game. */
+            table?: components["schemas"]["GameTableRef"] | null;
             /**
              * Tokens
              * @description Tokens the game paid you (v0.4.0); null while it runs or without a seat.
@@ -6739,6 +6796,22 @@ export interface components {
             turn_cap: number;
             /** Your Seat */
             your_seat: number | null;
+        };
+        /**
+         * GameTableRef
+         * @description The table a table's game was started at (v1.0.0), for its players and the staff.
+         */
+        GameTableRef: {
+            /**
+             * Code
+             * @description The table's code: #tables/<code>.
+             */
+            code: string;
+            /**
+             * Suspendable
+             * @description Whether its players may suspend the game together to play it on later: a private table's single game (not a queue's, not a match's).
+             */
+            suspendable: boolean;
         };
         /** GamesEnded */
         GamesEnded: {
@@ -9658,15 +9731,26 @@ export interface components {
              */
             ends_at_upgrade: boolean;
             /**
+             * Held
+             * @description How many saves count against your limit: your own games and the suspended tables you host.
+             * @default 0
+             */
+            held: number;
+            /**
              * Limit
              * @description How many saves an account holds at once.
              */
             limit: number;
             /**
              * Saves
-             * @description Waiting to be resumed, newest first.
+             * @description Your games against the bots waiting to be resumed, newest first.
              */
             saves: components["schemas"]["SavedGame"][];
+            /**
+             * Tables
+             * @description The suspended tables you sit at, whoever hosts them, newest first: each is played on at its table.
+             */
+            tables?: components["schemas"]["SuspendedTable"][];
         };
         /** SceneSeen */
         SceneSeen: {
@@ -10465,6 +10549,106 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** SuspendedPlayer */
+        SuspendedPlayer: {
+            /** Handle */
+            handle: string | null;
+            /**
+             * Needed
+             * @description Whether the player is still in the game, and so must be back and ready for it to be played on; a player who conceded, was removed or lost is not.
+             */
+            needed: boolean;
+            /**
+             * Ready
+             * @description Back at the table and ready to play on.
+             */
+            ready: boolean;
+            /** Seat */
+            seat: number;
+            /** You */
+            you: boolean;
+        };
+        /**
+         * SuspendedTable
+         * @description A private table whose game its players suspended together (v1.0.0, api/saves.py): it is
+         *     played on once every player still in it is back at the table and ready.
+         */
+        SuspendedTable: {
+            /**
+             * Code
+             * @description The table's code: #tables/<code>.
+             */
+            code: string;
+            /**
+             * Expires At
+             * Format: date-time
+             * @description When the save runs out: the game then ends interrupted, with no result.
+             */
+            expires_at: string;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander" | "two_headed_giant" | "kings_table";
+            /**
+             * Game Id
+             * Format: uuid
+             */
+            game_id: string;
+            /**
+             * Host
+             * @description The host's handle: the save counts as one of theirs.
+             */
+            host: string | null;
+            /** Players */
+            players: components["schemas"]["SuspendedPlayer"][];
+            /**
+             * Save Id
+             * Format: uuid
+             * @description The save; its owner, the host, may discard it.
+             */
+            save_id: string;
+            /**
+             * Saved At
+             * Format: date-time
+             */
+            saved_at: string;
+            /** Turn */
+            turn: number | null;
+            /** You Host */
+            you_host: boolean;
+        };
+        /**
+         * SuspensionVote
+         * @description Where a proposal to suspend a table's game stands, after the caller agreed to it.
+         */
+        SuspensionVote: {
+            /**
+             * Agreed
+             * @description The seats that agreed, of those that must.
+             */
+            agreed: number[];
+            /**
+             * Needed
+             * @description The seats that must agree: every player still in the game who is present. A player away for two minutes or longer does not vote.
+             */
+            needed: number[];
+            /**
+             * Proposed By
+             * @description The seat that proposed it.
+             */
+            proposed_by: number | null;
+            /**
+             * Save Id
+             * @description The save, once the game is suspended: one of the host's.
+             */
+            save_id?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "voting" | "suspended";
+        };
         /**
          * SwitchedEdition
          * @description Copies of a card the draft moved to an edition the library holds, when v0.5.0 deployed.
@@ -10885,9 +11069,12 @@ export interface components {
             starter: boolean;
             /**
              * Status
+             * @description open (the lobby), started (its game holds the rest), closed, or since v1.0.0 suspended: its players paused the game together, and it is played on once everyone still in it is back and ready (suspended says who).
              * @enum {string}
              */
-            status: "open" | "started" | "closed";
+            status: "open" | "started" | "closed" | "suspended";
+            /** @description Since v1.0.0: the suspended game and who is ready to play it on, for the table's players and the staff; null unless the table is suspended. */
+            suspended?: components["schemas"]["SuspendedTable"] | null;
             /** Turn Cap */
             turn_cap: number;
             /**
@@ -32063,6 +32250,398 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    agree_to_suspend_api_v1_tables__code__suspension_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuspensionVote"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    decline_to_suspend_api_v1_tables__code__suspension_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    ready_to_play_on_api_v1_tables__code__suspension_ready_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    not_ready_to_play_on_api_v1_tables__code__suspension_ready_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Gone */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };

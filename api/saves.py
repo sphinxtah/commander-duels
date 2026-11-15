@@ -25,8 +25,22 @@ The rules, as the owner set them (2026-11-14):
   (``game_saves.engine_build``): when the API starts against another, and when a resume is
   refused for it, the save is ended as ``upgrade`` and its player is told so in the list.
 
-What is not saved: a table's game (its players suspend it together, by vote; not built here) and
-a game of a best-of-three match (the match would stand between its games for a month).
+**A private table's game is suspended by its players together**, never by one player's word
+(the owner's rules, 2026-11-14):
+
+- **The vote** (``POST``/``DELETE /tables/{code}/suspension``). Any player still in the game
+  proposes; every player still in it who is present must agree, and one who declines ends the
+  proposal. A player away for two minutes or longer does not vote, so a table can pause when
+  someone drops. The table is told each change over the game's socket (``suspension``).
+- **The save is the host's**: one of the host's five, kept the same 30 days, discarded by the
+  host alone (``DELETE /saves/{id}``).
+- **Playing on** (``POST``/``DELETE /tables/{code}/suspension/ready``). The table shows as
+  ``suspended``; the game is taken up once every player still in it is back at the table and
+  ready, each under their limit of running games. Nobody is voted out for missing the restart.
+- Only a private table's single game: not a public table's, not a queue's, not a match's.
+
+What is not saved at all: a game of a best-of-three match (the owner's decision: the match would
+stand between its games for as long as the save lasts).
 
 Behind the gate ``save_resume`` (api/rollout.py): off until SysOp stages it. Recovery itself is
 on for everyone and needs none.
@@ -34,6 +48,7 @@ on for everyone and needs none.
 
 import asyncio
 import logging
+from contextlib import AsyncExitStack
 from datetime import datetime, timedelta
 from functools import partial
 from typing import Any, Literal
@@ -69,8 +84,11 @@ from api.games import (
     visible_game,
 )
 from api.identity import ApiError, Db, Principal, not_found, utcnow
-from api.models import CampaignGame, Game, GameSave
-from api.schemas import Contract, Error, GameSummary
+from api.models import CampaignGame, Game, GameSave, GameSeat, GameTable, TableSeat, User
+from api.schemas import Contract, Error, GameSummary, SuspendedPlayer, SuspendedTable
+
+# api.tables reads this module's views lazily (view_of), so nothing goes round.
+from api.tables import Code, TableView, find, under_limits, view_of
 
 log = logging.getLogger(__name__)
 
@@ -117,10 +135,37 @@ class SavedGame(Contract):
     )
 
 
+class SuspensionVote(Contract):
+    """Where a proposal to suspend a table's game stands, after the caller agreed to it."""
+
+    status: Literal["voting", "suspended"]
+    proposed_by: int | None = Field(description="The seat that proposed it.")
+    agreed: list[int] = Field(description="The seats that agreed, of those that must.")
+    needed: list[int] = Field(
+        description="The seats that must agree: every player still in the game who is present. "
+        "A player away for two minutes or longer does not vote."
+    )
+    save_id: UUID | None = Field(
+        default=None, description="The save, once the game is suspended: one of the host's."
+    )
+
+
 class Saves(Contract):
     """The account's saved games and the rules they stand under."""
 
-    saves: list[SavedGame] = Field(description="Waiting to be resumed, newest first.")
+    saves: list[SavedGame] = Field(
+        description="Your games against the bots waiting to be resumed, newest first."
+    )
+    tables: list[SuspendedTable] = Field(
+        default_factory=list,
+        description="The suspended tables you sit at, whoever hosts them, newest first: each is "
+        "played on at its table.",
+    )
+    held: int = Field(
+        default=0,
+        description="How many saves count against your limit: your own games and the suspended "
+        "tables you host.",
+    )
     ended: list[SavedGame] = Field(
         description="Saves that ended otherwise than by their player's doing (expired, upgrade, "
         f"unrecoverable) in the last {ENDED_SHOWN_DAYS} days, newest first."
@@ -232,13 +277,18 @@ def record_saved(
     expires: datetime,
     build: str,
     turn: int | None,
+    table_id: UUID | None = None,
 ) -> UUID:
-    """The engine stopped the game: it is saved, in one transaction with its save."""
+    """The engine stopped the game: it is saved, in one transaction with its save. At a table
+    (``table_id``) nobody is ready to play on yet: each player says so when they are back."""
     with Session(database) as db:
         game = db.get(Game, game_id)
         if game is None or game.status != "active":
             raise RuntimeError(f"Game {game_id} is not running: it cannot be recorded as saved")
         game.status = "saved"
+        if table_id is not None:
+            for row in db.scalars(select(TableSeat).where(TableSeat.table_id == table_id)):
+                row.ready = False
         save = GameSave(
             game_id=game_id,
             user_id=user_id,
@@ -268,9 +318,99 @@ def own_open(db: Session, save_id: UUID, user_id: UUID, now: datetime) -> GameSa
     return save
 
 
-def open_game_of(database: Engine, save_id: UUID, user_id: UUID, now: datetime) -> UUID:
+def open_game_of(
+    database: Engine, save_id: UUID, user_id: UUID, now: datetime, solo: bool = False
+) -> UUID:
+    """The game of the account's own open save. With ``solo``, a table's suspended game is
+    refused: it is played on at its table, by all its players."""
     with Session(database) as db:
-        return own_open(db, save_id, user_id, now).game_id
+        save = own_open(db, save_id, user_id, now)
+        game = db.get(Game, save.game_id)
+        if solo and game is not None and game.kind == "table":
+            raise ApiError(
+                409,
+                "table_save",
+                "This game is a table's: it is played on at the table, once every player is "
+                "back and ready.",
+            )
+        return save.game_id
+
+
+# A table's suspended game.
+
+
+def suspended_of(db: Session, table: GameTable) -> tuple[Game, GameSave] | None:
+    """The table's game and its open save, when its players suspended it."""
+    if table.game_id is None:
+        return None
+    game = db.get(Game, table.game_id)
+    if game is None or game.status != "saved":
+        return None
+    save = db.scalar(
+        select(GameSave).where(GameSave.game_id == game.id, GameSave.ended_at.is_(None))
+    )
+    return (game, save) if save is not None else None
+
+
+def players_of(db: Session, game_id: UUID) -> dict[UUID, bool]:
+    """The game's players, each with whether they are still in it."""
+    return {
+        row.user_id: row.left_at is None
+        for row in db.scalars(select(GameSeat).where(GameSeat.game_id == game_id))
+        if row.user_id is not None
+    }
+
+
+def suspended_view(db: Session, table: GameTable, user_id: UUID) -> SuspendedTable | None:
+    """The table as its players see it while its game is suspended; None when it is not."""
+    found = suspended_of(db, table)
+    if found is None:
+        return None
+    game, save = found
+    playing = players_of(db, game.id)
+    rows = list(
+        db.scalars(select(TableSeat).where(TableSeat.table_id == table.id).order_by(TableSeat.seat))
+    )
+    handles = dict(
+        db.execute(
+            select(User.id, User.handle).where(
+                User.id.in_({row.user_id for row in rows} | {table.host_id})
+            )
+        ).all()
+    )
+    return SuspendedTable(
+        code=table.code,
+        format=game.format,  # type: ignore[arg-type]
+        host=handles.get(table.host_id),
+        you_host=table.host_id == user_id,
+        save_id=save.id,
+        game_id=game.id,
+        saved_at=save.saved_at,
+        expires_at=save.expires_at,
+        turn=save.turn,
+        players=[
+            SuspendedPlayer(
+                seat=row.seat,
+                handle=handles.get(row.user_id),
+                you=row.user_id == user_id,
+                needed=playing.get(row.user_id, False),
+                ready=row.ready and playing.get(row.user_id, False),
+            )
+            for row in rows
+        ],
+    )
+
+
+def refuse_unsuspendable(table: GameTable, game: Game) -> None:
+    """Only a private table's single game is suspended, by its players together."""
+    if table.visibility != "private" or table.queued:
+        raise ApiError(
+            409, "not_private", "Only a private table's game can be suspended by its players."
+        )
+    if game.match_id is not None:
+        raise ApiError(
+            409, "match_game", "A game of a match cannot be suspended: only a single game can."
+        )
 
 
 def end_one(database: Engine, save_id: UUID, reason: str, now: datetime) -> None:
@@ -360,11 +500,15 @@ async def settle_after_restart(hub: GameHub) -> None:
 # The routes.
 
 
-def turn_of(game: LiveGame, user_id: UUID) -> int | None:
-    seat = game.seat_of(user_id)
-    view = seat.snapshot.get("view") if seat is not None and seat.snapshot else None
-    turn = view.get("turn") if isinstance(view, dict) else None
-    return turn if isinstance(turn, int) and not isinstance(turn, bool) else None
+def turn_of(game: LiveGame, user_id: UUID | None = None) -> int | None:
+    """The game's turn by the last view of the player's seat, or of any seat."""
+    seats = [game.seat_of(user_id)] if user_id is not None else list(game.seats.values())
+    for seat in seats:
+        view = seat.snapshot.get("view") if seat is not None and seat.snapshot else None
+        turn = view.get("turn") if isinstance(view, dict) else None
+        if isinstance(turn, int) and not isinstance(turn, bool):
+            return turn
+    return None
 
 
 def refuse_unsavable(game: Game, live: LiveGame, user_id: UUID) -> None:
@@ -410,11 +554,24 @@ def list_saves(request: Request, principal: Player, db: Db) -> Saves:
     if expire_due(db, now, user_id):
         db.commit()
     campaign = campaign_or_none(request)
-    waiting = db.scalars(
-        select(GameSave)
-        .where(GameSave.user_id == user_id, GameSave.ended_at.is_(None))
-        .order_by(GameSave.saved_at.desc())
+    held = list(
+        db.scalars(
+            select(GameSave)
+            .where(GameSave.user_id == user_id, GameSave.ended_at.is_(None))
+            .order_by(GameSave.saved_at.desc())
+        )
     )
+    # A table's suspended game is shown with its table, to every player seated there.
+    kinds = {save.id: db.scalar(select(Game.kind).where(Game.id == save.game_id)) for save in held}
+    waiting = [save for save in held if kinds[save.id] != "table"]
+    seated = db.scalars(
+        select(GameTable)
+        .join(TableSeat, TableSeat.table_id == GameTable.id)
+        .join(Game, Game.id == GameTable.game_id)
+        .where(TableSeat.user_id == user_id, Game.status == "saved")
+    )
+    tables = [view for table in seated if (view := suspended_view(db, table, user_id))]
+    tables.sort(key=lambda found: found.saved_at, reverse=True)
     ended = db.scalars(
         select(GameSave)
         .where(
@@ -427,6 +584,8 @@ def list_saves(request: Request, principal: Player, db: Db) -> Saves:
     return Saves(
         saves=[saved_game(db, save, principal, campaign) for save in waiting],
         ended=[saved_game(db, save, principal, campaign) for save in ended],
+        tables=tables,
+        held=len(held),
         limit=SAVE_LIMIT,
         days=SAVE_DAYS,
     )
@@ -516,6 +675,61 @@ async def save_game(game_id: UUID, request: Request, principal: Player, db: Db) 
     return await run_in_threadpool(read)
 
 
+async def take_up(hub: GameHub, save_id: UUID, game_id: UUID, now: datetime) -> LiveGame:
+    """Asks the engine to resume a saved game and records it running again: the game as this
+    process follows it, not yet registered. The caller holds a slot (``hub.reserve``) and the
+    locks of the players it concerns. A save the engine cannot give back is ended, and says so
+    (410); an engine that is full or not ready leaves the save waiting (429, 503)."""
+    engine = hub.require_engine()
+    try:
+        status, body = await engine.request(
+            "POST",
+            f"/games/{game_id}/attach",
+            body={"resume": True},
+            timeout=CREATE_TIMEOUT_SECONDS,
+        )
+    except EngineUnavailable as error:
+        raise unavailable() from error
+    if status == 429:
+        words = body.get("message") if isinstance(body, dict) else None
+        raise ApiError(
+            429,
+            "games_busy",
+            words if isinstance(words, str) else ENGINE_FULL,
+            {"Retry-After": "30"},
+        )
+    answered = body.get("status") if status == 200 and isinstance(body, dict) else None
+    if status in (404, 405, 409) or answered == "finished":
+        # The engine cannot give the game back: another build holds it (an upgrade), or its
+        # recording is gone or damaged. A recording with a result is not a saved game's, and
+        # is not played on either.
+        code = body.get("code") if isinstance(body, dict) else None
+        reason = "upgrade" if code == "recording_incompatible" else "unrecoverable"
+        log.warning("Saved game %s cannot be resumed (%s, %s)", game_id, status, code)
+        await retried(
+            partial(end_one, hub.database, save_id, reason, now),
+            f"end the save of game {game_id}",
+        )
+        raise ApiError(410, "save_ended", ENDED_WORDS[reason])
+    if answered not in ("attached", "recovered") or not isinstance(body.get("seats"), list):
+        # Still loading its cards, or something else that passes: the save waits.
+        raise unavailable()
+    live = await retried(
+        partial(record_resumed, hub.database, save_id, game_id, seat_tokens(body), now),
+        f"record game {game_id} as resumed",
+    )
+    if live is None:
+        # Running in the engine and not followed: closed there, and ended here.
+        await hub.give_up([game_id])
+        await retried(
+            partial(end_one, hub.database, save_id, "unrecoverable", now),
+            f"end the save of game {game_id}",
+        )
+        raise ApiError(410, "save_ended", ENDED_WORDS["unrecoverable"])
+    metrics.count("saves.resumed")
+    return live
+
+
 @router.post(
     "/saves/{save_id}/resume",
     response_model=GameSummary,
@@ -529,13 +743,14 @@ async def save_game(game_id: UUID, request: Request, principal: Player, db: Db) 
 async def resume_save(save_id: UUID, request: Request, principal: Player, db: Db) -> GameSummary:
     """Plays a saved game on: the engine takes it up where it stopped, and it is your running
     game again. 410 when the save has ended (it ran out, the game was upgraded, or it could not
-    be read back); the game then ends interrupted, with no result."""
+    be read back); the game then ends interrupted, with no result. A table's suspended game is
+    played on at its table instead (409 ``table_save``)."""
     hub = hub_of(request)
-    engine = hub.require_engine()
+    hub.require_engine()
     user_id = principal.user.id
     async with hub.locks[user_id]:
         now = utcnow()
-        game_id = await run_in_threadpool(open_game_of, hub.database, save_id, user_id, now)
+        game_id = await run_in_threadpool(open_game_of, hub.database, save_id, user_id, now, True)
         if not full_access(principal):
             running = await run_in_threadpool(active_games_of, db, user_id)
             await run_in_threadpool(db.commit)
@@ -547,53 +762,7 @@ async def resume_save(save_id: UUID, request: Request, principal: Player, db: Db
                 )
         hub.reserve()
         try:
-            try:
-                status, body = await engine.request(
-                    "POST",
-                    f"/games/{game_id}/attach",
-                    body={"resume": True},
-                    timeout=CREATE_TIMEOUT_SECONDS,
-                )
-            except EngineUnavailable as error:
-                raise unavailable() from error
-            if status == 429:
-                words = body.get("message") if isinstance(body, dict) else None
-                raise ApiError(
-                    429,
-                    "games_busy",
-                    words if isinstance(words, str) else ENGINE_FULL,
-                    {"Retry-After": "30"},
-                )
-            answered = body.get("status") if status == 200 and isinstance(body, dict) else None
-            if status in (404, 405, 409) or answered == "finished":
-                # The engine cannot give the game back: another build holds it (an upgrade), or
-                # its recording is gone or damaged. A recording with a result is not a saved
-                # game's, and is not played on either.
-                code = body.get("code") if isinstance(body, dict) else None
-                reason = "upgrade" if code == "recording_incompatible" else "unrecoverable"
-                log.warning("Saved game %s cannot be resumed (%s, %s)", game_id, status, code)
-                await retried(
-                    partial(end_one, hub.database, save_id, reason, now),
-                    f"end the save of game {game_id}",
-                )
-                raise ApiError(410, "save_ended", ENDED_WORDS[reason])
-            if answered not in ("attached", "recovered") or not isinstance(body.get("seats"), list):
-                # Still loading its cards, or something else that passes: the save waits.
-                raise unavailable()
-            live = await retried(
-                partial(record_resumed, hub.database, save_id, game_id, seat_tokens(body), now),
-                f"record game {game_id} as resumed",
-            )
-            if live is None:
-                # Running in the engine and not followed: closed there, and ended here.
-                await hub.give_up([game_id])
-                await retried(
-                    partial(end_one, hub.database, save_id, "unrecoverable", now),
-                    f"end the save of game {game_id}",
-                )
-                raise ApiError(410, "save_ended", ENDED_WORDS["unrecoverable"])
-            hub.register(live)
-            metrics.count("saves.resumed")
+            hub.register(await take_up(hub, save_id, game_id, now))
         finally:
             hub.starting -= 1
 
@@ -626,3 +795,320 @@ async def discard_save(save_id: UUID, request: Request, principal: Player) -> Re
             f"discard the save of game {game_id}",
         )
     return Response(status_code=204)
+
+
+# A private table's game, suspended by its players together.
+
+
+def table_game(db: Session, code: str) -> tuple[GameTable, Game | None]:
+    """The table by its code, and its game. A table that does not exist is not found."""
+    table = find(db, code)
+    return table, db.get(Game, table.game_id) if table.game_id is not None else None
+
+
+def table_of(database: Engine, game_id: UUID) -> tuple[UUID, UUID, str] | None:
+    """The id, host and code of the table a game was started at."""
+    with Session(database) as db:
+        table = db.scalar(select(GameTable).where(GameTable.game_id == game_id))
+        return (table.id, table.host_id, table.code) if table is not None else None
+
+
+async def carry_out(hub: GameHub, game: LiveGame) -> UUID | None:
+    """Suspends a table's game every player who must has agreed to: the engine stops it, and it
+    is one of the host's saves. None when there is nothing to do any more (the game ended, or
+    the vote is no longer whole). A refusal ends the proposal, tells the table why, and is
+    raised; the game plays on."""
+    async with hub.locks[("suspend", game.id)]:
+        if game.finished or game.ending or game.saving or not hub.suspension_agreed(game):
+            return None
+        engine = hub.require_engine()
+        now = utcnow()
+        found = await run_in_threadpool(table_of, hub.database, game.id)
+        if found is None:
+            hub.suspension_ended(game)
+            return None
+        table_id, host_id, code = found
+
+        def refused(error: ApiError) -> ApiError:
+            hub.suspension_ended(game, refused=error.message)
+            return error
+
+        if await run_in_threadpool(held_by, hub.database, host_id, now) >= SAVE_LIMIT:
+            raise refused(
+                ApiError(
+                    409,
+                    "save_limit",
+                    f"The table's host holds {SAVE_LIMIT} saved games: one must be resumed or "
+                    "discarded before this game can be suspended.",
+                )
+            )
+        if game.finished or game.ending or game.saving:
+            return None
+        expires = now + timedelta(days=SAVE_DAYS)
+        turn = turn_of(game)
+        hub.pause(game)
+        try:
+            status, body = await engine.request(
+                "POST",
+                f"{game.path}/save",
+                body={"until_millis": int(expires.timestamp() * 1000)},
+                timeout=SAVE_TIMEOUT_SECONDS,
+            )
+        except EngineUnavailable as error:
+            hub.go_on(game)
+            raise refused(unavailable()) from error
+        build = body.get("engine_build") if isinstance(body, dict) else None
+        if status != 200 or not isinstance(build, str) or not build:
+            hub.go_on(game)
+            metrics.count("saves.refused", status=str(status))
+            raise refused(save_refusal(status, body))
+        try:
+            save_id = await retried(
+                partial(
+                    record_saved,
+                    hub.database,
+                    game.id,
+                    host_id,
+                    now,
+                    expires,
+                    build,
+                    turn,
+                    table_id,
+                ),
+                f"record the suspension of game {game.id}",
+            )
+        except Exception:
+            log.exception("Game %s was stopped to be suspended and could not be recorded", game.id)
+            try:
+                await engine.request("POST", f"{game.path}/discard", body={})
+            except EngineUnavailable:
+                pass
+            hub.go_on(game)
+            hub.suspension_ended(game, refused="The game could not be suspended.")
+            raise
+        game.suspension.clear()
+        game.suspension_by = None
+        metrics.count("saves.saved")
+        await hub.saved(game, save_id, table=code)
+        return save_id
+
+
+async def suspend_agreed(hub: GameHub, game: LiveGame) -> None:
+    """The hub's own asking (a player who had not agreed went away for long, or left the game,
+    and everyone left has agreed): carried out, with a refusal told to the table and no one
+    else to raise it to."""
+    try:
+        await carry_out(hub, game)
+    except ApiError:
+        pass
+
+
+def live_seat(hub: GameHub, game: Game | None, user_id: UUID) -> tuple[LiveGame, int]:
+    """The table's running game and the caller's seat in it, still in play."""
+    live = hub.games.get(game.id) if game is not None and game.status == "active" else None
+    if live is None or live.finished or live.ending:
+        raise ApiError(
+            409, "game_not_running", "The table's game is not being played: nothing to suspend."
+        )
+    seat = live.seat_of(user_id)
+    if seat is None or seat.left is not None:
+        raise ApiError(
+            409, "not_in_game", "Only a player still in the game votes on suspending it."
+        )
+    return live, seat.seat
+
+
+@router.post(
+    "/tables/{code}/suspension",
+    response_model=SuspensionVote,
+    responses={409: {"model": Error}, 503: {"model": Error}},
+)
+async def agree_to_suspend(
+    code: Code, request: Request, principal: Player, db: Db
+) -> SuspensionVote:
+    """Proposes to suspend a private table's game, or agrees to the proposal: the game is saved
+    to be played on later once every player still in it who is present has agreed. A player
+    away for two minutes or longer does not vote. The save is one of the host's five."""
+    hub = hub_of(request)
+    table, game = await run_in_threadpool(table_game, db, code)
+    host_id = table.host_id
+    await run_in_threadpool(db.commit)
+    live, seat = live_seat(hub, game, principal.user.id)
+    assert game is not None
+    refuse_unsuspendable(table, game)
+    if live.saving:
+        raise ApiError(409, "game_saving", "The game is being saved.")
+    if not live.suspension:
+        # Asked before anyone is asked to agree: a proposal that could not be carried out.
+        if await run_in_threadpool(held_by, hub.database, host_id, utcnow()) >= SAVE_LIMIT:
+            raise ApiError(
+                409,
+                "save_limit",
+                f"The table's host holds {SAVE_LIMIT} saved games: one must be resumed or "
+                "discarded before this game can be suspended.",
+            )
+        if live.finished or live.ending or live.saving:
+            raise ApiError(409, "game_not_running", "The table's game is over.")
+        if not live.suspension:
+            live.suspension_by = seat
+    live.suspension.add(seat)
+    if hub.suspension_agreed(live):
+        proposed_by = live.suspension_by
+        state = hub.suspension_state(live)
+        save_id = await carry_out(hub, live)
+        if save_id is not None:
+            return SuspensionVote(
+                status="suspended",
+                proposed_by=proposed_by,
+                agreed=state["agreed"],
+                needed=state["needed"],
+                save_id=save_id,
+            )
+    state = hub.suspension_state(live)
+    if not live.finished:
+        hub.broadcast(live, state)
+    return SuspensionVote(
+        status="voting",
+        proposed_by=state["proposed_by"],
+        agreed=state["agreed"],
+        needed=state["needed"],
+    )
+
+
+@router.delete("/tables/{code}/suspension", status_code=204, responses={409: {"model": Error}})
+async def decline_to_suspend(code: Code, request: Request, principal: Player, db: Db) -> Response:
+    """Declines the proposal to suspend the table's game, or withdraws it: the proposal is over
+    for everyone, and the table is told who ended it."""
+    hub = hub_of(request)
+    _, game = await run_in_threadpool(table_game, db, code)
+    await run_in_threadpool(db.commit)
+    live, seat = live_seat(hub, game, principal.user.id)
+    if live.suspension and not live.saving:
+        hub.suspension_ended(live, declined_by=seat)
+    return Response(status_code=204)
+
+
+def set_ready(
+    database: Engine, code: str, user_id: UUID, ready: bool, now: datetime
+) -> tuple[UUID, UUID, UUID, list[UUID]] | None:
+    """The caller is back at the suspended table and ready to play on, or no longer is. Returns
+    the table, the save, the game and its players still in it once every one of them is ready;
+    None while someone is not."""
+    with Session(database) as db:
+        table, _ = table_game(db, code)
+        found = suspended_of(db, table)
+        if found is None:
+            raise ApiError(409, "not_suspended", "This table's game is not suspended.")
+        game, save = found
+        if save.expires_at <= now:
+            end_save(db, save, "expired", now)
+            db.commit()
+            raise ApiError(410, "save_ended", ENDED_WORDS["expired"])
+        playing = players_of(db, game.id)
+        if not playing.get(user_id, False):
+            raise ApiError(
+                409, "not_in_game", "Only a player still in the game gets ready to play it on."
+            )
+        rows = list(db.scalars(select(TableSeat).where(TableSeat.table_id == table.id)))
+        for row in rows:
+            if row.user_id == user_id:
+                row.ready = ready
+        db.commit()
+        needed = [user for user, still in playing.items() if still]
+        back = {row.user_id for row in rows if row.ready}
+        if ready and set(needed) <= back:
+            return table.id, save.id, game.id, needed
+        return None
+
+
+def unready(database: Engine, table_id: UUID, user_ids: list[UUID]) -> None:
+    with Session(database) as db:
+        for row in db.scalars(select(TableSeat).where(TableSeat.table_id == table_id)):
+            if row.user_id in user_ids:
+                row.ready = False
+        db.commit()
+
+
+def table_view(db: Session, code: str, principal: Principal) -> TableView:
+    db.expire_all()
+    return view_of(db, find(db, code), principal)
+
+
+def over_limit(db: Session, request: Request, players: list[UUID]) -> UUID | None:
+    """The first of the players who has no room for one more running game, if any has."""
+    for user_id in players:
+        try:
+            under_limits(db, request, [user_id])
+        except ApiError:
+            return user_id
+    return None
+
+
+@router.post(
+    "/tables/{code}/suspension/ready",
+    response_model=TableView,
+    responses={
+        409: {"model": Error},
+        410: {"model": Error},
+        429: {"model": Error},
+        503: {"model": Error},
+    },
+)
+async def ready_to_play_on(code: Code, request: Request, principal: Player, db: Db) -> TableView:
+    """You are back at the suspended table and ready to play on. Once every player still in the
+    game is, the engine takes the game up where it stopped and the table is started again: the
+    reply's ``game_id`` is then the running game. A player with another game running cannot get
+    ready (409 ``game_limit``)."""
+    hub = hub_of(request)
+    hub.require_engine()
+    user_id = principal.user.id
+    if not full_access(principal):
+        running = await run_in_threadpool(active_games_of, db, user_id)
+        await run_in_threadpool(db.commit)
+        if running >= hub.settings.games_per_account:
+            raise ApiError(
+                409,
+                "game_limit",
+                "Finish, save or close your running game before playing this one on.",
+            )
+    table, _ = await run_in_threadpool(table_game, db, code)
+    table_id = table.id
+    await run_in_threadpool(db.commit)
+    async with hub.locks[table_id]:
+        now = utcnow()
+        whole = await run_in_threadpool(set_ready, hub.database, code, user_id, True, now)
+        if whole is not None:
+            _, save_id, game_id, players = whole
+            async with AsyncExitStack() as stack:
+                # Every player's lock, in one order, as a table's start takes them.
+                for player in sorted(players, key=str):
+                    await stack.enter_async_context(hub.locks[player])
+                short = await run_in_threadpool(over_limit, db, request, players)
+                if short is not None:
+                    # Started another game since getting ready: they get ready again, later.
+                    await run_in_threadpool(unready, hub.database, table_id, [short])
+                else:
+                    hub.reserve()
+                    try:
+                        hub.register(await take_up(hub, save_id, game_id, now))
+                    finally:
+                        hub.starting -= 1
+    return await run_in_threadpool(table_view, db, code, principal)
+
+
+@router.delete(
+    "/tables/{code}/suspension/ready",
+    response_model=TableView,
+    responses={409: {"model": Error}, 410: {"model": Error}},
+)
+async def not_ready_to_play_on(
+    code: Code, request: Request, principal: Player, db: Db
+) -> TableView:
+    """You are not ready to play the suspended game on after all."""
+    hub = hub_of(request)
+    table, _ = await run_in_threadpool(table_game, db, code)
+    table_id = table.id
+    await run_in_threadpool(db.commit)
+    async with hub.locks[table_id]:
+        await run_in_threadpool(set_ready, hub.database, code, principal.user.id, False, utcnow())
+    return await run_in_threadpool(table_view, db, code, principal)
