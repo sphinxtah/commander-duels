@@ -49,7 +49,7 @@ class GameEventsTest {
         long expected = 1;
         int lastTurn = 0;
         for (JsonObject event : events) {
-            assertEquals(1, event.get("v").getAsInt(), event.toString());
+            assertEquals(2, event.get("v").getAsInt(), event.toString());
             assertEquals(expected++, event.get("seq").getAsLong(), "numbered in order, without a gap");
             assertTrue(event.get("turn").getAsInt() >= lastTurn, "turns never go back: " + event);
             lastTurn = event.get("turn").getAsInt();

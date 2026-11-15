@@ -5969,7 +5969,7 @@
         "type": "object"
       },
       "EventsPage": {
-        "description": "A page of a game's events, as the perspective may see them.",
+        "description": "A page of a game's events, as the perspective may see them, oldest first.",
         "properties": {
           "events": {
             "items": {
@@ -5979,10 +5979,20 @@
             "title": "Events",
             "type": "array"
           },
+          "first": {
+            "default": 0,
+            "title": "First",
+            "type": "integer"
+          },
           "game_id": {
             "format": "uuid",
             "title": "Game Id",
             "type": "string"
+          },
+          "more": {
+            "default": false,
+            "title": "More",
+            "type": "boolean"
           },
           "next": {
             "title": "Next",
@@ -6007,6 +6017,14 @@
               }
             ],
             "title": "Seat"
+          },
+          "turns": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "default": {},
+            "title": "Turns",
+            "type": "object"
           }
         },
         "required": [
@@ -33748,7 +33766,7 @@
     },
     "/api/v1/games/{game_id}/timeline": {
       "get": {
-        "description": "A game's structured events after ``since``, oldest first (v0.9.10), of one ``turn`` or one\n``type`` if asked: a player's own seat's perspective, or with ``view=inspection`` everything,\nfor SysOp (and an administrator outside a game they play against people), each reading\naudited. Anyone else is answered 404.",
+        "description": "A game's structured events, oldest first (v0.9.10): after ``since``, or since v1.0.0 the\nlast ones ``before`` a number; of one ``turn``, of the ``type``s named (one, or several with\ncommas), of one ``seat``, or naming a card (``q``, part of a name the reader may see). A\nplayer's own seat's perspective, or with ``view=inspection`` everything, for SysOp (and an\nadministrator outside a game they play against people), each reading audited. Anyone else is\nanswered 404. A running game's events are read from the engine first, so that the page holds\nwhat has just happened.",
         "operationId": "game_events_api_v1_games__game_id__timeline_get",
         "parameters": [
           {
@@ -33822,7 +33840,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "maxLength": 32,
+                  "maxLength": 400,
                   "type": "string"
                 },
                 {
@@ -33830,6 +33848,58 @@
                 }
               ],
               "title": "Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before"
+            }
+          },
+          {
+            "in": "query",
+            "name": "seat",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 7,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Seat"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 80,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
             }
           }
         ],

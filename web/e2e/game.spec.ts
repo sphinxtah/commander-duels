@@ -843,6 +843,31 @@ test.describe("practice games in the browser", () => {
       quality: 80,
     });
     expect(shot || snapshot.result!.turns <= 2).toBe(true);
+
+    // The game's timeline (v1.0.0, docs/timeline.md), from the result's own button: the real
+    // engine's events, read through this seat's eyes. A burn deck cast its spells for their cost,
+    // and the turns are headed by whose they were.
+    await page.getByRole("button", { name: "See the timeline" }).click();
+    const timeline = page.locator('[data-drawer="timeline"]');
+    await expect(timeline).toHaveAttribute("data-open", "true");
+    await expect(
+      timeline
+        .locator('li[data-group="spells"]', { hasText: /cast .+ for/ })
+        .first(),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(
+      timeline.getByRole("region", { name: /^Turn \d+ · / }).last(),
+    ).toBeVisible();
+    await expect(timeline.getByRole("alert")).toHaveCount(0);
+    // A land tapped for mana is bookkeeping: told only when every event is asked for.
+    await expect(timeline.locator("li[data-quiet]")).toHaveCount(0);
+    await timeline.getByLabel("Every event, bookkeeping too").check();
+    await expect(timeline.locator("li[data-quiet]").first()).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath("game-timeline.jpg"),
+      type: "jpeg",
+      quality: 80,
+    });
   });
 
   test("a game saved from the Game menu is resumed from Your games and played to its end (v1.0.0)", async ({

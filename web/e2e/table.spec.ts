@@ -11,7 +11,11 @@ import {
   type TableFixture,
 } from "../src/game/table/fixtures";
 import { occluded, sizeChecks } from "./helpers/checks";
-import { openTable, respondingFixture } from "./helpers/fakeTable";
+import {
+  openTable,
+  respondingFixture,
+  type TimelineEvent,
+} from "./helpers/fakeTable";
 
 // The game screen on the fake table (design §24.2): Vite's dev server with no engine and no API.
 // Each table is a fixture sent over a fake game socket. The sizes are the scope's: 1280 × 720 to
@@ -220,6 +224,134 @@ test.describe("playing on the table", () => {
       "data-open",
     );
     await expect(log).toBeFocused();
+    expect(table.commands).toEqual([]);
+    expect(await table.problems()).toEqual([]);
+  });
+
+  test("the timeline explains a death by its rule, shows a card, and opens at What changed? from the chip", async ({
+    page,
+  }) => {
+    // A game's events as the API shows them to seat 0 (v1.0.0, docs/timeline.md): a Lightning
+    // Bolt that cost {1} more kills the Grizzly Bears.
+    const bears = { ref: "o10", name: "Grizzly Bears", owner: 1 };
+    const bolt = { ref: "o2", name: "Lightning Bolt", owner: 0 };
+    const at = { v: 2, epoch: 0, turn: 1, step: "precombat_main" };
+    const events: TimelineEvent[] = [
+      { ...at, seq: 1, type: "step", active: 0 },
+      {
+        ...at,
+        seq: 2,
+        type: "cast",
+        player: 0,
+        object: { ...bolt, mana_cost: "{R}" },
+        cost: {
+          paid: "{1}{R}",
+          changes: [
+            {
+              how: "more",
+              by: { ref: "o3", name: "Sphere of Resistance", owner: 1 },
+            },
+          ],
+        },
+      },
+      { ...at, seq: 3, type: "resolve", player: 0, object: bolt },
+      { ...at, seq: 4, type: "damage", target: bears, amount: 3, cause: bolt },
+      {
+        ...at,
+        seq: 5,
+        type: "zone_change",
+        from: "battlefield",
+        to: "graveyard",
+        player: 1,
+        object: { ...bears, ref: "o11", was: "o10" },
+        why: "lethal_damage",
+      },
+    ];
+    const fixture = tableFixture("duel");
+    await page.setViewportSize({ width: 1366, height: 768 });
+    const table = await openTable(page, { fixture, timeline: events });
+    await sizeChecks(page, { width: 1366, height: 768, dpr: 1 });
+
+    // Its own diamond, beside the log's; the log stays what it was.
+    const diamond = page.getByRole("button", { name: "Timeline" });
+    const drawer = page.locator('[data-drawer="timeline"]');
+    await expect(page.getByRole("button", { name: "Game log" })).toBeVisible();
+    await diamond.click();
+    await expect(drawer).toHaveAttribute("data-open", "true");
+    await expect(
+      drawer.getByRole("heading", { name: "Timeline", level: 2 }),
+    ).toBeVisible();
+    const cast = drawer.locator('li[data-seq="2"]');
+    await expect(cast).toContainText("cast Lightning Bolt for");
+    await expect(cast).toContainText(
+      "Its cost was raised by Sphere of Resistance.",
+    );
+    const died = drawer.locator('li[data-seq="5"]');
+    await expect(died).toContainText("Grizzly Bears died.");
+    await expect(died).toContainText(
+      "It had been dealt 3 damage this turn, by Lightning Bolt.",
+    );
+    // The rule opens How to play in a tab of its own: the game goes on where it is.
+    const rule = died.getByRole("link", {
+      name: /^Rule 704\.5g, in How to play/,
+    });
+    await expect(rule).toHaveAttribute("href", "/#how-to-play/rules/704.5g");
+    await expect(rule).toHaveAttribute("target", "_blank");
+    // A card's name shows its picture under the line, by the keyboard too.
+    const name = died.getByRole("button", { name: "Grizzly Bears" });
+    await name.focus();
+    await page.keyboard.press("Enter");
+    await expect(died.locator("figure img")).toBeVisible();
+    await expect(name).toHaveAttribute("aria-expanded", "true");
+    // Nothing of the drawer is wider than it: no sideways scrolling at 1366 wide.
+    const overflow = await drawer.evaluate((element) => {
+      const list = element.querySelector('[role="region"]') as HTMLElement;
+      return list.scrollWidth - list.clientWidth;
+    });
+    expect(overflow).toBeLessThanOrEqual(1);
+    await page.keyboard.press("Escape");
+    await expect(drawer).not.toHaveAttribute("data-open");
+    await expect(diamond).toBeFocused();
+
+    // A board wipe resolves: the table offers "What changed?", and opens nothing by itself.
+    const wrath = { ref: "o30", name: "Wrath of God", owner: 0 };
+    events.push(
+      { ...at, turn: 2, seq: 6, type: "step", active: 1 },
+      { ...at, turn: 2, seq: 7, type: "resolve", player: 0, object: wrath },
+      ...[
+        "Runeclaw Bear",
+        "Savannah Lions",
+        "Elvish Mystic",
+        "Llanowar Elves",
+      ].map((creature, index) => ({
+        ...at,
+        turn: 2,
+        seq: 8 + index,
+        type: "zone_change",
+        from: "battlefield",
+        to: "graveyard",
+        player: 1,
+        object: { ref: `o4${index}`, name: creature, owner: 1 },
+        why: "destroyed",
+        cause: wrath,
+      })),
+    );
+    const wiped = structuredClone(fixture.snapshot);
+    wiped.revision += 1;
+    expect(wiped.view!.battlefield.length).toBeGreaterThanOrEqual(3);
+    wiped.view!.battlefield = [];
+    table.send(wiped);
+    const chip = page.getByRole("button", { name: /^What changed\?/ });
+    await expect(chip).toBeVisible({ timeout: 8000 });
+    await expect(drawer).not.toHaveAttribute("data-open");
+    await chip.click();
+    await expect(drawer).toHaveAttribute("data-open", "true");
+    const summary = drawer.locator("details[data-changed]");
+    await expect(summary).toHaveAttribute("open", "");
+    await expect(summary).toContainText(
+      "4 permanents went to the graveyard: Runeclaw Bear, Savannah Lions, Elvish Mystic, Llanowar Elves.",
+    );
+    await expect(chip).toBeHidden();
     expect(table.commands).toEqual([]);
     expect(await table.problems()).toEqual([]);
   });

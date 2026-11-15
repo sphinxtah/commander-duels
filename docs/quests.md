@@ -128,6 +128,7 @@ The badges are generated medallions drawn as SVG in the page (`web/src/records/B
 - **The history for the player and SysOp alone:** each game with its date, format and kind, the opponents (a player by handle, a bot by its skill, and which seat won), the player's own deck with its revision, the outcome, the turns and the length, newest first, 20 at a time. Another player asking answers 403 `history_private`. SysOp reads anyone's (permission `players.history`, SysOp's alone, [identity](identity.md#roles-and-permissions-auth06-auth07-sec05)); the reading is not audited, since the history holds nothing hidden.
 - **What it never shows** (PROG08): another seat's deck, at any time, to anyone; a table's code; an email address. A history names only the player's own deck, as its seat names it.
 - **Replays.** No game is recorded for replay yet, so the history offers none (PROG08's "replay availability").
+- **The timeline** (v1.0.0). In the player's own history each game links its [timeline](timeline.md) for 89 days after it ended, a day short of the 90 its events are kept: the game event by event, through that player's own seat's eyes. SysOp reading another player's history is offered none: a timeline is read through a seat, and that seat is not SysOp's.
 
 ## After a reset, and deleting an account
 

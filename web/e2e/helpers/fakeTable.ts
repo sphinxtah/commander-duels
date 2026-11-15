@@ -61,6 +61,12 @@ function gameId(): string {
   return `00000000-0000-4000-8000-${String(games).padStart(12, "0")}`;
 }
 
+/** An event of a game's timeline, as GET /api/v1/games/{id}/timeline gives it. */
+export type TimelineEvent = { seq: number; type: string } & Record<
+  string,
+  unknown
+>;
+
 /** The portrait the fake summary gives the fixtures' own player, Alice (seat 0). */
 export const ALICE_PORTRAIT = "rowan";
 
@@ -76,6 +82,9 @@ export async function openTable(
     settings?: Partial<TableSettings>;
     portraits?: Record<number, string | null>;
     humans?: Record<number, string>;
+    /** The game's structured events (v1.0.0), as the API shows them to the fixture's seat: the
+     * timeline is answered from this list as it stands when asked, so a journey may add to it. */
+    timeline?: TimelineEvent[];
   },
 ): Promise<FakeTable> {
   const fixture =
@@ -215,6 +224,50 @@ export async function openTable(
       },
     }),
   );
+  // The game's timeline (v1.0.0): the events after a number, or the last ones before one, of the
+  // types asked for, as the API pages them. A table without events has an empty timeline.
+  const timeline = options.timeline ?? [];
+  await page.route(`**/api/v1/games/${id}/timeline**`, (route) => {
+    const query = new URL(route.request().url()).searchParams;
+    const limit = Number(query.get("limit") ?? 500);
+    const types = query.get("type")?.split(",");
+    let found = timeline.filter(
+      (event) => !types || types.includes(event.type),
+    );
+    let more = false;
+    const before = query.get("before");
+    if (before !== null) {
+      found = found.filter((event) => event.seq < Number(before));
+      more = found.length > limit;
+      found = found.slice(-limit);
+    } else {
+      found = found.filter(
+        (event) => event.seq > Number(query.get("since") ?? 0),
+      );
+      more = found.length > limit;
+      found = found.slice(0, limit);
+    }
+    // Whose turn each of the page's turns was, from the game's steps.
+    const turns: Record<string, unknown> = {};
+    for (const event of timeline)
+      if (
+        event.type === "step" &&
+        found.some((shown) => shown.turn === event.turn)
+      )
+        turns[String(event.turn)] = event.active;
+    return route.fulfill({
+      json: {
+        game_id: id,
+        perspective: "seat",
+        seat: fixture.seat,
+        turns,
+        events: found,
+        next: found.at(-1)?.seq ?? Number(query.get("since") ?? 0),
+        first: found[0]?.seq ?? 0,
+        more,
+      },
+    });
+  });
   // The app's check-in (v0.4.3) and the friends' chat socket (v0.4.4) run on every screen, the
   // table's too: both are answered as for an account with nothing new.
   await page.route("**/api/v1/presence", (route) =>

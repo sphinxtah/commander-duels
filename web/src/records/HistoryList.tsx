@@ -22,6 +22,16 @@ function when(iso: string) {
   });
 }
 
+/** How long a game's events are kept after it (api/events.py, EVENT_RETENTION_DAYS). */
+export const TIMELINE_DAYS = 90;
+
+/** Whether a game that ended then still has its events: a day short of the 90, so that a link is
+ * never offered to a timeline the daily job is about to remove. */
+export function hasTimeline(finishedAt: string, now = Date.now()): boolean {
+  const age = now - new Date(finishedAt).getTime();
+  return age >= 0 && age < (TIMELINE_DAYS - 1) * 24 * 60 * 60 * 1000;
+}
+
 function details(item: HistoryEntry): string {
   const parts = [];
   if (item.deck)
@@ -110,7 +120,17 @@ export function HistoryList({ playerId }: { playerId?: string }) {
                   {formatName(item.format)} against{" "}
                   {opponentsWords(item.opponents)}
                 </span>
-                <small>{details(item)}</small>
+                <small>
+                  {details(item)}
+                  {/* The game's timeline (v1.0.0), for as long as its events are kept: the
+                      account's own games only, read through its own seat's eyes. */}
+                  {!playerId && hasTimeline(item.finished_at) && (
+                    <>
+                      {" · "}
+                      <a href={`#timeline/${item.game_id}`}>Timeline</a>
+                    </>
+                  )}
+                </small>
               </span>
               <time dateTime={item.finished_at}>{when(item.finished_at)}</time>
             </li>

@@ -20,6 +20,7 @@ export type IconName =
   | "hourglass"
   | "menu"
   | "log"
+  | "timeline"
   | "priority"
   | "fullscreen"
   | "inspect"
@@ -44,6 +45,8 @@ export const ICONS: Record<IconName, string> = {
     "M7 3h10M7 21h10M8 3c0 5 8 6 8 9s-8 4-8 9M16 3c0 5-8 6-8 9s8 4 8 9",
   menu: "M5 7h14M5 12h14M5 17h14",
   log: "M6 4h12v16H6zM9 8h6M9 12h6M9 16h4",
+  // The timeline (v1.0.0): a line of time with what happened along it.
+  timeline: "M6 3v18M6 7h12M6 12h8M6 17h11",
   priority: "M6 4v16M12 4v16M18 4v16M4 8h4M10 15h4M16 11h4",
   fullscreen: "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5",
   inspect:

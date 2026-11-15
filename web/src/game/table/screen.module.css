@@ -190,6 +190,23 @@
   color: #e7cf9b;
   font-size: 1rem;
 }
+/* A notice that is pressed (v1.0.0): "What changed?" after a large resolution. The notices' row
+   lets presses through to the table; this one takes them. */
+.chipButton {
+  min-height: 44px;
+  border-color: #e6c68c;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.chipButton:hover,
+.chipButton:focus-visible {
+  background: #1c2c29;
+  outline: 2px solid #f4dca6;
+  outline-offset: 2px;
+}
 
 /* ---------- the Game menu (§9.1) ---------- */
 .gameMenu {

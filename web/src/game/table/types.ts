@@ -337,6 +337,7 @@ export interface BandLayout {
   hud: {
     menu: Diamond;
     log: Diamond;
+    timeline: Diamond;
     priority: Diamond;
     fullscreen: Diamond;
     inspection: Diamond | null;
@@ -423,7 +424,7 @@ export interface StageFit {
 
 /* ---------- interface state (external store; no React re-render on pointer moves) ---------- */
 export type DrawerId =
-  "log" | "priority" | "inspection" | "options" | "zone" | "chat";
+  "log" | "timeline" | "priority" | "inspection" | "options" | "zone" | "chat";
 export type TimerPhase =
   "idle" | "arming" | "running" | "paused" | "stopped" | "expired";
 export interface TimerView {

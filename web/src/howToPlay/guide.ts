@@ -1739,7 +1739,8 @@ export const GUIDE: GuideChapter[] = [
             items: [
               "Rest the pointer on any card for the magnifier; right-click or Z to zoom it.",
               "Cards you can play from your hand glow pink; cards with something to do glow purple; your choices glow teal.",
-              "The game log, the priority controls and the table's options open as drawers at the right; the game goes on beside them.",
+              "The game log, the timeline, the priority controls and the table's options open as drawers at the right; the game goes on beside them.",
+              "The timeline tells the game event by event, with what explains each: what a spell cost and what changed its cost, why a creature died, why a spell did not resolve, each with its rule. After a big spell resolves, a What changed? chip sums up what it did.",
               "Tab moves between the zones and controls; the arrow keys move between cards; Enter answers.",
             ],
           },

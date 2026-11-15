@@ -16,14 +16,21 @@ An object a perspective may not see is shown as ``{"hidden": true, "owner": seat
 name and its id before a move are all withheld, so nothing in an event's ids or metadata says
 which card it was.
 
-Kept ``EVENT_RETENTION_DAYS`` after the game ended (the owner's question, assumed at 90 days on
-2026-11-12), then removed by the worker's daily job (``sweep``).
+Kept ``EVENT_RETENTION_DAYS`` after the game ended (90 days: assumed on 2026-11-12, the owner's
+decision on 2026-11-14), then removed by the worker's daily job (``sweep``).
+
+Since v1.0.0 the timeline's screen reads them (docs/timeline.md): the newest first or from a
+number on, of some kinds, of one seat, or naming a card. Every such narrowing that could tell what
+a reader may not see (a name, a seat's own card) is applied to the events as the reader sees them,
+never to the rows, so that asking for "Counterspell" finds no card that is hidden from the asker.
+A running game's newest events are read from the engine as the timeline is asked for.
 """
 
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from functools import partial
 from typing import Annotated, Any, Literal, Protocol
 from uuid import UUID
 
@@ -78,23 +85,41 @@ def sees(seen_by: object, perspective: Perspective) -> bool:
     return perspective.kind == "seat" and isinstance(seen_by, list) and perspective.seat in seen_by
 
 
+def shown_object(value: object, perspective: Perspective) -> object:
+    """An event's object as the perspective may see it: itself without who else may see it, or
+    hidden. A seat (``{"seat": n}``) and anything that is no object are everyone's."""
+    if not isinstance(value, dict) or "seat" in value:
+        return value
+    if "ref" not in value or not sees(value.get("seen_by"), perspective):
+        hidden: dict[str, Any] = {"hidden": True}
+        if isinstance(value.get("owner"), int):
+            hidden["owner"] = value["owner"]
+        return hidden
+    return {name: part for name, part in value.items() if name != "seen_by"}
+
+
 def filtered(event: dict[str, Any], perspective: Perspective) -> dict[str, Any]:
     """The event as the perspective may see it. Inspection sees it whole; every other perspective
-    sees each object it may see without who else may, and every other object as hidden."""
+    sees each object it may see without who else may, and every other object as hidden: the
+    event's own (``object``, ``target``, ``cause``) and, since the events' version 2, the sources
+    of what changed a cast's cost (``cost.changes[].by``)."""
     if perspective.kind == "inspection":
         return dict(event)
     shown = dict(event)
     for key in OBJECT_FIELDS:
-        value = shown.get(key)
-        if not isinstance(value, dict) or "seat" in value:
-            continue
-        if "ref" not in value or not sees(value.get("seen_by"), perspective):
-            hidden: dict[str, Any] = {"hidden": True}
-            if isinstance(value.get("owner"), int):
-                hidden["owner"] = value["owner"]
-            shown[key] = hidden
-        else:
-            shown[key] = {name: part for name, part in value.items() if name != "seen_by"}
+        if key in shown:
+            shown[key] = shown_object(shown[key], perspective)
+    cost = shown.get("cost")
+    if isinstance(cost, dict) and isinstance(cost.get("changes"), list):
+        shown["cost"] = {
+            **cost,
+            "changes": [
+                {**change, "by": shown_object(change["by"], perspective)}
+                if isinstance(change, dict) and "by" in change
+                else change
+                for change in cost["changes"]
+            ],
+        }
     return shown
 
 
@@ -238,14 +263,22 @@ def sweep(db: Session, now: datetime) -> int:
 
 
 class EventsPage(BaseModel):
-    """A page of a game's events, as the perspective may see them."""
+    """A page of a game's events, as the perspective may see them, oldest first."""
 
     game_id: UUID
     perspective: Literal["seat", "spectator", "inspection"]
     seat: int | None
     events: list[dict[str, Any]]
-    # The last number given, to ask after; the same as asked when there was nothing new.
+    # The number to ask after for what follows: the last one given, or, when the page was not
+    # filled, the last one looked at; the same as asked when there was nothing new.
     next: int
+    # Since v1.0.0. The lowest number given, to ask before for what came earlier; 0 with no event.
+    first: int = 0
+    # Whether events that fit were left out of the page: later ones, or with ``before`` earlier.
+    more: bool = False
+    # Whose turn each turn of the page's events was: the turn's number to its active seat. A
+    # narrowed page holds no steps of its own to tell.
+    turns: dict[int, int] = {}
 
 
 def perspective_for(
@@ -285,6 +318,44 @@ def perspective_for(
     return None
 
 
+def names_in(event: dict[str, Any]) -> list[str]:
+    """The names an event shows: of its objects, and of what changed a cast's cost."""
+    values = [event.get(key) for key in OBJECT_FIELDS]
+    cost = event.get("cost")
+    if isinstance(cost, dict) and isinstance(cost.get("changes"), list):
+        values += [change.get("by") for change in cost["changes"] if isinstance(change, dict)]
+    return [
+        value["name"]
+        for value in values
+        if isinstance(value, dict) and isinstance(value.get("name"), str)
+    ]
+
+
+def involves(event: dict[str, Any], seat: int) -> bool:
+    """Whether the event is the seat's: it did it, it happened to the seat, or to a card of the
+    seat's (whose it is is told of a hidden card too, as at a table)."""
+    if event.get("player") == seat:
+        return True
+    for key in OBJECT_FIELDS:
+        value = event.get(key)
+        if isinstance(value, dict) and (value.get("seat") == seat or value.get("owner") == seat):
+            return True
+    return False
+
+
+@dataclass(frozen=True)
+class Page:
+    """What a reading found: the events, where it stopped, and whether more fit."""
+
+    events: list[dict[str, Any]]
+    last_read: int
+    more: bool
+
+
+# How many rows a narrowed reading takes from the database at once.
+READ_CHUNK = 500
+
+
 def read(
     db: Session,
     game_id: UUID,
@@ -292,37 +363,85 @@ def read(
     since: int,
     limit: int,
     turn: int | None = None,
-    kind: str | None = None,
-) -> list[dict[str, Any]]:
-    """The events after ``since`` in order, of one turn or one kind if asked (both indexed)."""
-    query = select(GameEventRow.event).where(
-        GameEventRow.game_id == game_id, GameEventRow.seq > since
-    )
+    kinds: Iterable[str] | None = None,
+    *,
+    before: int | None = None,
+    seat: int | None = None,
+    text: str | None = None,
+) -> Page:
+    """The events after ``since`` in order, or with ``before`` the last ones before that number
+    (still oldest first): of one turn or of some kinds if asked (both indexed), of one seat, or
+    naming ``text``. The seat and the text are judged on each event as the perspective sees it:
+    a hidden card's name finds nothing."""
+    query = select(GameEventRow.event).where(GameEventRow.game_id == game_id)
     if turn is not None:
         query = query.where(GameEventRow.turn == turn)
-    if kind is not None:
-        query = query.where(GameEventRow.type == kind)
-    rows = db.scalars(query.order_by(GameEventRow.seq).limit(limit))
-    return filtered_all((dict(event) for event in rows), perspective)
+    wanted = sorted(set(kinds)) if kinds is not None else []
+    if wanted:
+        query = query.where(GameEventRow.type.in_(wanted))
+    backwards = before is not None
+    needle = text.casefold().strip() if text else ""
+    # Narrowed by what only the shown event tells, a page may need many rows; otherwise one more
+    # than the page says whether there is more.
+    size = READ_CHUNK if seat is not None or needle else limit + 1
+    found: list[dict[str, Any]] = []
+    edge = before if before is not None else since
+    last_read = edge
+    more = False
+    while not more:
+        if backwards:
+            chunk = query.where(GameEventRow.seq < edge).order_by(GameEventRow.seq.desc())
+        else:
+            chunk = query.where(GameEventRow.seq > edge).order_by(GameEventRow.seq)
+        rows: list[dict[str, Any]] = [dict(event) for event in db.scalars(chunk.limit(size))]
+        for event in filtered_all(rows, perspective):
+            if seat is not None and not involves(event, seat):
+                continue
+            if needle and not any(needle in name.casefold() for name in names_in(event)):
+                continue
+            if len(found) == limit:
+                more = True
+                break
+            found.append(event)
+            last_read = int(event["seq"])
+        else:
+            if rows:
+                edge = last_read = int(rows[-1]["seq"])
+        if len(rows) < size:
+            break
+    if backwards:
+        found.reverse()
+    return Page(found, last_read, more)
 
 
-@router.get("/games/{game_id}/timeline", response_model=EventsPage)
-def game_events(
-    game_id: UUID,
-    request: Request,
-    principal: Active,
-    db: Db,
-    since: Annotated[int, Query(ge=0)] = 0,
-    limit: Annotated[int, Query(ge=1, le=MAX_PAGE)] = MAX_PAGE,
-    view: Annotated[Literal["seat", "inspection"], Query()] = "seat",
-    turn: Annotated[int | None, Query(ge=0)] = None,
-    type: Annotated[str | None, Query(max_length=32)] = None,
-) -> EventsPage:
-    """A game's structured events after ``since``, oldest first (v0.9.10), of one ``turn`` or one
-    ``type`` if asked: a player's own seat's perspective, or with ``view=inspection`` everything,
-    for SysOp (and an administrator outside a game they play against people), each reading
-    audited. Anyone else is answered 404."""
-    perspective = perspective_for(db, principal, game_id, view == "inspection")
+def turn_owners(db: Session, game_id: UUID, turns: Iterable[int]) -> dict[int, int]:
+    """Whose turn each of the turns was: the active seat of its steps (public, as at a table)."""
+    wanted = sorted(set(turns))
+    owners: dict[int, int] = {}
+    if not wanted:
+        return owners
+    rows = db.execute(
+        select(GameEventRow.turn, GameEventRow.event)
+        .where(
+            GameEventRow.game_id == game_id,
+            GameEventRow.type == "step",
+            GameEventRow.turn.in_(wanted),
+        )
+        .order_by(GameEventRow.seq)
+    )
+    for turn, event in rows:
+        active = event.get("active") if isinstance(event, dict) else None
+        if isinstance(active, int):
+            # A turn's later steps stand: an extra turn's controller is the last to be named.
+            owners[int(turn)] = active
+    return owners
+
+
+def viewer(
+    db: Session, request: Request, principal: Principal, game_id: UUID, inspect: bool, since: int
+) -> Perspective:
+    """The eyes a timeline is read through, or 404; an inspection is audited."""
+    perspective = perspective_for(db, principal, game_id, inspect)
     if perspective is None:
         if db.scalar(select(GameSeat.seat).where(GameSeat.game_id == game_id).limit(1)) is not None:
             # The game exists and the caller has no view of it; answered as a missing game all
@@ -337,14 +456,68 @@ def game_events(
             actor_id=principal.user.id,
             details={"game": str(game_id), "since": since},
         )
-        db.commit()
-    events = read(db, game_id, perspective, since, limit, turn, type)
+    # No pooled connection is held while the engine is asked for the game's newest events.
+    db.commit()
+    return perspective
+
+
+@router.get("/games/{game_id}/timeline", response_model=EventsPage)
+async def game_events(
+    game_id: UUID,
+    request: Request,
+    principal: Active,
+    db: Db,
+    since: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE)] = MAX_PAGE,
+    view: Annotated[Literal["seat", "inspection"], Query()] = "seat",
+    turn: Annotated[int | None, Query(ge=0)] = None,
+    type: Annotated[str | None, Query(max_length=400)] = None,
+    before: Annotated[int | None, Query(ge=1)] = None,
+    seat: Annotated[int | None, Query(ge=0, le=7)] = None,
+    q: Annotated[str | None, Query(max_length=80)] = None,
+) -> EventsPage:
+    """A game's structured events, oldest first (v0.9.10): after ``since``, or since v1.0.0 the
+    last ones ``before`` a number; of one ``turn``, of the ``type``s named (one, or several with
+    commas), of one ``seat``, or naming a card (``q``, part of a name the reader may see). A
+    player's own seat's perspective, or with ``view=inspection`` everything, for SysOp (and an
+    administrator outside a game they play against people), each reading audited. Anyone else is
+    answered 404. A running game's events are read from the engine first, so that the page holds
+    what has just happened."""
+    perspective = await run_in_threadpool(
+        viewer, db, request, principal, game_id, view == "inspection", since
+    )
+    hub = getattr(request.app.state, "games", None)
+    if hub is not None:
+        await hub.events_fresh(game_id)
+    kinds = [kind for kind in (type or "").split(",") if kind]
+    page = await run_in_threadpool(
+        partial(
+            read,
+            db,
+            game_id,
+            perspective,
+            since,
+            limit,
+            turn,
+            kinds,
+            before=before,
+            seat=seat,
+            text=q,
+        )
+    )
+    events = page.events
+    turns = await run_in_threadpool(
+        turn_owners, db, game_id, {int(event.get("turn", 0)) for event in events}
+    )
     return EventsPage(
         game_id=game_id,
         perspective=perspective.kind,
         seat=perspective.seat,
         events=events,
-        next=int(events[-1]["seq"]) if events else since,
+        next=since if before is not None else max(since, page.last_read),
+        first=int(events[0]["seq"]) if events else 0,
+        more=page.more,
+        turns=turns,
     )
 
 
@@ -375,6 +548,16 @@ def timeline_lines(events: Iterable[dict[str, Any]]) -> list[str]:
             parts.append(name(event["object"]))
         if kind == "zone_change":
             parts.append(f"{event.get('from')} -> {event.get('to')}")
+        if isinstance(event.get("cost"), dict):
+            cost = event["cost"]
+            parts.append(f"for {cost.get('paid')}")
+            for change in cost.get("changes") or []:
+                by = "commander tax" if change.get("tax") else name(change.get("by"))
+                parts.append(f"[{change.get('how')}: {by}]")
+        if event.get("why"):
+            parts.append(f"<{event['why']}>")
+        if event.get("immediate"):
+            parts.append("(immediate)")
         if "target" in event:
             parts.append("-> " + name(event["target"]))
         if event.get("amount") is not None:

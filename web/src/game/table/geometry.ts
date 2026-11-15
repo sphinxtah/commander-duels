@@ -83,11 +83,13 @@ export const BAND = {
     side: 26,
     menu: 32,
     log: 76,
-    priority: 120,
-    fullscreen: 164,
-    inspection: 208,
+    // The timeline's diamond (v1.0.0) stands beside the log's; the ones after it moved over.
+    timeline: 120,
+    priority: 164,
+    fullscreen: 208,
+    inspection: 252,
   },
-  turnText: rect(236, 494, 470, 526),
+  turnText: rect(280, 494, 470, 526),
   status: rect(476, 494, 592, 526),
   /** Step text is right-aligned to x 1530, or 1410 while the combat icons show. */
   stepRight: 1530,

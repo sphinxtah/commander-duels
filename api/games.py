@@ -206,6 +206,8 @@ STARTUP_ATTACH_SECONDS = 5.0
 CLOSE_RECOVERING = 4503
 # How often a running game's events are read from the engine (v0.9.10), at most, in seconds.
 EVENTS_EVERY = 5.0
+# A timeline asked for reads a running game's events anew when they are older than this.
+EVENTS_FRESH = 1.0
 # The engine's words when its games' memory is spent (v0.9.10, docs/engine/isolation.md).
 ENGINE_FULL = "The tables are full; try again in a minute."
 RETRY_MAX_SECONDS = 30.0
@@ -1033,6 +1035,18 @@ class GameHub:
             return
         game.events_reading = True
         self.spawn(self.read_events(game))
+
+    async def events_fresh(self, game_id: UUID) -> None:
+        """A timeline asked for (v1.0.0, api/events.py): a game this process runs has its new
+        events read now, unless they were read within the last EVENTS_FRESH seconds or are being
+        read, so that its reader sees what has just happened and many readers ask the engine
+        once."""
+        game = self.games.get(game_id)
+        if game is None or game.finished or game.events_reading or self.engine is None:
+            return
+        if time.monotonic() - game.events_read_at < EVENTS_FRESH:
+            return
+        await self.read_events(game)
 
     async def read_events(self, game: LiveGame) -> None:
         """Reads and keeps the game's new events. Never fails the game: an engine that cannot

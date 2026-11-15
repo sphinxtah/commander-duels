@@ -59,6 +59,7 @@ import { useHud } from "./shell/hud";
 import { PageBand } from "./shell/PageBand";
 import { pages, type Page } from "./shell/pages";
 import { PLAY_GAMES_ROUTE, PlayPage } from "./shell/PlayPage";
+import { TIMELINE_ROUTE, TimelinePage } from "./timeline/TimelinePage";
 import { MusicBox } from "./shell/music/MusicBox";
 import { TopBar } from "./shell/TopBar";
 import {
@@ -134,6 +135,10 @@ function currentHowToPlay(): string | undefined {
 function currentPlayGames(): boolean {
   return PLAY_GAMES_ROUTE.test(window.location.hash);
 }
+/** #timeline/<game> (v1.0.0): a game's timeline on a page of its own, once the game is over. */
+function currentTimeline(): string | undefined {
+  return TIMELINE_ROUTE.exec(window.location.hash)?.[1]?.toLowerCase();
+}
 /** #player/<id> opens a player's profile (v0.4.3), under Friends. */
 function currentPlayer(): string | undefined {
   return PLAYER_ROUTE.exec(window.location.hash)?.[1]?.toLowerCase();
@@ -149,7 +154,12 @@ function currentPage(): Page {
   if (path.startsWith("tables/")) return "Tables";
   // Tivit's Auction House's tabs (v0.6.0): #auctions/search, #auctions/list, #auctions/targets.
   if (path.startsWith("auctions/")) return "Auctions";
-  if (path.startsWith("match/") || path === "play/games") return "Play";
+  if (
+    path.startsWith("match/") ||
+    path.startsWith("timeline/") ||
+    path === "play/games"
+  )
+    return "Play";
   // The campaign (v0.8.0), and its way back from a duel.
   if (path.startsWith("campaign/")) return "Campaign";
   if (path.startsWith("deck/") || path.startsWith("shared/")) return "Decks";
@@ -169,6 +179,7 @@ export function App() {
   const [tableRoute, setTableRoute] = useState(currentTable);
   const [matchRoute, setMatchRoute] = useState(currentMatch);
   const [playGames, setPlayGames] = useState(currentPlayGames);
+  const [timelineRoute, setTimelineRoute] = useState(currentTimeline);
   const [playerRoute, setPlayerRoute] = useState(currentPlayer);
   const [campaignRoute, setCampaignRoute] = useState(currentCampaign);
   const [messagesRoute, setMessagesRoute] = useState(currentMessages);
@@ -318,6 +329,7 @@ export function App() {
       setTableRoute(currentTable());
       setMatchRoute(currentMatch());
       setPlayGames(currentPlayGames());
+      setTimelineRoute(currentTimeline());
       setPlayerRoute(currentPlayer());
       setCampaignRoute(currentCampaign());
       setMessagesRoute(currentMessages());
@@ -750,6 +762,12 @@ export function App() {
                 me={me}
                 heading={heading}
                 returning={campaignRoute}
+              />
+            ) : page === "Play" && timelineRoute ? (
+              <TimelinePage
+                key={timelineRoute}
+                gameId={timelineRoute}
+                heading={heading}
               />
             ) : page === "Play" && matchRoute ? (
               <MatchPage

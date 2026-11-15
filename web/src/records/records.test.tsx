@@ -12,7 +12,7 @@ import {
   stats,
   totals,
 } from "./fixtures";
-import { HistoryList } from "./HistoryList";
+import { hasTimeline, HistoryList } from "./HistoryList";
 import { PlayerRecord } from "./PlayerRecord";
 import { RecordTable } from "./RecordTable";
 import { duration, formatName, opponentsWords, winRate } from "./records";
@@ -296,12 +296,17 @@ describe("the games one by one (v0.5.0)", () => {
       .spyOn(client, "GET")
       .mockResolvedValueOnce(ok(history([game()], "next-page")))
       .mockResolvedValueOnce(ok(history([older])));
+    // Ten days after the fixture's game: its events are kept (90 days), so its timeline is linked.
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-01T00:00:00Z"));
     render(<HistoryList />);
     await settle();
     const list = screen.getByRole("list", { name: "Games, newest first" });
     expect(within(list).getAllByRole("listitem")[0]).toHaveTextContent(
-      "WonCommander against two skill-3 botsRed Test, revision 2 · 9 turns · 24 minOct 22, 2026",
+      "WonCommander against two skill-3 botsRed Test, revision 2 · 9 turns · 24 min · TimelineOct 22, 2026",
     );
+    expect(
+      within(list).getByRole("link", { name: "Timeline" }),
+    ).toHaveAttribute("href", `#timeline/${game().game_id}`);
     fireEvent.click(screen.getByRole("button", { name: "Show older games" }));
     await settle();
     expect(get).toHaveBeenLastCalledWith("/api/v1/me/history", {
@@ -315,6 +320,20 @@ describe("the games one by one (v0.5.0)", () => {
     expect(
       screen.queryByRole("button", { name: "Show older games" }),
     ).toBeNull();
+  });
+
+  it("link a game's timeline only while its events are kept, and only in one's own list", async () => {
+    const day = 24 * 60 * 60 * 1000;
+    const ended = Date.parse("2026-10-22T18:24:00Z");
+    expect(hasTimeline("2026-10-22T18:24:00Z", ended + 88 * day)).toBe(true);
+    expect(hasTimeline("2026-10-22T18:24:00Z", ended + 89 * day)).toBe(false);
+    expect(hasTimeline("2026-10-22T18:24:00Z", ended - day)).toBe(false);
+    // Another player's games, as SysOp reads them: their timelines are not SysOp's seat's.
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-01T00:00:00Z"));
+    vi.spyOn(client, "GET").mockResolvedValue(ok(history([game()])));
+    render(<HistoryList playerId={ADA} />);
+    await settle();
+    expect(screen.queryByRole("link", { name: "Timeline" })).toBeNull();
   });
 
   it("say when there are none", async () => {

@@ -11,6 +11,9 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -18,14 +21,33 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import mage.MageObject;
+import mage.abilities.Ability;
+import mage.abilities.SpellAbility;
+import mage.abilities.TriggeredAbility;
+import mage.abilities.costs.VariableCost;
+import mage.abilities.costs.mana.ManaCost;
+import mage.abilities.effects.ContinuousEffectsList;
+import mage.abilities.effects.CostModificationEffect;
+import mage.abilities.effects.common.cost.CommanderCostModification;
+import mage.constants.CostModificationType;
 import mage.constants.PhaseStep;
+import mage.constants.SpellAbilityCastMode;
+import mage.constants.SubType;
 import mage.constants.WatcherScope;
 import mage.constants.Zone;
+import mage.counters.CounterType;
 import mage.game.Game;
 import mage.game.events.DamagedEvent;
 import mage.game.events.GameEvent;
 import mage.game.events.ZoneChangeEvent;
+import mage.game.permanent.Permanent;
+import mage.game.stack.Spell;
+import mage.game.stack.StackAbility;
+import mage.game.stack.StackObject;
+import mage.util.CardUtil;
 import mage.watchers.Watcher;
 
 /**
@@ -49,9 +71,16 @@ import mage.watchers.Watcher;
  * ({@value #FILE}), one JSON line each. A checkpoint holds the sequence number it was taken at
  * ({@link Checkpoint#eventSeq}); a game taken up again keeps the events up to it and makes the rest
  * again as the journal is played, under a new {@code epoch}, so the log is always the game's own.
+ *
+ * <p><b>Version 2 (v1.0.0, for the timeline).</b> What XMage's events do not say and the game still
+ * knows as they happen: what a spell cost and what changed its cost ({@code cost} on a cast, the
+ * printed {@code mana_cost} on its object), why a permanent left the battlefield ({@code why} on its
+ * zone change: lethal damage, a toughness of 0, the legend rule, destroyed, sacrificed), a spell or
+ * ability that left the stack without resolving ({@code fizzled}), and which resolutions never were
+ * on the stack ({@code immediate}: a mana ability). Each is told only where the game is sure of it.
  */
 final class GameEvents {
-    static final int VERSION = 1;
+    static final int VERSION = 2;
     static final String FILE = "events.jsonl";
     /** The live games' event logs, by game id: the taps in their states find them here. */
     private static final Map<String, GameEvents> LIVE = new ConcurrentHashMap<>();
@@ -63,8 +92,14 @@ final class GameEvents {
      * checkpoint's copy is never played.
      */
     static final class Tap extends Watcher {
-        private static final long serialVersionUID = 1L;
+        private static final long serialVersionUID = 2L;
         private String gameId;
+        /**
+         * How often each commander was cast from the command zone before now (903.8), by its main
+         * card: kept here, in the game's state, so that it is right after a recovery and a rollback,
+         * and whatever the order XMage's own watcher of the same count is asked in.
+         */
+        private final HashMap<UUID, Integer> commandCasts = new HashMap<>();
 
         Tap(String gameId) {
             super(WatcherScope.GAME);
@@ -73,15 +108,38 @@ final class GameEvents {
 
         @Override
         public void watch(GameEvent event, Game game) {
+            int castsBefore = 0;
+            if (event.getType() == GameEvent.EventType.SPELL_CAST && event.getZone() == Zone.COMMAND) {
+                UUID main = CardUtil.getMainCardId(game, event.getSourceId());
+                if (main != null) {
+                    castsBefore = commandCasts.merge(main, 1, Integer::sum) - 1;
+                }
+            }
             if (gameId == null || game.isSimulation()) {
                 return;
             }
             GameEvents events = LIVE.get(gameId);
             if (events != null) {
-                events.on(event, game);
+                events.on(event, game, castsBefore);
             }
         }
     }
+
+    /** A spell or ability on the stack that has neither resolved nor been countered yet. */
+    private static final class Pending {
+        final JsonObject object;
+        final StackObject item;
+        boolean resolved;
+        boolean countered;
+
+        Pending(JsonObject object, StackObject item) {
+            this.object = object;
+            this.item = item;
+        }
+    }
+
+    /** How a permanent left the battlefield, as XMage said before its move was told. */
+    private record Leaving(String why, int zoneChanges) {}
 
     private final String gameId;
     private final Path file;
@@ -93,6 +151,10 @@ final class GameEvents {
     private String lastStep;
     private BufferedWriter writer;
     private boolean writeFailed;
+    /** What is on the stack, by its id there, in the order it was put there. */
+    private final Map<UUID, Pending> pending = new LinkedHashMap<>();
+    /** Permanents XMage said were destroyed or sacrificed, until their zone change is told. */
+    private final Map<UUID, Leaving> leaving = new HashMap<>();
 
     /**
      * @param folder the game's recording folder, or null for a game that keeps no recording
@@ -144,6 +206,17 @@ final class GameEvents {
         // Watchers.add keeps a tap already there (a game restored from a checkpoint carries its own);
         // looking it up first logged an error with a stack trace at the start of every game.
         game.getState().addWatcher(new Tap(gameId));
+        // A game taken up again has what its checkpoint had on the stack: followed from here, so
+        // that what leaves it without resolving is told as it was the first time.
+        pending.clear();
+        leaving.clear();
+        for (StackObject item : game.getStack()) {
+            com.google.gson.JsonElement made = object(item instanceof Spell ? item.getId() : item.getSourceId(),
+                game, null);
+            if (made.isJsonObject()) {
+                pending.put(item.getId(), new Pending(made.getAsJsonObject(), item));
+            }
+        }
         LIVE.put(gameId, this);
     }
 
@@ -210,9 +283,10 @@ final class GameEvents {
     }
 
     /** The game's thread: one of XMage's events, made into the game's if it is one the schema keeps. */
-    synchronized void on(GameEvent event, Game game) {
+    synchronized void on(GameEvent event, Game game, int commandCastsBefore) {
         try {
-            JsonObject made = make(event, game);
+            settleStack(game);
+            JsonObject made = make(event, game, commandCastsBefore);
             if (made == null) {
                 return;
             }
@@ -272,7 +346,7 @@ final class GameEvents {
     }
 
     /** XMage's event in the schema's words, or null for one the schema does not keep. */
-    private JsonObject make(GameEvent event, Game game) {
+    private JsonObject make(GameEvent event, Game game, int commandCastsBefore) {
         JsonObject made = new JsonObject();
         switch (event.getType()) {
             case ZONE_CHANGE -> {
@@ -282,23 +356,48 @@ final class GameEvents {
                 made.addProperty("to", zone(move.getToZone()));
                 made.add("player", seatOf(ownerOf(move.getTargetId(), game, move.getPlayerId())));
                 made.add("object", moved(move, game));
-                cause(made, move.getSource() == null ? event.getSourceId() : move.getSource().getSourceId(),
-                    move.getTargetId(), game);
+                UUID source = move.getSource() == null ? event.getSourceId() : move.getSource().getSourceId();
+                cause(made, source, move.getTargetId(), game);
+                if (move.getFromZone() == Zone.BATTLEFIELD) {
+                    String why = whyItLeft(move, source == null || source.equals(move.getTargetId()), game);
+                    if (why != null) {
+                        made.addProperty("why", why);
+                    }
+                }
+            }
+            case DESTROYED_PERMANENT, SACRIFICED_PERMANENT -> {
+                // Told before the move itself, which XMage keeps for the end of the action: remembered
+                // for the zone change, by how often the permanent has changed zones, so that a later
+                // departure of the same card is never taken for this one.
+                if (event.getTargetId() != null) {
+                    leaving.put(event.getTargetId(), new Leaving(
+                        event.getType() == GameEvent.EventType.DESTROYED_PERMANENT ? "destroyed" : "sacrificed",
+                        game.getState().getZoneChangeCounter(event.getTargetId())));
+                }
+                return null;
             }
             case SPELL_CAST -> {
                 made.addProperty("type", "cast");
                 made.add("player", seatOf(event.getPlayerId()));
-                made.add("object", object(event.getTargetId(), game, null));
+                JsonObject cast = object(event.getTargetId(), game, null).getAsJsonObject();
+                made.add("object", cast);
+                Spell spell = game.getStack().getSpell(event.getTargetId());
+                if (spell != null) {
+                    cost(made, cast, spell, commandCastsBefore, game);
+                    pending.put(spell.getId(), new Pending(cast.deepCopy(), spell));
+                }
             }
             case ACTIVATED_ABILITY -> {
                 made.addProperty("type", "activate");
                 made.add("player", seatOf(event.getPlayerId()));
                 made.add("object", object(event.getSourceId(), game, null));
+                onStack(event.getTargetId(), made, game);
             }
             case TRIGGERED_ABILITY -> {
                 made.addProperty("type", "trigger");
                 made.add("player", seatOf(event.getPlayerId()));
                 made.add("object", object(event.getSourceId(), game, null));
+                onStack(event.getTargetId(), made, game);
             }
             case TARGETED -> {
                 made.addProperty("type", "target");
@@ -310,11 +409,19 @@ final class GameEvents {
                 made.addProperty("type", "resolve");
                 made.add("player", seatOf(event.getPlayerId()));
                 made.add("object", object(event.getSourceId(), game, null));
+                if (!resolvingFromTheStack(event, game)) {
+                    // Never on the stack: a mana ability, a special action (605.3b, 116).
+                    made.addProperty("immediate", true);
+                }
             }
             case COUNTERED -> {
                 made.addProperty("type", "countered");
                 made.add("object", object(event.getTargetId(), game, null));
                 cause(made, event.getSourceId(), event.getTargetId(), game);
+                Pending countered = pending.get(event.getTargetId());
+                if (countered != null) {
+                    countered.countered = true;
+                }
             }
             case ATTACKER_DECLARED -> {
                 made.addProperty("type", "attack");
@@ -370,6 +477,244 @@ final class GameEvents {
             }
         }
         return made;
+    }
+
+    /** An ability put onto the stack is followed until it leaves it. */
+    private void onStack(UUID abilityId, JsonObject made, Game game) {
+        StackObject item = abilityId == null ? null : game.getStack().getStackObject(abilityId);
+        if (item != null && made.get("object").isJsonObject()) {
+            pending.put(item.getId(), new Pending(made.getAsJsonObject("object").deepCopy(), item));
+        }
+    }
+
+    /** Whether the ability XMage says is resolving is the stack's top: marks it resolved if so. */
+    private boolean resolvingFromTheStack(GameEvent event, Game game) {
+        StackObject top = game.getStack().getFirstOrNull();
+        if (top == null) {
+            return false;
+        }
+        Ability ability = top.getStackAbility();
+        boolean same = ability != null && ability.getOriginalId() != null
+            && ability.getOriginalId().equals(event.getTargetId());
+        // A spell's further abilities (a spliced card's, a fused half's) resolve as the spell does.
+        if (!same && !(top instanceof Spell && top.getSourceId() != null
+                && top.getSourceId().equals(event.getSourceId()))) {
+            return false;
+        }
+        Pending found = pending.get(top.getId());
+        if (found != null) {
+            found.resolved = true;
+        }
+        return true;
+    }
+
+    /**
+     * What left the stack since the last event without resolving or being countered: a spell XMage
+     * marked as countered by the rules (608.2b: every target illegal), an ability whose targets are
+     * no longer legal, a triggered ability whose condition no longer holds (603.4). Anything else
+     * that left it says nothing: a permanent spell that became a permanent, an optional ability its
+     * player declined.
+     */
+    private void settleStack(Game game) {
+        if (pending.isEmpty()) {
+            return;
+        }
+        List<JsonObject> fizzled = new ArrayList<>();
+        for (Iterator<Map.Entry<UUID, Pending>> entries = pending.entrySet().iterator(); entries.hasNext();) {
+            Map.Entry<UUID, Pending> entry = entries.next();
+            if (game.getStack().getStackObject(entry.getKey()) != null) {
+                continue;
+            }
+            entries.remove();
+            Pending gone = entry.getValue();
+            if (gone.resolved || gone.countered) {
+                continue;
+            }
+            String why = null;
+            try {
+                if (gone.item instanceof Spell held) {
+                    MageObject last = game.getLastKnownInformation(entry.getKey(), Zone.STACK);
+                    if (held.isCountered() || (last instanceof Spell spell && spell.isCountered())) {
+                        why = "targets";
+                    }
+                } else if (gone.item instanceof StackAbility) {
+                    Ability ability = gone.item.getStackAbility();
+                    if (ability instanceof TriggeredAbility trigger && !trigger.checkInterveningIfClause(game)) {
+                        why = "condition";
+                    } else if (ability != null && !ability.getTargets().isEmpty()
+                            && !ability.getTargets().stillLegal(ability, game)) {
+                        why = "targets";
+                    }
+                }
+            } catch (RuntimeException e) {
+                // What cannot be judged any more is not claimed.
+                why = null;
+            }
+            if (why != null) {
+                JsonObject made = new JsonObject();
+                made.addProperty("type", "fizzled");
+                made.addProperty("of", gone.item instanceof Spell ? "spell" : "ability");
+                made.add("player", seatOf(gone.item.getControllerId()));
+                made.add("object", gone.object);
+                made.addProperty("why", why);
+                fizzled.add(made);
+            }
+        }
+        for (JsonObject made : fizzled) {
+            stepIfChanged(game);
+            add(made, game);
+        }
+    }
+
+    /**
+     * Why a permanent left the battlefield, where the game is sure: XMage said it was destroyed or
+     * sacrificed; destroyed by no source it had lethal damage (704.5g) or damage from deathtouch
+     * (704.5h); put into the graveyard by no source it had a toughness of 0 or less (704.5f), no
+     * loyalty (704.5i), a legendary namesake under the same control (704.5j), or was an Aura left
+     * without what it enchanted (704.5m). Null where none of these is so.
+     */
+    private String whyItLeft(ZoneChangeEvent move, boolean byNoSource, Game game) {
+        UUID id = move.getTargetId();
+        Leaving told = leaving.remove(id);
+        String why = told != null && told.zoneChanges() == game.getState().getZoneChangeCounter(id)
+            ? told.why() : null;
+        Permanent last = move.getTarget();
+        if (last == null && game.getLastKnownInformation(id, Zone.BATTLEFIELD) instanceof Permanent known) {
+            last = known;
+        }
+        if (last == null || !byNoSource) {
+            return why;
+        }
+        if ("destroyed".equals(why)) {
+            if (last.isCreature(game)) {
+                if (last.isDeathtouched()) {
+                    return "deathtouch";
+                }
+                if (last.getDamage() > 0 && last.getDamage() >= last.getToughness().getValue()) {
+                    return "lethal_damage";
+                }
+            }
+            return why;
+        }
+        if (why != null || move.getToZone() != Zone.GRAVEYARD) {
+            return why;
+        }
+        if (last.isCreature(game) && last.getToughness().getValue() <= 0) {
+            return "toughness";
+        }
+        if (last.isPlaneswalker(game) && last.getCounters(game).getCount(CounterType.LOYALTY) <= 0) {
+            return "loyalty";
+        }
+        if (last.isLegendary(game)) {
+            for (Permanent other : game.getBattlefield().getAllActivePermanents(last.getControllerId())) {
+                if (!other.getId().equals(id) && other.isLegendary(game) && other.getName().equals(last.getName())) {
+                    return "legend_rule";
+                }
+            }
+        }
+        if (last.hasSubtype(SubType.AURA, game)) {
+            return "unattached";
+        }
+        return null;
+    }
+
+    private static final Pattern SYMBOL = Pattern.compile("\\{([^}]+)\\}");
+
+    /** A mana cost in one line, its generic part first and summed: "{3}{R}"; "{0}" for nothing. */
+    static String costText(Iterable<? extends ManaCost> costs) {
+        int generic = 0;
+        StringBuilder rest = new StringBuilder();
+        for (ManaCost cost : costs) {
+            if (cost instanceof VariableCost) {
+                // X is in the cost as the mana it came to.
+                continue;
+            }
+            Matcher symbols = SYMBOL.matcher(cost.getText());
+            while (symbols.find()) {
+                String symbol = symbols.group(1);
+                if (symbol.chars().allMatch(Character::isDigit)) {
+                    generic += Integer.parseInt(symbol);
+                } else {
+                    rest.append('{').append(symbol).append('}');
+                }
+            }
+        }
+        if (generic == 0 && rest.length() == 0) {
+            return "{0}";
+        }
+        return (generic > 0 ? "{" + generic + "}" : "") + rest;
+    }
+
+    /**
+     * What the spell cost (v1.0.0): the mana its player had to pay ({@code paid}), which every seat
+     * sees paid, and the card's printed cost on the object itself, hidden with it. For a spell every
+     * seat may see, also the X chosen, the way it was cast if not the usual one, and what changed its
+     * cost: commander tax by its amount (903.8), and each cost-changing effect that applies to it by
+     * its source. A spell cast face down says only what was paid: what applies to the card beneath
+     * would tell what it is.
+     */
+    private void cost(JsonObject made, JsonObject cast, Spell spell, int commandCastsBefore, Game game) {
+        SpellAbility ability = spell.getSpellAbility();
+        if (ability == null) {
+            return;
+        }
+        JsonObject cost = new JsonObject();
+        String paid = costText(ability.getManaCostsToPay());
+        cost.addProperty("paid", paid);
+        made.add("cost", cost);
+        String printed = spell.getCard() == null ? null : spell.getCard().getManaCost().getText();
+        if (printed != null && !printed.isEmpty()) {
+            cast.addProperty("mana_cost", printed);
+        }
+        if (!cast.has("seen_by") || !cast.get("seen_by").isJsonPrimitive()) {
+            return;
+        }
+        if (printed != null && printed.contains("{X}")) {
+            cost.addProperty("x", CardUtil.getSourceCostsTagX(game, ability, 0));
+        }
+        SpellAbilityCastMode mode = ability.getSpellAbilityCastMode();
+        if (mode != null && mode != SpellAbilityCastMode.NORMAL) {
+            cost.addProperty("mode", mode.name().toLowerCase(Locale.ROOT));
+        }
+        JsonArray changes = new JsonArray();
+        if (commandCastsBefore > 0) {
+            JsonObject tax = new JsonObject();
+            tax.addProperty("how", "more");
+            tax.addProperty("tax", true);
+            tax.addProperty("amount", 2 * commandCastsBefore);
+            changes.add(tax);
+        }
+        Set<String> named = new LinkedHashSet<>();
+        for (ContinuousEffectsList<?> list : game.getContinuousEffects().allEffectsLists) {
+            for (Object found : list) {
+                if (!(found instanceof CostModificationEffect effect) || effect instanceof CommanderCostModification) {
+                    continue;
+                }
+                for (Ability source : list.getAbility(effect.getId())) {
+                    try {
+                        if (effect.isInactive(source, game) || !source.isInUseableZone(game, null, null)
+                                || !effect.applies(ability, source, game)) {
+                            continue;
+                        }
+                    } catch (RuntimeException e) {
+                        // An effect that cannot judge the spell after its cast names nothing.
+                        continue;
+                    }
+                    String how = effect.getModificationType() == CostModificationType.INCREASE_COST ? "more"
+                        : effect.getModificationType() == CostModificationType.REDUCE_COST ? "less" : "set";
+                    if (source.getSourceId() == null || !named.add(how + source.getSourceId())) {
+                        continue;
+                    }
+                    JsonObject change = new JsonObject();
+                    change.addProperty("how", how);
+                    change.add("by", object(source.getSourceId(), game, null));
+                    changes.add(change);
+                }
+            }
+        }
+        if (!changes.isEmpty()) {
+            cost.add("changes", changes);
+        }
     }
 
     /** A seat's number, or null for no seat. */

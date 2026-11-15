@@ -1624,6 +1624,7 @@ export const layoutTable: LayoutTable = (model, options) => {
     hud: {
       menu: hud(BAND.hud.menu),
       log: hud(BAND.hud.log),
+      timeline: hud(BAND.hud.timeline),
       priority: hud(BAND.hud.priority),
       fullscreen: hud(BAND.hud.fullscreen),
       // The slot is always kept; the HUD shows it to SysOp only.

@@ -42,6 +42,7 @@ const LEAST_FIT = 0.7;
 const HUD: BandLayout["hud"] = {
   menu: diamond(BAND.hud.menu, BAND.y, BAND.hud.side),
   log: diamond(BAND.hud.log, BAND.y, BAND.hud.side),
+  timeline: diamond(BAND.hud.timeline, BAND.y, BAND.hud.side),
   priority: diamond(BAND.hud.priority, BAND.y, BAND.hud.side),
   fullscreen: diamond(BAND.hud.fullscreen, BAND.y, BAND.hud.side),
   inspection: diamond(BAND.hud.inspection, BAND.y, BAND.hud.side),
@@ -96,6 +97,7 @@ export function BandHud({
   statusPhase,
   chat = null,
   friends = null,
+  timeline = false,
 }: {
   layout: TableLayout | null;
   sysop: boolean;
@@ -112,18 +114,25 @@ export function BandHud({
   /** At every table (v0.5.1): the diamond that brings out the chat bar (chat/ChatBar.tsx), with
    * the friends' messages not read yet. */
   friends?: { unread: number; open: boolean; onToggle(): void } | null;
+  /** The game has a timeline (v1.0.0): its diamond stands beside the log's. A scripted game has
+   * none, and the diamonds after it close the gap. */
+  timeline?: boolean;
 }) {
   const band = layout?.band ?? null;
   const hud = band?.hud ?? HUD;
   // The chat and the chat bar take the inspection's slot, which only SysOp uses, and the ones
   // after it, in turn; the turn line moves over by each slot taken past the inspection's.
   const step = BAND.hud.inspection - BAND.hud.fullscreen;
+  // Without the timeline's diamond everything after its place stands one step to the left.
+  const back = timeline ? 0 : step;
+  const moved = (at: Diamond): Diamond =>
+    back ? { ...at, cx: at.cx - back } : at;
   let slots = sysop ? 1 : 0;
   const slot = () =>
-    diamond(BAND.hud.inspection + slots++ * step, BAND.y, BAND.hud.side);
+    diamond(BAND.hud.inspection - back + slots++ * step, BAND.y, BAND.hud.side);
   const chatAt = chat ? slot() : null;
   const friendsAt = friends ? slot() : null;
-  const shift = Math.max(0, slots - 1) * step;
+  const shift = Math.max(0, slots - 1) * step - back;
   // While connected the status chip is hidden, and the turn line takes its place too (v0.5.1): a
   // long line ("Turn 12 · Your team’s turn") stays whole.
   const connected = statusText === "Connected";
@@ -133,13 +142,13 @@ export function BandHud({
     w: connected ? status.x + status.w - band.turnText.x : band.turnText.w,
   };
   const turnText =
-    shown && shift > 0
+    shown && shift !== 0
       ? { ...shown, x: shown.x + shift, w: shown.w - shift }
       : shown;
   // A line longer than its box is drawn smaller until it fits whole (v0.5.1), whatever the font
   // and the text size: with every diamond on the band (SysOp at a Two-Headed Giant human table:
   // the inspection, the table chat and the chat bar's) "Turn 12 · Other team’s turn" outgrows
-  // the 268 units left. Measured before it is painted, at its own size, for each line and width.
+  // the 224 units left (268 before v1.0.0's timeline diamond; the line is 309 wide). Measured before it is painted, at its own size, for each line and width.
   const turnBox = useRef<HTMLSpanElement>(null);
   const fitKey = `${turnLine?.turn ?? ""}\n${turnText?.w ?? 0}`;
   const [fit, setFit] = useState({ key: "", scale: 1 });
@@ -182,15 +191,23 @@ export function BandHud({
         onClick={() => onMenu(!menuOpen)}
       />
       <HudButton at={hud.log} icon="log" label="Game log" {...toggle("log")} />
+      {timeline && (
+        <HudButton
+          at={hud.timeline}
+          icon="timeline"
+          label="Timeline"
+          {...toggle("timeline")}
+        />
+      )}
       <HudButton
-        at={hud.priority}
+        at={moved(hud.priority)}
         icon="priority"
         label="Priority controls"
         {...toggle("priority")}
       />
       {fullscreen.available && (
         <HudButton
-          at={hud.fullscreen}
+          at={moved(hud.fullscreen)}
           icon="fullscreen"
           label="Full screen"
           aria-pressed={fullscreen.active}
@@ -200,7 +217,7 @@ export function BandHud({
       )}
       {sysop && hud.inspection && (
         <HudButton
-          at={hud.inspection}
+          at={moved(hud.inspection)}
           icon="inspect"
           label="Inspection"
           {...toggle("inspection")}

@@ -246,6 +246,37 @@ class CommanderScenarioTest {
         assertEquals(4, recast.tax(), "two casts from the command zone make the next one cost {4} more");
         assertTrue(check.reached.contains("commander zone graveyard"), "Isamaru's owner saw it in the graveyard");
 
+        // The game's events say the same (v1.0.0, the timeline): the first cast at its printed cost,
+        // the second {2} dearer by commander tax, and the death between them by lethal damage.
+        List<com.google.gson.JsonObject> casts = new ArrayList<>();
+        List<String> deaths = new ArrayList<>();
+        for (com.google.gson.JsonObject event : game.events().since(0, Integer.MAX_VALUE)) {
+            com.google.gson.JsonElement object = event.get("object");
+            if (object == null || !object.isJsonObject() || !object.getAsJsonObject().has("name")
+                    || object.getAsJsonObject().get("name").isJsonNull()
+                    || !ISAMARU.equals(object.getAsJsonObject().get("name").getAsString())) {
+                continue;
+            }
+            String type = event.get("type").getAsString();
+            if (type.equals("cast")) {
+                casts.add(event);
+            } else if (type.equals("zone_change") && "battlefield".equals(event.get("from").getAsString())) {
+                deaths.add(event.has("why") ? event.get("why").getAsString() : "none");
+            }
+        }
+        assertEquals(2, casts.size(), "Isamaru's casts: " + casts);
+        assertEquals("{W}", casts.get(0).getAsJsonObject("object").get("mana_cost").getAsString());
+        assertEquals("{W}", casts.get(0).getAsJsonObject("cost").get("paid").getAsString(), casts.get(0).toString());
+        assertTrue(!casts.get(0).getAsJsonObject("cost").has("changes"), "no tax on the first cast: " + casts.get(0));
+        com.google.gson.JsonObject taxed = casts.get(1).getAsJsonObject("cost");
+        assertEquals("{2}{W}", taxed.get("paid").getAsString(), casts.get(1).toString());
+        assertEquals(1, taxed.getAsJsonArray("changes").size(), casts.get(1).toString());
+        com.google.gson.JsonObject tax = taxed.getAsJsonArray("changes").get(0).getAsJsonObject();
+        assertTrue(tax.get("tax").getAsBoolean(), tax.toString());
+        assertEquals("more", tax.get("how").getAsString());
+        assertEquals(2, tax.get("amount").getAsInt());
+        assertEquals("lethal_damage", deaths.get(0), "Lightning Bolt killed Isamaru: " + deaths);
+
         SeatView.PermanentInfo stolen = (SeatView.PermanentInfo) check.seen.get("stolen");
         assertNotNull(stolen, "Control Magic never took Isamaru: " + check.reached);
         assertEquals(1, stolen.ownerSeat());

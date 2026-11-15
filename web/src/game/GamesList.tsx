@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { hasTimeline } from "../records/HistoryList";
 import { client, type Me } from "../api";
 import { useWorkflow } from "../app/rollout";
 import { COURT } from "../campaign/campaign";
@@ -137,6 +138,20 @@ export function GamesList({ me }: { me: Me }) {
                       ` · ${deckName(game.seats.find((s) => s.seat === game.your_seat)?.deck)}`}
                   </small>
                 </div>
+                {game.status !== "active" &&
+                  game.status !== "saved" &&
+                  game.your_seat !== null &&
+                  hasTimeline(game.finished_at ?? game.created_at) && (
+                    <div className={styles.gameActions}>
+                      {/* The game's timeline (v1.0.0), while its events are kept. */}
+                      <a
+                        className={styles.secondaryButton}
+                        href={`#timeline/${game.id}`}
+                      >
+                        Timeline
+                      </a>
+                    </div>
+                  )}
                 {game.status === "active" && (
                   <div className={styles.gameActions}>
                     <a

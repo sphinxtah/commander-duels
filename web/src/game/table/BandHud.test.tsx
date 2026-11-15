@@ -16,6 +16,7 @@ const layout = {
     hud: {
       menu: diamond(BAND.hud.menu, BAND.y, BAND.hud.side),
       log: diamond(BAND.hud.log, BAND.y, BAND.hud.side),
+      timeline: diamond(BAND.hud.timeline, BAND.y, BAND.hud.side),
       priority: diamond(BAND.hud.priority, BAND.y, BAND.hud.side),
       fullscreen: diamond(BAND.hud.fullscreen, BAND.y, BAND.hud.side),
       inspection: diamond(BAND.hud.inspection, BAND.y, BAND.hud.side),
@@ -26,7 +27,7 @@ const layout = {
   },
 } as unknown as TableLayout;
 
-function hud(turn: string, every = true) {
+function hud(turn: string, every = true, timeline = false) {
   const line: TurnLine = {
     turn,
     step: "Declare attackers",
@@ -52,6 +53,7 @@ function hud(turn: string, every = true) {
       statusPhase="open"
       chat={every ? { unread: 0 } : null}
       friends={{ unread: 3, open: false, onToggle: () => undefined }}
+      timeline={timeline}
     />
   );
 }
@@ -155,5 +157,37 @@ describe("the band's HUD", () => {
       diamond.backgroundColor,
     ]);
     badge.remove();
+  });
+});
+
+describe("the timeline's diamond (v1.0.0)", () => {
+  /** A diamond's centre along the band, in stage units, from its button's box. */
+  const centre = (name: string) => {
+    const style = screen.getByRole("button", { name }).style;
+    return Math.round(parseFloat(style.left) + parseFloat(style.width) / 2);
+  };
+
+  it("stands beside the log's, and the diamonds after it keep their order", () => {
+    render(hud("Turn 3 · Your turn", true, true));
+    const timeline = screen.getByRole("button", { name: "Timeline" });
+    expect(timeline).toHaveAttribute("aria-controls", "drawer-timeline");
+    expect(timeline).toHaveAttribute("aria-expanded", "false");
+    expect(centre("Game log")).toBe(BAND.hud.log);
+    expect(centre("Timeline")).toBe(BAND.hud.timeline);
+    expect(centre("Priority controls")).toBe(BAND.hud.priority);
+    expect(centre("Inspection")).toBe(BAND.hud.inspection);
+    const step = BAND.hud.priority - BAND.hud.timeline;
+    expect(centre("Table chat")).toBe(BAND.hud.inspection + step);
+    expect(centre("Friends and messages, 3 unread")).toBe(
+      BAND.hud.inspection + 2 * step,
+    );
+  });
+
+  it("leaves no gap in a game without one: a scripted game's band is as it was", () => {
+    render(hud("Turn 3 · Your turn", true, false));
+    expect(screen.queryByRole("button", { name: "Timeline" })).toBeNull();
+    expect(centre("Priority controls")).toBe(BAND.hud.timeline);
+    expect(centre("Inspection")).toBe(BAND.hud.fullscreen);
+    expect(centre("Table chat")).toBe(BAND.hud.inspection);
   });
 });

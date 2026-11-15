@@ -567,6 +567,47 @@ describe("Escape on the table", () => {
   });
 });
 
+describe("the timeline at the table (v1.0.0)", () => {
+  it("has its own diamond and drawer beside the log's, and reads the game only while it is open", async () => {
+    const { client } = await import("../api");
+    const asked = () =>
+      (vi.mocked(client.GET).mock.calls as unknown as unknown[][]).filter(
+        (call) => call[0] === "/api/v1/games/{game_id}/timeline",
+      ).length;
+    playing(view, null);
+    const before = asked();
+    const toggle = screen.getByRole("button", { name: "Timeline" });
+    const drawer = document.querySelector('[data-drawer="timeline"]')!;
+    expect(drawer).toHaveAttribute("hidden");
+    expect(drawer.tagName).not.toBe("DIALOG");
+    // The table's text log stays what it was.
+    expect(
+      screen.getByRole("button", { name: "Game log" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("log", { name: "Game log" })).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(drawer).toHaveAttribute("data-open");
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(
+      within(drawer as HTMLElement).getByRole("heading", { name: "Timeline" }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(asked()).toBeGreaterThan(before));
+    // Rules open in a tab of their own from a table; the search is the timeline's own.
+    expect(
+      within(drawer as HTMLElement).getByRole("search", {
+        name: "Narrow the timeline",
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(drawer).toHaveAttribute("hidden");
+    expect(within(drawer as HTMLElement).queryByRole("search")).toBeNull();
+    // No chip without a large resolution: nothing is offered, nothing opens by itself.
+    expect(screen.queryByRole("button", { name: /What changed/ })).toBeNull();
+  });
+});
+
 describe("a human table's game (v0.4.0)", () => {
   it("offers the vote on an away player, then shows what the game paid and leads to the lobby", async () => {
     const { client } = await import("../api");

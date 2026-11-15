@@ -68,6 +68,8 @@ import { DomLayer } from "./table/DomLayer";
 import { Drawer } from "./table/Drawers";
 import { useDragController } from "./table/dnd";
 import { GameMenu } from "./table/GameMenu";
+import { useWhatChanged } from "../timeline/chip";
+import { Timeline, type TimelineSeat } from "../timeline/Timeline";
 import { COMPACT_PILE_CAP, REGIONS } from "./table/geometry";
 import { useTableKeys } from "./table/keys";
 import { Magnifier } from "./table/Magnifier";
@@ -595,6 +597,38 @@ export function GameScreen({
     (atTable
       ? summary?.seats.find((entry) => entry.seat === seat)?.handle
       : null) ?? playerName(view, seat, observing);
+  // The timeline (v1.0.0, docs/timeline.md): in its own drawer, behind the diamond beside the
+  // log's, while the game runs and once it is over; a scripted game has no events to read. After
+  // a large resolution a chip offers "What changed?", which opens the timeline at its summary.
+  const hasTimeline = !scripted;
+  const [timelineFocus, setTimelineFocus] = useState<number | null>(null);
+  const timelineSeats = useMemo<TimelineSeat[]>(() => {
+    // By name, never "You": the timeline's sentences say whose a card is ("Ada’s graveyard").
+    const players = view ? [view.you, ...view.opponents] : [];
+    const seats = new Set<number>([
+      ...(summary?.seats.map((entry) => entry.seat) ?? []),
+      ...players.flatMap((player) => (player ? [player.seat] : [])),
+    ]);
+    return [...seats]
+      .sort((a, b) => a - b)
+      .map((seat) => ({
+        seat,
+        name:
+          summary?.seats.find((entry) => entry.seat === seat)?.handle ??
+          players.find((player) => player?.seat === seat)?.name ??
+          `Player ${seat + 1}`,
+        you: seat === state.seat,
+      }));
+  }, [summary, view, state.seat]);
+  const changed = useWhatChanged(
+    gameId,
+    view,
+    hasTimeline && live && drawer !== "timeline",
+  );
+  // A summary asked for from the chip is opened once: the drawer opened again starts at its end.
+  useEffect(() => {
+    if (drawer !== "timeline") setTimelineFocus(null);
+  }, [drawer]);
   // The engine names players by kind and seat ("Human 2" sits in seat 1); its log lines say the
   // handles instead at a table.
   const handlesInLog = (text: string) =>
@@ -826,6 +860,7 @@ export function GameScreen({
                 turnLine={turnLine}
                 statusText={connectionText}
                 statusPhase={state.phase}
+                timeline={hasTimeline}
                 chat={
                   chatting ? { unread: unread.table + unread.allies } : null
                 }
@@ -858,6 +893,27 @@ export function GameScreen({
                 {state.recovered && (
                   <span role="status" className={screen.chip}>
                     Recovered after a restart: the game goes on where it stood
+                  </span>
+                )}
+                {changed.offer && (
+                  // Said to a screen reader as it appears, as the other notices are.
+                  <span role="status">
+                    <button
+                      type="button"
+                      className={`${screen.chip} ${screen.chipButton}`}
+                      aria-controls="drawer-timeline"
+                      onClick={() => {
+                        setTimelineFocus(changed.offer?.seq ?? null);
+                        changed.dismiss();
+                        openDrawer("timeline");
+                      }}
+                    >
+                      What changed?{" "}
+                      <span className={styles.visuallyHidden}>
+                        After {changed.offer.source} resolved. Opens the
+                        timeline.
+                      </span>
+                    </button>
                   </span>
                 )}
                 {match && <MatchChip match={match} seat={state.seat} />}
@@ -1186,6 +1242,30 @@ export function GameScreen({
                     />
                   </section>
                 </Drawer>
+                {hasTimeline && (
+                  <Drawer
+                    id="timeline"
+                    name="Timeline"
+                    titled
+                    fill
+                    open={drawer === "timeline"}
+                    closed="hidden"
+                    onClose={closeDrawer}
+                  >
+                    {/* Read only while it is open: a closed drawer asks the server nothing. */}
+                    {drawer === "timeline" && (
+                      <Timeline
+                        gameId={gameId}
+                        seats={timelineSeats}
+                        live={live}
+                        pulse={revision ?? 0}
+                        focus={timelineFocus}
+                        newTab
+                        fill
+                      />
+                    )}
+                  </Drawer>
+                )}
                 {chatting && (
                   <Drawer
                     id="chat"
@@ -1370,6 +1450,18 @@ export function GameScreen({
                 >
                   Review the board
                 </button>
+                {hasTimeline && (
+                  <button
+                    type="submit"
+                    className={styles.secondaryButton}
+                    onClick={() => {
+                      setReviewing(true);
+                      openDrawer("timeline");
+                    }}
+                  >
+                    See the timeline
+                  </button>
+                )}
                 <a
                   href={back.href}
                   className={styles.primaryButton}

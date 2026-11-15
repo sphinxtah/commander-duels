@@ -2445,10 +2445,13 @@ export interface paths {
         };
         /**
          * Game Events
-         * @description A game's structured events after ``since``, oldest first (v0.9.10), of one ``turn`` or one
-         *     ``type`` if asked: a player's own seat's perspective, or with ``view=inspection`` everything,
-         *     for SysOp (and an administrator outside a game they play against people), each reading
-         *     audited. Anyone else is answered 404.
+         * @description A game's structured events, oldest first (v0.9.10): after ``since``, or since v1.0.0 the
+         *     last ones ``before`` a number; of one ``turn``, of the ``type``s named (one, or several with
+         *     commas), of one ``seat``, or naming a card (``q``, part of a name the reader may see). A
+         *     player's own seat's perspective, or with ``view=inspection`` everything, for SysOp (and an
+         *     administrator outside a game they play against people), each reading audited. Anyone else is
+         *     answered 404. A running game's events are read from the engine first, so that the page holds
+         *     what has just happened.
          */
         get: operations["game_events_api_v1_games__game_id__timeline_get"];
         put?: never;
@@ -6491,7 +6494,7 @@ export interface components {
         };
         /**
          * EventsPage
-         * @description A page of a game's events, as the perspective may see them.
+         * @description A page of a game's events, as the perspective may see them, oldest first.
          */
         EventsPage: {
             /** Events */
@@ -6499,10 +6502,20 @@ export interface components {
                 [key: string]: unknown;
             }[];
             /**
+             * First
+             * @default 0
+             */
+            first: number;
+            /**
              * Game Id
              * Format: uuid
              */
             game_id: string;
+            /**
+             * More
+             * @default false
+             */
+            more: boolean;
             /** Next */
             next: number;
             /**
@@ -6512,6 +6525,13 @@ export interface components {
             perspective: "seat" | "spectator" | "inspection";
             /** Seat */
             seat: number | null;
+            /**
+             * Turns
+             * @default {}
+             */
+            turns: {
+                [key: string]: number;
+            };
         };
         /** FaceSummary */
         FaceSummary: {
@@ -24300,6 +24320,9 @@ export interface operations {
                 view?: "seat" | "inspection";
                 turn?: number | null;
                 type?: string | null;
+                before?: number | null;
+                seat?: number | null;
+                q?: string | null;
             };
             header?: never;
             path: {

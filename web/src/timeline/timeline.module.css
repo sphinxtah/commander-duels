@@ -1,0 +1,298 @@
+/* The explainable game timeline (v1.0.0, docs/timeline.md): in a table's drawer and on a page of
+   its own. Sizes are in rem and em, so the table's stage and the player's text size scale it. */
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  color: var(--cd-text, #ebece6);
+}
+.timeline[data-fill] {
+  flex: 1;
+  min-height: 0;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5em, 1fr));
+  gap: 8px 10px;
+  align-items: end;
+  font-size: 0.875em;
+}
+.find {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.find label,
+.kinds legend {
+  color: var(--cd-muted, #a3aea7);
+  font-size: 0.86em;
+}
+.find input,
+.find select {
+  min-height: 2.5em;
+  min-width: 0;
+  padding: 0 0.6em;
+  border: 1px solid var(--cd-gold-line, #d5b77c3d);
+  border-radius: 6px;
+  background: #0a1213;
+  color: inherit;
+  font: inherit;
+}
+.kinds {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.kinds legend {
+  padding: 0;
+  margin-bottom: 3px;
+}
+.kinds button,
+.earlier button,
+.status button,
+.picture button {
+  min-height: 2.5em;
+  padding: 0 0.8em;
+  border: 1px solid var(--cd-gold-line, #d5b77c3d);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.kinds button[aria-pressed="true"] {
+  border-color: var(--cd-gold, #d5b77c);
+  background: #d5b77c26;
+  color: var(--cd-gold-hi, #f4dca6);
+}
+/* Pressed is told by more than its colour. */
+.kinds button[aria-pressed="true"]::before {
+  content: "✓ ";
+}
+.every {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  min-height: 2.5em;
+  color: var(--cd-muted, #a3aea7);
+}
+.every input {
+  width: 1.15em;
+  height: 1.15em;
+}
+
+.list {
+  min-width: 0;
+  outline-offset: 2px;
+  line-height: 1.45;
+}
+.timeline[data-fill] .list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding-right: 6px;
+}
+.status,
+.earlier {
+  margin: 8px 0;
+  color: var(--cd-muted, #a3aea7);
+  font-size: 0.9em;
+}
+
+.turn {
+  margin: 0 0 14px;
+}
+.turn h3 {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--cd-gold-line, #d5b77c3d);
+  background: #0c1314;
+  color: var(--cd-gold, #d5b77c);
+  font:
+    600 1em Georgia,
+    serif;
+}
+.turn ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.step h4 {
+  margin: 10px 0 2px;
+  color: var(--cd-faint, #74847c);
+  font-size: 0.78em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.line {
+  padding: 5px 0 5px 10px;
+  border-left: 3px solid #ffffff1f;
+  margin: 3px 0;
+  font-size: 0.92em;
+}
+/* The kinds differ by their mark's shade and are told by their words besides. */
+.line[data-group="spells"] {
+  border-left-color: #7fa6d9;
+}
+.line[data-group="combat"] {
+  border-left-color: #d99a5b;
+}
+.line[data-group="damage"] {
+  border-left-color: #d9706b;
+}
+.line[data-group="counters"] {
+  border-left-color: #8fc79a;
+}
+.line[data-quiet] {
+  opacity: 0.72;
+}
+.line p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.note {
+  margin-top: 2px !important;
+  color: var(--cd-muted, #a3aea7);
+  font-size: 0.92em;
+}
+.note::before {
+  content: "↳ ";
+}
+.note[data-unknown] {
+  font-style: italic;
+}
+
+.card {
+  display: inline;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px dotted currentColor;
+  background: none;
+  color: var(--cd-gold-hi, #f4dca6);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.card[aria-expanded="true"] {
+  border-bottom-style: solid;
+}
+.card:focus-visible,
+.rule:focus-visible,
+.kinds button:focus-visible,
+.changed summary:focus-visible {
+  outline: 2px solid var(--cd-gold-hi, #f4dca6);
+  outline-offset: 2px;
+}
+.unseen {
+  color: var(--cd-muted, #a3aea7);
+  font-style: italic;
+}
+.player {
+  font-weight: 600;
+}
+.player[data-you] {
+  text-decoration: underline;
+  text-decoration-color: var(--cd-gold-line, #d5b77c3d);
+  text-underline-offset: 3px;
+}
+/* A link by more than its colour. */
+.rule {
+  color: #9cc3ee;
+  white-space: nowrap;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.changed {
+  margin-top: 4px;
+  border: 1px solid var(--cd-gold-line, #d5b77c3d);
+  border-radius: 6px;
+  background: #d5b77c12;
+}
+.changed summary {
+  padding: 6px 10px;
+  color: var(--cd-gold-hi, #f4dca6);
+  font-weight: 600;
+  cursor: pointer;
+}
+.changed ul {
+  margin: 0;
+  padding: 0 10px 8px 26px;
+}
+.changed li {
+  margin: 2px 0;
+}
+
+.picture {
+  margin: 6px 0 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+.picture img {
+  width: min(244px, 100%);
+  height: auto;
+  border-radius: 4.75% / 3.5%;
+}
+.picture figcaption {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--cd-muted, #a3aea7);
+}
+.noPicture {
+  color: var(--cd-muted, #a3aea7);
+  font-style: italic;
+}
+
+/* The page of a game that is over (#timeline/<game>). */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 60rem;
+}
+.page header p {
+  margin: 4px 0 0;
+  color: var(--cd-muted, #a3aea7);
+}
+.page header a {
+  color: var(--cd-gold-hi, #f4dca6);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.pagePanel {
+  padding: 14px 16px;
+  border: 1px solid var(--cd-gold-line, #d5b77c3d);
+  border-radius: 10px;
+  background: #0c1314;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .changed[open] ul {
+    animation: timeline-open 160ms ease-out;
+  }
+}
+@keyframes timeline-open {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
