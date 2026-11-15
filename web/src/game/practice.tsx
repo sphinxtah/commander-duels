@@ -61,6 +61,8 @@ export function outcome(game: GameSummary): string {
       : left
         ? "You are out · the game goes on"
         : "In progress";
+  // Saved by its player to be played on later (v1.0.0): it has no end yet.
+  if (game.status === "saved") return "Saved";
   if (game.status === "interrupted") return "Interrupted";
   const result = game.result;
   if (!result) return "Finished";

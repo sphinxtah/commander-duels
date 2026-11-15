@@ -526,6 +526,10 @@ class LiveGame:
     events: events_module.Cursor = field(default_factory=events_module.Cursor)
     events_read_at: float = 0.0
     events_reading: bool = False
+    # The tasks that follow its seats' views, so that a game being saved (v1.0.0, api/saves.py)
+    # can stop being followed; and whether it is being saved: its seats send nothing meanwhile.
+    followers: list["asyncio.Task[None]"] = field(default_factory=list)
+    saving: bool = False
 
     def __post_init__(self) -> None:
         if self.teams:
@@ -653,10 +657,11 @@ class GameHub:
             )
         return self.engine
 
-    def spawn(self, work: Coroutine[Any, Any, None]) -> None:
+    def spawn(self, work: Coroutine[Any, Any, None]) -> "asyncio.Task[None]":
         task = asyncio.get_running_loop().create_task(work)
         self.tasks.add(task)
         task.add_done_callback(self.task_done)
+        return task
 
     def task_done(self, task: asyncio.Task[None]) -> None:
         """A task's failure is logged when it happens (v0.8.3), not when the task is collected."""
@@ -674,6 +679,12 @@ class GameHub:
         be starting), the check retries in the background. On PostgreSQL the process first takes
         the lock on running the games (hold), waiting while the database cannot be reached."""
         await retried(self.hold, "take the lock on running the games")
+        # Saved games (v1.0.0) another engine build holds end with the upgrade that brought this
+        # process: checked in the background, once the engine names its build. Imported here:
+        # api.saves imports this module.
+        from api import saves
+
+        self.spawn(saves.settle_after_restart(self))
         started = utcnow()
         try:
             left = await run_in_threadpool(active_games, self.database)
@@ -896,7 +907,7 @@ class GameHub:
         for seat in game.seats.values():
             # Nobody has connected yet: a player who never comes is away from the start.
             seat.away_since = now
-            self.spawn(self.follow(game, seat))
+            game.followers.append(self.spawn(self.follow(game, seat)))
             if game.kind == "table":
                 self.spawn(self.away_check(game, seat, now))
 
@@ -972,6 +983,37 @@ class GameHub:
             if finished:
                 await self.end(game, snapshot["result"])
                 return
+
+    def pause(self, game: LiveGame) -> None:
+        """A game about to be saved (v1.0.0, api/saves.py) is followed no longer: the engine
+        stops it where it is, and what a follower would make of that (a game the engine no longer
+        knows, to be asked for again; a last view with a result that is no game's) is not what
+        happened. Its seats' commands are refused meanwhile. Nothing is awaited here, so no
+        follower gets between the caller's checks and this."""
+        game.saving = True
+        for task in game.followers:
+            task.cancel()
+        game.followers.clear()
+
+    def go_on(self, game: LiveGame) -> None:
+        """A game that was not saved after all is followed again, each seat from its view anew."""
+        game.saving = False
+        if not game.finished:
+            for seat in game.seats.values():
+                game.followers.append(self.spawn(self.follow(game, seat)))
+
+    async def saved(self, game: LiveGame, save_id: UUID) -> None:
+        """The engine stopped the game and the database holds its save (v1.0.0): its tabs are
+        told, its last events are kept, and the game is no longer one of this process's. Nothing
+        is recorded as its end: it has none."""
+        game.ending = True
+        game.finished = True
+        game.recorded.set()
+        self.broadcast(game, {"type": "saved", "game_id": str(game.id), "save_id": str(save_id)})
+        await self.read_events(game)
+        for connection in list(game.connections.values()):
+            connection.close(1000)
+        self.games.pop(game.id, None)
 
     def events_soon(self, game: LiveGame) -> None:
         """Reads the game's new events from the engine (v0.9.10, api/events.py), at most every
@@ -1373,6 +1415,9 @@ class GameHub:
             return
         if command.game_id != game.id:
             reply(400, {"code": "invalid_command", "message": "The command names another game."})
+            return
+        if game.saving:
+            reply(409, {"code": "game_saving", "message": "The game is being saved."})
             return
         if game.finished:
             reply(409, {"code": "game_over", "message": "The game has finished."})

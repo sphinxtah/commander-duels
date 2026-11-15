@@ -676,7 +676,11 @@ class GameSummary(Contract):
         description="A practice game against bots, or a human table's game (v0.4.0).",
     )
     format: GameFormatId
-    status: Literal["active", "finished", "interrupted"]
+    status: Literal["active", "finished", "interrupted", "saved"] = Field(
+        description="Running, over with a result, over without one, or since v1.0.0 saved by "
+        "its player to be played on later (GET /saves): a saved game runs nowhere and has no "
+        "end yet."
+    )
     seats: list[GameSeat]
     your_seat: int | None
     bot_skill: int

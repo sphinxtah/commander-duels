@@ -666,6 +666,32 @@ final class GameProcesses implements AutoCloseable {
         }
     }
 
+    /**
+     * A process whose game was saved (v1.0.0): the game is its recording's now, and comes back in
+     * whichever process a later attach gives it. This one takes its next game at once, where a
+     * process whose game is over waits for the end to be read, or is ended if it may not be reused.
+     */
+    void vacated(GameProcess process) throws InterruptedException {
+        String gameId = process.gameId;
+        if (gameId != null) {
+            byGame.remove(gameId, process);
+        }
+        JsonObject status = process.status;
+        if (status == null) {
+            // Saved before its first report was asked for: asked now, for its memory.
+            Optional<Forwarded> answer = forward(process, "GET", "/v1/service/process", null, null, null, 5_000);
+            if (answer.isPresent() && answer.get().status() == 200) {
+                status = JsonParser.parseString(new String(answer.get().body(), StandardCharsets.UTF_8))
+                    .getAsJsonObject();
+            }
+        }
+        if (status != null && reusable(process, status)) {
+            reuse(process);
+        } else {
+            retire(process);
+        }
+    }
+
     /** Ends a process on purpose: its game is over, or it never got one. */
     void retire(GameProcess process) {
         process.retiring = true;

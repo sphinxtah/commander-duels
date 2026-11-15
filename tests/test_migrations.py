@@ -64,6 +64,8 @@ def test_migration_upgrade_and_downgrade(tmp_path, monkeypatch):
         "table_presets",
         # v1.0.0 (0051): a starter deck bought at the table.
         "starter_purchases",
+        # v1.0.0 (0052): games saved to be played on later.
+        "game_saves",
         "game_tables",
         "table_seats",
         "table_invites",

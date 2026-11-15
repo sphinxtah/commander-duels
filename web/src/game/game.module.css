@@ -1043,6 +1043,25 @@ button.life[data-selected] {
   display: flex;
   gap: 8px;
 }
+/* Saved games (v1.0.0): waiting to be resumed, and those that ended by themselves. */
+.games li[data-status="saved"] {
+  border-color: #7fb8a455;
+}
+.games li[data-status="ended"] {
+  border-style: dashed;
+}
+.saveRules {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: #7c8b86;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+.confirm .saveRules {
+  color: inherit;
+  font-size: 0.9rem;
+  margin: 0 0 12px;
+}
 /* Narrow windows: the practice table and the card zoom in one column. The game screen
    itself is one 16:9 table that scales (v0.3.0). */
 @media (max-width: 900px) {

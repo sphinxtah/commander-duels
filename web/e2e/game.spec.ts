@@ -743,6 +743,128 @@ test.describe("practice games in the browser", () => {
     expect(shot || snapshot.result!.turns <= 2).toBe(true);
   });
 
+  test("a game saved from the Game menu is resumed from Your games and played to its end (v1.0.0)", async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    const mine = deckNames("legacy-mono-red-burn");
+    const theirs = deckNames("legacy-mono-green-creatures");
+    const table = new Table(
+      page,
+      mine,
+      new Set([...theirs].filter((n) => !mine.has(n))),
+    );
+    await signInSysop(page);
+    // Save and resume is behind its gate: SysOp opens it to the staff for this journey, and
+    // closes it again whatever the journey comes to.
+    const stage = (to: "staff" | "off") =>
+      page.evaluate(async (wanted) => {
+        const me = (await (await fetch("/api/v1/me")).json()) as {
+          csrf_token: string;
+        };
+        const changed = await fetch("/api/v1/admin/rollout/save_resume", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": me.csrf_token,
+          },
+          body: JSON.stringify({ stage: wanted }),
+        });
+        return changed.status;
+      }, to);
+    expect(await stage("staff")).toBe(200);
+    try {
+      const gameId = await startGame(page, {
+        format: "Legacy",
+        deck: "legacy-mono-red-burn",
+        turnCap: 20,
+      });
+      // On the second turn, between two answers: saved, found among the saved games, resumed.
+      // Held in an object: the hook below sets it, and the journey reads it afterwards.
+      const save: {
+        at: { turn: number; hand: number; revision: number } | null;
+      } = { at: null };
+      const { snapshot, answered } = await play(
+        page,
+        table,
+        "mouse",
+        async (now) => {
+          if (save.at || (now.view?.turn ?? 0) < 2) return;
+          const saved = (save.at = {
+            turn: now.view!.turn,
+            hand: now.view!.hand.length,
+            revision: now.revision,
+          });
+          await page.getByRole("button", { name: "Game menu" }).click();
+          await page.getByRole("button", { name: "Save and leave" }).click();
+          const asking = page.getByRole("dialog", {
+            name: "Save this game and leave?",
+          });
+          await expect(asking).toContainText("A saved game waits 30 days");
+          await expect(asking).toContainText(
+            "A save ends when the game is upgraded",
+          );
+          await asking.getByRole("button", { name: "Save and leave" }).click();
+
+          // The table is left for the list the game waits in.
+          await expect(page).toHaveURL(/#play\/games$/, { timeout: 30_000 });
+          const waiting = page.getByRole("region", { name: "Saved games" });
+          await expect(waiting).toContainText("1 of 5");
+          await expect(waiting).toContainText(`Turn ${saved.turn}`);
+          await expect(waiting).toContainText("runs out in 2");
+          const status = await page.evaluate(
+            async (id) =>
+              (
+                (await (await fetch(`/api/v1/games/${id}`)).json()) as {
+                  game: { status: string };
+                }
+              ).game.status,
+            gameId,
+          );
+          expect(status).toBe("saved");
+
+          await waiting.getByRole("button", { name: "Resume" }).click();
+          await expect(page).toHaveURL(new RegExp(`#game/${gameId}$`), {
+            timeout: 30_000,
+          });
+          // The game the engine took up from its recording: the same turn, the same hand, the
+          // same question, at revisions a million on.
+          const panel = page.locator('section[aria-labelledby="prompt-title"]');
+          await expect
+            .poll(
+              async () =>
+                Number((await panel.getAttribute("data-revision")) ?? 0),
+              { timeout: 60_000 },
+            )
+            .toBeGreaterThanOrEqual(1_000_000);
+          const back = table.latest!;
+          expect(back.view?.turn).toBe(saved.turn);
+          expect(back.view?.hand.length).toBe(saved.hand);
+          expect(back.prompt?.kind).toBe(now.prompt?.kind);
+          expect(back.prompt?.options.map((option) => option.id)).toEqual(
+            now.prompt?.options.map((option) => option.id),
+          );
+        },
+      );
+      note(
+        testInfo,
+        `saved at turn ${save.at?.turn}, revision ${save.at?.revision}; ${snapshot.result!.kind} after ${snapshot.result!.turns} turns; ${answered} prompts by mouse`,
+      );
+      expect(save.at).not.toBeNull();
+      expect(table.problems).toEqual([]);
+      await expect(
+        page.getByRole("dialog", { name: /Victory|Defeat|draw|Game over/ }),
+      ).toBeVisible();
+      // Over, it is no saved game: the list holds none.
+      await page.goto("/#play/games");
+      await expect(
+        page.getByRole("region", { name: "Saved games" }),
+      ).toHaveCount(0);
+    } finally {
+      await stage("off");
+    }
+  });
+
   test("a Legacy game played to the end by keyboard alone", async ({
     page,
   }, testInfo) => {

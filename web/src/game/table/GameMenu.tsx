@@ -5,7 +5,7 @@ import type { FullscreenState } from "./types";
 import styles from "./screen.module.css";
 
 // The Game menu (design §9.1): a popover above the band's menu diamond with the way back to the
-// Table, Full screen, Mute, Mute music (v0.7.2), the table options, Report a problem (v0.4.1) and
+// Table, Save and leave (v1.0.0, a game against the bots), Full screen, Mute, Mute music (v0.7.2), the table options, Report a problem (v0.4.1) and
 // Concede. It is a
 // list of ordinary links and buttons that Tab moves through, never a dialog: the game goes on
 // behind it. Escape closes it (the table's Escape chain), and so does a press anywhere else. At
@@ -26,6 +26,7 @@ export function GameMenu({
   onConcede,
   concedeDisabled,
   onConcedeMatch,
+  onSave,
   onLeave,
   rules = null,
 }: {
@@ -44,6 +45,8 @@ export function GameMenu({
   concedeDisabled: boolean;
   /** In a best-of-three match (v0.5.0): concede the whole match, not only this game. */
   onConcedeMatch?: () => void;
+  /** A game against the bots, where its player may save it (v1.0.0): "Save and leave". */
+  onSave?: () => void;
   onLeave(): void;
   /** King's Table's settings in a line (v0.8.7): the decks, the life and the house rule. */
   rules?: string | null;
@@ -91,6 +94,13 @@ export function GameMenu({
             <span aria-hidden="true">←</span> Table
           </a>
         </li>
+        {onSave && (
+          <li>
+            <button type="button" aria-haspopup="dialog" onClick={onSave}>
+              Save and leave
+            </button>
+          </li>
+        )}
         {fullscreen.available && (
           <li>
             <button

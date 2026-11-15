@@ -44,6 +44,7 @@ A folder named for the game, under `CD_ENGINE_RECORDINGS` (`/var/lib/commander-d
 | `checkpoint-NNNNNNNNNN.bin` | A header (which checkpoint, the journal record it stands on, turn and step, sizes, a checksum, a digest of the state, the engine's build) and the state, serialized and compressed. The newest two are kept |
 | `result.json` | The game's result, once it has one. A recording with a result is over: its checkpoints are removed, and no game is ever made from it |
 | `stopped.json` | Only if the recording could not be kept up ([below](#what-is-not-supported)): when it stopped and why. The game went on without it, and no game is ever made from it |
+| `saved.json` | Only while the game is saved by its player ([below](#saving-a-game-v100)): when, and until when the recording is kept. Removed as the game is taken up again |
 
 **What a checkpoint holds.** XMage's own copy of the game (the copy it makes for its saved states and its searches), so the game plays on untouched while the checkpoint is written on another thread; the generator the game's shuffles and coin flips draw from, as it stood; each bot's generator, budget, habits and statistics; the ids every seat has been shown objects under; the log; each seat's revision and messages; who has conceded; the bots' switch.
 
@@ -78,6 +79,23 @@ The engine takes nothing up by itself: a game nobody asks for is nobody's game. 
 
 What the API kept only in memory is gone with its process: which tab held each seat's controller lease (the tabs reconnect and take it again), the votes on an away player, and a table's alliances and offers other than its teams'. The away clock starts again.
 
+## Saving a game (v1.0.0)
+
+A game its player saves stops on purpose where a dead process stops one by accident, and what a recovery finds is what a resume finds. Nothing new is stored: the recording is the save. What the tests prove (`SaveResumeHttpTest`, `GameProcessesTest.aSavedGameLeavesItsProcessAndComesBackWhenItIsAskedFor`, `tests/test_saves.py`, and a browser journey against the real engine in `web/e2e/game.spec.ts`):
+
+- **The game comes back where it stood.** A person's game against a bot, saved after twenty answers and resumed by the engine that follows a dead one: the seat's view, the question it was asked with every choice, and every hand and library in order are what they were, at revisions a million on.
+- **A save is not an interruption.** Saved and resumed seven times in a row with nothing answered in between, the game is given back each time: the journal notes each save, and the count of fruitless recoveries starts anew at it (`Recovery.MAX_FRUITLESS`).
+- **A saved game takes nothing.** With room for one game, another is admitted while the first is saved. In a process of its own, the game's process goes back to the warm processes at once and takes the game up again when it is asked for.
+- **Only its player's asking brings it back.** An attach that does not say `resume` is answered 409 `recording_saved` and starts no process: a follower that finds the game missing does not undo the save.
+- **It is kept as long as its save lasts, and no longer.** The sweep passes over a saved recording however old it is, and removes it once its time is up, whatever the retention.
+- **A game that cannot be saved plays on.** One whose recording stopped is refused in words, and is where it was.
+
+How it goes (`HumanGame.suspend`, `HumanGames.save`): every state taken so far is brought to disk, so the game goes on from the last point it could go on from; the journal notes the save; `saved.json` is written; and only then does the recording close and the game's thread end. No result is written. Anything that fails before the game is stopped leaves it running. On the front process the save is forwarded to the game's process, which is then no longer the game's (`GameProcesses.vacated`).
+
+What a resume is exact about is what a recovery is exact about. A game saved while a person is asked something, which is nearly always, comes back at that question. One saved while the bots play goes back to the last state taken, at most one decision at priority earlier, and a bot may decide otherwise from there than it was about to.
+
+**An upgrade ends a saved game**, as it ends a running one: the recording is another build's, and the resume is answered `recording_incompatible`. The API ends such saves as it starts against the new engine and tells their players why ([save and resume](../games.md#save-and-resume-v100)). This is the owner's decision (2026-11-14): no second engine is kept alive for old recordings.
+
 ## What is not supported
 
 - **An upgrade ends the running games**, as before. A new version is a new engine build, and a recording is played on only by the build that made it: the API is told the recording is incompatible and records the game interrupted. To spare the players, upgrade while no game is running, or let games finish first ([deployment](../deployment.md#recordings-v099)). Keeping an old engine alive beside a new one for its games is v1.0.0's question.
@@ -89,7 +107,7 @@ What the API kept only in memory is gone with its process: which tab held each s
 - **A state that cannot be written.** XMage copies its objects and never serializes them, so nothing had ever noticed that some classes cannot be written by Java. Writing every card of the card database once found 37 of 33,612 that could not be; patch 0019 made them writable, and `SerializableCardsTest` now fails if a card is not. What a card makes only while it is played (an effect, a watcher) is not covered by that test. A state that cannot be written costs that one checkpoint: the one before it stands, the next is tried, the engine's log names the class, and the count is in the numbers below. Eight in a row stop the game's recording.
 - **A recording that stopped.** A disk that refuses a write (it is full, or failing) stops that game's recording, as eight unwritable states in a row do. The game plays on: it is not ended because its insurance lapsed. But from then on the recording is behind its game, and a game taken up from it would put its seats back to wherever it stopped, turns ago perhaps, as if that were the game. So the recording says that it stopped (`stopped.json`, written after its checkpoints are removed, whose room a full disk may need for it), and it is refused from then on: if the engine loses that game, the game ends interrupted, as every game did before v0.9.9. If even the note cannot be written, the manifest is removed, which needs no room and leaves no recording. A game that ends after its recording stopped still has its result written, and is answered as over. One case is left: a disk that refuses the note and the removal both, and then works again by the time the engine is restarted. Nothing on that disk can tell that recording from a good one.
 - **The owner's private cards** are not in this repository, and neither test above reads them. Their nine scripted games (each card, and the seven emblems) were played once against this engine with recording on: 485 checkpoints were read back at the questions asked, and no state was skipped. That was a check made while v0.9.9 was built, not a test that runs with every build.
-- **Rolling a game back, saving one to play later, and replays** are not here. v1.0.0 builds save and resume on this, and replays on the event framework.
+- **Rolling a game back and replays** are not here. Saving a game to play later is, since v1.0.0 ([above](#saving-a-game-v100)); replays are built on the event framework.
 
 ## What the tests found
 
@@ -129,6 +147,8 @@ Building it with the tests running found these, each fixed:
 }
 ```
 
+Since v1.0.0 the answer also has `"saves": {"waiting": 2, "saved": 9, "resumed": 6, "discarded": 1, "expired": 0}`: the saved games waiting in the folder, and what this engine process did with saves since it started.
+
 `checkpoints_skipped` counts states that could not be written and `recordings_stopped` recordings that stopped; both should be 0. When they are not, a running game's `stopped` says why in a few words (a full disk, states that could not be written), and the engine's log says it in full. `refused` counts recordings that could not give their game back, by reason: `incompatible` after every upgrade under a running game, `unreadable` for damage, `unrecoverable` for a game given up after five recoveries and for one whose recording had stopped.
 
 **Looking at recordings**, without seeing anything of a game:
@@ -146,11 +166,11 @@ bdd58a56-…  resumable   commander      4 seats  turn 7      61 records  2 chec
 Total 546 KiB; every recording is whole
 ```
 
-A recording is `resumable` (this engine could take its game up), `finished`, `other build` (another engine build made it), `stopped` (it could not be kept up, and its game went on without it), `lost` (it had checkpoints and none can be used) or `unreadable`.
+A recording is `resumable` (this engine could take its game up), `saved` (resumable, and kept until its save runs out: the report says until when), `finished`, `other build` (another engine build made it), `stopped` (it could not be kept up, and its game went on without it), `lost` (it had checkpoints and none can be used) or `unreadable`.
 
 With a game's id it reports on that recording: who sat where (a person or a bot, the deck's name, a digest of the deck), the journal's record counts, each checkpoint's turn, step, size and whether its checksum holds, and whether this engine could take the game up. `--verify` also reads each checkpoint's state back and checks that it is the game that was saved. It names no card, hand, library or answer; `--show-private` prints the journal in full, what each seat answered, and what stopped a recording that stopped in the error's own words (which may name a card), and says that it is private. It exits with 1 when a recording is not whole. It only reads, so a running engine's recordings can be looked at.
 
-**Retention.** A recording is removed once nothing in it has changed for `CD_ENGINE_RECORDING_RETENTION_HOURS` (24): a finished game's, whose result was there for the API to ask for all that time, and one nobody came back for. A running game keeps its recording however quiet it is. The sweep runs every five minutes and is safe to run twice. A finished game's recording holds no state of the game, only who played, what they answered and how it ended.
+**Retention.** A saved game's recording (v1.0.0) is kept until its save runs out, thirty days at most, and removed at the first sweep after that; it holds the game's whole state all that time, at about what a running game's holds (under 1 MiB). Any other recording is removed once nothing in it has changed for `CD_ENGINE_RECORDING_RETENTION_HOURS` (24): a finished game's, whose result was there for the API to ask for all that time, and one nobody came back for. A running game keeps its recording however quiet it is. The sweep runs every five minutes and is safe to run twice. A finished game's recording holds no state of the game, only who played, what they answered and how it ended.
 
 **Privacy.** A recording holds everything about a game: every hand, library and deck. It lives in the engine's own folder, no route reads it, the API never sees it, and it is not in the site's backups. Treat the volume as you treat the database.
 
@@ -168,7 +188,8 @@ With a game's id it reports on that recording: who sat where (a person or a bot,
 | What a question's fingerprint is | `Prompts.Prompt.print` |
 | The engine's build key | `EngineBuild` |
 | The registry: recording service games, attach, retention, the numbers | `HumanGames` |
-| The routes | `EngineServer` (`attach`, `recordings`) |
+| The routes | `EngineServer` (`attach`, `recordings`; `save`, `discard`, `isolatedSave`) |
+| Saving: the game stopped on purpose, its recording kept and given up | `HumanGame.suspend`, `HumanGames` (`save`, `discard`, the sweep), `Recording` (`save`, `savedUntil`, `unsave`) |
 | The tool | `RecordingTool` |
 | XMage: resuming in the middle of a turn, and what a saved state needs | `engine/xmage/patches/0018-resume-from-saved-state.patch` |
 | XMage: the cards a saved state could not hold | `engine/xmage/patches/0019-serializable-cards.patch` |

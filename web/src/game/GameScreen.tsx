@@ -20,6 +20,7 @@ import {
 } from "../app/liveGame";
 import { useLargeText, useMotionLevel } from "../app/motion";
 import { useOnline } from "../app/online";
+import { useWorkflow } from "../app/rollout";
 import { ReportDialog } from "../app/ReportProblem";
 import { useTableSettings } from "../app/tableSettings";
 import { TableSettingsForm } from "../app/TableSettingsForm";
@@ -55,6 +56,7 @@ import {
   type Located,
 } from "./model";
 import { PriorityPanel } from "./PriorityPanel";
+import { SaveDialog } from "./saves";
 import { PromptPanel } from "./PromptPanel";
 import { useGameMusic } from "./music/useGameMusic";
 import { useTableSound } from "./sound/useTableSound";
@@ -135,11 +137,17 @@ function remember(key: string, value: boolean) {
 
 const ended: Record<string, string> = {
   not_live: "This game is no longer running on the server.",
+  saved:
+    "This game is saved. It waits under Saved games on Your games: resume it there to play on from where it stopped.",
   signed_out: "Your session ended. Sign in again to keep playing.",
   forbidden: "This game is not available to this account.",
   not_found: "There is no such game, or it is not yours.",
 };
 
+/** A reconnect is said in words once it has taken this long (v1.0.0). */
+const RECONNECT_SAID_MS = 2500;
+/** How long "Recovered after a restart" stays on the table. */
+const RECOVERED_SHOWN_MS = 12_000;
 /** How long the band's "Full screen: F" chip stays when the table could not start in full screen. */
 const FULLSCREEN_HINT_MS = 6000;
 
@@ -190,6 +198,9 @@ export function GameScreen({
   const [ui] = useState(createTableUi);
   const concedeDialog = useRef<HTMLDialogElement>(null);
   const concedeMatchDialog = useRef<HTMLDialogElement>(null);
+  // "Save and leave" (v1.0.0, saves.tsx), where save and resume is open to the account.
+  const saveDialog = useRef<HTMLDialogElement>(null);
+  const saving = useWorkflow("save_resume");
   // "Review the board" after a match's game keeps the screen here instead of going on to
   // sideboarding (v0.5.0).
   const [reviewing, setReviewing] = useState(false);
@@ -279,6 +290,27 @@ export function GameScreen({
     () => (live && !scripted ? holdLiveGame(gameId) : undefined),
     [live, gameId, scripted],
   );
+  // A reconnect that takes more than a moment is said in words (v1.0.0), beside the band's chip:
+  // a short drop comes and goes unnoticed.
+  const [stalled, setStalled] = useState(false);
+  const reconnecting = state.phase === "reconnecting" && !state.crowded;
+  useEffect(() => {
+    if (!reconnecting) {
+      setStalled(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setStalled(true), RECONNECT_SAID_MS);
+    return () => window.clearTimeout(timer);
+  }, [reconnecting]);
+  // "Recovered after a restart" stays a while, then goes.
+  useEffect(() => {
+    if (!state.recovered) return;
+    const timer = window.setTimeout(
+      () => connection?.acknowledgeRecovered(),
+      RECOVERED_SHOWN_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [state.recovered, connection]);
 
   // A table that opened without full screen (a reload, a typed address, the app's launch) says
   // once how to get it: F, or the band's diamond.
@@ -603,7 +635,11 @@ export function GameScreen({
       ),
     [view],
   );
-  const over = Boolean(snapshot?.result) || state.ended !== null;
+  // Saved to be played on later (v1.0.0), here or in another tab, or found saved on arriving: it
+  // has not ended, so it has no result screen and no rematch.
+  const savedGame = state.ended === "saved" || summary?.status === "saved";
+  const over =
+    (Boolean(snapshot?.result) || state.ended !== null) && !savedGame;
   // The result screen's Rematch (v0.5.0), once the game's end is recorded.
   const rematch = useRematch(gameId, summary, over);
   const alliances = useMemo<TableAlliances | null>(
@@ -680,6 +716,21 @@ export function GameScreen({
       ? resultText(view, summary.your_seat, summary.result, seatName)
       : null;
   const concedeDisabled = state.role !== "controller" || result !== null;
+  // Its own player saves a single game against the bots (v1.0.0): not a table's, not a match's.
+  const canSave =
+    saving &&
+    !scripted &&
+    !atTable &&
+    match === null &&
+    summary?.kind === "practice" &&
+    state.seat !== null &&
+    state.role === "controller" &&
+    live;
+  // A game the engine could not give back (v0.9.9): told as it happens, and to a player who
+  // comes back to it later.
+  const unrecoverable =
+    state.interrupted ||
+    (state.ended === "not_live" && summary?.status === "interrupted");
   const connectionText =
     state.phase === "open"
       ? state.role === "controller"
@@ -786,6 +837,11 @@ export function GameScreen({
                     Full screen: F
                   </span>
                 )}
+                {state.recovered && (
+                  <span role="status" className={screen.chip}>
+                    Recovered after a restart: the game goes on where it stood
+                  </span>
+                )}
                 {match && <MatchChip match={match} seat={state.seat} />}
               </div>
               <GameMenu
@@ -814,13 +870,38 @@ export function GameScreen({
                       }
                     : undefined
                 }
+                onSave={
+                  canSave
+                    ? () => {
+                        closeMenu(false);
+                        saveDialog.current?.showModal();
+                      }
+                    : undefined
+                }
                 onLeave={leave}
                 rules={kingsSettings ? settingsLine(kingsSettings) : null}
               />
 
-              {(state.ended || state.crowded || state.interrupted || !view) && (
+              {(state.ended ||
+                state.crowded ||
+                unrecoverable ||
+                state.recovering ||
+                stalled ||
+                !view) && (
                 <div className={screen.alerts} style={boxStyle(REGIONS.alerts)}>
-                  {state.ended && (
+                  {savedGame && state.ended && (
+                    <div className={screen.alert} role="alert">
+                      <p>{ended.saved}</p>
+                      <a
+                        href="#play/games"
+                        className={styles.secondaryButton}
+                        onClick={leave}
+                      >
+                        Your games
+                      </a>
+                    </div>
+                  )}
+                  {state.ended && !savedGame && !unrecoverable && (
                     <div className={screen.alert} role="alert">
                       <p>{ended[state.ended] ?? "This game has ended."}</p>
                       {recordedOutcome && (
@@ -846,11 +927,32 @@ export function GameScreen({
                       </p>
                     </div>
                   )}
-                  {state.interrupted && (
+                  {state.recovering && !unrecoverable && (
+                    <div className={screen.alert} role="status">
+                      <p>
+                        The server restarted and is recovering this game. This
+                        tab reconnects by itself, and the game goes on from
+                        where it stood.
+                      </p>
+                    </div>
+                  )}
+                  {stalled && !state.recovering && (
+                    <div className={screen.alert} role="status">
+                      <p>
+                        {online
+                          ? "The connection to the server dropped. Reconnecting…"
+                          : "You are offline. The game reconnects when you are back online."}{" "}
+                        The game is kept on the server, and nothing you played
+                        is lost.
+                      </p>
+                    </div>
+                  )}
+                  {unrecoverable && (
                     <div className={screen.alert} role="alert">
                       <p>
-                        The rules engine lost this game (a restart), so it
-                        cannot continue.
+                        This game could not be recovered after a server restart,
+                        so it cannot continue. It ended with no result: nobody
+                        won or lost.
                         {campaign &&
                           " The duel counts for nothing: start it again from the campaign."}
                       </p>
@@ -1149,6 +1251,18 @@ export function GameScreen({
                 </button>
               </form>
             </dialog>
+            {!scripted && (
+              <SaveDialog
+                dialog={saveDialog}
+                gameId={gameId}
+                onSaved={() => {
+                  // Left on purpose: the table's lock on leaving lets go, and the saved game is
+                  // shown where it waits.
+                  leave();
+                  window.location.hash = "#play/games";
+                }}
+              />
+            )}
             <ReportDialog
               open={reporting}
               game={{ id: gameId, turn: view?.turn ?? null }}

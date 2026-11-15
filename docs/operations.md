@@ -70,7 +70,7 @@ Every workflow is `off` until it is set.
 
 | Workflow | Delivers (spec §) | Guards today | Paths reserved for its routes (after `/api/v1`) |
 | --- | --- | --- | --- |
-| `save_resume` | Save and resume (17) | Nothing yet: recovery itself is on for everyone | `/saves`, `/games/{id}/save`, `/tables/{id}/suspension` |
+| `save_resume` | Save and resume (17) | Since v1.0.0 saving, resuming and discarding a game against the bots ([games](games.md#save-and-resume-v100)); recovery itself is on for everyone. A table's suspension is not built | `/saves`, `/games/{id}/save`, `/tables/{id}/suspension` |
 | `sandbox` | The practice sandbox (19) | Sandbox access; the `sandbox` mode | `/sandbox` |
 | `deck_lending` | Friend deck lending (20) | A lent deck's access; the `borrowed` mode | `/loans`, `/decks/{id}/loans` |
 | `replays` | Replays and review (23) | A shared replay's access | `/replays`, `/games/{id}/replay` |

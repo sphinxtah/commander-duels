@@ -135,7 +135,7 @@ Changing a control sends a `set_priority` command ([the human seat](engine/human
 
 ## The Game menu
 
-The band's first diamond opens it, above the HUD: **Table** (back to the Play page), **Full screen**, **Mute**, **Table options** (the timer, animation speed, sound and how the table is drawn, in a drawer) and **Concede**. A click elsewhere or Escape closes it. Since v0.8.7 a King's Table game's menu starts with its settings, fixed for the game: "Commander decks · Generals 20, Kings 40 · King can attack anyone: off" ([below](#kings-table-v087)).
+The band's first diamond opens it, above the HUD: **Table** (back to the Play page), since v1.0.0 **Save and leave** (in a single game against the bots, for its own player, where [save and resume](games.md#save-and-resume-v100) is open to the account: a dialog says what a save is, how long it lasts, how many an account holds and that an upgrade ends it, and then saves; the table is left for Your games), **Full screen**, **Mute**, **Table options** (the timer, animation speed, sound and how the table is drawn, in a drawer) and **Concede**. A click elsewhere or Escape closes it. Since v0.8.7 a King's Table game's menu starts with its settings, fixed for the game: "Commander decks · Generals 20, Kings 40 · King can attack anyone: off" ([below](#kings-table-v087)).
 
 ## Keyboard (UI04)
 
@@ -162,6 +162,16 @@ The page speaks the protocol of [games through the API](games.md#the-websocket):
 - **Two tabs.** A tab opened while another plays the seat watches, and says so. "Play here" takes the lease, and the first tab then watches.
 - **Too many tabs.** The server lets an account hold 4 connections to a game, and a game 8. A tab refused for that says so and connects by itself once another tab closes.
 - **The session.** If it ends, the page says so. If the account's roles change, or another request rotated the cookie, the page renews the session and reconnects.
+
+Since v1.0.0 the table says in words what happens to a game across a failure, from the states the socket reports (the band's chip said "Reconnecting…" and the page "interrupted", and nothing else):
+
+| State | When | What the table says |
+| --- | --- | --- |
+| Reconnecting | The socket dropped, and no attempt has got through for 2.5 seconds | "The connection to the server dropped. Reconnecting…", or that the player is offline, and that the game is kept on the server and nothing played is lost |
+| Recovering | The server refuses the tab with 4503: it restarted and is asking the engine for the game again | "The server restarted and is recovering this game. This tab reconnects by itself, and the game goes on from where it stood." |
+| Recovered | The tab reached a game it was told was being recovered, or the game's revisions jumped by a recovery's stride while the tab watched (the engine restarted under it) | A chip for twelve seconds: "Recovered after a restart: the game goes on where it stood" |
+| Unrecoverable | The server says `interrupted`, or the player comes back to a game recorded so | "This game could not be recovered after a server restart, so it cannot continue. It ended with no result: nobody won or lost.", with the way back |
+| Saved | The game's player saved it, in this tab or another, or the game is found saved | "This game is saved. It waits under Saved games on Your games", with the link there |
 
 ## The installable app (v0.3.0)
 

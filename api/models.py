@@ -215,8 +215,10 @@ class LoginChallenge(Base):
 class Game(Base):
     """A game the API started in the engine. Its id is the engine's game id. The engine holds the
     game itself, in memory; the seat tokens live only in the API process, so a game still active
-    when the API restarts is marked interrupted. A practice game seats one player against bots; a
-    table game (v0.4.0) seats every player of a human table."""
+    when the API restarts is asked for again (v0.9.9). A practice game seats one player against
+    bots; a table game (v0.4.0) seats every player of a human table. A game its player saved
+    (v1.0.0, api/saves.py) is ``saved``: it runs nowhere, has no end yet, and counts as nobody's
+    running game until it is resumed (active again) or its save ends (interrupted)."""
 
     __tablename__ = "games"
     __table_args__ = (
@@ -225,7 +227,9 @@ class Game(Base):
             "format IN ('legacy', 'commander', 'two_headed_giant', 'kings_table')",
             name="ck_games_format",
         ),
-        CheckConstraint("status IN ('active', 'finished', 'interrupted')", name="ck_games_status"),
+        CheckConstraint(
+            "status IN ('active', 'finished', 'interrupted', 'saved')", name="ck_games_status"
+        ),
         CheckConstraint("(match_id IS NULL) = (match_game IS NULL)", name="ck_games_match"),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True)
@@ -270,6 +274,43 @@ class Game(Base):
     # api/table_profiles.py), copied from the table: the game keeps what was agreed, whatever
     # the table becomes. Null for a game of no table, or of a table with no profile.
     table_profile: Mapped[dict[str, object] | None] = mapped_column(JsonType)
+
+
+class GameSave(Base):
+    """A game saved to be played on later (v1.0.0, api/saves.py; docs/games.md): one row each time
+    a game is saved. While ``ended_at`` is null the save is open: its game is ``saved`` and waits
+    in the engine's recording until ``expires_at``. It ends when it is resumed, discarded by its
+    player, runs out, or cannot be given back: by an upgrade (a recording is played on only by
+    the engine build that made it, ``engine_build``) or because the recording is gone. A game has
+    at most one open save."""
+
+    __tablename__ = "game_saves"
+    __table_args__ = (
+        CheckConstraint(
+            "ended_reason IS NULL OR ended_reason IN "
+            "('resumed', 'discarded', 'expired', 'upgrade', 'unrecoverable', 'account')",
+            name="ck_game_saves_ended_reason",
+        ),
+        CheckConstraint("(ended_at IS NULL) = (ended_reason IS NULL)", name="ck_game_saves_ended"),
+        Index(
+            "uq_game_saves_open",
+            "game_id",
+            unique=True,
+            postgresql_where=text("ended_at IS NULL"),
+            sqlite_where=text("ended_at IS NULL"),
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    game_id: Mapped[UUID] = mapped_column(ForeignKey("games.id"), index=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    saved_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    # The engine build that holds the game: no other can play it on.
+    engine_build: Mapped[str] = mapped_column(String(64))
+    # The game's turn as it was saved, for the list; null when the last view did not say.
+    turn: Mapped[int | None]
+    ended_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    ended_reason: Mapped[str | None] = mapped_column(String(16))
 
 
 class AccessGrant(Base):

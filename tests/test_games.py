@@ -118,6 +118,16 @@ class FakeEngine:
         self.lost: dict[str, FakeGame] = {}
         self.attaches: list[str] = []
         self.attach_failures = 0
+        # Saved games (v1.0.0): each waits in its recording with the build that saved it. Only an
+        # attach that asks to resume brings one back, and only the build that saved it can.
+        self.build = "build-1"
+        self.saved: dict[str, tuple[FakeGame, str]] = {}
+        self.saves: list[tuple[str, int]] = []
+        self.discarded: list[str] = []
+        # The answer to the next save, in place of saving, when set: (status, body).
+        self.save_refusal: tuple[int, dict[str, Any]] | None = None
+        # How many times the engine was asked for its recordings' numbers (its build).
+        self.builds_asked = 0
 
     def game(self, game_id: str) -> FakeGame:
         return self.games[game_id]
@@ -137,8 +147,21 @@ class FakeEngine:
                 self.mangle(answer)
                 return httpx.Response(201, json=answer)
             return created
+        if parts == ["recordings"]:
+            with self.lock:
+                self.builds_asked += 1
+                return httpx.Response(200, json={"enabled": True, "engine_build": self.build})
         if len(parts) == 3 and parts[2] == "attach":
-            return self.attach(parts[1])
+            return self.attach(parts[1], bool(body and body.get("resume")))
+        if len(parts) == 3 and parts[2] == "save":
+            return self.save(parts[1], body)
+        if len(parts) == 3 and parts[2] == "discard":
+            with self.lock:
+                self.discarded.append(parts[1])
+                removed = self.saved.pop(parts[1], None) is not None
+                return httpx.Response(
+                    200, json={"game_id": parts[1], "status": "discarded", "removed": removed}
+                )
         if len(parts) == 3 and parts[2] == "events":
             return self.events(parts[1], request.url.params)
         game = self.games.get(parts[1])
@@ -207,10 +230,40 @@ class FakeEngine:
             self.lost.update(self.games)
             self.games.clear()
 
-    def attach(self, game_id: str) -> httpx.Response:
+    def save(self, game_id: str, body: dict[str, Any] | None) -> httpx.Response:
+        """POST /games/{id}/save (v1.0.0): the game stops and waits in its recording."""
+        with self.lock:
+            if self.save_refusal is not None:
+                status, answer = self.save_refusal
+                self.save_refusal = None
+                return httpx.Response(status, json=answer)
+            game = self.games.get(game_id)
+            if game is None:
+                return httpx.Response(404, json={"code": "not_found"})
+            if game.result is not None:
+                return httpx.Response(409, json={"code": "game_over"})
+            until = body.get("until_millis") if body else None
+            if not isinstance(until, int) or until <= time.time() * 1000:
+                return httpx.Response(400, json={"code": "invalid_request"})
+            del self.games[game_id]
+            self.saved[game_id] = (game, self.build)
+            self.saves.append((game_id, until))
+            return httpx.Response(
+                200,
+                json={
+                    "game_id": game_id,
+                    "status": "saved",
+                    "until_millis": until,
+                    "engine_build": self.build,
+                },
+            )
+
+    def attach(self, game_id: str, resume: bool = False) -> httpx.Response:
         """POST /games/{id}/attach (v0.9.9): a running game gets new tokens; a game of a dead
         engine is taken up from its recording, its revisions far on; a game that is over is
-        answered with its result. An engine that keeps no recordings knows no such route."""
+        answered with its result. An engine that keeps no recordings knows no such route. A
+        saved game (v1.0.0) is taken up only when the attach asks to resume it, and only by the
+        build that saved it."""
         with self.lock:
             self.attaches.append(game_id)
             if not self.recordings:
@@ -218,6 +271,14 @@ class FakeEngine:
             if self.attach_failures > 0:
                 self.attach_failures -= 1
                 return httpx.Response(503, json={"code": "engine_loading"})
+            if game_id in self.saved:
+                if not resume:
+                    return httpx.Response(409, json={"code": "recording_saved"})
+                if self.saved[game_id][1] != self.build:
+                    return httpx.Response(409, json={"code": "recording_incompatible"})
+                if sum(running.result is None for running in self.games.values()) >= self.cap:
+                    return httpx.Response(429, json=self.busy)
+                self.lost[game_id] = self.saved.pop(game_id)[0]
             status = "attached"
             game = self.games.get(game_id)
             if game is None:

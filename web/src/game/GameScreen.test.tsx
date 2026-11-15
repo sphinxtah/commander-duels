@@ -15,6 +15,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { forgetRollout } from "../app/rollout";
 import { ChatContext, type Chat } from "../chat/chat";
 import { GameScreen } from "./GameScreen";
 import { tableFixture } from "./table/fixtures";
@@ -890,6 +891,282 @@ describe("a best-of-three match's game (v0.5.0)", () => {
       );
     } finally {
       get.mockImplementation(original);
+    }
+  });
+});
+
+describe("save, resume and recovery at the table (v1.0.0)", () => {
+  /** The game's summary as the API gives it, and whether save and resume is open to the account. */
+  async function served(game: Record<string, unknown>, open: boolean) {
+    const { client } = await import("../api");
+    const get = vi.mocked(client.GET);
+    const original = get.getMockImplementation()!;
+    forgetRollout();
+    get.mockImplementation((async (path: string) =>
+      path === "/api/v1/rollout"
+        ? {
+            data: {
+              workflows: [{ id: "save_resume", available: open }],
+            },
+          }
+        : path === "/api/v1/games/{game_id}"
+          ? {
+              data: {
+                game: {
+                  id: "g1",
+                  kind: "practice",
+                  format: "legacy",
+                  status: "active",
+                  seats: [],
+                  your_seat: 0,
+                  bot_skill: 3,
+                  turn_cap: 20,
+                  created_at: "2026-11-14T10:00:00Z",
+                  finished_at: null,
+                  result: null,
+                  match: null,
+                  campaign: null,
+                  ...game,
+                },
+                snapshot: null,
+              },
+            }
+          : { data: undefined }) as never);
+    return {
+      client,
+      restore: () => {
+        get.mockImplementation(original);
+        forgetRollout();
+      },
+    };
+  }
+
+  it("saves a game against the bots from the Game menu, after saying what a save is", async () => {
+    const { client, restore } = await served({}, true);
+    const post = vi.fn(async () => ({ data: { id: "s1" } }));
+    Object.assign(client, { POST: post });
+    try {
+      const socket = playing(view);
+      fireEvent.click(screen.getByRole("button", { name: "Game menu" }));
+      const save = await screen.findByRole("button", {
+        name: "Save and leave",
+      });
+      fireEvent.click(save);
+      expect(document.getElementById("game-menu")).toHaveAttribute("hidden");
+      const dialog = screen.getByRole("dialog", {
+        name: "Save this game and leave?",
+      });
+      // The rules, before anything is saved.
+      expect(dialog).toHaveTextContent("A saved game waits 30 days");
+      expect(dialog).toHaveTextContent("You can hold 5 saved games");
+      expect(dialog).toHaveTextContent("A save ends when the game is upgraded");
+      expect(post).not.toHaveBeenCalled();
+
+      fireEvent.click(
+        screen.getAllByRole("button", { name: "Save and leave" }).at(-1)!,
+      );
+      await waitFor(() =>
+        expect(post).toHaveBeenCalledWith("/api/v1/games/{game_id}/save", {
+          params: { path: { game_id: "g1" } },
+        }),
+      );
+      await waitFor(() => expect(window.location.hash).toBe("#play/games"));
+
+      // The server tells the tab and lets it go: the table says where the game waits.
+      act(() => {
+        socket.deliver({ type: "saved", game_id: "g1", save_id: "s1" });
+        socket.onclose?.({ code: 1000 });
+      });
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "This game is saved.",
+      );
+      expect(screen.getByRole("link", { name: "Your games" })).toHaveAttribute(
+        "href",
+        "#play/games",
+      );
+      expect(FakeSocket.made).toHaveLength(1);
+    } finally {
+      window.location.hash = "";
+      restore();
+    }
+  });
+
+  it("says why a save was refused and keeps the game on the table", async () => {
+    const { client, restore } = await served({}, true);
+    const post = vi.fn(async () => ({
+      error: {
+        code: "save_limit",
+        message:
+          "You hold 5 saved games. Resume or discard one before saving another.",
+      },
+    }));
+    Object.assign(client, { POST: post });
+    try {
+      playing(view);
+      fireEvent.click(screen.getByRole("button", { name: "Game menu" }));
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Save and leave" }),
+      );
+      fireEvent.click(
+        screen.getAllByRole("button", { name: "Save and leave" }).at(-1)!,
+      );
+      const dialog = screen.getByRole("dialog", {
+        name: "Save this game and leave?",
+      });
+      await waitFor(() =>
+        expect(dialog).toHaveTextContent("You hold 5 saved games."),
+      );
+      expect(window.location.hash).toBe("");
+      fireEvent.click(screen.getByRole("button", { name: "Keep playing" }));
+      expect(screen.getByText("Connected")).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
+  it("offers no save where the workflow is closed, at a table, or in a match", async () => {
+    for (const [game, open] of [
+      [{}, false],
+      [{ kind: "table" }, true],
+      [
+        {
+          match: {
+            id: "m1",
+            game: 1,
+            best_of: 3,
+            status: "playing",
+            wins: [0, 0],
+          },
+        },
+        true,
+      ],
+    ] as const) {
+      const { restore } = await served(game, open);
+      try {
+        const { unmount } = render(<GameScreen gameId="g1" me={null} />);
+        const socket = FakeSocket.made.at(-1)!;
+        act(() => {
+          socket.accept();
+          socket.deliver(welcome(0, false));
+          socket.deliver({
+            type: "lease",
+            role: "controller",
+            controlled: true,
+            reason: "granted",
+          });
+          socket.deliver({
+            type: "snapshot",
+            snapshot: snapshot(5, priority("A")),
+          });
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Game menu" }));
+        // The summary and the workflows have been asked for and answered.
+        await act(async () => {
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+        expect(
+          screen.queryByRole("button", { name: "Save and leave" }),
+        ).toBeNull();
+        unmount();
+      } finally {
+        restore();
+      }
+    }
+  });
+
+  it("says that the game is being recovered, and that it came back", () => {
+    vi.useFakeTimers();
+    try {
+      const socket = playing(view);
+      act(() => socket.onclose?.({ code: 4503 }));
+      expect(
+        screen.getByText(/The server restarted and is recovering this game/),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("alert")).toBeNull();
+
+      advance(1000);
+      const next = FakeSocket.made[1];
+      act(() => {
+        next.accept();
+        next.deliver(welcome(0, false));
+        next.deliver({
+          type: "snapshot",
+          snapshot: snapshot(1_000_005, priority("B")),
+        });
+      });
+      expect(
+        screen.queryByText(/The server restarted and is recovering/),
+      ).toBeNull();
+      expect(
+        screen.getByText(
+          "Recovered after a restart: the game goes on where it stood",
+        ),
+      ).toBeInTheDocument();
+      // The notice goes by itself.
+      advance(12_000);
+      expect(screen.queryByText(/Recovered after a restart/)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("says in words when a reconnect takes more than a moment", () => {
+    vi.useFakeTimers();
+    try {
+      const socket = playing(view);
+      act(() => socket.onclose?.({ code: 1006 }));
+      expect(screen.getByText("Reconnecting…")).toBeInTheDocument();
+      expect(screen.queryByText(/nothing you played is lost/)).toBeNull();
+      // Every attempt fails for a while.
+      advance(2600);
+      expect(
+        screen.getByText(/The connection to the server dropped/),
+      ).toHaveTextContent("nothing you played is lost");
+      const next = FakeSocket.made.at(-1)!;
+      act(() => {
+        next.accept();
+        next.deliver(welcome(0, false));
+      });
+      expect(
+        screen.queryByText(/The connection to the server dropped/),
+      ).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("says that a game could not be recovered, with no result and nobody the loser", () => {
+    const socket = playing(view);
+    act(() => socket.deliver({ type: "interrupted", game_id: "g1" }));
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent(
+      "This game could not be recovered after a server restart",
+    );
+    expect(alert).toHaveTextContent("nobody won or lost");
+  });
+
+  it("shows a game found saved as saved, with the way to resume it", async () => {
+    const { restore } = await served({ status: "saved" }, true);
+    try {
+      render(<GameScreen gameId="g1" me={null} />);
+      const socket = FakeSocket.made[0];
+      act(() => {
+        socket.accept();
+        socket.deliver({ type: "error", code: "game_not_live" });
+        socket.onclose?.({ code: 4410 });
+      });
+      const alert = await screen.findByText(/This game is saved\./);
+      expect(alert).toBeInTheDocument();
+      expect(
+        screen.queryByText("This game is no longer running on the server."),
+      ).toBeNull();
+      expect(screen.getByRole("link", { name: "Your games" })).toHaveAttribute(
+        "href",
+        "#play/games",
+      );
+    } finally {
+      restore();
     }
   });
 });

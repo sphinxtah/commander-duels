@@ -39,6 +39,7 @@ from api import (
     rematches,
     reports,
     rollout,
+    saves,
     shop,
     sleeves,
     social,
@@ -405,6 +406,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(economy.router)
     app.include_router(shop.router)
     app.include_router(starter_tables.router)
+    # Save and resume (v1.0.0), behind its gate.
+    app.include_router(saves.router)
     app.include_router(auctions.router)
     app.include_router(reports.router)
     app.include_router(social.router)

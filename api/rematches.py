@@ -227,7 +227,7 @@ def view_of(db: Session, game: Game, principal: Principal) -> RematchView:
     asked = any(user == me for _, user in seated)
     can_offer = (
         played
-        and game.status != "active"
+        and game.status not in ("active", "saved")
         and rematch is None
         and not match_goes_on(db, game)
         and (game.settings is not None if game.kind == "practice" else asked and len(seated) > 1)
@@ -273,7 +273,8 @@ def player_game(db: Session, game_id: UUID, principal: Principal) -> Game:
     game, owner = visible_game(db, game_id, principal)
     if not owner:
         raise ApiError(403, "not_a_player", "Only the game's players play it again.")
-    if game.status == "active":
+    if game.status in ("active", "saved"):
+        # A saved game (v1.0.0) has no end either: it waits to be resumed.
         raise ApiError(409, "game_running", "The game has not ended yet.")
     if match_goes_on(db, game):
         raise ApiError(409, "match_running", "The match goes on: its next game comes first.")

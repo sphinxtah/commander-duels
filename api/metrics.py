@@ -17,6 +17,9 @@ went wrong and of what kind, and nothing concealed.
   ``recorded_interrupted`` (no result, nothing paid), ``forced`` (the game alone marked
   interrupted), ``lost`` (not even that; the restart's sweep takes it).
 - ``settlement.recorded``: a game's end recorded, by its status, for the rate.
+- ``saves.saved``, ``saves.resumed``, ``saves.refused`` (by the engine's status) and
+  ``saves.ended`` (by its reason: resumed, discarded, expired, upgrade, unrecoverable, account):
+  save and resume (v1.0.0, api/saves.py).
 """
 
 import threading

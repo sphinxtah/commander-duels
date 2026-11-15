@@ -223,7 +223,8 @@ def sweep(db: Session, now: datetime) -> int:
     interrupted game counts from its start). Safe to run again: what is gone is gone."""
     cutoff = now - timedelta(days=EVENT_RETENTION_DAYS)
     old = select(Game.id).where(
-        Game.status != "active",
+        # A saved game (v1.0.0) is not over: its events wait with it.
+        Game.status.not_in(("active", "saved")),
         or_(
             Game.finished_at < cutoff,
             Game.finished_at.is_(None) & (Game.created_at < cutoff),
@@ -274,7 +275,7 @@ def perspective_for(
         if isinstance(seat, int):
             return Perspective.of_seat(seat)
     game = db.get(Game, game_id)
-    if game is not None and game.status != "active":
+    if game is not None and game.status not in ("active", "saved"):
         for grant in access.active(db, principal.user.id, "replay", game_id):
             seat = grant.scope.get("seat")
             if isinstance(seat, int):

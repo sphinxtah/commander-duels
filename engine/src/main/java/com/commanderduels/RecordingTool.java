@@ -257,6 +257,15 @@ public final class RecordingTool {
             found.state = "lost";
             found.problems.add("The game had checkpoints and none can be used: it cannot be taken up");
         }
+        Optional<Long> savedUntil = recording.savedUntil();
+        if (savedUntil.isPresent() && result.isEmpty()) {
+            // Saved by its player (v1.0.0): kept until its save runs out, and taken up when asked for.
+            found.lines.add("Saved by its player to be played on later: kept until "
+                + java.time.Instant.ofEpochMilli(savedUntil.get()));
+            if (found.state.equals("resumable")) {
+                found.state = "saved";
+            }
+        }
         return found;
     }
 

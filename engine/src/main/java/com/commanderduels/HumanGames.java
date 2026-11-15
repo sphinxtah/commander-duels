@@ -125,6 +125,8 @@ final class HumanGames {
         final boolean service;
         final AtomicBoolean closing = new AtomicBoolean();
         volatile long finishedAtNanos;
+        /** Saved by its player (v1.0.0): the game is not here any more, whatever its thread still does. */
+        volatile boolean suspended;
 
         Entry(HumanGame game, Map<Integer, byte[]> tokenHashes, byte[] spectatorHash, boolean service) {
             this.game = game;
@@ -154,6 +156,11 @@ final class HumanGames {
     private final AtomicLong longestRecoveryMillis = new AtomicLong();
     private final AtomicLong answeredFinished = new AtomicLong();
     private final AtomicLong removed = new AtomicLong();
+    /** Saved games (v1.0.0): saved, taken up again, given up by their player, and kept past their time. */
+    private final AtomicLong saved = new AtomicLong();
+    private final AtomicLong resumed = new AtomicLong();
+    private final AtomicLong discarded = new AtomicLong();
+    private final AtomicLong expired = new AtomicLong();
     /** Recordings that could not give their game back, by why. Guarded by this. */
     private final Map<String, Long> refused = new LinkedHashMap<>();
     /**
@@ -349,14 +356,112 @@ final class HumanGames {
         return new Created(game, tokens, spectatorToken);
     }
 
+    /** What asking for a service game to be saved came to (v1.0.0). */
+    enum Saved {
+        /** The game stopped here and waits in its recording until it is asked for again. */
+        SAVED,
+        /** No such game is running here. */
+        UNKNOWN,
+        /** The game has a result, or is being closed. */
+        OVER,
+        /** The game has no recording to wait in. */
+        UNRECORDED,
+        /** Its newest state could not be written in time: the game plays on, and may be asked again. */
+        NOT_YET
+    }
+
+    /**
+     * Saves a service game to be played on later (v1.0.0, {@link HumanGame#suspend}): the game stops
+     * here and its recording is kept until {@code untilMillis}. It is no longer a game of this
+     * registry: its seats' tokens stop working and its slot is free. It comes back by
+     * {@link #attach(String, boolean)} with {@code resume}, in this process or another. The wait
+     * for the state to reach the disk and for the game's thread to end is outside the lock.
+     */
+    Saved save(String id, long untilMillis) {
+        Entry entry;
+        synchronized (this) {
+            entry = id == null ? null : games.get(id);
+            if (entry == null || !entry.service || entry.suspended) {
+                return Saved.UNKNOWN;
+            }
+            if (entry.game.finished() || !entry.closing.compareAndSet(false, true)) {
+                return Saved.OVER;
+            }
+        }
+        HumanGame.Suspension outcome = entry.game.suspend(untilMillis);
+        if (outcome != HumanGame.Suspension.SAVED) {
+            entry.closing.set(false);
+            return switch (outcome) {
+                case OVER -> Saved.OVER;
+                case UNRECORDED -> Saved.UNRECORDED;
+                default -> Saved.NOT_YET;
+            };
+        }
+        entry.suspended = true;
+        saved.incrementAndGet();
+        try {
+            entry.game.thread().join(5_000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        if (!entry.game.thread().isAlive()) {
+            // Gone from here at once, so that a game's own process is free for its next game. One
+            // whose thread is still ending stays until it has (releaseFinished waits for it), and
+            // is answered for as a game that is not here.
+            games.remove(id, entry);
+        }
+        System.out.println("Human game " + id + " saved by its player; its recording is kept until "
+            + java.time.Instant.ofEpochMilli(untilMillis));
+        return Saved.SAVED;
+    }
+
+    /**
+     * A saved game given up by its player, or past its time (v1.0.0): its recording is removed. Only
+     * a recording that is marked as saved and whose game does not run here is ever removed this way;
+     * returns whether one was.
+     */
+    synchronized boolean discard(String id) {
+        Entry entry = games.get(id);
+        if (entry != null && !entry.suspended && !entry.game.finished() || recordings == null
+                || runningElsewhere.test(id)) {
+            return false;
+        }
+        Recording recording = Recording.of(recordings, id);
+        if (!recording.exists() || recording.savedUntil().isEmpty() || recording.result().isPresent()) {
+            return false;
+        }
+        recording.delete();
+        discarded.incrementAndGet();
+        return true;
+    }
+
+    /** Whether a game that is saved waits in the recordings (v1.0.0). */
+    boolean savedOnDisk(String id) {
+        if (recordings == null) {
+            return false;
+        }
+        Recording recording = Recording.of(recordings, id);
+        return recording.exists() && recording.savedUntil().isPresent() && recording.result().isEmpty();
+    }
+
+    /** {@link #attach(String, boolean)} for a game that was never saved: an interrupted one. */
+    Attachment attach(String id) {
+        return attach(id, false);
+    }
+
     /**
      * The API asks for a service game again (v0.9.9): a game running here gets new tokens; one that
      * is not here is taken up from its recording, with new tokens; one that is over is answered
      * with its result. See the class comment.
      */
-    synchronized Attachment attach(String id) {
+    synchronized Attachment attach(String id, boolean resume) {
         evict();
         Entry entry = games.get(id);
+        if (entry != null && entry.suspended) {
+            // Saved, and its thread was still ending when it was (save): the game is its recording's.
+            games.remove(id, entry);
+            entry = null;
+        }
         if (entry != null) {
             if (!entry.service) {
                 return new Attachment(Attached.UNKNOWN, null, null, null, null, null);
@@ -380,6 +485,13 @@ final class HumanGames {
             answeredFinished.incrementAndGet();
             return new Attachment(Attached.FINISHED, null, result.get(), null, null, null);
         }
+        boolean wasSaved = recording.savedUntil().isPresent();
+        if (wasSaved && !resume) {
+            // A saved game comes back only when its player asks for it (v1.0.0), never because
+            // something that follows games found it missing.
+            return new Attachment(Attached.UNUSABLE, null, null, "saved",
+                "The game was saved by its player and waits to be resumed", null);
+        }
         if (active() >= maxActive) {
             return new Attachment(Attached.BUSY, null, null, null, null, null);
         }
@@ -396,6 +508,11 @@ final class HumanGames {
             return new Attachment(Attached.UNUSABLE, null, null, e.code, e.getMessage(), null);
         }
         Created created = register(restored.game(), true);
+        if (wasSaved) {
+            // Running again: an ordinary recording from here on, kept and swept as any other.
+            recording.unsave();
+            resumed.incrementAndGet();
+        }
         restored.game().start();
         long millis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
         recovered.incrementAndGet();
@@ -421,7 +538,7 @@ final class HumanGames {
     /** The game and seat (null for the spectator) on the route given by {@code service}. */
     Optional<SeatHandle> find(String id, String token, boolean service) {
         Entry entry = id == null ? null : games.get(id);
-        if (entry == null || entry.service != service) {
+        if (entry == null || entry.service != service || entry.suspended) {
             return Optional.empty();
         }
         byte[] presented = hash(token == null ? "" : token);
@@ -442,7 +559,7 @@ final class HumanGames {
     /** A service game by id alone: the service token already authorized the caller. */
     Optional<HumanGame> service(String id) {
         Entry entry = id == null ? null : games.get(id);
-        return entry == null || !entry.service ? Optional.empty() : Optional.of(entry.game);
+        return entry == null || !entry.service || entry.suspended ? Optional.empty() : Optional.of(entry.game);
     }
 
     /**
@@ -453,7 +570,7 @@ final class HumanGames {
      */
     synchronized Optional<HumanGame> serviceOrCancel(String id) {
         Entry entry = games.get(id);
-        if (entry != null) {
+        if (entry != null && !entry.suspended) {
             return entry.service ? Optional.of(entry.game) : Optional.empty();
         }
         evict();
@@ -472,7 +589,7 @@ final class HumanGames {
     }
 
     synchronized int active() {
-        return (int) games.values().stream().filter(entry -> !entry.game.finished()).count();
+        return (int) games.values().stream().filter(entry -> !entry.suspended && !entry.game.finished()).count();
     }
 
     private void finished(HumanGame game) {
@@ -565,10 +682,22 @@ final class HumanGames {
         status.put("asked_for_again", asked);
         long count = 0;
         long bytes = 0;
+        long waiting = 0;
         for (Recording recording : onDisk()) {
             count++;
             bytes += recording.bytes();
+            if (recording.savedUntil().isPresent() && recording.result().isEmpty()) {
+                waiting++;
+            }
         }
+        // Saved games (v1.0.0): how many wait in the recordings, and what became of the others.
+        Map<String, Object> saves = new LinkedHashMap<>();
+        saves.put("waiting", waiting);
+        saves.put("saved", saved.get());
+        saves.put("resumed", resumed.get());
+        saves.put("discarded", discarded.get());
+        saves.put("expired", expired.get());
+        status.put("saves", saves);
         Map<String, Object> disk = new LinkedHashMap<>();
         disk.put("recordings", count);
         disk.put("bytes", bytes);
@@ -602,6 +731,17 @@ final class HumanGames {
             String id = recording.folder().getFileName().toString();
             Entry entry = games.get(id);
             if (entry != null && !entry.game.finished() || runningElsewhere.test(id)) {
+                continue;
+            }
+            Optional<Long> savedUntil = recording.savedUntil();
+            if (savedUntil.isPresent() && recording.result().isEmpty()) {
+                // A saved game (v1.0.0) is kept until its save runs out, however quiet it is, and
+                // not a day longer: it holds every hand and library of its game.
+                if (now >= savedUntil.get()) {
+                    recording.delete();
+                    expired.incrementAndGet();
+                    gone++;
+                }
                 continue;
             }
             long changed = recording.lastChanged();

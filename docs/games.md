@@ -256,6 +256,25 @@ The engine serves the API's games under `/v1/service`, only when `CD_ENGINE_SERV
 
 Service games and development games share one registry and the engine's game cap, but each belongs to its own route. A token or game ID from one route finds nothing on the other, and development games cannot be inspected. The development endpoints stay for scripts (`CD_ENGINE_DEV_ENDPOINTS`). The engine's `/health` reports `service_games_enabled`, which says only whether the service routes are on. Since v0.1.1 it also reports `gameplay_available: true` when the engine is ready (its card database is open) and its service routes serve the API's players' games. It is false while the engine loads, after a failed load, and on an engine without service games. The API passes the value through at `/api/v1/engine/status`.
 
+### Save and resume (v1.0.0)
+
+A game against the bots can be closed into its recording and played on later ([recording and recovery](engine/recovery.md#saving-a-game-v100), `api/saves.py`). The routes are behind the gate `save_resume` ([operations](operations.md#the-gates)): until SysOp stages it they answer as paths that do not exist.
+
+| Request | Who | Returns |
+| --- | --- | --- |
+| `POST /api/v1/games/{id}/save` | The game's own player, alone at it against the bots | 201 with the save: its `id`, the `game` (now `saved`), `saved_at`, `expires_at`, the `turn`. The engine brings the game's newest state to disk and stops it; the game's tabs get `{"type": "saved"}` and are closed. 409 `not_solo` for a table's game, `match_game` for a game of a match, `game_not_running` for one that is over, `save_limit` at five saves, `save_unavailable` for a game the engine keeps no recording of; 503 `save_not_ready` when its state could not be written in time. A refused game plays on untouched |
+| `GET /api/v1/saves` | Any player | `saves` (waiting, newest first), `ended` (those that ended by themselves in the last 14 days, each with its `ended_reason`: `expired`, `upgrade` or `unrecoverable`), and the rules: `limit` 5, `days` 30, `ends_at_upgrade` |
+| `POST /api/v1/saves/{id}/resume` | The save's owner | The game's summary, `active` again: the engine took it up from its recording, and the API follows it with new tokens. 409 `game_limit` while the account plays another game; 429 `games_busy` while the engine is full (the save waits); 410 `save_ended` when the save ran out, the engine was upgraded since, or the recording cannot be read back |
+| `DELETE /api/v1/saves/{id}` | The save's owner | 204. The recording is removed and the game ends `interrupted`: no result, nobody loses |
+
+**The rules** (the owner, 2026-11-14). A save lasts **30 days**; then the game ends `interrupted` and the engine removes its recording. An account holds **five** saves; a sixth waits for one to be resumed or discarded. **A save ends at the next engine upgrade**: a recording is played on only by the engine build that made it, and no second engine is kept beside the new one. Each save names its build; the API that starts against another ends those saves as `upgrade`, and a resume the engine refuses for it does the same. The save screens say all three before a game is saved and over the list.
+
+**A saved game** has the status `saved`. It runs nowhere and holds no slot, in the engine or under `CD_GAMES_MAX`; it is not its player's running game, so they may start another; it has no result, no rematch and no socket (4410 `game_not_live`); its events wait with it. A restart of the API asks the engine for nothing on its account, and an attach that does not say `resume` never brings it back. Resumed, it is an ordinary running game again and ends as any game does. A save that ends otherwise ends its game `interrupted`, as a game the engine could not give back ends: a campaign duel is recorded unfinished, which is no loss.
+
+**Not saved:** a table's game (its players suspend it together, by vote; not built yet) and a game of a best-of-three match (the match would stand between its games for as long as the save lasts).
+
+Migration `0052_game_saves` lets a game's status be `saved` and adds `game_saves`: each time a game was saved, until when, the engine build that holds it, and how the save ended. Its downgrade is refused while a game is saved.
+
 ### Recordings and attaching (v0.9.9)
 
 With `CD_ENGINE_RECORDINGS` set to a folder (the engine's image sets it), every service game keeps a recording of itself there, and a game the engine no longer has in memory is taken up again from it ([recording and recovery](engine/recovery.md)). The engine takes nothing up by itself. The API asks:
@@ -271,10 +290,18 @@ POST /v1/service/games/{id}/attach
 | 200, `"status": "finished"` | The game is over: its `result`, from the game or, once the engine has forgotten it, from its recording. No tokens |
 | 404 `not_found` | No such game, here or among the recordings. An engine that keeps no recordings answers this for every game it does not run |
 | 409 `recording_unreadable`, `recording_incompatible`, `recording_unrecoverable` | The recording cannot give the game back, with a `message` that says why: it is damaged; another engine build made it (after an upgrade); or the game was taken up five times in a row with no seat answering |
+| 409 `recording_saved` | Its player saved the game (v1.0.0), and the attach does not ask to resume it. A saved game is taken up only by `{"resume": true}` in the attach's body |
 | 429 `games_busy` | Every game slot is in use; `Retry-After: 30` |
 | 503 `engine_loading` | The card database is not open yet; `Retry-After: 5` |
 
 A create that names the id of a recording, finished or not, answers 409 `game_exists`: a game is not started anew over one that was played.
+
+Since v1.0.0 two more, for [save and resume](#save-and-resume-v100):
+
+| Request | Answers |
+| --- | --- |
+| `POST /v1/service/games/{id}/save` with `{"until_millis": N}`, a time to come | 200 `"status": "saved"` with the `engine_build`: the game's newest state is on disk, the game is stopped with no result, and its recording is kept until then, whatever the retention. 404 for a game not running here; 409 `game_over`; 409 `not_recorded` for a game with no recording to wait in; 503 `save_not_ready` when the state could not be written in time. A refused game plays on |
+| `POST /v1/service/games/{id}/discard` | 200 with `removed`: whether a recording marked as saved was removed. Nothing else is ever removed this way, so it is safe to repeat. 409 `game_running` for a game that runs |
 
 ## Data and restarts
 

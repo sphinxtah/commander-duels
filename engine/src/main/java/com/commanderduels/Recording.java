@@ -73,8 +73,12 @@ final class Recording {
     static final String JOURNAL = "journal.bin";
     static final String RESULT = "result.json";
     static final String STOPPED = "stopped.json";
+    /** Its player saved the game to play it on later (v1.0.0): the note that keeps the recording. */
+    static final String SAVED = "saved.json";
     /** How many checkpoints are kept: the newest, and the one before it should the newest be damaged. */
     static final int KEPT_CHECKPOINTS = 2;
+    /** How long a saved game whose note cannot be read is kept, from the note's date (v1.0.0). */
+    static final long UNREADABLE_SAVE_MILLIS = 31L * 24 * 60 * 60 * 1000;
     /** A journal record is small; a length beyond this is damage, not a record. */
     static final int MAX_RECORD_BYTES = 1 << 20;
     /** A checkpoint's state beyond this is refused unread. */
@@ -251,6 +255,52 @@ final class Recording {
             JsonObject damaged = new JsonObject();
             damaged.addProperty("why", "its note cannot be read");
             return Optional.of(damaged);
+        }
+    }
+
+    /**
+     * Notes that the game was saved by its player (v1.0.0, docs/engine/recovery.md): its process
+     * stopped playing it on purpose, and the recording waits for the game to be asked for again.
+     * Until {@code untilMillis} the sweep keeps it however quiet it is; after that it is removed.
+     * The note says nothing of the game.
+     */
+    void save(long untilMillis) throws IOException {
+        JsonObject note = new JsonObject();
+        note.addProperty("at", Instant.now().toString());
+        note.addProperty("until_millis", untilMillis);
+        writeWhole(SAVED, note.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Until when a saved game's recording is kept, in milliseconds since the epoch; empty for a
+     * recording that is not saved. A note that cannot be read still says the game was saved: it is
+     * kept for {@link #UNREADABLE_SAVE_MILLIS} from the note's own date, so that damage to the note
+     * neither loses a player's game at the next sweep nor keeps it for ever.
+     */
+    Optional<Long> savedUntil() {
+        Path file = folder.resolve(SAVED);
+        if (!Files.exists(file)) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(JsonParser.parseString(Files.readString(file)).getAsJsonObject()
+                .get("until_millis").getAsLong());
+        } catch (IOException | RuntimeException e) {
+            try {
+                return Optional.of(Files.getLastModifiedTime(file).toMillis() + UNREADABLE_SAVE_MILLIS);
+            } catch (IOException gone) {
+                return Optional.empty();
+            }
+        }
+    }
+
+    /** The game is played on, or its save was given up: the note is removed. */
+    void unsave() {
+        try {
+            Files.deleteIfExists(folder.resolve(SAVED));
+        } catch (IOException e) {
+            System.err.println("Recording " + folder.getFileName() + ": its save note could not be removed: "
+                + e.getMessage());
         }
     }
 

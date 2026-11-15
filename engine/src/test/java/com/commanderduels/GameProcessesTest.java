@@ -418,6 +418,63 @@ class GameProcessesTest {
     }
 
     @Test
+    void aSavedGameLeavesItsProcessAndComesBackWhenItIsAskedFor() throws Exception {
+        // No warm process, and a process may play many games: the saved game's process is free at once.
+        start(16_384, 0, 1, 8, 40);
+        String id = UUID.randomUUID().toString();
+        var created = service("POST", GAMES, null, duel(111L, id));
+        assertEquals(201, created.statusCode(), created.body());
+        String first = token(json(created), 0);
+        String second = token(json(created), 1);
+        var player = new ScriptedPlayer(111);
+        JsonObject asked = play(id, player, 12, first, second);
+        int askedSeat = asked.get("seat").getAsInt();
+        long pid = processes.processForTest(id).orElseThrow().pid();
+
+        String until = "{\"until_millis\":" + (System.currentTimeMillis() + 3_600_000) + "}";
+        var saved = service("POST", GAMES + "/" + id + "/save", null, until);
+        assertEquals(200, saved.statusCode(), saved.body());
+        assertEquals("saved", json(saved).get("status").getAsString());
+
+        // No process runs the game: its tokens find nothing, and its process is among the warm ones.
+        assertTrue(processes.processForTest(id).isEmpty());
+        assertEquals(404, service("GET", GAMES + "/" + id + "/view", first, null).statusCode());
+        assertEquals(404, service("POST", GAMES + "/" + id + "/save", null, until).statusCode());
+        JsonObject totals = untilTotal("reused", 1);
+        assertEquals(0, totals.get("retired").getAsInt(), totals.toString());
+        assertEquals(1, totals.get("processes_alive").getAsInt(), totals.toString());
+        assertTrue(Recording.of(recordings, id).savedUntil().isPresent());
+
+        // A follower that misses the game starts no process for it; its player's asking does.
+        var missed = service("POST", GAMES + "/" + id + "/attach", null, "{}");
+        assertEquals(409, missed.statusCode(), missed.body());
+        assertEquals("recording_saved", json(missed).get("code").getAsString());
+        assertEquals(1, metrics().getAsJsonObject("totals").get("processes_started").getAsInt());
+
+        var resumed = service("POST", GAMES + "/" + id + "/attach", null, "{\"resume\":true}");
+        assertEquals(200, resumed.statusCode(), resumed.body());
+        assertEquals("recovered", json(resumed).get("status").getAsString());
+        assertEquals(pid, processes.processForTest(id).orElseThrow().pid(), "the warm process took it up");
+        assertTrue(Recording.of(recordings, id).savedUntil().isEmpty());
+        String newFirst = token(json(resumed), 0);
+        String newSecond = token(json(resumed), 1);
+        JsonObject askedAgain = untilAsked(id, newFirst, newSecond);
+        assertEquals(askedSeat, askedAgain.get("seat").getAsInt());
+        assertEquals(comparable(asked), comparable(askedAgain));
+        // And it is played on as any game.
+        JsonObject later = play(id, player, 6, newFirst, newSecond);
+        assertTrue(later.get("revision").getAsLong() > askedAgain.get("revision").getAsLong());
+
+        // Saved again and given up: the recording is removed, and nothing brings the game back.
+        assertEquals(409, service("POST", GAMES + "/" + id + "/discard", null, "{}").statusCode(), "it runs");
+        assertEquals(200, service("POST", GAMES + "/" + id + "/save", null, until).statusCode());
+        var discarded = service("POST", GAMES + "/" + id + "/discard", null, "{}");
+        assertEquals(200, discarded.statusCode(), discarded.body());
+        assertTrue(json(discarded).get("removed").getAsBoolean());
+        assertEquals(404, service("POST", GAMES + "/" + id + "/attach", null, "{\"resume\":true}").statusCode());
+    }
+
+    @Test
     void aGameRunsInAProcessSizedForItsFormatAndReportsItsBots() throws Exception {
         start(16_384, 0);
         String id = UUID.randomUUID().toString();

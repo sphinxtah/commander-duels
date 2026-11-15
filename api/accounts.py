@@ -285,6 +285,10 @@ def delete_account(
             "This account is playing a game. Delete it once the game ends or its seat concedes.",
         )
     end_auctions_of(db, user, "account deleted", roster=roster)
+    # Its saved games (v1.0.0) end with it. Imported here: api.saves imports api.games.
+    from api.saves import end_saves_of
+
+    end_saves_of(db, user.id, now)
     removed = Removed(user.status)
     removed.tables_left = leave_open_tables(db, user.id, now)
     # Imported here: api.queues imports api.games, which imports far. Before the decks go: a place
@@ -399,12 +403,20 @@ def prune_events(engine: Engine, now: datetime) -> int:
     return removed
 
 
+def expire_saved_games(engine: Engine, now: datetime) -> int:
+    """Saved games past their time (api/saves.py expire_due), since v1.0.0 in the same run."""
+    from api.saves import expire_saves
+
+    return expire_saves(engine, now)
+
+
 def handle(engine: Engine, now: datetime) -> Outcome:
     """One run of the job, as the outcome catalog.sync.settle records on it."""
     try:
         count = remove_unapproved(engine, now)
         messages = prune_messages(engine, now)
         events = prune_events(engine, now)
+        saves = expire_saved_games(engine, now)
     except Exception:
         # Tomorrow's run tries again; the accounts and messages wait one more day.
         log.exception("The daily account cleanup failed")
@@ -415,4 +427,8 @@ def handle(engine: Engine, now: datetime) -> Outcome:
         log.info("Deleted %s chat messages past their time", messages)
     if events:
         log.info("Deleted %s game events past their time", events)
-    return Outcome("completed", "deleted" if count or messages or events else "nothing_due")
+    if saves:
+        log.info("Ended %s saved games past their time", saves)
+    return Outcome(
+        "completed", "deleted" if count or messages or events or saves else "nothing_due"
+    )

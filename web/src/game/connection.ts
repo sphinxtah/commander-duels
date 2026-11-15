@@ -39,6 +39,14 @@ export interface GameState {
   /** The engine's or the API's last refusal, in words. */
   refusal: string | null;
   interrupted: boolean;
+  /** The server is asking the engine for the game again after a restart (v0.9.9; close code
+   * 4503): the tab keeps trying, and says that the game is being recovered, not that it is gone. */
+  recovering: boolean;
+  /** The game came back after a restart while this tab watched or waited (v1.0.0): the engine
+   * took it up from its recording, or the server reached it again. Shown once, then cleared. */
+  recovered: boolean;
+  /** The save's id once the game's player saved it (v1.0.0): the game waits to be resumed. */
+  saved: string | null;
   /** The server refused this tab: the account has the game open in too many tabs already. */
   crowded: boolean;
   /** The priority controls a set_priority reply reported, until the next view shows them. */
@@ -73,7 +81,7 @@ export interface OutgoingChat {
 }
 
 export type EndReason =
-  "finished" | "not_live" | "signed_out" | "forbidden" | "not_found";
+  "finished" | "not_live" | "signed_out" | "forbidden" | "not_found" | "saved";
 
 /** The prompt an answer was chosen from, as the screen drew it. */
 export interface Seen {
@@ -94,6 +102,9 @@ const initial: GameState = {
   pending: null,
   refusal: null,
   interrupted: false,
+  recovering: false,
+  recovered: false,
+  saved: null,
   crowded: false,
   priority: null,
   presence: null,
@@ -120,6 +131,9 @@ const ALLIANCE_REFUSALS = new Set([
   "not_allied",
 ]);
 const LOG_KEPT = 400;
+/** A game taken up from its recording goes on at revisions a million further on for each recovery
+ * (docs/engine/recovery.md): a jump of at least this much says the game was recovered. */
+export const RECOVERY_STRIDE = 500_000;
 /** An open socket is pinged this often, and as the tab is shown again: a connection that died
  * while the computer slept may still look open, and only an unanswered ping tells. */
 export const PING_EVERY_MS = 25_000;
@@ -501,6 +515,9 @@ export class GameConnection {
           role: "observer",
           controlled: message.controlled,
           crowded: false,
+          // Refused as being recovered, and now reached: the game is back.
+          recovering: false,
+          recovered: this.state.recovered || this.state.recovering,
         });
         this.startHeartbeat();
         if (message.seat !== null && !message.controlled && !this.yielded)
@@ -555,6 +572,11 @@ export class GameConnection {
           log: mergeLog(this.state.log, next.log),
           pending,
           priority: null,
+          recovered:
+            this.state.recovered ||
+            (current !== null &&
+              current.game_id === next.game_id &&
+              next.revision - current.revision >= RECOVERY_STRIDE),
         });
         break;
       }
@@ -587,7 +609,10 @@ export class GameConnection {
         this.update({ inspection: message.inspection });
         break;
       case "interrupted":
-        this.update({ interrupted: true });
+        this.update({ interrupted: true, recovering: false });
+        break;
+      case "saved":
+        this.update({ saved: message.save_id });
         break;
       case "presence":
         this.update({
@@ -703,6 +728,8 @@ export class GameConnection {
       return end("forbidden");
     }
     if (code === 4404) return end("not_found");
+    // Saved by its player (v1.0.0), in this tab or another: it waits to be resumed.
+    if (this.state.saved) return end("saved");
     if (code === 4410) return end("not_live");
     if (code === 1000 && this.state.snapshot?.result) return end("finished");
     // Anything else (a dropped network, a restart, 4408) reconnects with backoff. A tab refused
@@ -710,7 +737,14 @@ export class GameConnection {
     // another tab closes or the server drops a dead connection.
     this.reconnect(() => this.open(), {
       crowded: code === 4429 && this.lastError === "too_many_connections",
+      // 4503: the server restarted and is asking the engine for the game again.
+      recovering: code === 4503,
     });
+  }
+
+  /** The notice that the game came back was shown. */
+  acknowledgeRecovered(): void {
+    if (this.state.recovered) this.update({ recovered: false });
   }
 
   /** Tries again after a delay that grows with each attempt since the last welcome. */

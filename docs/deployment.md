@@ -253,6 +253,7 @@ The site stays down until you run those commands or deploy a fixed tag.
 - `CD_ENGINE_RECORDING_RETENTION_HOURS` (24): a recording is removed once nothing in it has changed for this long; a running game's never.
 - `CD_ENGINE_CHECKPOINT_SECONDS` (3): how often a game's state reaches the disk while only bots play. When a person is asked something it is written at once.
 - **Size.** Under 1 MiB for a running game, a few KiB for a finished one: 64 games at once keep under 100 MiB.
+- **Saved games (v1.0.0).** A game its player saved ([save and resume](games.md#save-and-resume-v100)) waits in this volume for up to 30 days, under 1 MiB each and at most five an account, whatever the retention above. **An upgrade ends every saved game**, as it ends a running one: the new engine cannot play another build's recording on, and the API that starts with it ends those saves and tells their players why. The volume must outlive the container for a save to outlive a restart: the Compose files mount it.
 - **Not in the backups.** A recording holds every hand and library of a game, and is of use only to the engine build that made it: the nightly dumps do not hold it, and nothing needs restoring after a restore. Treat the volume as you treat the database.
 - **Looking.** The service route `GET /v1/service/recordings` gives the numbers, and `RecordingTool` says whether each recording is whole, without showing any game:
 

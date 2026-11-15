@@ -126,6 +126,8 @@ final class HumanGame {
         || Boolean.getBoolean("cd.engine.journalChoices");
     /** The journal's record types that are played again (v0.9.9); its other records are notes. */
     private static final Set<String> REPLAYED = Set.of("answer", "concede", "priority", "bots");
+    /** The journal's note that the game was saved by its player to be played on later (v1.0.0). */
+    static final String SAVED_NOTE = "saved";
     /** Reads a journalled reply back as the map it was, whole numbers as whole numbers. */
     private static final Gson REPLIES = new GsonBuilder().setObjectToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
         .create();
@@ -349,6 +351,8 @@ final class HumanGame {
     private long replayedSeq;
     /** Set by {@link #interrupt}: the recording was left as it stood, and takes no result. */
     private boolean interrupted;
+    /** Saved by its player (v1.0.0): its thread is ended on purpose, which is no failure. */
+    private volatile boolean suspended;
 
     HumanGame(String id, HumanGameRequest request, Path deckDirectory, Consumer<HumanGame> onFinished) {
         this(id, request, deckDirectory, onFinished, Hooks.NONE);
@@ -572,9 +576,14 @@ final class HumanGame {
         try {
             play();
         } catch (Throwable t) {
-            failure = t;
-            System.err.println("Human game " + id + " failed");
-            t.printStackTrace();
+            if (suspended) {
+                // Stopped on purpose, in the middle of whatever it was doing (v1.0.0): no failure.
+                System.out.println("Human game " + id + " stopped where it was saved");
+            } else {
+                failure = t;
+                System.err.println("Human game " + id + " failed");
+                t.printStackTrace();
+            }
         } finally {
             finish(failure);
             events.detach();
@@ -1410,6 +1419,10 @@ final class HumanGame {
             requested = endRequest;
             concededSeats = List.copyOf(conceded);
         }
+        if (suspended) {
+            // No game's result: the game waits in its recording (suspend).
+            return new Result("suspended", concededSeats, turns, null);
+        }
         if (failure != null) {
             // Every seat is sent the result: the details stay in the engine's log (see run).
             return new Result("error", concededSeats, turns, "The engine stopped the game after an internal error");
@@ -2228,6 +2241,73 @@ final class HumanGame {
             stopping.end();
         }
         BotMatchRunner.stop(thread);
+    }
+
+    /** What asking a game to be saved came to (v1.0.0). */
+    enum Suspension {
+        /** The game stopped here and waits in its recording. */
+        SAVED,
+        /** The game has a result, or is already stopping. */
+        OVER,
+        /** The game keeps no recording, or its recording stopped: there is nothing to save it in. */
+        UNRECORDED,
+        /** The newest state could not be brought to disk in time; the game plays on, ask again. */
+        NOT_YET
+    }
+
+    /**
+     * Saves the game to be played on later (v1.0.0, docs/engine/recovery.md): the game stops here on
+     * purpose, as a dead process stops it by accident, and what a recovery finds is what a resume
+     * finds. First every state taken so far is brought to disk, so the game goes on from the last
+     * point it could go on from, and no further back; then the journal notes the save (a game saved
+     * and taken up is not a game that keeps being interrupted, {@link Recovery#MAX_FRUITLESS}) and
+     * the recording is marked as saved until {@code untilMillis}, which keeps it from the sweep.
+     * Only then does the recording close and the game's thread end. No result is written: the
+     * recording is not over, and the result the seats see here ({@code suspended}) is no game's
+     * result. Anything that fails before the game is stopped leaves it running as it was.
+     */
+    Suspension suspend(long untilMillis) {
+        Recorder keeper = recorder;
+        if (keeper == null || keeper.failure() != null) {
+            return Suspension.UNRECORDED;
+        }
+        synchronized (this) {
+            if (result != null || interrupted || endRequest != null) {
+                return Suspension.OVER;
+            }
+        }
+        if (!keeper.awaitDurable()) {
+            return keeper.failure() != null ? Suspension.UNRECORDED : Suspension.NOT_YET;
+        }
+        JsonObject note = new JsonObject();
+        note.addProperty("type", SAVED_NOTE);
+        note.addProperty("until_millis", untilMillis);
+        if (keeper.journal(note) == 0) {
+            return Suspension.UNRECORDED;
+        }
+        try {
+            keeper.recording().save(untilMillis);
+        } catch (IOException | RuntimeException e) {
+            System.err.println("Human game " + id + " could not be marked as saved: " + e);
+            return Suspension.NOT_YET;
+        }
+        synchronized (this) {
+            if (result != null || interrupted || endRequest != null) {
+                // It ended while its state was being written: a game with a result is not saved.
+                keeper.recording().unsave();
+                return Suspension.OVER;
+            }
+            interrupted = true;
+            endRequest = "suspended";
+            suspended = true;
+        }
+        keeper.close();
+        Game stopping = game;
+        if (stopping != null) {
+            stopping.end();
+        }
+        BotMatchRunner.stop(thread);
+        return Suspension.SAVED;
     }
 
     /** The game's recorder (v0.9.9); null for a game that keeps no recording. */

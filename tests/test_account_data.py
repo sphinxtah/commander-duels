@@ -72,6 +72,8 @@ TRANSIENT = {
     "rematch_players": "a rematch vote",
     "player_blocks": "a block; social, no asset",
     "auction_watches": "a watched auction; no asset",
+    "game_saves": "a saved game; it ends at the upgrade (the owner's decision, 2026-11-14), and "
+    "its game is the record",
 }
 
 

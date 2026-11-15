@@ -384,6 +384,76 @@ describe("too many tabs", () => {
   });
 });
 
+describe("recovery and saving (v1.0.0)", () => {
+  it("says that the game is being recovered while the server asks for it again, and that it came back", () => {
+    const first = playing();
+    // The API restarts: the socket drops, and the next ones are refused while the engine is
+    // asked for the game again.
+    first.drop(1012);
+    expect(state).toMatchObject({ phase: "reconnecting", recovering: false });
+    vi.advanceTimersByTime(1000);
+    const second = FakeSocket.made[1];
+    second.accept();
+    second.deliver({ type: "error", code: "game_recovering" });
+    second.drop(4503);
+    expect(state).toMatchObject({
+      phase: "reconnecting",
+      recovering: true,
+      ended: null,
+    });
+
+    vi.advanceTimersByTime(2000);
+    const third = FakeSocket.made[2];
+    third.accept();
+    third.deliver(welcome(0, false));
+    expect(state).toMatchObject({
+      phase: "open",
+      recovering: false,
+      recovered: true,
+    });
+    connection.acknowledgeRecovered();
+    expect(state.recovered).toBe(false);
+  });
+
+  it("notices a game the engine took up from its recording by its revisions, without a reconnect", () => {
+    const socket = playing();
+    socket.deliver({
+      type: "snapshot",
+      snapshot: snapshot(6, prompt("B", "pass")),
+    });
+    expect(state.recovered).toBe(false);
+    // The engine restarted under a tab that never disconnected: the game goes on a million on.
+    socket.deliver({
+      type: "snapshot",
+      snapshot: snapshot(1_000_006, prompt("C", "pass")),
+    });
+    expect(state).toMatchObject({ phase: "open", recovered: true });
+    expect(state.snapshot?.revision).toBe(1_000_006);
+  });
+
+  it("a game that cannot be given back is interrupted, not still being recovered", () => {
+    const first = playing();
+    first.drop(4503);
+    expect(state.recovering).toBe(true);
+    vi.advanceTimersByTime(1000);
+    const second = FakeSocket.made[1];
+    second.accept();
+    second.deliver(welcome(0, false));
+    second.deliver({ type: "interrupted", game_id: "g1" });
+    expect(state).toMatchObject({ interrupted: true, recovering: false });
+  });
+
+  it("ends as saved when its player saves it, and does not reconnect", () => {
+    const socket = playing();
+    socket.deliver({ type: "saved", game_id: "g1", save_id: "s1" });
+    expect(state.saved).toBe("s1");
+    socket.drop(1000);
+    expect(state).toMatchObject({ phase: "ended", ended: "saved" });
+    vi.advanceTimersByTime(60_000);
+    expect(FakeSocket.made).toHaveLength(1);
+  });
+});
+
 describe("one socket at a time", () => {
   it("coming back online while a reconnect is opening opens no second socket", () => {
     const first = playing();

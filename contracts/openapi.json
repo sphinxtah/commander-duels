@@ -6688,10 +6688,12 @@
             "type": "array"
           },
           "status": {
+            "description": "Running, over with a result, over without one, or since v1.0.0 saved by its player to be played on later (GET /saves): a saved game runs nowhere and has no end yet.",
             "enum": [
               "active",
               "finished",
-              "interrupted"
+              "interrupted",
+              "saved"
             ],
             "title": "Status",
             "type": "string"
@@ -13654,6 +13656,133 @@
           "products"
         ],
         "title": "SaleInfo",
+        "type": "object"
+      },
+      "SavedGame": {
+        "additionalProperties": false,
+        "description": "A game saved to be played on later.",
+        "properties": {
+          "ended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null while the game waits to be resumed.",
+            "title": "Ended At"
+          },
+          "ended_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "resumed",
+                  "discarded",
+                  "expired",
+                  "upgrade",
+                  "unrecoverable",
+                  "account"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How the save ended: resumed or discarded by its player, expired after its days, upgrade (the engine was upgraded: a saved game is played on only by the build that saved it), unrecoverable (its recording could not be read back), or account (its account was deleted).",
+            "title": "Ended Reason"
+          },
+          "expires_at": {
+            "description": "When the save runs out: the game then ends interrupted, with no result.",
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "game": {
+            "$ref": "#/components/schemas/GameSummary"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "saved_at": {
+            "format": "date-time",
+            "title": "Saved At",
+            "type": "string"
+          },
+          "turn": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The game's turn as it was saved, when known.",
+            "title": "Turn"
+          }
+        },
+        "required": [
+          "id",
+          "game",
+          "saved_at",
+          "expires_at",
+          "turn",
+          "ended_at",
+          "ended_reason"
+        ],
+        "title": "SavedGame",
+        "type": "object"
+      },
+      "Saves": {
+        "additionalProperties": false,
+        "description": "The account's saved games and the rules they stand under.",
+        "properties": {
+          "days": {
+            "description": "How many days a save lasts.",
+            "title": "Days",
+            "type": "integer"
+          },
+          "ended": {
+            "description": "Saves that ended otherwise than by their player's doing (expired, upgrade, unrecoverable) in the last 14 days, newest first.",
+            "items": {
+              "$ref": "#/components/schemas/SavedGame"
+            },
+            "title": "Ended",
+            "type": "array"
+          },
+          "ends_at_upgrade": {
+            "default": true,
+            "description": "A save ends at the next upgrade of the game's engine: a saved game is played on only by the build that saved it.",
+            "title": "Ends At Upgrade",
+            "type": "boolean"
+          },
+          "limit": {
+            "description": "How many saves an account holds at once.",
+            "title": "Limit",
+            "type": "integer"
+          },
+          "saves": {
+            "description": "Waiting to be resumed, newest first.",
+            "items": {
+              "$ref": "#/components/schemas/SavedGame"
+            },
+            "title": "Saves",
+            "type": "array"
+          }
+        },
+        "required": [
+          "saves",
+          "ended",
+          "limit",
+          "days"
+        ],
+        "title": "Saves",
         "type": "object"
       },
       "SceneSeen": {
@@ -33167,6 +33296,117 @@
         "summary": "Decline Rematch"
       }
     },
+    "/api/v1/games/{game_id}/save": {
+      "post": {
+        "description": "Saves your game against the bots to be played on later: it stops where it is and waits in\nYour games. It lasts 30 days, an account holds five, and a save ends at the next upgrade of\nthe game. A refused game plays on untouched.",
+        "operationId": "save_game_api_v1_games__game_id__save_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedGame"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Save Game"
+      }
+    },
     "/api/v1/games/{game_id}/timeline": {
       "get": {
         "description": "A game's structured events after ``since``, oldest first (v0.9.10), of one ``turn`` or one\n``type`` if asked: a player's own seat's perspective, or with ``view=inspection`` everything,\nfor SysOp (and an administrator outside a game they play against people), each reading\naudited. Anyone else is answered 404.",
@@ -39454,6 +39694,340 @@
           }
         },
         "summary": "Reach"
+      }
+    },
+    "/api/v1/saves": {
+      "get": {
+        "description": "Your saved games, and the rules they stand under.",
+        "operationId": "list_saves_api_v1_saves_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Saves"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "List Saves"
+      }
+    },
+    "/api/v1/saves/{save_id}": {
+      "delete": {
+        "description": "Gives a saved game up: it ends interrupted, with no result, and its recording is removed.\nNobody loses.",
+        "operationId": "discard_save_api_v1_saves__save_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "save_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Save Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Gone"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Discard Save"
+      }
+    },
+    "/api/v1/saves/{save_id}/resume": {
+      "post": {
+        "description": "Plays a saved game on: the engine takes it up where it stopped, and it is your running\ngame again. 410 when the save has ended (it ran out, the game was upgraded, or it could not\nbe read back); the game then ends interrupted, with no result.",
+        "operationId": "resume_save_api_v1_saves__save_id__resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "save_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Save Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Gone"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Resume Save"
       }
     },
     "/api/v1/sets": {

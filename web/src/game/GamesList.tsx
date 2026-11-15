@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { client, type Me } from "../api";
+import { useWorkflow } from "../app/rollout";
 import { COURT } from "../campaign/campaign";
 import { RunningMatches } from "../matches/RunningMatches";
 import { seatTitle } from "../tables/kingsTable";
+import { SavedGames, useSaves } from "./saves";
 import { getSoundEngine } from "./sound/engine";
 import {
   ago,
@@ -39,8 +41,9 @@ export function useGames(everyone = false): {
 }
 
 /**
- * The account's games (v1.0.0): the ones running, to resume or close, and the last eight that
- * ended. Until v1.0.0 this list sat under the practice table's options on the Play page; the Play
+ * The account's games (v1.0.0): the ones saved to be played on later, to resume or discard (where
+ * save and resume is open to the account), the ones running, to resume or close, and the last
+ * eight that ended. Until v1.0.0 this list sat under the practice table's options on the Play page; the Play
  * wizard took that page, so the list has a page of its own (#play/games), opened from the wizard's
  * first slide (the owner's choice). SysOp may list every player's games.
  */
@@ -48,6 +51,9 @@ export function GamesList({ me }: { me: Me }) {
   const sysop = me.permissions.includes("games.view_concealed");
   const [everyone, setEveryone] = useState(false);
   const { games, refresh } = useGames(everyone);
+  // Saved games (v1.0.0, saves.tsx): the account's own, whoever's games are listed below.
+  const saving = useWorkflow("save_resume");
+  const { saves, refresh: refreshSaves } = useSaves(saving);
   // The campaign's court closed by its own player is the court lost (v0.9.8): closing it asks first.
   const [closingCourt, setClosingCourt] = useState<GameSummary | null>(null);
   const courtDialog = useRef<HTMLDialogElement>(null);
@@ -60,7 +66,16 @@ export function GamesList({ me }: { me: Me }) {
   }
 
   const active = games?.filter((g) => g.status === "active") ?? [];
-  const recent = games?.filter((g) => g.status !== "active").slice(0, 8) ?? [];
+  // A saved game is listed above, with its save; without the list (the workflow closed again)
+  // it stays among the others, and says that it is saved.
+  const recent =
+    games
+      ?.filter(
+        (g) =>
+          g.status !== "active" &&
+          !(g.status === "saved" && saves && !everyone),
+      )
+      .slice(0, 8) ?? [];
 
   return (
     <section
@@ -68,6 +83,15 @@ export function GamesList({ me }: { me: Me }) {
       aria-label={everyone ? "Every player's games" : "Your games"}
     >
       <RunningMatches refreshKey={games} />
+      {saves && !everyone && (
+        <SavedGames
+          saves={saves}
+          onChanged={() => {
+            void refreshSaves();
+            void refresh();
+          }}
+        />
+      )}
       <div className={styles.gamesHead}>
         <h2>{everyone ? "Every player's games" : "Running and recent"}</h2>
         {sysop && (
@@ -83,8 +107,10 @@ export function GamesList({ me }: { me: Me }) {
       </div>
       {!games ? (
         <p role="status">Loading games…</p>
-      ) : games.length === 0 ? (
-        <p className={styles.hint}>No games yet.</p>
+      ) : active.length + recent.length === 0 ? (
+        <p className={styles.hint}>
+          {games.length === 0 ? "No games yet." : "No other games yet."}
+        </p>
       ) : (
         <ul className={styles.games}>
           {[...active, ...recent].map((game) => {

@@ -49,7 +49,8 @@ public final class EngineServer {
     private static final String SERVICE = "/v1/service/";
     private static final String GAME_ID = "([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})";
     private static final Pattern GAME_PATH = Pattern.compile(GAME_ID + "/(view|commands|close)");
-    private static final Pattern SERVICE_GAME_PATH = Pattern.compile(GAME_ID + "/(close|inspection|bots|attach|events)");
+    private static final Pattern SERVICE_GAME_PATH = Pattern.compile(GAME_ID
+        + "/(close|inspection|bots|attach|events|save|discard)");
     /** The body of a request to the passive bot switch (v0.8.6). */
     private static final Set<String> BOTS_FIELDS = Set.of("passive");
     /** Content a plugin carries for the API (v0.8.0): {@code /v1/service/content/<name>}. */
@@ -231,6 +232,14 @@ public final class EngineServer {
                 attach(exchange, engine, matcher.group(1));
                 return;
             }
+            if (matcher.group(2).equals("save")) {
+                save(exchange, games, matcher.group(1));
+                return;
+            }
+            if (matcher.group(2).equals("discard")) {
+                discard(exchange, engine, matcher.group(1));
+                return;
+            }
             if (matcher.group(2).equals("events")) {
                 Optional<HumanGame> running = games.service(matcher.group(1));
                 events(exchange, running.map(HumanGame::events).orElse(null), games.recordings(), matcher.group(1));
@@ -276,10 +285,11 @@ public final class EngineServer {
             respond(exchange, 503, Map.of("code", notReadyCode(engine)));
             return;
         }
-        if (readBody(exchange).isEmpty()) {
+        Optional<String> asked = readBody(exchange);
+        if (asked.isEmpty()) {
             return;
         }
-        HumanGames.Attachment attachment = engine.humanGames().attach(id);
+        HumanGames.Attachment attachment = engine.humanGames().attach(id, resumes(asked.get()));
         switch (attachment.status()) {
             case UNKNOWN -> respond(exchange, 404, Map.of("code", "not_found"));
             case BUSY -> {
@@ -315,8 +325,165 @@ public final class EngineServer {
         }
     }
 
+    /**
+     * Whether an attach's body asks for a saved game (v1.0.0): {@code {"resume": true}}. Without it a
+     * saved game is not taken up: it comes back when its player asks, not when a follower misses it.
+     */
+    private static boolean resumes(String body) {
+        try {
+            var json = com.google.gson.JsonParser.parseString(body.isBlank() ? "{}" : body);
+            return json.isJsonObject() && json.getAsJsonObject().has("resume")
+                && json.getAsJsonObject().get("resume").getAsBoolean();
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /** Until when a save's body asks the recording to be kept; -1 when it does not say. */
+    private static long untilMillis(String body) {
+        try {
+            var json = com.google.gson.JsonParser.parseString(body.isBlank() ? "{}" : body).getAsJsonObject();
+            long until = json.get("until_millis").getAsLong();
+            return until > System.currentTimeMillis() ? until : -1;
+        } catch (RuntimeException e) {
+            return -1;
+        }
+    }
+
+    /**
+     * Saves a game to be played on later (v1.0.0, {@link HumanGames#save}; {@code POST
+     * /v1/service/games/{id}/save} with {@code {"until_millis": N}}, a time to come): the game stops
+     * where it is and waits in its recording until then. 200 says it is saved, with the engine's
+     * build, which alone can take it up again. 404 when no such game runs here; 409 {@code
+     * game_over} for one with a result or being closed, 409 {@code not_recorded} for one with no
+     * recording to wait in; 503 {@code save_not_ready}, to be asked again, when its newest state
+     * could not be written in time. A refused game plays on untouched.
+     */
+    private static void save(HttpExchange exchange, HumanGames games, String id) throws IOException {
+        if (!exchange.getRequestMethod().equals("POST")) {
+            methodNotAllowed(exchange, "POST");
+            return;
+        }
+        Optional<String> body = readBody(exchange);
+        if (body.isEmpty()) {
+            return;
+        }
+        long until = untilMillis(body.get());
+        if (until < 0) {
+            respond(exchange, 400, Map.of("code", "invalid_request",
+                "message", "until_millis must be a time to come, in milliseconds since the epoch"));
+            return;
+        }
+        switch (games.save(id, until)) {
+            case SAVED -> {
+                Map<String, Object> response = new LinkedHashMap<>();
+                response.put("game_id", id);
+                response.put("status", "saved");
+                response.put("until_millis", until);
+                response.put("engine_build", EngineBuild.key());
+                respond(exchange, 200, response);
+            }
+            case UNKNOWN -> respond(exchange, 404, Map.of("code", "not_found"));
+            case OVER -> respond(exchange, 409, Map.of("code", "game_over",
+                "message", "The game is over or being closed"));
+            case UNRECORDED -> respond(exchange, 409, Map.of("code", "not_recorded",
+                "message", "The game keeps no recording to be saved in"));
+            default -> {
+                exchange.getResponseHeaders().set("Retry-After", "2");
+                respond(exchange, 503, Map.of("code", "save_not_ready",
+                    "message", "The game's state could not be written in time; ask again"));
+            }
+        }
+    }
+
+    /**
+     * A saved game given up (v1.0.0; {@code POST /v1/service/games/{id}/discard}): its recording is
+     * removed. Only a recording marked as saved whose game is not running is removed; anything else
+     * is answered {@code removed: false} and left alone, so the call is safe to repeat. 409 {@code
+     * game_running} for a game that runs.
+     */
+    private static void discard(HttpExchange exchange, Engine engine, String id) throws IOException {
+        if (!exchange.getRequestMethod().equals("POST")) {
+            methodNotAllowed(exchange, "POST");
+            return;
+        }
+        if (readBody(exchange).isEmpty()) {
+            return;
+        }
+        GameProcesses processes = engine.processes();
+        var lock = processes == null ? null : processes.lock(id);
+        if (lock != null) {
+            lock.lock();
+        }
+        try {
+            boolean running = processes != null ? processes.of(id).isPresent()
+                : engine.humanGames().service(id).filter(game -> !game.finished()).isPresent();
+            if (running) {
+                respond(exchange, 409, Map.of("code", "game_running", "message", "The game is running"));
+                return;
+            }
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("game_id", id);
+            response.put("status", "discarded");
+            response.put("removed", engine.humanGames().discard(id));
+            respond(exchange, 200, response);
+        } finally {
+            if (lock != null) {
+                lock.unlock();
+            }
+        }
+    }
+
+    /**
+     * A save on the front process (v1.0.0): forwarded to the game's process, which stops the game;
+     * the process is then no longer the game's, and takes its next game or is ended, as after a
+     * game that is over. The game comes back in whichever process a later attach gives it.
+     */
+    private static void isolatedSave(HttpExchange exchange, Engine engine, String id) throws IOException {
+        if (!exchange.getRequestMethod().equals("POST")) {
+            methodNotAllowed(exchange, "POST");
+            return;
+        }
+        Optional<String> body = readBody(exchange);
+        if (body.isEmpty()) {
+            return;
+        }
+        GameProcesses processes = engine.processes();
+        var lock = processes.lock(id);
+        lock.lock();
+        try {
+            Optional<GameProcesses.GameProcess> process = processes.of(id);
+            if (process.isEmpty()) {
+                respond(exchange, 404, Map.of("code", "not_found"));
+                return;
+            }
+            Optional<GameProcesses.Forwarded> answer;
+            try {
+                answer = processes.forward(process.get(), "POST", exchange.getRequestURI().getRawPath(), null, null,
+                    body.get().getBytes(StandardCharsets.UTF_8), 60_000);
+                if (answer.filter(forwarded -> forwarded.status() == 200).isPresent()) {
+                    processes.vacated(process.get());
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                respond(exchange, 503, Map.of("code", "interrupted"));
+                return;
+            }
+            if (answer.isEmpty()) {
+                exchange.getResponseHeaders().set("Retry-After", "5");
+                respond(exchange, 503, Map.of("code", "game_process_unavailable",
+                    "message", "The game's process did not answer; ask again shortly"));
+            } else {
+                respondRaw(exchange, answer.get());
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
     /** Every route a game's process answers for it, on the front process (v0.9.10). */
-    private static final Pattern ISOLATED_GAME_PATH = Pattern.compile(GAME_ID + "/(view|commands|close|inspection|bots|attach|events)");
+    private static final Pattern ISOLATED_GAME_PATH = Pattern.compile(GAME_ID
+        + "/(view|commands|close|inspection|bots|attach|events|save|discard)");
 
     /**
      * The engine's numbers when every game runs in this one process (v0.9.10): memory and the bots
@@ -341,7 +508,7 @@ public final class EngineServer {
         Matcher matcher = ISOLATED_GAME_PATH.matcher(rest);
         String action = matcher.matches() ? matcher.group(2) : "";
         boolean serviceOnly = action.equals("inspection") || action.equals("bots") || action.equals("attach")
-            || action.equals("events");
+            || action.equals("events") || action.equals("save") || action.equals("discard");
         if (action.isEmpty() || serviceOnly && !service) {
             respond(exchange, 404, Map.of("code", "not_found"));
             return;
@@ -349,6 +516,14 @@ public final class EngineServer {
         String id = matcher.group(1);
         if (action.equals("attach")) {
             isolatedAttach(exchange, engine, id);
+            return;
+        }
+        if (action.equals("save")) {
+            isolatedSave(exchange, engine, id);
+            return;
+        }
+        if (action.equals("discard")) {
+            discard(exchange, engine, id);
             return;
         }
         GameProcesses processes = engine.processes();
@@ -569,6 +744,14 @@ public final class EngineServer {
                 response.put("status", "finished");
                 response.put("result", result.get());
                 respond(exchange, 200, response);
+                return;
+            }
+            if (recording.savedUntil().isPresent() && !resumes(body.get())) {
+                // A saved game (v1.0.0) is taken up only when its player asks: no process is started.
+                Map<String, Object> refusal = new LinkedHashMap<>();
+                refusal.put("code", "recording_saved");
+                refusal.put("message", "The game was saved by its player and waits to be resumed");
+                respond(exchange, 409, refusal);
                 return;
             }
             GameProcesses.Size size;

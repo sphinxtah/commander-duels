@@ -35,7 +35,8 @@ import mage.game.Game;
  *   <li>The journal is read up to its first damaged record, and cut back to there before anything
  *       is added.
  *   <li>A game taken up {@link #MAX_FRUITLESS} times in a row with no seat answering in between is
- *       refused: what interrupts it comes back each time.
+ *       refused: what interrupts it comes back each time. A game its player saved (v1.0.0) starts
+ *       the count anew.
  * </ol>
  */
 final class Recovery {
@@ -127,7 +128,9 @@ final class Recovery {
             String type = journal.records().get(index).get("type").getAsString();
             if (type.equals("recovered")) {
                 fruitless++;
-            } else if (type.equals("answer") || type.equals("concede")) {
+            } else if (type.equals("answer") || type.equals("concede") || type.equals(HumanGame.SAVED_NOTE)) {
+                // A save is its player's doing, not an interruption (v1.0.0): a game saved and
+                // resumed again and again, with nothing answered, is not one that keeps failing.
                 break;
             }
         }
