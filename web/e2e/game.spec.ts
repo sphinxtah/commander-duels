@@ -624,9 +624,11 @@ async function concede(page: Page) {
     .click();
 }
 
-/** Save and resume is behind its gate (v1.0.0): SysOp opens it to the staff for a journey and
- * closes it again afterwards, whatever the journey came to. */
-async function stageSaves(page: Page, to: "staff" | "off"): Promise<number> {
+/** Save and resume is behind its gate (v1.0.0): SysOp opens it for the journeys that save a game.
+ * It is opened to everyone and left open: the journeys of several files run at once on one
+ * installation, and one that closed the gate behind itself closed it under the others (the
+ * hosted run of d0a8f9c). */
+async function openSaves(page: Page): Promise<number> {
   return page.evaluate(async (wanted) => {
     const me = (await (await fetch("/api/v1/me")).json()) as {
       csrf_token: string;
@@ -640,7 +642,7 @@ async function stageSaves(page: Page, to: "staff" | "off"): Promise<number> {
       body: JSON.stringify({ stage: wanted }),
     });
     return changed.status;
-  }, to);
+  }, "on");
 }
 
 /**
@@ -681,7 +683,8 @@ function savedOnce(
       // The table is left for the list the game waits in.
       await expect(page).toHaveURL(/#play\/games$/, { timeout: 30_000 });
       const waiting = page.getByRole("region", { name: "Saved games" });
-      await expect(waiting).toContainText("1 of 5");
+      // Another journey's suspended table may count against the same account meanwhile.
+      await expect(waiting).toContainText(/[1-5] of 5/);
       await expect(waiting).toContainText(`Turn ${saved.turn}`);
       await expect(waiting).toContainText("runs out in 2");
       const status = await page.evaluate(
@@ -850,38 +853,34 @@ test.describe("practice games in the browser", () => {
       new Set([...theirs].filter((n) => !mine.has(n))),
     );
     await signInSysop(page);
-    expect(await stageSaves(page, "staff")).toBe(200);
-    try {
-      const gameId = await startGame(page, {
-        format: "Legacy",
-        deck: "legacy-mono-red-burn",
-        turnCap: 20,
-      });
-      // On the second turn, between two answers: saved, found among the saved games, resumed.
-      const save = savedOnce(page, table, gameId);
-      const { snapshot, answered } = await play(
-        page,
-        table,
-        "mouse",
-        save.hook,
-      );
-      note(
-        testInfo,
-        `saved at turn ${save.at?.turn}, revision ${save.at?.revision}; ${snapshot.result!.kind} after ${snapshot.result!.turns} turns; ${answered} prompts by mouse`,
-      );
-      expect(save.at).not.toBeNull();
-      expect(table.problems).toEqual([]);
-      await expect(
-        page.getByRole("dialog", { name: /Victory|Defeat|draw|Game over/ }),
-      ).toBeVisible();
-      // Over, it is no saved game: the list holds none.
-      await page.goto("/#play/games");
-      await expect(
-        page.getByRole("region", { name: "Saved games" }),
-      ).toHaveCount(0);
-    } finally {
-      await stageSaves(page, "off");
-    }
+    expect(await openSaves(page)).toBe(200);
+    const gameId = await startGame(page, {
+      format: "Legacy",
+      deck: "legacy-mono-red-burn",
+      turnCap: 20,
+    });
+    // On the second turn, between two answers: saved, found among the saved games, resumed.
+    const save = savedOnce(page, table, gameId);
+    const { snapshot, answered } = await play(page, table, "mouse", save.hook);
+    note(
+      testInfo,
+      `saved at turn ${save.at?.turn}, revision ${save.at?.revision}; ${snapshot.result!.kind} after ${snapshot.result!.turns} turns; ${answered} prompts by mouse`,
+    );
+    expect(save.at).not.toBeNull();
+    expect(table.problems).toEqual([]);
+    await expect(
+      page.getByRole("dialog", { name: /Victory|Defeat|draw|Game over/ }),
+    ).toBeVisible();
+    // Over, it is no saved game: the account's list of saved games against the bots holds none
+    // (a table suspended by another journey at the same time is not one of them).
+    const listed = page.waitForResponse((response) =>
+      response.url().endsWith("/api/v1/saves"),
+    );
+    await page.goto("/#play/games");
+    expect(
+      ((await (await listed).json()) as { saves: unknown[] }).saves,
+    ).toEqual([]);
+    await expect(page.getByRole("button", { name: "Resume" })).toHaveCount(0);
   });
 
   test("a Legacy game played to the end by keyboard alone", async ({
@@ -930,7 +929,7 @@ test.describe("practice games in the browser", () => {
     await signInSysop(page);
     // Since v1.0.0 the table is also saved and resumed on its second turn: a four-seat game
     // comes back from its recording as a duel does, every bot's deck still concealed.
-    expect(await stageSaves(page, "staff")).toBe(200);
+    expect(await openSaves(page)).toBe(200);
     const gameId = await startGame(page, {
       format: "Commander",
       deck: "commander-mono-red-raiders",
@@ -945,7 +944,7 @@ test.describe("practice games in the browser", () => {
       table,
       "mouse",
       save.hook,
-    ).finally(() => stageSaves(page, "off"));
+    );
     expect(save.at).not.toBeNull();
     await expect(page.getByRole("article")).toHaveCount(3);
     note(
@@ -989,7 +988,7 @@ test.describe("practice games in the browser", () => {
     await signInSysop(page);
     // Since v1.0.0 the game is also saved and resumed on its second turn: the teams, the shared
     // life and the teammate's hand come back as they were.
-    expect(await stageSaves(page, "staff")).toBe(200);
+    expect(await openSaves(page)).toBe(200);
     const gameId = await startGame(page, {
       format: "Two-Headed Giant",
       deck: "legacy-mono-red-burn",
@@ -1002,12 +1001,7 @@ test.describe("practice games in the browser", () => {
       page.getByRole("article", { name: /seat 2, your teammate$/ }),
     ).toHaveCount(1);
     const save = savedOnce(page, table, gameId);
-    const { snapshot, answered } = await play(
-      page,
-      table,
-      "mouse",
-      save.hook,
-    ).finally(() => stageSaves(page, "off"));
+    const { snapshot, answered } = await play(page, table, "mouse", save.hook);
     expect(save.at).not.toBeNull();
     await expect(page.getByText("Teammate", { exact: true })).toBeVisible();
     note(

@@ -754,7 +754,13 @@ def test_weekly_goals_count_what_the_server_records(client, monkeypatch):
     ada.get("/api/v1/me/quests")
     product = pack_product(client)
     printing, concept = card_printing(client)
-    now = utcnow()
+    # What follows is dated up to three hours back, "this week". In the week's first hours
+    # (Sunday, from midnight in Arizona) no such time is in this week, and the test failed then
+    # (the hosted runs of 2026-11-15, minutes after the week began). So the test's clock, and
+    # the quests', stand at least four hours into the week; anything the server dates with the
+    # real time is then still this week's, and earlier than now.
+    now = max(utcnow(), quests.period_of("weekly", utcnow())[1] + timedelta(hours=4))
+    monkeypatch.setattr(quests, "utcnow", lambda: max(utcnow(), now))
     with database(client) as db:
         for index in range(3):
             db.add(

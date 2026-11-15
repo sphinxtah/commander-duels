@@ -438,10 +438,11 @@ test.describe("a human table in two browsers", () => {
     const hostFrames = new Frames(host, hostNames, guestNames);
     const guestFrames = new Frames(guest, guestNames, hostNames);
     const stamp = Date.now();
-    // Save and resume is behind its gate: SysOp opens it to everyone for this journey (the
-    // second player is no staff), and closes it again whatever the journey comes to.
-    const stage = (to: "on" | "off") =>
-      host.evaluate(async (wanted) => {
+    // Save and resume is behind its gate: SysOp opens it to everyone (the second player is no
+    // staff) and leaves it open, as the journeys of game.spec.ts do: they run at the same time,
+    // and a gate closed behind one journey is closed under the others.
+    const openSaves = () =>
+      host.evaluate(async () => {
         const me = (await (await fetch("/api/v1/me")).json()) as {
           csrf_token: string;
         };
@@ -451,13 +452,13 @@ test.describe("a human table in two browsers", () => {
             "Content-Type": "application/json",
             "X-CSRF-Token": me.csrf_token,
           },
-          body: JSON.stringify({ stage: wanted }),
+          body: JSON.stringify({ stage: "on" }),
         });
         return changed.status;
-      }, to);
+      });
     try {
       await signInSysop(host);
-      expect(await stage("on")).toBe(200);
+      expect(await openSaves()).toBe(200);
       await importDeck(host, `Paused host ${stamp}`, HOST_DECK);
       await importDeck(guest, `Paused guest ${stamp}`, GUEST_DECK);
 
@@ -595,7 +596,6 @@ test.describe("a human table in two browsers", () => {
       expect(hostFrames.check()).toEqual([]);
       expect(guestFrames.check()).toEqual([]);
     } finally {
-      await stage("off").catch(() => undefined);
       await host
         .evaluate(async () => {
           const id = /#game\/([0-9a-f-]{36})/.exec(location.hash)?.[1];
