@@ -493,7 +493,7 @@ async function play(
   page: Page,
   table: Table,
   mode: "mouse" | "keyboard",
-  beforeAnswer?: (snapshot: Snapshot) => Promise<void>,
+  beforeAnswer?: (snapshot: Snapshot) => Promise<boolean | void>,
 ) {
   const kinds: Record<string, number> = {};
   const player = new Player();
@@ -502,7 +502,11 @@ async function play(
     const snapshot = await drawn(page, table);
     await table.checkScreen(page);
     if (snapshot.result) return { snapshot, answered, kinds };
-    await beforeAnswer?.(snapshot);
+    // A hook that moved the game on (a save and its resume) leaves this snapshot behind: the
+    // question is read again from what the page draws now. An answer chosen from the old
+    // snapshot, and the wait for a revision after the old one, ran one answer ahead of the page
+    // (the hosted run of 9ed569b).
+    if (await beforeAnswer?.(snapshot)) continue;
     // A card clicked as its prompt moved on opens its details over the table (CI #105); the
     // player closes them, as a person would, before answering.
     const details = page.locator('dialog[aria-labelledby="zoom-title"][open]');
@@ -657,13 +661,13 @@ function savedOnce(
   gameId: string,
   fromTurn = 2,
 ): {
-  hook: (now: Snapshot) => Promise<void>;
+  hook: (now: Snapshot) => Promise<boolean>;
   at: { turn: number; hand: number; revision: number } | null;
 } {
   const save: ReturnType<typeof savedOnce> = {
     at: null,
     hook: async (now) => {
-      if (save.at || (now.view?.turn ?? 0) < fromTurn) return;
+      if (save.at || (now.view?.turn ?? 0) < fromTurn) return false;
       const saved = (save.at = {
         turn: now.view!.turn,
         hand: now.view!.hand.length,
@@ -702,21 +706,21 @@ function savedOnce(
       await expect(page).toHaveURL(new RegExp(`#game/${gameId}$`), {
         timeout: 30_000,
       });
-      // The game the engine took up from its recording.
-      const panel = page.locator('section[aria-labelledby="prompt-title"]');
+      // The game the engine took up from its recording: the snapshot of the new connection,
+      // once this test has it and the page draws it (the page may draw a frame before the
+      // test's listener is told of it).
       await expect
-        .poll(
-          async () => Number((await panel.getAttribute("data-revision")) ?? 0),
-          { timeout: 60_000 },
-        )
+        .poll(() => table.latest?.revision ?? 0, { timeout: 60_000 })
         .toBeGreaterThanOrEqual(1_000_000);
-      const back = table.latest!;
+      const back = await drawn(page, table);
+      expect(back.revision).toBeGreaterThanOrEqual(1_000_000);
       expect(back.view?.turn).toBe(saved.turn);
       expect(back.view?.hand.length).toBe(saved.hand);
       expect(back.prompt?.kind).toBe(now.prompt?.kind);
       expect(back.prompt?.options.map((option) => option.id)).toEqual(
         now.prompt?.options.map((option) => option.id),
       );
+      return true;
     },
   };
   return save;
