@@ -1150,8 +1150,19 @@ test.describe("practice games in the browser", () => {
       .getByRole("link", { name: "Play it at the practice table" })
       .click();
     const practice = playWizard(page);
+    // The link leads straight to the wizard's last slide, once the wizard has the account's
+    // decks. A journey that moved to another slide before that was taken to the last one after
+    // it (the hosted run of da11233): it waits for the wizard to arrive first.
+    await expect(practice.locator('form[data-slide="start"]')).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(
+      practice.getByRole("button", { name: "Change your deck" }),
+    ).toBeVisible();
     await toSlide(page, "Your deck");
-    await expect(practice.getByLabel("Your deck")).toHaveValue(/^own:/);
+    await expect(
+      practice.getByRole("combobox", { name: "Your deck" }),
+    ).toHaveValue(/^own:/);
     await toSlide(page, "The bots");
     await practice.getByLabel(/Bot skill/).fill("1");
     await toSlide(page, "The table's rules");

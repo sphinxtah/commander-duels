@@ -197,6 +197,11 @@ test.describe("decks and the card catalog", () => {
       .getByRole("link", { name: "Play it at the practice table" })
       .click();
     const practice = playWizard(page);
+    // On its last slide first, where the link takes it once it has the account's decks: a
+    // journey that moves before that is taken there afterwards.
+    await expect(
+      practice.getByRole("heading", { name: "Ready to play" }),
+    ).toBeVisible();
     await toSlide(page, "Format");
     await expect(
       practice.getByRole("radio", { name: /Commander/ }),
