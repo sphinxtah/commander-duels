@@ -79,6 +79,7 @@ from api import (
     starter_tables,
     table_profiles,
     teams,
+    watching,
 )
 from api.auth import INPUT_ERRORS
 from api.custom_play import custom_in_seats
@@ -98,6 +99,7 @@ from api.games import (
     full_access,
     hub_of,
     own_deck,
+    public_seat,
     require_loaded,
     seat_tokens,
     starter_seat,
@@ -124,6 +126,7 @@ from api.models import (
     GameTable,
     TableInvite,
     TableSeat,
+    TableSpectator,
     User,
 )
 from api.roster import roster_of
@@ -203,6 +206,13 @@ class TableRequest(Contract):
     visibility: Visibility = Field(
         default="public",
         description="public tables are listed; a private one is reached by its invite link only.",
+    )
+    spectators: watching.Setting = Field(
+        default="nobody",
+        description="Since v1.0.0 (docs/tables.md): who may watch the table's game: nobody, the "
+        "friends its players invite (invited), or anyone, at a public table alone, whose game "
+        "is then shown a minute behind. Anything but nobody is refused while spectators are "
+        "not the account's to reach.",
     )
     rules: TableRules = Field(
         default_factory=casual,
@@ -321,6 +331,12 @@ class TableChange(Contract):
         "ready again: getting ready again is how they accept it.",
     )
 
+    spectators: watching.Setting | None = Field(
+        default=None,
+        description="Since v1.0.0: who may watch from now on, at any table that is still open; "
+        "left out, it stays. It makes nobody not ready: it changes nothing a player agreed to "
+        "play. The friends already invited stay invited unless it becomes nobody.",
+    )
     kings_table: KingsTableChange | None = Field(
         default=None, description="Settings to change; one left out stays."
     )
@@ -362,6 +378,19 @@ class TableView(Contract):
     code: str = Field(description="The invite link's code: #tables/<code>.")
     format: TableFormatId
     visibility: Visibility
+    spectators: watching.Setting = Field(
+        default="nobody", description="Since v1.0.0: who may watch the table's game."
+    )
+    spectator_delay: int = Field(
+        default=0,
+        description="How far behind the game its spectators watch, in seconds: 0 where they "
+        "are invited, 60 where anyone may watch.",
+    )
+    watching: bool = Field(
+        default=False,
+        description="Whether you may watch its game: invited, or anyone at a public table. "
+        "game_id is then given once the game runs.",
+    )
     status: Literal["open", "started", "closed", "suspended"] = Field(
         description="open (the lobby), started (its game holds the rest), closed, or since "
         "v1.0.0 suspended: its players paused the game together, and it is played on once "
@@ -624,6 +653,8 @@ def view_of(db: Session, table: GameTable, principal: Principal) -> TableView:
     }
     you = principal.user.id
     mine = next((row for row in rows if row.user_id == you), None)
+    # Whether the viewer may watch its game (v1.0.0): never one of its own players.
+    watches = mine is None and watching.allowed(db, table, principal.user)
     deck = db.get(Deck, mine.deck_id) if mine is not None else None
     # Whose each seat's deck is (v1.0.0): a deck not its player's own is one lent to them.
     owners = dict(
@@ -709,7 +740,17 @@ def view_of(db: Session, table: GameTable, principal: Principal) -> TableView:
         your_seat=mine.seat if mine is not None else None,
         profile_changed=mine is not None and mine.profile_seen < table.profile_changes,
         can_start=status == "open" and table.host_id == you and ready,
-        game_id=table.game_id if mine is not None or full_access(principal) else None,
+        # One who watches is given the game to watch now: of a match, its latest (v1.0.0).
+        game_id=(
+            table.game_id
+            if mine is not None or full_access(principal)
+            else watching.current_game(db, table)
+            if watches
+            else None
+        ),
+        spectators=table.spectators,  # type: ignore[arg-type]
+        spectator_delay=watching.delay(table),
+        watching=watches,
         created_at=table.created_at,
         open_seats=sum(1 for player in players if player.player == "human" and not player.taken),
         campaign=str(table.campaign.get("title")) if table.campaign else None,
@@ -1156,6 +1197,7 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
             )
         rules = casual()
         purchase = starter_tables.claim(db, principal.user, body.deck_id, fmt)
+    spectators_asked(db, principal.user, body.spectators, body.visibility)
     invitees = friends_to_invite(db, principal.user, body.invite)
     revision = check_deck(
         db,
@@ -1192,6 +1234,7 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
         allow_stand_in=rules.stand_in,
         best_of=body.best_of,
         starter=purchase is not None,
+        spectators=body.spectators,
         status="open",
         created_at=now,
     )
@@ -1229,6 +1272,21 @@ def friends_to_invite(db: Session, user: User, ids: list[UUID]) -> list[User]:
             raise ApiError(422, "not_friend", "You may invite only your friends to a table.")
         found.append(friend)
     return found
+
+
+def spectators_asked(db: Session, host: User, setting: str, visibility: str) -> None:
+    """Checks a host's choice of who may watch (v1.0.0, api/watching.py): anything but nobody is
+    behind the spectators' gate, refused as something that does not exist, and only a public
+    table is open to anyone."""
+    if setting == "nobody":
+        return
+    rollout.require(db, watching.WORKFLOW, host)
+    if setting == "anyone" and visibility != "public":
+        raise ApiError(
+            422,
+            "invalid_table",
+            "Only a public table is open to anyone to watch: a private one invites its spectators.",
+        )
 
 
 def invite(
@@ -1568,8 +1626,17 @@ def change_table(code: Code, body: TableChange, principal: Player, db: Db) -> Ta
         raise ApiError(409, "table_closed", "This table is no longer open.")
     profiled = "profile" in body.model_fields_set
     seating = body.kings_table is not None or body.bot_seats is not None or body.move is not None
-    if table.format != KINGS and (seating or not profiled):
+    if table.format != KINGS and (seating or not (profiled or body.spectators is not None)):
         raise ApiError(422, "invalid_table", "Only King's Table tables have settings to change.")
+    if body.spectators is not None and body.spectators != table.spectators:
+        # Who may watch (v1.0.0): the host's, while the table is open. No player is made not
+        # ready by it. A queue's table and the campaign's court are watched by nobody.
+        if table.queued or table.campaign:
+            raise ApiError(409, "queue_table", "Nobody watches this table: it is not a host's.")
+        spectators_asked(db, principal.user, body.spectators, table.visibility)
+        table.spectators = body.spectators
+        if body.spectators == "nobody":
+            db.execute(delete(TableSpectator).where(TableSpectator.table_id == table.id))
     if table.queued and profiled:
         raise ApiError(409, "queue_table", "A table the queue opened has no profile to change.")
     if table.starter and profiled and body.profile is not None:
@@ -1628,6 +1695,9 @@ def change_table(code: Code, body: TableChange, principal: Player, db: Db) -> Ta
         except IntegrityError:
             db.rollback()
             raise ApiError(409, "seat_taken", "That seat was just taken. Try again.") from None
+    else:
+        # Who may watch (v1.0.0) is kept without making anyone not ready.
+        db.commit()
     return view_of(db, table, principal)
 
 
@@ -2024,6 +2094,9 @@ async def start_table(code: Code, request: Request, principal: Player, db: Db) -
                                 for seat, user_id in enumerate(users)
                                 if user_id is not None
                             },
+                            # Where the table lets spectators in (v1.0.0), the game's public
+                            # view is followed for them, with the engine's spectator token.
+                            public=public_seat(table, created),
                             **team_play(table.format),
                         )
                     )
@@ -2043,6 +2116,11 @@ def engine_body(table: GameTable, seats: list[dict[str, object]]) -> dict[str, o
         "turn_cap": table.turn_cap,
         "idle_timeout_seconds": TABLE_IDLE_SECONDS,
     }
+    # Where anyone may watch (v1.0.0), spectators see the game a minute behind: the engine is
+    # told as the game starts, and keeps to it through a reconnection and a recovery.
+    delay = watching.delay(table)
+    if delay:
+        body["spectator_delay_seconds"] = delay
     if table.format == KINGS:
         body["kings_table"] = kings_table.engine_settings(kings_table.config_of(table.kings_table))
     return body

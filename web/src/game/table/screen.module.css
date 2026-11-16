@@ -246,6 +246,14 @@
   letter-spacing: 1px;
   text-transform: uppercase;
 }
+/* A spectator's menu (v1.0.0): the label over the players to watch from behind. */
+.menuLabel {
+  padding: 8px 14px 2px;
+  color: #e6c68c;
+  font-size: 0.8rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
 .gameMenu a,
 .gameMenu button {
   display: flex;

@@ -87,6 +87,10 @@ The owner's decision at the start of v0.5.1 ([plan](plans/0.5.1.md#decisions-at-
 
 At a four-player Commander table, the Alliance button on a plate stands left of the plate's count diamonds since v0.5.1, where it no longer covers them.
 
+### The spectators' channel (v1.0.0)
+
+The people watching a table's game ([spectators](tables.md#spectators-v100)) talk among themselves, in text, on a channel of their own: `spectators`. No player of the game reads it or writes to it (`invalid_message`), and a spectator reads and writes nothing of the table's or the allies' (`read_only`), so nothing said there can reach a hand's owner through the game, and nothing of the table's chat reaches someone who does not play. A spectator's line has no seat and names its sender by handle; one who connects later is given the channel's latest lines as its history, and no alliance. No emotes. The lines are stored, limited and removed as every other line of a table's chat; a spectator reports one while the table still lets them watch, with the channel's lines before it, and SysOp reads them in Administration, where each says "Among the spectators". A coach ([coaching](games.md#coaching-v100)) has no chat at the game at all.
+
 ### On the game's WebSocket
 
 Sent by the page:

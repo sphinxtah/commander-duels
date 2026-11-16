@@ -747,7 +747,8 @@ export const buildTableModel: BuildTableModel = (input) => {
       : anchoredView
         ? `${anchoredView.name}'s hand`
         : "Your hand",
-    handBacks: you ? 0 : (anchoredView?.hand_count ?? 0),
+    // A spectator sees the hand of the player they watch from behind as its backs (v1.0.0).
+    handBacks: you && !input.spectating ? 0 : (anchoredView?.hand_count ?? 0),
     stack,
     combat: view.combat,
     lines,

@@ -434,12 +434,14 @@ export interface Presence {
 }
 
 /** A line of a human table's chat (v0.4.4, docs/chat.md): a player's text or emote, or an
- * alliance's start or end. */
+ * alliance's start or end. Since v1.0.0 also a spectator's text to the game's other spectators,
+ * which only they receive. */
 export interface ChatLine {
   id: string;
-  channel: "table" | "allies";
+  channel: "table" | "allies" | "spectators";
   kind: "text" | "emote" | "event";
-  /** The sender's seat: null for SysOp watching, and for an event nobody caused. */
+  /** The sender's seat: null for SysOp watching, for a spectator, and for an event nobody
+   * caused. */
   seat: Seat | null;
   sender: { id: string; handle: string | null } | null;
   /** A text's words, an emote's name, or an event's: "allied" or "alliance_ended". */
@@ -448,6 +450,12 @@ export interface ChatLine {
   seats: Seat[];
   client_id: string | null;
   created_at: string;
+}
+
+/** A seat that has a coach (v1.0.0, docs/games.md), and the coach's handle. */
+export interface SeatCoach {
+  seat: Seat;
+  handle: string | null;
 }
 
 /** Every alliance at the table, and the offers this connection's seat made or received (all of
@@ -483,9 +491,14 @@ export type ServerMessage =
       game_id: string;
       connection_id: string;
       seat: Seat | null;
-      role: "controller" | "observer";
+      /** "spectator" (v1.0.0): one who watches a table's game, with its public view alone.
+       * "coach" (v1.0.0): one a player lets see their seat's own view, in `coached`. */
+      role: "controller" | "observer" | "spectator" | "coach";
+      coached?: Seat | null;
       controlled: boolean;
     }
+  // Which seats have a coach (v1.0.0): said to everyone at the game, and as it changes.
+  | { type: "coaches"; coaches: SeatCoach[] }
   | { type: "snapshot"; snapshot: Snapshot }
   | CommandResult
   | {

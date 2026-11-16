@@ -35,7 +35,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from api import kings_table, table_profiles, teams
+from api import kings_table, table_profiles, teams, watching
 from api.auth import INPUT_ERRORS
 from api.custom_play import custom_in_seats
 from api.games import (
@@ -52,6 +52,7 @@ from api.games import (
     full_access,
     hub_of,
     own_deck,
+    public_seat,
     require_loaded,
     seat_tokens,
     team_play,
@@ -70,6 +71,7 @@ from api.models import (
     Rematch,
     RematchPlayer,
     TableSeat,
+    TableSpectator,
     User,
 )
 from api.queues import bot_plans, waiting_of
@@ -553,7 +555,8 @@ def record_rematch(
     decks: list[UUID],
 ) -> Game:
     """The new table, started, with its game and seats, and the rematch started, in one
-    transaction. The table keeps the old one's visibility, rules, skill, turn cap and origin."""
+    transaction. The table keeps the old one's visibility, rules, skill, turn cap and origin,
+    and since v1.0.0 who may watch it: the host's setting, and the friends invited to watch."""
     rematch = rematch_of(db, game.id, lock=True)
     old = table_of(db, game)
     assert rematch is not None and old is not None
@@ -590,9 +593,26 @@ def record_rematch(
         intent=old.intent,
         pace=old.pace,
         duration=old.duration,
+        spectators=old.spectators,
     )
     db.add(table)
     db.flush()
+    if old.spectators != "nobody":
+        # Those invited to watch the game are invited to its rematch, by whoever invited them:
+        # never one who now plays in it. Nobody is told again.
+        for invitation in db.scalars(
+            select(TableSpectator).where(
+                TableSpectator.table_id == old.id, TableSpectator.user_id.not_in(players)
+            )
+        ):
+            db.add(
+                TableSpectator(
+                    table_id=table.id,
+                    user_id=invitation.user_id,
+                    invited_by=invitation.invited_by,
+                    created_at=now,
+                )
+            )
     seated = [seat for seat, user in enumerate(users) if user is not None]
     for index, user_id, deck_id in zip(seated, players, decks, strict=True):
         db.add(
@@ -626,6 +646,9 @@ async def start_table_rematch(
         raise
     async with hub.locks[game.id]:
         plans, users, decks = await run_in_threadpool(plan_rematch, db, request, game, principal)
+        # Who may watch the rematch is who might watch the game (v1.0.0): read here, so the
+        # engine is told the delay as the new game starts.
+        watched = await run_in_threadpool(table_of, db, game)
         players = [user for user in users if user is not None]
         async with AsyncExitStack() as stack:
             for user_id in sorted(players, key=str):
@@ -662,6 +685,8 @@ async def start_table_rematch(
                         body["kings_table"] = kings_table.engine_settings(
                             kings_table.config_of(game.kings_table)
                         )
+                    if watched is not None and watching.delay(watched):
+                        body["spectator_delay_seconds"] = watching.delay(watched)
                     created = await engine_game(engine, body, request)
                 except ApiError:
                     await run_in_threadpool(reopen, db, game.id, principal.user.id)
@@ -680,6 +705,7 @@ async def start_table_rematch(
                                 for seat, user_id in enumerate(users)
                                 if user_id is not None
                             },
+                            public=public_seat(watched, created),
                             **team_play(game.format),
                         )
                     )

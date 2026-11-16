@@ -45,10 +45,12 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
+from api import watching
 from api.auth import INPUT_ERRORS
 from api.economy import tokens_from
 from api.games import (
     CLOSE_WAIT_SECONDS,
+    SPECTATOR_SEAT,
     EngineUnavailable,
     GameHub,
     LiveGame,
@@ -643,6 +645,9 @@ class NextGame:
     kind: str
     body: dict[str, object]
     seats: list[NextSeat] = field(default_factory=list)
+    # Whose table lets spectators in (v1.0.0, api/watching.py): its host, or None where nobody
+    # watches. Every game of the match is watched as its first was.
+    watched_host: UUID | None = None
 
 
 # Why each match's next game waits although everyone is ready, by the hub that runs it.
@@ -684,6 +689,13 @@ def plan_next(db: Session, match_id: UUID) -> NextGame | None:
     if match.idle_timeout_seconds is not None:
         body["idle_timeout_seconds"] = match.idle_timeout_seconds
     plan = NextGame(match.id, match.game_number, match.kind, body)
+    first = db.scalar(select(Game.id).where(Game.match_id == match.id, Game.match_game == 1))
+    table = watching.table_of(db, first) if first is not None else None
+    if table is not None and table.spectators != "nobody":
+        plan.watched_host = table.host_id
+        if watching.delay(table):
+            # The delay of every game of the match is the table's, told as each one starts.
+            body["spectator_delay_seconds"] = watching.delay(table)
     for player in players:
         if player.engine_deck is not None or player.arrangement is None:
             seat = NextSeat(
@@ -845,6 +857,16 @@ async def next_game(hub: GameHub, match_id: UUID) -> None:
                                     for index, seat in enumerate(plan.seats)
                                     if seat.user_id is not None
                                 },
+                                public=(
+                                    LiveSeat(
+                                        SPECTATOR_SEAT,
+                                        plan.watched_host,
+                                        str(created["spectator_token"]),
+                                    )
+                                    if plan.watched_host is not None
+                                    and isinstance(created.get("spectator_token"), str)
+                                    else None
+                                ),
                             )
                         )
                 except ApiError:

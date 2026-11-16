@@ -956,3 +956,36 @@
     display: none;
   }
 }
+
+/* Spectators (v1.0.0): the friends invited to watch a table, and the lobby's games to watch. */
+.spectators,
+.watchList {
+  margin: 10px 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+.spectators li,
+.watchList li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border: 1px solid #d4b47a33;
+  border-radius: 6px;
+}
+.watchName {
+  display: grid;
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.hostPanel select {
+  max-width: 420px;
+}
+.spectators small,
+.watchList small {
+  color: #b9b09c;
+  overflow-wrap: anywhere;
+}

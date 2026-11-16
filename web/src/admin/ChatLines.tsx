@@ -52,6 +52,8 @@ export function lineWords(line: ChatLine) {
 export function whereWords(line: ChatLine) {
   if (line.channel === "direct") return "Friend's message";
   if (line.channel === "table") return "To the table";
+  // What a game's spectators say among themselves (v1.0.0): no player of it reads this.
+  if (line.channel === "spectators") return "Among the spectators";
   const to = (line.seats ?? []).slice(1);
   if (to.length === 0) return "Allies only";
   return `Allies only, to ${to.length === 1 ? "seat" : "seats"} ${seatList(to)}`;

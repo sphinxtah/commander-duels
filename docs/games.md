@@ -154,7 +154,7 @@ Since v0.3.1 the transaction that records a finished game also counts its win, w
    - `since` is the last revision the client holds (-1 for none); the server sends a newer snapshot.
    - `control` asks for the controller lease.
    - `inspect` asks for SysOp's inspection views.
-3. The server answers `welcome` with the connection's ID, the seat (null for an observer who does not own it) and whether another tab controls the seat. Then come the lease, if one was granted, the current snapshot and, for SysOp, an inspection. That first snapshot carries the latest page of the log; snapshots of revisions reached while it was fetched come after it, never before, so the tab's log never starts in the middle.
+3. The server answers `welcome` with the connection's ID, the seat (null for an observer who does not own it), the `role` (`observer`; since v1.0.0 `spectator` or `coach`, with `coached`, for [those who only watch](#spectators-and-coaches-v100)) and whether another tab controls the seat. Then come the lease, if one was granted, the current snapshot and, for SysOp, an inspection. That first snapshot carries the latest page of the log; snapshots of revisions reached while it was fetched come after it, never before, so the tab's log never starts in the middle.
 
 **Refusals.** The server sends `{"type": "error", "code": …}` and closes, at the handshake and when it later closes an open connection because of its session:
 
@@ -163,8 +163,10 @@ Since v0.3.1 the transaction that records a finished game also counts its win, w
 | 4401 | `authentication_required` | No valid session. Also sent before an open connection is closed because its session was signed out, revoked or expired |
 | 4401 | `session_refresh` | The account's roles changed, or an HTTP request rotated the cookie this connection opened with. That includes a connection opened with the old cookie during the rotation grace, once the grace has run out. Make any HTTP request (it rotates the cookie), then reconnect; an unanswered command is resent once control is taken again |
 | 4403 | `origin_refused`, `csrf_failed`, `forbidden` | Another site; a wrong CSRF token; no `games.play`, or `inspect` without SysOp's permission |
+| 4403 | `spectator_removed`, `coach_removed` | Since v1.0.0: an open connection of a spectator who was removed from the table, or of a coach whose access ended |
 | 4404 | `not_found` | Not your game, or no such game |
 | 4410 | `game_not_live` | The API no longer follows the game (finished long ago, or interrupted); read it over HTTP |
+| 4410 | `not_watchable` | Since v1.0.0, a spectator: the game's table let nobody watch as the game started, so it has no public view to follow |
 | 4503 | `game_recovering` | Since v0.9.9: the API was restarted and is still asking the engine for this game ([below](#data-and-restarts)). Reconnect, with backoff; the page does |
 | 4429 | `too_many_connections` | The account already holds 4 connections to this game, or the game holds 8 for each player's seat. SysOp's connections are not counted. Close a tab; the page retries with backoff |
 | 4400 | `hello_required` | The first message was not a valid hello |
@@ -182,6 +184,8 @@ Since v0.3.1 the transaction that records a finished game also counts its win, w
 | `{"type": "chat"}`, `{"type": "emote"}`, `{"type": "alliance"}` | Since v0.4.4, at a table: the table's chat and its alliances ([chat](chat.md#on-the-games-websocket)). The session is checked as for a command |
 | `{"type": "ping"}` | Answered with `pong` |
 
+Since v1.0.0 a spectator's connection may send `ping`, `resync` and a `chat` on the channel `spectators`, and a coach's `ping` and `resync`; anything else is answered `{"type": "error", "code": "read_only"}` and acted on by nobody.
+
 **Messages from the server.**
 
 | Message | Contents |
@@ -192,6 +196,7 @@ Since v0.3.1 the transaction that records a finished game also counts its win, w
 | `inspection` | SysOp's inspection view, after each new revision, only to connections that asked to inspect |
 | `presence` | Since v0.4.0, at a table only: `away_after` (120 seconds) and, for each player's seat, `connected`, `away_seconds` (since no tab of theirs has been connected), `left`, `removable`, the seats that voted `yes` and `no`, and the yes votes `needed`. Sent to every connection when it changes, when a seat has been away long enough to be voted on, and after the welcome |
 | `chat_history`, `chat`, `alliances` | Since v0.4.4, at a table only: the table's chat and its alliances, each line only to the connections that may see it ([chat](chat.md#on-the-games-websocket)) |
+| `coaches` | Since v1.0.0: the seats that have a coach, each with the coach's handle ([coaching](#coaching-v100)). Sent to every connection after the welcome while any seat has one, and whenever it changes |
 | `interrupted` | The engine lost the game and could not give it back (since v0.9.9; before, whenever the engine lost it) |
 | `welcome`, `pong`, `error` | As above |
 
@@ -300,6 +305,28 @@ A practice game asked for with `sandbox` ([the sandbox](decks.md#the-sandbox-v10
 - **`passive`** starts it with passive bots, and its player switches them in the game (`PUT /games/{id}/bots`): outside the sandbox that switch stays SysOp's and the administrators'.
 - **A restart** is the game closed and its rematch asked for: the rematch replays the request kept with the game, the sandbox and the passive bots with it.
 - **Refusals.** `404` while the sandbox is not the account's to reach; `422 invalid_table` for another format, best of three, a starter-deck game, or `passive` outside the sandbox; `422 not_a_sandbox_deck` where the player's own deck is a normal one; `422 sandbox_deck` where a sandbox deck is chosen for any other game.
+
+### Spectators and coaches (v1.0.0)
+
+Two kinds of people read a game without playing it, each by someone's leave, and neither acts on it.
+
+- **A spectator** watches a table's game through the engine's public view, where the table's host lets them ([spectators](tables.md#spectators-v100)).
+- **A coach** sees one seat as its player does, hand included, where that player lets them ([coaching](#coaching-v100)).
+
+Either is told of the game by `GET /api/v1/games/{id}` and connects to its WebSocket; to anyone else the game does not exist (404, and `4404` on the socket). A coach's leave is asked before a spectator's: one who is both is a coach. On the socket both are guests (`Connection.guest`): never staff, whatever a connection without a seat is taken for elsewhere, so no inspection, no lease, no audit entry of an observation, and nothing of the table's chat.
+
+### Coaching (v1.0.0)
+
+A player lets one friend see what they see while they play: their seat's own view, their hand included (the specification's §24, `api/coaching.py`, behind the gate `coaching`). The coach cannot act, and advises in the friends' chat the two already have. The owner's decision of 2026-11-16: **against bots, and at a private table**, where every player is told that the seat has a coach. Never at a public table or in a queue's game.
+
+- **It is the player's consent**, given and taken back: an [access grant](access.md) of the seat's hand (`hand`, with the seat in its scope), asked for every time the coach reads the game or connects to it. `POST /api/v1/games/{id}/coaches` with `{"player": id}` gives it to a friend, who is told by the bell (`coach_invite`, which leads to the game); `DELETE …/coaches/{player}` ends it, by the player or by the coach, and the hub closes the coach's connections (`4403 coach_removed`). It lasts while the game does: once the game is over the grant gives nothing, and what the game's record keeps is not a coach's to read. `GET …/coaches` lists the game's coaches to its players and to the coaches, with `can_invite` and, for a player who may not, the `reason`.
+- **One coach a seat, and one seat a coach**: nobody sees two hands. A player of the game coaches nobody in it.
+- **Everyone at the game is told.** The socket sends `{"type": "coaches", "coaches": [{"seat", "handle"}]}` to every connection as it arrives (when a seat has a coach) and whenever it changes, and the table says so.
+- **What a coach is given.** `GET /api/v1/games/{id}`: the summary anyone at the game has of the others, `coaching` (the seat), and that seat's snapshot. The socket: `role: "coach"` and `coached` in the welcome, then that seat's snapshots and its lease's news. Anything but `ping` and `resync` is answered `error` `read_only`. The game's events are read through the same grant, as its seat reads them ([access](access.md)).
+- **Refusals.** 404 while coaching is not the account's to reach, and for a game that is not the caller's; 409 `not_coachable` (a public table, a queue's game, or a game that is over), `not_in_game`, `coach_exists`, `already_coaching` and `not_available` (coaching is not the friend's to reach); 422 `not_friend` and `already_seated`.
+- **In the web.** The Game menu's "Coach" opens the player's dialog: a friend to choose and "Show them my hand", or who the coach is and "End coaching". A chip at the table says "Your coach: cy", or "ada has a coach: cy" to everyone else. The coach's screen is the seat's own, read-only: "Coaching ada: you see what they see, and cannot act", no Concede, and "Stop coaching" in the menu.
+
+Checked by `tests/test_coaching.py` and `web/src/game/GameScreen.test.tsx`, and by the three-browser journey against the real engine (`web/e2e/team-tables.spec.ts`): the host takes a friend as coach from the Game menu, both players' tables say so, the coach's table holds the same hand as the host's, with no Concede, and ending it closes the coach's table.
 
 ### Recordings and attaching (v0.9.9)
 

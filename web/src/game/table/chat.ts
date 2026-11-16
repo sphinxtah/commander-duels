@@ -32,7 +32,8 @@ const EMOTE_WORDS = new Map<string, string>(
 export const CHAT_LENGTH = 500;
 export const CHAT_LINES = 13;
 
-export type Channel = ChatLine["channel"];
+/** The channels of the table's players. The spectators' own (v1.0.0) is apart from them. */
+export type Channel = Exclude<ChatLine["channel"], "spectators">;
 
 /** A chat tab's name. At a Two-Headed Giant table (v0.5.1) the allies-only channel is the
  * team's. */
@@ -121,7 +122,9 @@ export function lineBody(line: Pick<ChatLine, "kind" | "body">): string {
 export function lineText(line: ChatLine, people: ChatPeople): string | null {
   if (line.kind === "event") return eventText(line, people);
   const from = [senderName(line, people)];
-  if (line.seat === null) from.push("(watching)");
+  // Every spectator watches: only SysOp's line among the players' says so.
+  if (line.seat === null && line.channel !== "spectators")
+    from.push("(watching)");
   if (line.channel === "allies") from.push(recipients(line, people));
   return `${from.join(" ")}: ${lineBody(line)}`;
 }

@@ -242,6 +242,29 @@ A deck a friend lent a player ([friend deck lending](decks.md#friend-deck-lendin
 
 Checked by `tests/test_loans.py` and `web/src/tables/BorrowedDecks.test.tsx`.
 
+## Spectators (v1.0.0)
+
+A table's game is watched by people who do not play it (the specification's §24, `api/spectators.py` and `api/watching.py`, behind the gate `spectators`). A spectator sees what every seat sees: the battlefield, the stack, the graveyards, the log. Never a hand, a library, a card looked at, or a deck. A spectator cannot act. The owner's decisions of 2026-11-16:
+
+- **The host sets who may watch** (`spectators` as the table opens, and `PATCH /api/v1/tables/{code}` while it waits): `nobody`, as every table was and still is unless the host says otherwise; `invited`, the friends its players invite; or `anyone`, at a public table alone, which the lobby then lists to watch. A change makes no player not ready. Set back to `nobody`, the invitations are deleted. A queue's table and the campaign's court are watched by nobody.
+- **Any seated player invites their own friends** (`POST /api/v1/tables/{code}/spectators`, 1 to 20 ids, 20 invitations a table in all), while the setting lets spectators in and the table is open or its game runs. Each friend is told once, by the bell (`watch_invite`, which leads to the table). **The host removes any spectator**; a player withdraws their own invitations; a spectator leaves (`DELETE …/spectators/{player}`).
+- **Invited spectators watch live; where anyone may watch, the game is shown a minute behind** (`watching.OPEN_DELAY_SECONDS`). The engine is told the delay as the game starts (`spectator_delay_seconds`) and keeps to it: nothing changes it afterwards, a reconnection and a recovery included.
+
+**Who may watch is asked at every reading** (`watching.allowed`): the setting is not `nobody`, the workflow is the account's to reach, the account is active and not one of the table's players, neither the account nor a player of the table blocks the other, and the account was invited, or the table is public and open to anyone. So a removal, a block or a closed gate stops the next reading; the hub also closes the connections a removed spectator has open (`4403 spectator_removed`). The table's own list (`table_spectators`) is the authority: no access grant is written for a spectator.
+
+**What a spectator is given.**
+
+- **The game** (`GET /api/v1/games/{id}`): the summary anyone at the table has of the others (no deck, `your_seat` null), `spectating` true and `spectator_delay`, and the engine's public view. To anyone else the game does not exist.
+- **The game's WebSocket**, as `role: "spectator"` in the welcome, with no seat: the public view's snapshots and nothing else. No lease, no inspection, no presence vote, no table chat, no alliance. Anything but `ping`, `resync` and a message to the other spectators is answered `error` `read_only`. At most 40 spectators' connections a game (`4429 too_many_connections`); a game whose table let nobody watch as it started has no public view to follow (`4410 not_watchable`).
+- **The public view, drawn from behind a player.** The engine's public view has no `you` and lists every player under `opponents` ([the engine](engine/commander-tables.md)). The API moves its first player to `you` (`games.behind`), adding nothing, so that every screen that draws a seat's view draws this one. The web lets the spectator choose which player to watch from behind (the Game menu's "Watch from behind"), by itself: every player's entry is the public one. That player's hand is drawn as card backs.
+- **Their own chat**, apart from the table's ([chat](chat.md#the-spectators-channel-v100)).
+
+**The table's later games.** A rematch's table keeps the setting and the invitations (nobody is told again; a spectator who now plays in it is no longer one), and its engine game the delay. Every game of a best-of-three match is watched as its first: the table keeps the game it started with, and `watching.table_of` and `watching.current_game` lead from a later game to the table and back. After the API's restart a game is followed again with the engine's new spectator token where its table lets anyone watch (`games.revived`).
+
+**In the web.** "Who may watch" in the table-opening form and, for the host, on the table's page; the table's page lists who is invited, with "Invite friends to watch" for its players and Remove or "Stop watching" where each may; one who may watch is shown "Watch the game", and one who waited there is taken to the game as it starts; the lobby's "Watch a game" lists the tables the account was invited to and the running games of public tables open to anyone (`GET /api/v1/spectating`). At the game: "Spectating · live" or "· a minute behind", no Concede, no timeline, and the spectators' chat behind the chat's diamond.
+
+Checked by `tests/test_spectators.py`, `web/src/tables/Spectators.test.tsx`, `web/src/game/spectating.test.ts` and `web/src/game/GameScreen.test.tsx`, and by a journey in three browsers against the real engine (`web/e2e/team-tables.spec.ts`): a private Legacy table opened to invited spectators; a friend invited, told by the bell, waiting at the table and taken to the game as it starts; every frame they are sent holding the public view and no hand; the table watched from behind the other player; a line in the spectators' chat that neither player is shown; and the host's removal closing their table. The same friend is then the host's coach ([coaching](games.md#coaching-v100)).
+
 ## The campaign's court (v0.9.6)
 
 Ward 15 of [the campaign](campaign.md#the-unbound-court-ward-15-v096), with friends as the player's Generals, is a table the campaign opens (`POST /api/v1/campaign/encounters/15/court`): private, King's Table with Commander decks under the court's settings (everyone at 40 life; since v0.9.7 the house rule with its guard, and 240 turns, 40 for each player), casual rules, bots at skill 6. The player hosts it, seated as King A; team B's three seats are the court's bots, named and pictured in the table's view (The Sphinx, Nicol Bolas, Liliana); each friend invited has a General's seat waiting, the other is a bot's. The view says so (`campaign`: the encounter's title), and the page reads "Campaign · King's Table".
@@ -266,6 +289,10 @@ Ward 15 of [the campaign](campaign.md#the-unbound-court-ward-15-v096), with frie
 | `PUT /api/v1/me/table-presets` | Since v0.9.12: save `{name, profile, settings}`; a name the account has is replaced |
 | `DELETE /api/v1/me/table-presets/{id}` | Since v0.9.12: remove one of the account's saved tables |
 | `POST /api/v1/tables/{code}/start` | The host starts the game |
+| `GET /api/v1/tables/{code}/spectators` | Since v1.0.0, for the table's players and those invited to watch: `setting`, `delay_seconds`, `invited` (each with who invited them, `yours` and `you`), `limit`, `can_invite`, `can_remove` |
+| `POST /api/v1/tables/{code}/spectators` | Since v1.0.0, a seated player: `{"players": [ids]}`, 1 to 20 of their friends, invited to watch |
+| `DELETE /api/v1/tables/{code}/spectators/{player}` | Since v1.0.0: the host removes any spectator, a player one they invited, a spectator themselves |
+| `GET /api/v1/spectating` | Since v1.0.0: the tables whose game the account may watch now, each with its `code`, `format`, `host`, `players`, `game_id` (null while it waits), `invited` and `delay_seconds` |
 
 Since v0.9.12 `POST /api/v1/tables` takes `profile`, a table's answer carries `profile` (null when it has none), `PATCH /api/v1/tables/{code}` takes `profile` at any table (null removes it; left out, it stays), and `GET /api/v1/tables/browse` takes `intent`, `pace` and `max_duration` ([Rule Zero table profiles](#rule-zero-table-profiles-v0912)).
 
@@ -276,6 +303,7 @@ Every route needs `games.play`, and seats need `decks.edit`. Refusals:
 - Since v0.9.2: 422 `not_friend` (an invitation names someone who isn't your friend; opening a table with one opens nothing), 422 `invalid_page` (a page size other than 20, 50 or 100), 409 `not_seated` (an invitation from someone not seated at the table), `table_closed` and `too_many_invites` (past 50 for one table).
 - 422 `invalid_table` (since v0.8.7 also King's Table's settings, a `seat` or `bot_seats` at another table, a seat count other than 6 at King's Table, or a change to another table), the practice table's deck refusals (`invalid_deck`, `deck_not_playable`), and since v0.4.5 `deck_not_allowed`: your deck holds cards the table's rules do not allow, named in the message; since v0.5.1 `team_decks` as you get ready: your deck and your teammate's share cards, named, or beside a bot your deck shares a card with every bot deck.
 - Since v1.0.0: 409 `borrowed_deck` (a deck a friend lent, anywhere but a private table where that friend sits) and 409 `deck_lent` (your own deck while a friend has it): [a borrowed deck](#a-borrowed-deck-v100).
+- Since v1.0.0, [spectators](#spectators-v100): 404 for every spectators' route, and for a table opened with a setting other than `nobody`, while the gate is closed; 422 `invalid_table` (`anyone` at a private table); 409 `queue_table` (a change at a queue's table or the campaign's court), `spectators_off` (an invitation while nobody may watch), `not_seated`, `table_closed` and `too_many_spectators`; 422 `not_friend` and `already_seated` (a player of the table does not watch it); 403 `not_host` (another's invitation, removed by anyone but the host).
 - 429 `games_busy` and 503 as for practice games.
 
 Away players and votes go over the game's WebSocket: the `presence` message and the `vote` message ([games](games.md#the-websocket)).
@@ -306,8 +334,11 @@ Migration `0049_table_profiles` (v0.9.12) adds `game_tables.profile` with `inten
 
 Migration `0051_starter_tables` (v1.0.0) adds `game_tables.starter`, false for the tables already there, and **`starter_purchases`**: a starter deck bought for a table, with its key, the format, what was bought, the price, the deck it made, that deck's revision as it came, a Legacy product's opening, and the table it last sat at ([starter-deck tables](#starter-deck-tables-v100)). Expand only.
 
+Migration `0057_spectators` (v1.0.0) adds `game_tables.spectators` (`nobody` for every table already there) and **`table_spectators`**: a friend invited to watch a table, who invited them and when, one row per player and table. It lets a notification be `watch_invite` (its subject the table's code) or `coach_invite` ([coaching](games.md#coaching-v100)), and a line of a table's chat be of the channel `spectators`. Expand only. Going back deletes the invitations, those notices and those lines, and drops the column and the table.
+
 ## Verification
 
+- **API tests (`tests/test_spectators.py`, v1.0.0).** Against the tables' fake engine taught the public view: the host's setting and its gate, `anyone` refused at a private table, invitations by friends only and their list, the bell's notice; the public view alone over `GET` and the socket, with no seat's secret and no line of the table's chat in anything a spectator was sent; `read_only` for a command, a vote, a lease and the table's chat; removal closing the socket and refusing the next reading; the minute's delay told to the engine at a public table open to anyone, and none where spectators were invited; `/spectating`; a block keeping a stranger out; the spectators' own chat, which no player reads or writes, its history for one who connects later, and a report of one of its lines; a rematch and every game of a match watched as the first; and a game followed again after a restart with the engine's new token.
 - **API tests (`tests/test_tables.py`).** Against a fake engine with a token and a view for each player's seat:
   - the lobby, privacy (no deck of another player in any answer), seats, ready, the start, and the engine's request with the hour's idle timeout;
   - each player's connections seeing only their own seat, with no token in any message;

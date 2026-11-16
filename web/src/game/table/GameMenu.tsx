@@ -29,8 +29,11 @@ export function GameMenu({
   onSave,
   onSuspend,
   onRestart,
+  onCoach,
+  onStopCoaching,
   onLeave,
   rules = null,
+  watching = null,
 }: {
   open: boolean;
   onClose(refocus: boolean): void;
@@ -53,9 +56,19 @@ export function GameMenu({
   onSuspend?: () => void;
   /** A sandbox game (v1.0.0): end it and start the same setup again. */
   onRestart?: () => void;
+  /** A player, where coaching is theirs to reach (v1.0.0): take a friend as coach, or end it. */
+  onCoach?: () => void;
+  /** A coach (v1.0.0): stop coaching and leave. A coach has no Concede either. */
+  onStopCoaching?: () => void;
   onLeave(): void;
   /** King's Table's settings in a line (v0.8.7): the decks, the life and the house rule. */
   rules?: string | null;
+  /** A spectator's menu (v1.0.0): the players to watch from behind, and no Concede. */
+  watching?: {
+    players: { seat: number; name: string }[];
+    behind: number | null;
+    onBehind(seat: number): void;
+  } | null;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
@@ -96,10 +109,27 @@ export function GameMenu({
           </li>
         )}
         <li>
-          <a href="#play" onClick={onLeave}>
-            <span aria-hidden="true">←</span> Table
+          <a href={watching ? "#tables" : "#play"} onClick={onLeave}>
+            <span aria-hidden="true">←</span> {watching ? "Tables" : "Table"}
           </a>
         </li>
+        {watching && watching.players.length > 1 && (
+          <li className={styles.menuLabel}>Watch from behind</li>
+        )}
+        {watching &&
+          watching.players.length > 1 &&
+          watching.players.map((player) => (
+            <li key={player.seat}>
+              <button
+                type="button"
+                aria-pressed={player.seat === watching.behind}
+                aria-label={`Watch from behind ${player.name}`}
+                onClick={() => watching.onBehind(player.seat)}
+              >
+                {player.name}
+              </button>
+            </li>
+          ))}
         {onSave && (
           <li>
             <button type="button" aria-haspopup="dialog" onClick={onSave}>
@@ -118,6 +148,20 @@ export function GameMenu({
           <li>
             <button type="button" aria-haspopup="dialog" onClick={onSuspend}>
               Suspend the game
+            </button>
+          </li>
+        )}
+        {onCoach && (
+          <li>
+            <button type="button" aria-haspopup="dialog" onClick={onCoach}>
+              Coach
+            </button>
+          </li>
+        )}
+        {onStopCoaching && (
+          <li>
+            <button type="button" onClick={onStopCoaching}>
+              Stop coaching
             </button>
           </li>
         )}
@@ -165,16 +209,18 @@ export function GameMenu({
             Report a problem
           </button>
         </li>
-        <li>
-          <button
-            type="button"
-            className={styles.danger}
-            disabled={concedeDisabled}
-            onClick={onConcede}
-          >
-            {onConcedeMatch ? "Concede the game" : "Concede"}
-          </button>
-        </li>
+        {!watching && !onStopCoaching && (
+          <li>
+            <button
+              type="button"
+              className={styles.danger}
+              disabled={concedeDisabled}
+              onClick={onConcede}
+            >
+              {onConcedeMatch ? "Concede the game" : "Concede"}
+            </button>
+          </li>
+        )}
         {onConcedeMatch && (
           <li>
             <button

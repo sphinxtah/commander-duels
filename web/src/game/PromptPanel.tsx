@@ -598,7 +598,13 @@ export function PromptPanel({
           </div>
         )}
       {state.seat === null && state.phase === "open" && (
-        <p className={styles.hint}>You are observing this game.</p>
+        <p className={styles.hint}>
+          {state.spectating
+            ? "You are watching this game as a spectator."
+            : state.coaching !== null
+              ? "You are coaching: only the player answers."
+              : "You are observing this game."}
+        </p>
       )}
       {body}
       {busy && (

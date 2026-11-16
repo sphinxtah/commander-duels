@@ -61,6 +61,8 @@ import { PriorityPanel } from "./PriorityPanel";
 import { SaveDialog } from "./saves";
 import { SuspendDialog, SuspensionVote } from "./Suspension";
 import { PromptPanel } from "./PromptPanel";
+import { COACHING, CoachDialog, endCoaching } from "./Coaching";
+import { delayWords, seenFrom, watchedPlayers } from "./spectating";
 import { useGameMusic } from "./music/useGameMusic";
 import { useTableSound } from "./sound/useTableSound";
 import { AllianceContext, type TableAlliances } from "./table/Alliance";
@@ -76,6 +78,7 @@ import { COMPACT_PILE_CAP, REGIONS } from "./table/geometry";
 import { useTableKeys } from "./table/keys";
 import { Magnifier } from "./table/Magnifier";
 import { PassingNotice } from "./table/PassingNotice";
+import { SpectatorChat } from "./table/SpectatorChat";
 import { probeWebGL, SceneHost } from "./table/SceneHost";
 import { Stage, useStageFit } from "./table/Stage";
 import { TableChat, useChatReading } from "./table/TableChat";
@@ -184,6 +187,20 @@ export function GameScreen({
   const state = scripted ?? liveState;
   const [summary, setSummary] = useState<Summary>();
   const sysop = root || (conceals && summary?.inspectable === true);
+  // A spectator (v1.0.0, docs/tables.md): the game's public view, drawn from behind the player
+  // they choose, with nothing to act on. The connection's welcome says so, and so does the
+  // summary, which also says how far behind the game they watch.
+  const spectating =
+    !scripted && (state.spectating || summary?.spectating === true);
+  const [behind, setBehind] = useState<Seat | null>(null);
+  // A coach (v1.0.0, docs/games.md): the view of the seat whose player lets them see it, with
+  // nothing to act on. And for a player, where coaching is open to the account: the dialog to
+  // take a friend as their coach, or to end it.
+  const coaching = scripted
+    ? null
+    : (state.coaching ?? summary?.coaching ?? null);
+  const coachingAllowed = useWorkflow(COACHING);
+  const [coachOpen, setCoachOpen] = useState(false);
   const [zoomed, setZoomed] = useState<{
     card: CardView;
     located?: Located;
@@ -235,8 +252,14 @@ export function GameScreen({
   // At a human table (v0.4.0) a player sees the others by their handles, not the engine's
   // "Human 2": the view's names are swapped before anything draws them.
   const snapshot = useMemo(
-    () => withHandles(state.snapshot, summary, state.seat),
-    [state.snapshot, summary, state.seat],
+    () =>
+      spectating
+        ? seenFrom(state.snapshot, behind, summary?.seats ?? null)
+        : coaching !== null
+          ? // The coached seat's own view, its players named by their handles.
+            seenFrom(state.snapshot, null, summary?.seats ?? null)
+          : withHandles(state.snapshot, summary, state.seat),
+    [state.snapshot, summary, state.seat, spectating, behind, coaching],
   );
   const shown = useMemo(
     () => (snapshot === state.snapshot ? state : { ...state, snapshot }),
@@ -383,6 +406,7 @@ export function GameScreen({
             selfHandle: me?.handle ?? null,
             selfPortrait: me?.alliance ?? null,
             sysop,
+            spectating,
           }
         : null,
     [
@@ -395,6 +419,7 @@ export function GameScreen({
       me?.handle,
       me?.alliance,
       sysop,
+      spectating,
     ],
   );
   const { model, layout } = useTableModel({
@@ -608,7 +633,9 @@ export function GameScreen({
   // The timeline (v1.0.0, docs/timeline.md): in its own drawer, behind the diamond beside the
   // log's, while the game runs and once it is over; a scripted game has no events to read. After
   // a large resolution a chip offers "What changed?", which opens the timeline at its summary.
-  const hasTimeline = !scripted;
+  // Nor has a spectator (v1.0.0): the timeline is its players'. A coach reads it while the game
+  // runs, as the seat they coach does, and no longer once it is over.
+  const hasTimeline = !scripted && !spectating && (coaching === null || live);
   const [timelineFocus, setTimelineFocus] = useState<number | null>(null);
   const timelineSeats = useMemo<TimelineSeat[]>(() => {
     // By name, never "You": the timeline's sentences say whose a card is ("Ada’s graveyard").
@@ -648,7 +675,11 @@ export function GameScreen({
   // A human table's chat and alliances (v0.4.4, docs/chat.md): the chat in its drawer behind the
   // band's diamond, and the alliances on the plates. The history the server sends a table's
   // connection says it is one before the summary does; a practice game has neither.
-  const chatting = atTable || state.chat !== null;
+  // A spectator (v1.0.0) has neither: the spectators talk among themselves, in the same drawer.
+  // Nor has a coach, who advises in the friends' chat.
+  const chatting =
+    (atTable || state.chat !== null) && !spectating && coaching === null;
+  const spectatorChat = spectating && state.chat !== null;
   // Friends' chat (v0.5.1): the chat bar, folded away into its own diamond on the band at every
   // table, and brought out over the table on demand (chat/ChatBar.tsx).
   const friendsChat = useChatContext();
@@ -667,7 +698,14 @@ export function GameScreen({
     outbox: state.outbox,
     refusal: state.allianceRefusal,
     people,
-    reading: chatting && drawer === "chat" ? chatTab : null,
+    reading:
+      drawer !== "chat"
+        ? null
+        : chatting
+          ? chatTab
+          : spectatorChat
+            ? "spectators"
+            : null,
     say,
   });
   const lost = useMemo(
@@ -750,15 +788,18 @@ export function GameScreen({
   // A public queue's game (v0.5.0) leads back to the queue, as its rematch does; a campaign duel
   // (v0.8.0) back to the campaign, to its scene.
   const campaign = summary?.campaign ?? null;
-  const back = campaign
-    ? { href: campaignLink(gameId), text: "Back to the campaign" }
-    : match
-      ? matchLink(match)
-      : rematch.view?.origin === "queue"
-        ? { href: "#find", text: "Find another game" }
-        : atTable
-          ? { href: "#tables", text: "Back to the lobby" }
-          : { href: "#play", text: "Back to the table" };
+  // A spectator's (v1.0.0) back to the lobby, whose "Watch a game" lists what they may watch.
+  const back = spectating
+    ? { href: "#tables", text: "Back to the lobby" }
+    : campaign
+      ? { href: campaignLink(gameId), text: "Back to the campaign" }
+      : match
+        ? matchLink(match)
+        : rematch.view?.origin === "queue"
+          ? { href: "#find", text: "Find another game" }
+          : atTable
+            ? { href: "#tables", text: "Back to the lobby" }
+            : { href: "#play", text: "Back to the table" };
   const paid =
     summary?.status === "finished" && summary.tokens ? summary.tokens : null;
   // A sandbox game (v1.0.0) says on its result that it earned nothing, and why.
@@ -881,7 +922,11 @@ export function GameScreen({
                 statusPhase={state.phase}
                 timeline={hasTimeline}
                 chat={
-                  chatting ? { unread: unread.table + unread.allies } : null
+                  chatting
+                    ? { unread: unread.table + unread.allies }
+                    : spectatorChat
+                      ? { unread: unread.spectators, name: "Spectators’ chat" }
+                      : null
                 }
                 friends={
                   friendsChat && {
@@ -936,6 +981,34 @@ export function GameScreen({
                   </span>
                 )}
                 {match && <MatchChip match={match} seat={state.seat} />}
+                {coaching !== null && (
+                  <span role="status" className={screen.chip} data-coaching>
+                    Coaching {seatName(coaching)}: you see what they see, and
+                    cannot act
+                  </span>
+                )}
+                {state.coaches
+                  .filter((coach) => coach.seat !== coaching)
+                  .map((coach) => (
+                    <span
+                      key={coach.seat}
+                      role="status"
+                      className={screen.chip}
+                      data-coached={coach.seat}
+                    >
+                      {coach.seat === state.seat
+                        ? `Your coach: ${coach.handle ?? "a friend"}`
+                        : `${seatName(coach.seat)} has a coach: ${coach.handle ?? "a friend"}`}
+                    </span>
+                  ))}
+                {spectating && (
+                  <span role="status" className={screen.chip} data-spectating>
+                    Spectating
+                    {summary?.spectating
+                      ? ` · ${delayWords(summary.spectator_delay)}`
+                      : ""}
+                  </span>
+                )}
               </div>
               <GameMenu
                 open={menuOpen}
@@ -990,6 +1063,37 @@ export function GameScreen({
                 }
                 onLeave={leave}
                 rules={kingsSettings ? settingsLine(kingsSettings) : null}
+                onCoach={
+                  coachingAllowed && !scripted && state.seat !== null && live
+                    ? () => {
+                        closeMenu(false);
+                        setCoachOpen(true);
+                      }
+                    : undefined
+                }
+                onStopCoaching={
+                  coaching !== null && me?.id
+                    ? () => {
+                        closeMenu(false);
+                        void endCoaching(gameId, me.id!).then(() => {
+                          leave();
+                          window.location.hash = "#play";
+                        });
+                      }
+                    : undefined
+                }
+                watching={
+                  spectating
+                    ? {
+                        players: watchedPlayers(snapshot).map((player) => ({
+                          seat: player.seat,
+                          name: player.name,
+                        })),
+                        behind: view?.you?.seat ?? null,
+                        onBehind: setBehind,
+                      }
+                    : null
+                }
               />
 
               {(state.ended ||
@@ -1176,6 +1280,12 @@ export function GameScreen({
                       <h2 id="result-side-title">{outcome.title}</h2>
                       <p>{outcome.detail}</p>
                       {tokensLine && <p data-tokens={paid}>{tokensLine}</p>}
+                      {spectating && (
+                        <p data-spectator-next>
+                          If its players play on, their next game is listed
+                          under Watch a game in the lobby.
+                        </p>
+                      )}
                       {match && (
                         <MatchOutcome
                           match={match}
@@ -1323,6 +1433,28 @@ export function GameScreen({
                         connection?.chat(channel, text)
                       }
                       onEmote={(emote) => connection?.emote(emote)}
+                      onRetry={(id) => connection?.retryChat(id)}
+                      onDiscard={(id) => connection?.discardChat(id)}
+                      onReport={setReportedLine}
+                    />
+                  </Drawer>
+                )}
+                {spectatorChat && (
+                  <Drawer
+                    id="chat"
+                    name="Spectators’ chat"
+                    titled
+                    fill
+                    open={drawer === "chat"}
+                    closed="hidden"
+                    onClose={closeDrawer}
+                  >
+                    <SpectatorChat
+                      state={state}
+                      people={people}
+                      open={drawer === "chat"}
+                      connected={state.phase === "open"}
+                      onSend={(text) => connection?.chat("spectators", text)}
                       onRetry={(id) => connection?.retryChat(id)}
                       onDiscard={(id) => connection?.discardChat(id)}
                       onReport={setReportedLine}
@@ -1490,6 +1622,13 @@ export function GameScreen({
             {!scripted && summary?.table && (
               <SuspendDialog dialog={suspendDialog} code={summary.table.code} />
             )}
+            {coachingAllowed && !scripted && state.seat !== null && (
+              <CoachDialog
+                open={coachOpen}
+                gameId={gameId}
+                onClose={() => setCoachOpen(false)}
+              />
+            )}
             <ReportDialog
               open={reporting}
               game={{ id: gameId, turn: view?.turn ?? null }}
@@ -1515,6 +1654,12 @@ export function GameScreen({
               <h2 id="result-title">{outcome?.title}</h2>
               <p>{outcome?.detail}</p>
               {tokensLine && <p data-tokens={paid}>{tokensLine}</p>}
+              {spectating && (
+                <p data-spectator-next>
+                  If its players play on, their next game is listed under Watch
+                  a game in the lobby.
+                </p>
+              )}
               {match && (
                 <MatchOutcome
                   match={match}
@@ -1567,7 +1712,7 @@ export function GameScreen({
             {match && (
               <ConcedeMatchDialog match={match} dialog={concedeMatchDialog} />
             )}
-            {chatting && (
+            {(chatting || spectatorChat) && (
               <ReportMessageDialog
                 message={reportedLine}
                 game={{ id: gameId, turn: view?.turn ?? null }}

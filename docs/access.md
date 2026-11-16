@@ -51,6 +51,10 @@ No route makes a grant in v0.9.10: the workflows that offer, accept and show the
 
 **Since v1.0.0 a deck is lent by one** ([friend deck lending](decks.md#friend-deck-lending-v100)): `POST /api/v1/decks/{id}/loans` offers a friend the `deck` grant, bound to one saved version (`scope`: `revision`, `number`) and expiring in seven days; the friend's answer is the grant's consent, and accepting sets its seven days again; `DELETE /api/v1/loans/{id}` revokes it, by either of them. `access.lent_out` answers whether a deck is with a friend now, which keeps its owner from playing it (the owner's decision of 2026-11-15).
 
+**Since v1.0.0 a coach is given one** ([coaching](games.md#coaching-v100)): `POST /api/v1/games/{id}/coaches` gives a friend the `hand` grant for the player's own seat, with no expiry: it ends when either of them ends it (`DELETE …/coaches/{player}`), and gives nothing once the game is over, the gate is closed, an account is disabled or one blocks the other. The game's view and its socket are read through the grant's seat, as its events already were.
+
+**A spectator is given none.** Who may watch a table's game is the table's own to say ([spectators](tables.md#spectators-v100)): its host's setting and its list of invitations (`table_spectators`), asked at every reading as a grant would be. The `spectator` grant stays modelled and checked where events are read, and no route makes one.
+
 **Since v1.0.0 a replay is shared by one** ([replays](replays.md#sharing)): `POST /api/v1/games/{id}/replay/shares` gives a friend the `replay` grant for the sharer's own seat, expiring with the game's events; `DELETE …/shares/{grant}` revokes it, by its player or by the friend. The replay's routes read the game through the grant's seat and nothing else; the timeline's route honours the same grant.
 
 ## Tested

@@ -109,7 +109,7 @@ WORKFLOWS: dict[str, Workflow] = {
             "Spectators",
             24,
             "Structured events and access (v0.9.10)",
-            ("/games/{game_id}/spectators", "/tables/{table_id}/spectators"),
+            ("/games/{game_id}/spectators", "/tables/{table_id}/spectators", "/spectating"),
         ),
         Workflow(
             "coaching",

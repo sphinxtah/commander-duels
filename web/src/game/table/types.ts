@@ -231,6 +231,8 @@ export interface BuildInput {
   selfHandle: string | null; // me.handle
   selfPortrait?: string | null; // me.alliance, until the summary says
   sysop: boolean; // games.view_concealed
+  /** A spectator's (v1.0.0): the public view drawn from behind a seat, whose hand is backs. */
+  spectating?: boolean;
 }
 export type BuildTableModel = (input: BuildInput) => TableModel;
 

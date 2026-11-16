@@ -1716,6 +1716,335 @@ describe("a human table's chat and alliances (v0.4.4)", () => {
   });
 });
 
+describe("a spectator's game (v1.0.0)", () => {
+  it("shows the public view from behind a player of their choice, with their own chat and nothing to act on", async () => {
+    const { client } = await import("../api");
+    const get = vi.mocked(client.GET);
+    const original = get.getMockImplementation()!;
+    const human = (seat: number, handle: string) => ({
+      seat,
+      player: "human",
+      handle,
+      portrait: null,
+      deck: null,
+      left: null,
+    });
+    get.mockImplementation((async () => ({
+      data: {
+        game: {
+          id: "g1",
+          kind: "table",
+          format: "legacy",
+          status: "active",
+          seats: [human(0, "alice"), human(1, "bob")],
+          your_seat: null,
+          spectating: true,
+          spectator_delay: 60,
+          bot_skill: 4,
+          turn_cap: 60,
+          created_at: "2026-11-16T10:00:00Z",
+          finished_at: null,
+          result: null,
+          tokens: null,
+        },
+        snapshot: null,
+      },
+    })) as never);
+    // The public view as the server draws it: from behind the first player, no hand, no prompt.
+    const watched: Snapshot = {
+      ...snapshot(5, null),
+      status: "spectating",
+      seat: null,
+      view: {
+        ...view,
+        you: player(0, "Human 1"),
+        opponents: [player(1, "Human 2")],
+      },
+    };
+    const line = (id: string, body: string) => ({
+      id,
+      channel: "spectators",
+      kind: "text",
+      seat: null,
+      sender: { id: "u-cy", handle: "cy" },
+      body,
+      seats: [],
+      client_id: null,
+      created_at: "2026-11-16T10:00:00+00:00",
+    });
+    try {
+      render(<GameScreen gameId="g1" me={null} />);
+      const socket = FakeSocket.made[0];
+      act(() => {
+        socket.accept();
+        socket.deliver({ ...welcome(null, false), role: "spectator" });
+        socket.deliver({ type: "snapshot", snapshot: watched });
+        socket.deliver({ type: "chat_history", messages: [] });
+      });
+      // A spectator takes no seat's lease.
+      expect(socket.sent.map((message) => message.type)).toEqual(["hello"]);
+      expect(
+        await screen.findByText("Spectating · a minute behind"),
+      ).toBeInTheDocument();
+      // The players go by their handles, and the one watched from behind shows card backs.
+      expect(
+        screen.getByRole("region", { name: "alice's side of the table" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: /^alice's hand/ }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Your hand")).toBeNull();
+
+      // The menu: no Concede, and each player to watch from behind.
+      fireEvent.click(screen.getByRole("button", { name: /^Game menu/ }));
+      const menu = screen.getByRole("group", { name: "Game menu" });
+      expect(
+        within(menu).queryByRole("button", { name: /Concede/ }),
+      ).toBeNull();
+      expect(
+        within(menu).getByRole("button", { name: "Watch from behind alice" }),
+      ).toHaveAttribute("aria-pressed", "true");
+      fireEvent.click(
+        within(menu).getByRole("button", { name: "Watch from behind bob" }),
+      );
+      expect(
+        screen.getByRole("region", { name: "bob's side of the table" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: /^bob's hand/ }),
+      ).toBeInTheDocument();
+
+      // The spectators' own chat, in the chat's drawer: no table chat, no emote, no alliance.
+      expect(screen.queryByRole("button", { name: /^Alliance/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /^Timeline/ })).toBeNull();
+      const toggle = screen.getByRole("button", { name: "Spectators’ chat" });
+      act(() => socket.deliver({ type: "chat", message: line("1", "Nice") }));
+      expect(toggle).toHaveAccessibleName("Spectators’ chat, 1 unread");
+      fireEvent.click(toggle);
+      const box = screen.getByRole("textbox", {
+        name: "Message to the other spectators",
+      });
+      fireEvent.change(box, { target: { value: "Agreed" } });
+      fireEvent.keyDown(box, { key: "Enter" });
+      expect(socket.sent.at(-1)).toEqual({
+        type: "chat",
+        channel: "spectators",
+        text: "Agreed",
+        client_id: expect.any(String),
+      });
+      expect(
+        screen.getByRole("list", { name: "Messages among the spectators" }),
+      ).toHaveTextContent("cy: Nice");
+      expect(screen.queryByRole("tab")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Hello!" })).toBeNull();
+    } finally {
+      get.mockImplementation(original);
+    }
+  });
+});
+
+describe("coaching (v1.0.0)", () => {
+  const human = (seat: number, handle: string) => ({
+    seat,
+    player: "human",
+    handle,
+    portrait: null,
+    deck: null,
+    left: null,
+  });
+  const game = (fields: object) => ({
+    id: "g1",
+    kind: "practice",
+    format: "legacy",
+    status: "active",
+    seats: [
+      human(0, "alice"),
+      { ...human(1, "Bot 2"), player: "bot", handle: null },
+    ],
+    your_seat: 0,
+    bot_skill: 4,
+    turn_cap: 60,
+    created_at: "2026-11-16T10:00:00Z",
+    finished_at: null,
+    result: null,
+    tokens: null,
+    ...fields,
+  });
+  const cy = { id: "u-cy", handle: "cy", avatar: "sigil", alliance: null };
+
+  it("shows a coach the seat as its player sees it, with nothing to act on, and lets them leave", async () => {
+    const { client } = await import("../api");
+    const get = vi.mocked(client.GET);
+    const original = get.getMockImplementation()!;
+    get.mockImplementation((async () => ({
+      data: {
+        game: game({ your_seat: null, coaching: 0 }),
+        snapshot: null,
+      },
+    })) as never);
+    const ended = vi.fn(async () => ({
+      data: { coaches: [], can_invite: false, reason: null },
+    }));
+    Object.assign(client, { DELETE: ended });
+    try {
+      render(
+        <GameScreen
+          gameId="g1"
+          me={{ id: "u-cy", handle: "cy", permissions: [] } as never}
+        />,
+      );
+      const socket = FakeSocket.made[0];
+      act(() => {
+        socket.accept();
+        socket.deliver({ ...welcome(null, true), role: "coach", coached: 0 });
+        socket.deliver({
+          type: "snapshot",
+          snapshot: snapshot(5, priority("A")),
+        });
+        socket.deliver({
+          type: "coaches",
+          coaches: [{ seat: 0, handle: "cy" }],
+        });
+      });
+      // A coach takes no seat's lease, and answers nothing.
+      expect(socket.sent.map((message) => message.type)).toEqual(["hello"]);
+      expect(
+        await screen.findByText(
+          "Coaching alice: you see what they see, and cannot act",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: /^alice's hand/ }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/has a coach|Your coach/)).toBeNull();
+      fireEvent.keyDown(document.body, { key: "p" });
+      expect(socket.commands()).toEqual([]);
+
+      fireEvent.click(screen.getByRole("button", { name: /^Game menu/ }));
+      const menu = within(screen.getByRole("group", { name: "Game menu" }));
+      expect(menu.queryByRole("button", { name: /Concede/ })).toBeNull();
+      expect(menu.queryByRole("button", { name: "Coach" })).toBeNull();
+      fireEvent.click(menu.getByRole("button", { name: "Stop coaching" }));
+      await waitFor(() => expect(window.location.hash).toBe("#play"));
+      expect(ended).toHaveBeenCalledWith(
+        "/api/v1/games/{game_id}/coaches/{player_id}",
+        { params: { path: { game_id: "g1", player_id: "u-cy" } } },
+      );
+    } finally {
+      get.mockImplementation(original);
+      window.location.hash = "";
+    }
+  });
+
+  it("lets a player take a friend as their coach and end it, and says who is coached", async () => {
+    const { client } = await import("../api");
+    const get = vi.mocked(client.GET);
+    const original = get.getMockImplementation()!;
+    const coached = {
+      coaches: [
+        { seat: 0, player: "alice", coach: cy, yours: true, you: false },
+      ],
+      can_invite: false,
+      reason: "You have a coach already: end that first.",
+    };
+    const state = {
+      coaching: { coaches: [], can_invite: true, reason: null } as object,
+    };
+    get.mockImplementation((async (path: string) => {
+      if (path === "/api/v1/rollout")
+        return {
+          data: {
+            workflows: [{ id: "coaching", name: "Coaching", available: true }],
+          },
+        };
+      if (path === "/api/v1/games/{game_id}/coaches")
+        return { data: state.coaching };
+      if (path === "/api/v1/friends")
+        return {
+          data: {
+            friends: [{ ...cy, presence: null }],
+            incoming: [],
+            outgoing: [],
+            waiting: [],
+          },
+        };
+      if (path === "/api/v1/games/{game_id}")
+        return { data: { game: game({}), snapshot: null } };
+      return { data: undefined };
+    }) as never);
+    const post = vi.fn(async () => {
+      state.coaching = coached;
+      return { data: coached };
+    });
+    const ended = vi.fn(async () => {
+      state.coaching = { coaches: [], can_invite: true, reason: null };
+      return { data: state.coaching };
+    });
+    Object.assign(client, { POST: post, DELETE: ended });
+    forgetRollout();
+    try {
+      render(<GameScreen gameId="g1" me={null} />);
+      const socket = FakeSocket.made[0];
+      act(() => {
+        socket.accept();
+        socket.deliver(welcome(0, false));
+        socket.deliver({
+          type: "lease",
+          role: "controller",
+          controlled: true,
+          reason: "granted",
+        });
+        socket.deliver({ type: "snapshot", snapshot: snapshot(5, null) });
+      });
+      fireEvent.click(screen.getByRole("button", { name: /^Game menu/ }));
+      fireEvent.click(await screen.findByRole("button", { name: "Coach" }));
+      const dialog = within(
+        await screen.findByRole("dialog", { name: "A coach for this game" }),
+      );
+      const choice = (await dialog.findByLabelText(
+        "Your coach",
+      )) as HTMLSelectElement;
+      const show = dialog.getByRole("button", { name: "Show them my hand" });
+      expect(show).toBeDisabled();
+      fireEvent.change(choice, { target: { value: "u-cy" } });
+      fireEvent.click(show);
+      await waitFor(() =>
+        expect(post).toHaveBeenCalledWith("/api/v1/games/{game_id}/coaches", {
+          params: { path: { game_id: "g1" } },
+          body: { player: "u-cy" },
+        }),
+      );
+      expect(await dialog.findByText(/is your coach/)).toHaveTextContent(
+        "cy is your coach",
+      );
+      // The server tells everyone at the game: the player's own table says it too.
+      act(() =>
+        socket.deliver({
+          type: "coaches",
+          coaches: [
+            { seat: 0, handle: "cy" },
+            { seat: 1, handle: "dee" },
+          ],
+        }),
+      );
+      expect(screen.getByText("Your coach: cy")).toBeInTheDocument();
+      expect(screen.getByText("Bot 2 has a coach: dee")).toBeInTheDocument();
+
+      fireEvent.click(dialog.getByRole("button", { name: "End coaching" }));
+      await waitFor(() =>
+        expect(ended).toHaveBeenCalledWith(
+          "/api/v1/games/{game_id}/coaches/{player_id}",
+          { params: { path: { game_id: "g1", player_id: "u-cy" } } },
+        ),
+      );
+      expect(await dialog.findByLabelText("Your coach")).toBeInTheDocument();
+    } finally {
+      get.mockImplementation(original);
+      forgetRollout();
+    }
+  });
+});
+
 describe("a King's Table game (v0.8.7)", () => {
   function kings(change: Partial<Snapshot> = {}) {
     render(<GameScreen gameId="fx-kings" me={null} />);

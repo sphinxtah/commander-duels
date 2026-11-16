@@ -471,6 +471,9 @@ class GameTable(Base):
             name="ck_game_tables_format",
         ),
         CheckConstraint("visibility IN ('public', 'private')", name="ck_game_tables_visibility"),
+        CheckConstraint(
+            "spectators IN ('nobody', 'invited', 'anyone')", name="ck_game_tables_spectators"
+        ),
         CheckConstraint("status IN ('open', 'started', 'closed')", name="ck_game_tables_status"),
         # King's Table (v0.8.7) seats six, at least one of them a player's.
         CheckConstraint(TABLE_SEATS, name="ck_game_tables_seats"),
@@ -487,6 +490,10 @@ class GameTable(Base):
     host_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
     format: Mapped[str] = mapped_column(String(16))
     visibility: Mapped[str] = mapped_column(String(16))
+    # Who may watch its game (v1.0.0, api/spectators.py): nobody, the friends its players
+    # invited, or anyone (a public table's alone). Its host's, while the table is open: the
+    # engine is told how far behind spectators watch as the game starts.
+    spectators: Mapped[str] = mapped_column(String(8), default="nobody", server_default="nobody")
     # Every seat, bots included; the players' seats come first, unless bot_seats says otherwise.
     seats: Mapped[int]
     bots: Mapped[int]
@@ -567,6 +574,20 @@ class TableInvite(Base):
     One per player and table: inviting again sends no second notice."""
 
     __tablename__ = "table_invites"
+    __table_args__ = (UniqueConstraint("table_id", "user_id"),)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    table_id: Mapped[UUID] = mapped_column(ForeignKey("game_tables.id"), index=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    invited_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class TableSpectator(Base):
+    """A friend invited to watch a table's game by one of its players (v1.0.0,
+    api/spectators.py). One per player and table. The table's host removes any, the player who
+    invited one withdraws it, and a spectator leaves: the row goes, and with it the access."""
+
+    __tablename__ = "table_spectators"
     __table_args__ = (UniqueConstraint("table_id", "user_id"),)
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     table_id: Mapped[UUID] = mapped_column(ForeignKey("game_tables.id"), index=True)
@@ -1779,7 +1800,7 @@ class Notification(Base):
             "'quest_completed', 'achievement_earned', 'rematch', 'team_invite', "
             "'auction_outbid', 'auction_won', 'auction_sold', 'auction_unsold', "
             "'auction_cancelled', 'table_invite', 'warden_deck', 'replay_shared', "
-            "'deck_offered')",
+            "'deck_offered', 'watch_invite', 'coach_invite')",
             name="ck_notifications_kind",
         ),
         # The bell's list, newest first, and its unread count.
@@ -1835,11 +1856,14 @@ class TableMessage(Base):
     """One line of a table's chat (v0.4.4, api/table_chat.py): a player's text or preset emote to
     the whole table, a text to their allies only (seats: who it went to besides the sender), or an
     alliance's event (seats: the two allies; the sender, if any, is who ended it). seat is None
-    for SysOp watching."""
+    for SysOp watching. Since v1.0.0 also a spectator's text to the game's other spectators
+    (channel ``spectators``, no seat), which no player reads."""
 
     __tablename__ = "table_messages"
     __table_args__ = (
-        CheckConstraint("channel IN ('table', 'allies')", name="ck_table_messages_channel"),
+        CheckConstraint(
+            "channel IN ('table', 'allies', 'spectators')", name="ck_table_messages_channel"
+        ),
         CheckConstraint("kind IN ('text', 'emote', 'event')", name="ck_table_messages_kind"),
         Index("ix_table_messages_game_id_created_at", "game_id", "created_at"),
     )

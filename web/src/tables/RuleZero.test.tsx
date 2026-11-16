@@ -99,6 +99,9 @@ function table(fields: Partial<TableView> = {}): TableView {
     open_seats: 1,
     starter: false,
     profile_changed: false,
+    spectators: "nobody",
+    spectator_delay: 0,
+    watching: false,
     ...fields,
   };
 }

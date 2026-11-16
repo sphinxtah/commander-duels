@@ -16,6 +16,7 @@ import { FindGame } from "../queues/FindGame";
 import { useQueue } from "../queues/queue";
 import { timeAgo } from "../social/social";
 import { FriendPicker, useFriendList } from "./InviteFriends";
+import { WatchField, WatchList } from "./Spectators";
 import { TableLobby } from "./TableLobby";
 import {
   DEFAULT_KINGS_TABLE,
@@ -47,6 +48,7 @@ import {
   type TableView,
 } from "./tables";
 import { LIVE_POLL_MS, useLobby } from "./lobby";
+import { SPECTATORS, useWatchable, type WatchSetting } from "./watching";
 import {
   DURATIONS,
   INTENTS,
@@ -252,6 +254,8 @@ function Lobby({
   }, []);
 
   const lobby = useLobby();
+  // The games the account may watch (v1.0.0, Spectators.tsx), where spectators are open to it.
+  const watchable = useWatchable(useWorkflow(SPECTATORS));
   const nothing = filters.formats.length === 0 || filters.rules.length === 0;
   const load = useCallback(async () => {
     if (nothing) return null;
@@ -358,6 +362,8 @@ function Lobby({
           </button>
         </p>
       )}
+
+      <WatchList tables={watchable} />
 
       <section
         id="tables-browser"
@@ -853,6 +859,15 @@ function OpenTable({
   const [bots, setBots] = useState(0);
   const [skill, setSkill] = useState(4);
   const [visibility, setVisibility] = useState<"public" | "private">("public");
+  // Who may watch the table's game (v1.0.0, Spectators.tsx), where spectators are open to the
+  // account: nobody unless the host says otherwise. Anyone is a public table's alone.
+  const watchAllowed = useWorkflow(SPECTATORS);
+  const [watchers, setWatchers] = useState<WatchSetting>("nobody");
+  const spectators: WatchSetting = !watchAllowed
+    ? "nobody"
+    : watchers === "anyone" && visibility === "private"
+      ? "invited"
+      : watchers;
   const [rules, setRules] = useState<TableRules>(casualRules);
   // One game, or (v0.5.0, Legacy only) a best-of-three match with sideboards.
   const [bestOf, setBestOf] = useState<1 | 3>(1);
@@ -1028,6 +1043,7 @@ function OpenTable({
         bot_skill: skill,
         // No turn limit is named: the API gives the table 40 turns for each seat (v0.9.7).
         visibility,
+        spectators,
         // A starter-deck table is one game by casual rules: its decks play as they came.
         rules: starter ? casualRules : rules,
         best_of: format === "legacy" && !starter ? bestOf : 1,
@@ -1257,6 +1273,13 @@ function OpenTable({
             </option>
           </select>
         </label>
+        {watchAllowed && (
+          <WatchField
+            value={spectators}
+            visibility={visibility}
+            onChange={setWatchers}
+          />
+        )}
         {starterAllowed && starterFormat(format) && (
           <fieldset>
             <legend>Decks</legend>

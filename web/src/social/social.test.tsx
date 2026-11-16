@@ -169,6 +169,27 @@ describe("the words (v0.4.3)", () => {
     expect(looksLikeEmail("ada")).toBe(false);
   });
 
+  it("lead an invitation to watch to the table, and one to coach to the game (v1.0.0)", () => {
+    const watch = note({
+      kind: "watch_invite",
+      table: { code: "Table-code-0001", format: "legacy", open: true },
+    });
+    expect(notificationWords(watch)).toBe(
+      "bob invites you to watch a Legacy table.",
+    );
+    expect(notificationLink(watch)).toBe("#tables/Table-code-0001");
+    // A table that is gone leaves the words and leads to the lobby.
+    const gone = { ...watch, table: null };
+    expect(notificationWords(gone)).toBe("bob invites you to watch a table.");
+    expect(notificationLink(gone)).toBe("#tables");
+    const coach = note({ kind: "coach_invite", game_id: "game-1" });
+    expect(notificationWords(coach)).toBe(
+      "bob asks you to coach them: you will see what they see.",
+    );
+    expect(notificationLink(coach)).toBe("#game/game-1");
+    expect(notificationLink({ ...coach, game_id: null })).toBe("#play");
+  });
+
   it("lead an invitation to a table to the table (v0.9.2)", () => {
     const invite = note({
       kind: "table_invite",

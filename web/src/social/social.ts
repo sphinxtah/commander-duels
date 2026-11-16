@@ -84,6 +84,12 @@ export function notificationLink(item: NotificationItem): string | null {
     return `#replay/${item.game_id}/${item.actor.id}`;
   // A deck a friend offers to lend (v1.0.0) waits under "Decks lent to you".
   if (item.kind === "deck_offered") return "#decks";
+  // A friend to coach (v1.0.0): their game, seen as they see it.
+  if (item.kind === "coach_invite")
+    return item.game_id ? `#game/${item.game_id}` : "#play";
+  // An invitation to watch (v1.0.0) leads to the table, which leads to its game once it runs.
+  if (item.kind === "watch_invite")
+    return item.table ? `#tables/${item.table.code}` : "#tables";
   if (!item.actor) return null;
   return playerLink(item.actor.id);
 }
@@ -169,6 +175,16 @@ export function notificationWords(item: NotificationItem): string {
     case "deck_offered":
       // A friend offers to lend a deck (v1.0.0): looked at and answered on the Decks page.
       return `${who} offers to lend you a deck.`;
+    case "coach_invite":
+      // A friend lets the account see their seat as they play (v1.0.0, docs/games.md).
+      return `${who} asks you to coach them: you will see what they see.`;
+    case "watch_invite": {
+      // A friend invites the account to watch their table's game (v1.0.0).
+      const table = item.table
+        ? `a ${TABLE_FORMATS[item.table.format] ?? ""} table`.replace("  ", " ")
+        : "a table";
+      return `${who} invites you to watch ${table}.`;
+    }
     case "auction_outbid":
     case "auction_won":
     case "auction_sold":

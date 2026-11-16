@@ -110,7 +110,8 @@ export function BandHud({
   statusText: string;
   statusPhase: GameState["phase"];
   /** At a human table (v0.4.4): the chat's diamond, with the lines not read yet. */
-  chat?: { unread: number } | null;
+  /** The chat's drawer: the table's, or for a spectator (v1.0.0) the spectators' own. */
+  chat?: { unread: number; name?: string } | null;
   /** At every table (v0.5.1): the diamond that brings out the chat bar (chat/ChatBar.tsx), with
    * the friends' messages not read yet. */
   friends?: { unread: number; open: boolean; onToggle(): void } | null;
@@ -228,7 +229,9 @@ export function BandHud({
           at={chatAt}
           icon="chat"
           label={
-            chat.unread > 0 ? `Table chat, ${chat.unread} unread` : "Table chat"
+            chat.unread > 0
+              ? `${chat.name ?? "Table chat"}, ${chat.unread} unread`
+              : (chat.name ?? "Table chat")
           }
           {...toggle("chat")}
         >

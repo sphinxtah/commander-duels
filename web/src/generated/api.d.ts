@@ -2375,6 +2375,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/games/{game_id}/coaches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Coaches
+         * @description The game's coaches, for its players and for the coaches themselves.
+         */
+        get: operations["read_coaches_api_v1_games__game_id__coaches_get"];
+        put?: never;
+        /**
+         * Invite Coach
+         * @description A player of the game lets a friend see what they see, their hand included, until either
+         *     of them ends it or the game is over. One coach a seat, and one seat a coach. The friend is
+         *     told by the bell, and everyone at the game that the seat has a coach.
+         */
+        post: operations["invite_coach_api_v1_games__game_id__coaches_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/coaches/{player_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * End Coaching
+         * @description Ends a coach's access: the player takes it back, or the coach leaves. Their connections
+         *     to the game close, and they read it no more.
+         */
+        delete: operations["end_coaching_api_v1_games__game_id__coaches__player_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/games/{game_id}/inspection": {
         parameters: {
             query?: never;
@@ -4087,6 +4134,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/spectating": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Watchable
+         * @description The tables whose game the account may watch now: those it was invited to, waiting or
+         *     running, then the running games of public tables open to anyone, the newest first.
+         */
+        get: operations["watchable_api_v1_spectating_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/starter-decks": {
         parameters: {
             query?: never;
@@ -4285,6 +4353,52 @@ export interface paths {
          *     player not ready; getting ready checks your deck by the settings' deck format again.
          */
         patch: operations["change_seat_api_v1_tables__code__seat_patch"];
+        trace?: never;
+    };
+    "/api/v1/tables/{code}/spectators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Spectators
+         * @description Who is invited to watch the table's game, for its players and for those invited.
+         */
+        get: operations["read_spectators_api_v1_tables__code__spectators_get"];
+        put?: never;
+        /**
+         * Invite Spectators
+         * @description A seated player invites friends to watch, while the host's setting lets spectators in and
+         *     the table is open or its game runs. Each is told by the bell, once.
+         */
+        post: operations["invite_spectators_api_v1_tables__code__spectators_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tables/{code}/spectators/{player_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Spectator
+         * @description Removes a spectator: the host any of them, a player one they invited, a spectator
+         *     themselves. Their connections to the game close, and they read it no more.
+         */
+        delete: operations["remove_spectator_api_v1_tables__code__spectators__player_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/tables/{code}/start": {
@@ -5652,7 +5766,7 @@ export interface components {
              * Channel
              * @enum {string}
              */
-            channel: "direct" | "table" | "allies";
+            channel: "direct" | "table" | "allies" | "spectators";
             /**
              * Created At
              * Format: date-time
@@ -5769,6 +5883,54 @@ export interface components {
              * @enum {string}
              */
             which: "won" | "lost";
+        };
+        /** CoachInviting */
+        CoachInviting: {
+            /**
+             * Player
+             * Format: uuid
+             * @description The friend who is to see what you see.
+             */
+            player: string;
+        };
+        /** CoachView */
+        CoachView: {
+            coach: components["schemas"]["PlayerRef"];
+            /**
+             * Player
+             * @description That player's handle.
+             */
+            player: string | null;
+            /**
+             * Seat
+             * @description The seat whose player is coached.
+             */
+            seat: number;
+            /**
+             * You
+             * @description Whether you are the coach: you may leave.
+             */
+            you: boolean;
+            /**
+             * Yours
+             * @description Whether the coach is yours: you may end it.
+             */
+            yours: boolean;
+        };
+        /** Coaching */
+        Coaching: {
+            /**
+             * Can Invite
+             * @description Whether you may let a friend coach you here now: you play in this game, it is one a player is coached in, and you have no coach.
+             */
+            can_invite: boolean;
+            /** Coaches */
+            coaches: components["schemas"]["CoachView"][];
+            /**
+             * Reason
+             * @description For a player of the game who may not: why, in words. Null otherwise.
+             */
+            reason: string | null;
         };
         /** Comparison */
         Comparison: {
@@ -7127,6 +7289,11 @@ export interface components {
             /** @description The campaign encounter it was played for (v0.8.0); null for any other game. */
             campaign?: components["schemas"]["CampaignRef"] | null;
             /**
+             * Coaching
+             * @description Since v1.0.0: the seat you coach in this game (docs/games.md), whose player lets you see what they see. You act on nothing. Null for everyone else.
+             */
+            coaching?: number | null;
+            /**
              * Created At
              * Format: date-time
              */
@@ -7174,6 +7341,18 @@ export interface components {
             sandbox: boolean;
             /** Seats */
             seats: components["schemas"]["GameSeat"][];
+            /**
+             * Spectating
+             * @description Since v1.0.0: you watch this game as a spectator (docs/tables.md): you see what every seat sees and nothing else, and you act on nothing.
+             * @default false
+             */
+            spectating: boolean;
+            /**
+             * Spectator Delay
+             * @description How far behind the game a spectator's view runs, in seconds: 0 where spectators were invited, 60 where anyone may watch. Said to its spectators.
+             * @default 0
+             */
+            spectator_delay: number;
             /**
              * Status
              * @description Running, over with a result, over without one, or since v1.0.0 saved by its player to be played on later (GET /saves): a saved game runs nowhere and has no end yet.
@@ -8077,7 +8256,7 @@ export interface components {
             created_at: string;
             /**
              * Game Id
-             * @description For a rematch (v0.5.0): the finished game, whose result screen holds the offer. For a replay a friend shared (v1.0.0): the game, which the bell links to (#replay/<game>/<the friend>).
+             * @description For a rematch (v0.5.0): the finished game, whose result screen holds the offer. For a replay a friend shared (v1.0.0): the game, which the bell links to (#replay/<game>/<the friend>). For a friend who asks you to coach them (v1.0.0): their game, which the bell links to.
              */
             game_id?: string | null;
             /**
@@ -8089,7 +8268,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "friend_request" | "friend_accepted" | "friend_online" | "message" | "quest_completed" | "achievement_earned" | "rematch" | "team_invite" | "auction_outbid" | "auction_won" | "auction_sold" | "auction_unsold" | "auction_cancelled" | "table_invite" | "warden_deck" | "replay_shared" | "deck_offered";
+            kind: "friend_request" | "friend_accepted" | "friend_online" | "message" | "quest_completed" | "achievement_earned" | "rematch" | "team_invite" | "auction_outbid" | "auction_won" | "auction_sold" | "auction_unsold" | "auction_cancelled" | "table_invite" | "warden_deck" | "replay_shared" | "deck_offered" | "watch_invite" | "coach_invite";
             /**
              * Messages
              * @description For new messages (v0.4.4): how many from this friend are still unread.
@@ -10906,6 +11085,54 @@ export interface components {
             /** Sleeves */
             sleeves: components["schemas"]["Sleeve"][];
         };
+        /** SpectatorInviting */
+        SpectatorInviting: {
+            /** Players */
+            players: string[];
+        };
+        /** SpectatorView */
+        SpectatorView: {
+            /**
+             * Invited By
+             * @description The handle of the player who invited them.
+             */
+            invited_by: string;
+            player: components["schemas"]["PlayerRef"];
+            /** You */
+            you: boolean;
+            /**
+             * Yours
+             * @description Whether you invited them: you may withdraw the invitation.
+             */
+            yours: boolean;
+        };
+        /** Spectators */
+        Spectators: {
+            /**
+             * Can Invite
+             * @description Whether you may invite: seated at the table, which lets spectators in.
+             */
+            can_invite: boolean;
+            /**
+             * Can Remove
+             * @description Whether you may remove any spectator: the host.
+             */
+            can_remove: boolean;
+            /**
+             * Delay Seconds
+             * @description How far behind the game spectators watch: 0 where they were invited, a minute where anyone may watch.
+             */
+            delay_seconds: number;
+            /** Invited */
+            invited: components["schemas"]["SpectatorView"][];
+            /** Limit */
+            limit: number;
+            /**
+             * Setting
+             * @enum {string}
+             */
+            setting: "nobody" | "invited" | "anyone";
+        };
         /** Split */
         Split: {
             /**
@@ -11505,6 +11732,11 @@ export interface components {
             move?: components["schemas"]["SeatMove"] | null;
             /** @description Since v0.9.12: the table's Rule Zero profile from now on; null removes it, and left out it stays. Any change to it, its note included, makes every player not ready again: getting ready again is how they accept it. */
             profile?: components["schemas"]["TableProfile"] | null;
+            /**
+             * Spectators
+             * @description Since v1.0.0: who may watch from now on, at any table that is still open; left out, it stays. It makes nobody not ready: it changes nothing a player agreed to play. The friends already invited stay invited unless it becomes nobody.
+             */
+            spectators?: ("nobody" | "invited" | "anyone") | null;
         };
         /**
          * TableExpectations
@@ -11774,6 +12006,13 @@ export interface components {
              */
             seats: number;
             /**
+             * Spectators
+             * @description Since v1.0.0 (docs/tables.md): who may watch the table's game: nobody, the friends its players invite (invited), or anyone, at a public table alone, whose game is then shown a minute behind. Anything but nobody is refused while spectators are not the account's to reach.
+             * @default nobody
+             * @enum {string}
+             */
+            spectators: "nobody" | "invited" | "anyone";
+            /**
              * Starter
              * @description Since v1.0.0: a starter-deck table (docs/tables.md), in Legacy or Commander, one game, by casual rules and with no profile: every player sits down with a starter deck bought for it (POST /starter-decks/purchases), deck_id here being the host's, and plays it as it came. Refused while the workflow is not the account's to reach.
              * @default false
@@ -11897,6 +12136,19 @@ export interface components {
             /** Seats */
             seats: number;
             /**
+             * Spectator Delay
+             * @description How far behind the game its spectators watch, in seconds: 0 where they are invited, 60 where anyone may watch.
+             * @default 0
+             */
+            spectator_delay: number;
+            /**
+             * Spectators
+             * @description Since v1.0.0: who may watch the table's game.
+             * @default nobody
+             * @enum {string}
+             */
+            spectators: "nobody" | "invited" | "anyone";
+            /**
              * Starter
              * @description Since v1.0.0: a starter-deck table: a seat is taken with a starter deck bought for it, which plays as it came.
              * @default false
@@ -11917,6 +12169,12 @@ export interface components {
              * @enum {string}
              */
             visibility: "public" | "private";
+            /**
+             * Watching
+             * @description Whether you may watch its game: invited, or anyone at a public table. game_id is then given once the game runs.
+             * @default false
+             */
+            watching: boolean;
             /** Your Seat */
             your_seat: number | null;
         };
@@ -12392,6 +12650,38 @@ export interface components {
              * @description The cards, in the order they reveal.
              */
             pulled: components["schemas"]["WardenCard"][];
+        };
+        /**
+         * Watchable
+         * @description A table whose game the account may watch.
+         */
+        Watchable: {
+            /** Code */
+            code: string;
+            /** Delay Seconds */
+            delay_seconds: number;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander" | "two_headed_giant" | "kings_table";
+            /**
+             * Game Id
+             * @description Its game, once started; null while it waits.
+             */
+            game_id: string | null;
+            /** Host */
+            host: string;
+            /**
+             * Invited
+             * @description Whether you were invited; false for a table open to anyone.
+             */
+            invited: boolean;
+            /**
+             * Players
+             * @description Its players' handles, in seat order.
+             */
+            players: string[];
         };
         /** WinsChange */
         WinsChange: {
@@ -24797,6 +25087,293 @@ export interface operations {
             };
         };
     };
+    read_coaches_api_v1_games__game_id__coaches_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Coaching"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    invite_coach_api_v1_games__game_id__coaches_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachInviting"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Coaching"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    end_coaching_api_v1_games__game_id__coaches__player_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+                player_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Coaching"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     inspect_game_api_v1_games__game_id__inspection_get: {
         parameters: {
             query?: never;
@@ -33577,6 +34154,98 @@ export interface operations {
             };
         };
     };
+    watchable_api_v1_spectating_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Watchable"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     starter_decks_api_v1_starter_decks_get: {
         parameters: {
             query?: {
@@ -34577,6 +35246,293 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TableView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    read_spectators_api_v1_tables__code__spectators_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Spectators"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    invite_spectators_api_v1_tables__code__spectators_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpectatorInviting"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Spectators"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    remove_spectator_api_v1_tables__code__spectators__player_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+                player_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Spectators"];
                 };
             };
             /** @description Bad Request */

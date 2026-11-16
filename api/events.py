@@ -303,12 +303,14 @@ def perspective_for(
     # is over; a spectator sees what every seat may.
     from api import access
 
-    for grant in access.active(db, principal.user.id, "hand", game_id):
+    game = db.get(Game, game_id)
+    running = game is not None and game.status in ("active", "saved")
+    # A coach's leave lasts while the game does (v1.0.0, api/coaching.py): over, it gives nothing.
+    for grant in access.active(db, principal.user.id, "hand", game_id) if running else []:
         seat = grant.scope.get("seat")
         if isinstance(seat, int):
             return Perspective.of_seat(seat)
-    game = db.get(Game, game_id)
-    if game is not None and game.status not in ("active", "saved"):
+    if game is not None and not running:
         for grant in access.active(db, principal.user.id, "replay", game_id):
             seat = grant.scope.get("seat")
             if isinstance(seat, int):

@@ -117,6 +117,8 @@ NotificationKind = Literal[
     "warden_deck",
     "replay_shared",
     "deck_offered",
+    "watch_invite",
+    "coach_invite",
 ]
 AuctionKind = Literal[
     "auction_outbid", "auction_won", "auction_sold", "auction_unsold", "auction_cancelled"
@@ -335,7 +337,8 @@ class NotificationItem(Contract):
         default=None,
         description="For a rematch (v0.5.0): the finished game, whose result screen holds the "
         "offer. For a replay a friend shared (v1.0.0): the game, which the bell links to "
-        "(#replay/<game>/<the friend>).",
+        "(#replay/<game>/<the friend>). For a friend who asks you to coach them (v1.0.0): "
+        "their game, which the bell links to.",
     )
     auction: AuctionNotice | None = Field(
         default=None,
@@ -875,8 +878,10 @@ def items_of(db: Session, viewer: Viewer, rows: list[Notification]) -> list[Noti
     auctions = auction_notices(
         db, [row for row in rows if row.kind in AUCTION_KINDS and row.subject]
     )
+    # A table's invitation to play (v0.9.2) and to watch (v1.0.0) both name the table.
+    named = ("table_invite", "watch_invite")
     tables = table_notices(
-        db, viewer.id, [row.subject for row in rows if row.kind == "table_invite" and row.subject]
+        db, viewer.id, [row.subject for row in rows if row.kind in named and row.subject]
     )
     items = []
     for row in rows:
@@ -902,10 +907,14 @@ def items_of(db: Session, viewer: Viewer, rows: list[Notification]) -> list[Noti
                 if row.kind == "message" and row.actor_id
                 else 0,
                 award=award_of(row.kind, row.subject),
-                game_id=row.game_id if row.kind in ("rematch", "replay_shared") else None,
+                game_id=(
+                    row.game_id
+                    if row.kind in ("rematch", "replay_shared", "coach_invite")
+                    else None
+                ),
                 auction=auctions.get(row.id),
                 table=tables[row.subject][0]
-                if row.kind == "table_invite" and row.subject in tables
+                if row.kind in named and row.subject in tables
                 else None,
             )
         )

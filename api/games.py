@@ -42,7 +42,7 @@ import random
 import secrets
 import time
 from collections import defaultdict
-from collections.abc import AsyncIterator, Callable, Coroutine, Hashable
+from collections.abc import AsyncIterator, Callable, Coroutine, Hashable, Mapping
 from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -61,7 +61,7 @@ from sqlalchemy.exc import InterfaceError, OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from api import access, kings_table, metrics, modes, rollout
+from api import access, kings_table, metrics, modes, rollout, watching
 from api import events as events_module
 from api.auth import INPUT_ERRORS
 from api.config import Settings
@@ -219,6 +219,10 @@ QUEUE_LIMIT = 512
 CONNECTIONS_PER_ACCOUNT = 4
 # For each player's seat: a four-player table may hold four times as many.
 CONNECTIONS_PER_GAME = 8
+# Spectators (v1.0.0, api/spectators.py): the seat number of the public view, which is no
+# player's, and the most spectators' connections one game holds.
+SPECTATOR_SEAT = -1
+SPECTATORS_PER_GAME = 40
 RESULT_FIELDS = ("kind", "winner_seat", "winner_seats", "draw", "turns", "conceded_seats")
 # At a table, a seat with no connected tab for this long is away, and may be voted out.
 AWAY_SECONDS = 120.0
@@ -402,6 +406,50 @@ class GameCommand(BaseModel):
         return body
 
 
+def public_seat(table: "GameTable | None", created: Mapping[str, object]) -> "LiveSeat | None":
+    """The spectators' view of a table's game (v1.0.0, api/watching.py), as the hub follows it:
+    with the token the engine gives every game for it, where the table lets anyone watch at
+    all. Every game of the table gets it: its first, a match's later ones, a rematch's, and one
+    followed again after a restart."""
+    token = created.get("spectator_token")
+    if table is None or table.spectators == "nobody" or not isinstance(token, str):
+        return None
+    return LiveSeat(SPECTATOR_SEAT, table.host_id, token)
+
+
+def from_behind(message: dict[str, Any]) -> dict[str, Any]:
+    """A message carrying the public view, as a spectator's connection receives it."""
+    snapshot = message.get("snapshot")
+    if message.get("type") != "snapshot" or not isinstance(snapshot, dict):
+        return message
+    return {**message, "snapshot": behind(snapshot)}
+
+
+def behind(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """The engine's public view (v1.0.0, docs/engine/commander-tables.md) drawn from its first
+    player's side of the table, so that a spectator's screen lays the players out as a seat's
+    own does. The public view lists every player under ``opponents`` and has no ``you``: the
+    first player is moved to ``you``. Nothing is added: that player's entry is the public one,
+    with no hand, and the view's own ``hand`` stays empty. The screen draws it from behind
+    another player by itself (web/src/game/spectating.ts): every player's entry is public."""
+    view = snapshot.get("view")
+    if not isinstance(view, dict) or view.get("you") is not None:
+        return snapshot
+    players = [player for player in view.get("opponents") or [] if isinstance(player, dict)]
+    if not players:
+        return snapshot
+    front = players[0]
+    return {
+        **snapshot,
+        "view": {
+            **view,
+            "seat": front.get("seat"),
+            "you": front,
+            "opponents": [player for player in players if player is not front],
+        },
+    }
+
+
 class Hello(BaseModel):
     """The first message on a game's WebSocket."""
 
@@ -423,6 +471,12 @@ class Connection:
     # The seat its account plays; None for an observer (SysOp), who sees the first player's.
     seat: int | None
     inspect: bool
+    # A spectator (v1.0.0, api/spectators.py): no seat, and never a seat's view. It receives
+    # the game's public view alone, and sends nothing.
+    spectator: bool = False
+    # A coach's (v1.0.0, api/coaching.py): the seat whose own view its player lets them see. No
+    # seat of their own: they receive that seat's views and act on nothing.
+    coached: int | None = None
     # Whether it counts toward the connection limits: SysOp's do not.
     counted: bool = True
     queue: asyncio.Queue[dict[str, Any] | None] = field(
@@ -435,6 +489,12 @@ class Connection:
     # connection wait here: each carries only the log lines new since the one before, so one
     # reaching the client first would make it drop the page as a revision it already holds.
     held: list[dict[str, Any]] | None = field(default_factory=list)
+
+    @property
+    def guest(self) -> bool:
+        """One who only watches, by a table's leave or a player's (v1.0.0): a spectator or a
+        coach. Never staff, whatever a connection without a seat is taken for elsewhere."""
+        return self.spectator or self.coached is not None
 
     def send(self, message: dict[str, Any]) -> None:
         if self.close_code is not None:
@@ -539,6 +599,9 @@ class LiveGame:
     # the seat that proposed it. Empty and None while nobody has.
     suspension: set[int] = field(default_factory=set)
     suspension_by: int | None = None
+    # The spectators' view (v1.0.0, api/spectators.py): the engine's public view, read with the
+    # game's spectator token, at a table that lets spectators in. None where nobody watches.
+    public: LiveSeat | None = None
 
     def __post_init__(self) -> None:
         if self.teams:
@@ -562,7 +625,14 @@ class LiveGame:
         return next((seat for seat in self.seats.values() if seat.user_id == user_id), None)
 
     def viewed(self, connection: Connection) -> LiveSeat:
-        """The seat whose views a connection receives: its own, or the watched one."""
+        """The seat whose views a connection receives: its own, or the watched one. A
+        spectator's is the public view and never a player's seat: where the game has none, a
+        seat of nobody's, which nothing is published to."""
+        if connection.spectator:
+            return self.public or LiveSeat(SPECTATOR_SEAT, connection.user_id, "")
+        if connection.coached is not None and connection.coached in self.seats:
+            # A coach's (v1.0.0): the seat whose player lets them see it.
+            return self.seats[connection.coached]
         if connection.seat is not None and connection.seat in self.seats:
             return self.seats[connection.seat]
         return self.watched
@@ -771,7 +841,7 @@ class GameHub:
             return True
         tokens = seat_tokens(body)
         game = await retried(
-            partial(revived, self.database, game_id, tokens),
+            partial(revived, self.database, game_id, tokens, body.get("spectator_token")),
             f"read game {game_id} to follow it again",
         )
         if game is None:
@@ -852,6 +922,10 @@ class GameHub:
                     return "gone", None
                 for seat in game.seats.values():
                     seat.token = tokens[seat.seat]
+                # The spectators' token is handed out anew with the seats' (v1.0.0).
+                renewed = body.get("spectator_token") if isinstance(body, dict) else None
+                if game.public is not None and isinstance(renewed, str):
+                    game.public.token = renewed
                     seat.page = None
                 self.attached["recovered" if body.get("status") == "recovered" else "attached"] += 1
                 log.info("Game %s was given back by the engine (%s)", game.id, body.get("status"))
@@ -919,6 +993,8 @@ class GameHub:
             game.followers.append(self.spawn(self.follow(game, seat)))
             if game.kind == "table":
                 self.spawn(self.away_check(game, seat, now))
+        if game.public is not None:
+            game.followers.append(self.spawn(self.follow_public(game, game.public)))
 
     async def follow(self, game: LiveGame, seat: LiveSeat) -> None:
         """Long-polls one seat's view and publishes every new revision to the connections that see
@@ -993,6 +1069,85 @@ class GameHub:
                 await self.end(game, snapshot["result"])
                 return
 
+    async def follow_public(self, game: LiveGame, seat: LiveSeat) -> None:
+        """Long-polls the game's public view, the spectators' (v1.0.0), and publishes each new
+        revision to them. It never ends the game, as a seat's follower does: it stops with the
+        game, and a failure of its own only leaves the spectators without news. The engine
+        serves this view as far behind the game as it was told at the start."""
+        engine = self.require_engine()
+        since, log_from, failures = -1, 0, 0
+        try:
+            while self.games.get(game.id) is game:
+                token = seat.token
+                try:
+                    status, snapshot = await engine.request(
+                        "GET",
+                        f"{game.path}/view",
+                        seat_token=token,
+                        params={"since": since, "wait_ms": LONG_POLL_MS, "log_from": log_from},
+                        timeout=LONG_POLL_MS / 1000 + 10,
+                    )
+                except EngineUnavailable:
+                    status, snapshot = 0, None
+                if (
+                    status != 200
+                    or not isinstance(snapshot, dict)
+                    or not isinstance(snapshot.get("revision"), int)
+                    or not isinstance(snapshot.get("log"), list)
+                    or not isinstance(snapshot.get("log_from"), int)
+                ):
+                    # A token the engine handed out anew (a seat's follower asks, and sets
+                    # this one too), an engine away, a view that cannot be read: tried again.
+                    if game.finished and failures > 3:
+                        return
+                    failures += 1
+                    await asyncio.sleep(min(30.0, 0.5 * 2 ** min(failures, 6)))
+                    if seat.token != token:
+                        since, log_from = -1, 0
+                    continue
+                failures = 0
+                finished = snapshot.get("result") is not None
+                if finished and game.kings and isinstance(snapshot["result"], dict):
+                    snapshot = {**snapshot, "result": kings_table.team_result(snapshot["result"])}
+                if snapshot["revision"] != since or finished:
+                    since = snapshot["revision"]
+                    log_from = snapshot["log_from"] + len(snapshot["log"])
+                    seat.snapshot = snapshot
+                    self.publish(game, seat, {"type": "snapshot", "snapshot": snapshot})
+                if finished:
+                    return
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception("Following the public view of game %s failed", game.id)
+
+    def drop_spectator(self, game_id: UUID, user_id: UUID) -> None:
+        """Closes a removed spectator's connections to the game (v1.0.0)."""
+        game = self.games.get(game_id)
+        if game is None:
+            return
+        for connection in list(game.connections.values()):
+            if connection.spectator and connection.user_id == user_id:
+                connection.close(CLOSE_FORBIDDEN, "spectator_removed")
+
+    def drop_coach(self, game_id: UUID, user_id: UUID) -> None:
+        """Closes the connections of a coach whose access ended (v1.0.0, api/coaching.py)."""
+        game = self.games.get(game_id)
+        if game is None:
+            return
+        for connection in list(game.connections.values()):
+            if connection.coached is not None and connection.user_id == user_id:
+                connection.close(CLOSE_FORBIDDEN, "coach_removed")
+
+    def coaches_changed(self, game_id: UUID, coaches: list[dict[str, object]]) -> None:
+        """Tells everyone at the game which seats have a coach now (v1.0.0): a coached seat is
+        no secret from the table."""
+        game = self.games.get(game_id)
+        if game is None:
+            return
+        for connection in list(game.connections.values()):
+            connection.send({"type": "coaches", "coaches": coaches})
+
     def pause(self, game: LiveGame) -> None:
         """A game about to be saved (v1.0.0, api/saves.py) is followed no longer: the engine
         stops it where it is, and what a follower would make of that (a game the engine no longer
@@ -1010,6 +1165,8 @@ class GameHub:
         if not game.finished:
             for seat in game.seats.values():
                 game.followers.append(self.spawn(self.follow(game, seat)))
+            if game.public is not None:
+                game.followers.append(self.spawn(self.follow_public(game, game.public)))
 
     async def saved(self, game: LiveGame, save_id: UUID, table: str | None = None) -> None:
         """The engine stopped the game and the database holds its save (v1.0.0): its tabs are
@@ -1160,10 +1317,11 @@ class GameHub:
             connection.send(message)
 
     def publish(self, game: LiveGame, seat: LiveSeat, message: dict[str, Any]) -> None:
-        """Sends a seat's view to the connections that see it: never to another player's."""
+        """Sends a seat's view to the connections that see it: never to another player's. The
+        public view goes to each spectator drawn from behind its first player."""
         for connection in list(game.connections.values()):
             if game.viewed(connection) is seat:
-                connection.send(message)
+                connection.send(from_behind(message) if connection.spectator else message)
 
     def lease_changed(self, game: LiveGame, seat: LiveSeat, reason: str) -> None:
         for connection in list(game.connections.values()):
@@ -1562,13 +1720,18 @@ def active_games(database: Engine, before: datetime | None = None) -> list[UUID]
         return list(db.scalars(active.order_by(Game.created_at, Game.id)))
 
 
-def revived(database: Engine, game_id: UUID, tokens: dict[int, str]) -> "LiveGame | None":
+def revived(
+    database: Engine, game_id: UUID, tokens: dict[int, str], spectators: object = None
+) -> "LiveGame | None":
     """A game an earlier process started, as this one follows it (v0.9.9): its players' seats
     with the engine's new tokens, and what its kind and format fix, as each kind of game sets
     them when it starts. What that process kept only in memory is gone with it: who held each
     seat's controller lease (the tabs reconnect and take it again), the votes on an away player,
     and a table's alliances and offers other than its teams'. None if the game is no longer
-    running or the engine named no token for one of its players' seats."""
+    running or the engine named no token for one of its players' seats. Where the game's table
+    lets spectators in (v1.0.0), its public view is followed again with the engine's new
+    ``spectators`` token: who may watch is the table's, kept in the database, and the delay the
+    engine's own."""
     with Session(database) as db:
         game = db.get(Game, game_id)
         if game is None or game.status != "active":
@@ -1583,7 +1746,13 @@ def revived(database: Engine, game_id: UUID, tokens: dict[int, str]) -> "LiveGam
             for row in rows
         }
         if game.kind == "table":
-            return LiveGame(id=game.id, kind="table", seats=seats, **team_play(game.format))
+            return LiveGame(
+                id=game.id,
+                kind="table",
+                seats=seats,
+                public=public_seat(watching.table_of(db, game.id), {"spectator_token": spectators}),
+                **team_play(game.format),
+            )
         return LiveGame(id=game.id, seats=seats, kings=game.format == kings_table.FORMAT)
 
 
@@ -2957,7 +3126,18 @@ def list_games(
 async def get_game(game_id: UUID, request: Request, principal: Player, db: Db) -> GameState:
     """The game, with your seat's current snapshot while the engine holds it (an observer's is the
     first player's)."""
-    game, owner = await run_in_threadpool(visible_game, db, game_id, principal)
+    try:
+        game, owner = await run_in_threadpool(visible_game, db, game_id, principal)
+    except ApiError:
+        # Neither its player nor staff: a coach reads it as the seat they coach does (v1.0.0,
+        # api/coaching.py), and a spectator its public view (api/watching.py), where its table
+        # lets them watch; anyone else is told of no game.
+        from api import coaching  # Imported here: api.coaching imports this module.
+
+        seat = await run_in_threadpool(coaching.coached_seat, db, game_id, principal.user)
+        if seat is not None:
+            return await coached_game(db, request, principal, game_id, seat)
+        return await spectated(db, request, principal, game_id)
     if not owner:
         await run_in_threadpool(observed, db, request, principal, game_id, "game.observed")
     hub = hub_of(request)
@@ -2972,6 +3152,56 @@ async def get_game(game_id: UUID, request: Request, principal: Player, db: Db) -
             raise unavailable() from error
     summary = await run_in_threadpool(summary_of, db, game, principal, campaign_or_none(request))
     return GameState(game=summary, snapshot=snapshot)
+
+
+async def coached_game(
+    db: Session, request: Request, principal: Principal, game_id: UUID, seat: int
+) -> GameState:
+    """A game as a coach reads it (v1.0.0): the summary anyone at the game has of the others,
+    and the view of the seat whose player lets them see it, while the engine holds the game."""
+    game = await run_in_threadpool(db.get, Game, game_id)
+    if game is None:
+        raise not_found()
+    live = hub_of(request).games.get(game_id)
+    snapshot = None
+    if live is not None and seat in live.seats:
+        await run_in_threadpool(db.commit)
+        try:
+            snapshot = await hub_of(request).page(live, live.seats[seat])
+        except EngineUnavailable as error:
+            raise unavailable() from error
+    summary = await run_in_threadpool(summary_of, db, game, principal, campaign_or_none(request))
+    return GameState(game=summary.model_copy(update={"coaching": seat}), snapshot=snapshot)
+
+
+async def spectated(
+    db: Session, request: Request, principal: Principal, game_id: UUID
+) -> GameState:
+    """A game as its spectator reads it (v1.0.0): the summary anyone at the table has of the
+    others (no deck, no seat of their own), and the public view while the engine holds the
+    game, drawn from behind its first player. Never a seat's own view."""
+
+    def found() -> tuple[Game, int] | None:
+        table = watching.may_watch(db, game_id, principal.user)
+        game = db.get(Game, game_id) if table is not None else None
+        return (game, watching.delay(table)) if game is not None and table is not None else None
+
+    seen = await run_in_threadpool(found)
+    if seen is None:
+        raise not_found()
+    game, delay = seen
+    live = hub_of(request).games.get(game_id)
+    snapshot = None
+    if live is not None and live.public is not None:
+        await run_in_threadpool(db.commit)
+        try:
+            page = await hub_of(request).page(live, live.public)
+        except EngineUnavailable as error:
+            raise unavailable() from error
+        snapshot = behind(page) if page is not None else None
+    summary = await run_in_threadpool(summary_of, db, game, principal, campaign_or_none(request))
+    watched = summary.model_copy(update={"spectating": True, "spectator_delay": delay})
+    return GameState(game=watched, snapshot=snapshot)
 
 
 def observed(
@@ -3230,6 +3460,27 @@ def websocket_game(database: Engine, game_id: UUID, principal: Principal) -> boo
             return None
 
 
+def watches(database: Engine, game_id: UUID, principal: Principal) -> bool:
+    """Whether the account may watch the game as a spectator (v1.0.0, api/watching.py)."""
+    with Session(database) as db:
+        return watching.may_watch(db, game_id, principal.user) is not None
+
+
+def coaches(database: Engine, game_id: UUID, principal: Principal) -> int | None:
+    """The seat the account coaches in the game (v1.0.0, api/coaching.py), or None."""
+    from api import coaching  # Imported here: api.coaching imports this module.
+
+    with Session(database) as db:
+        return coaching.coached_seat(db, game_id, principal.user)
+
+
+def coaches_now(database: Engine, game_id: UUID) -> list[dict[str, object]]:
+    from api import coaching  # Imported here: api.coaching imports this module.
+
+    with Session(database) as db:
+        return coaching.wire(db, game_id)
+
+
 def inspects(database: Engine, game_id: UUID, principal: Principal) -> bool:
     with Session(database) as db:
         return concealed_in(db, principal, game_id)
@@ -3280,7 +3531,18 @@ async def game_events(websocket: WebSocket, game_id: UUID) -> None:
         await refuse(websocket, CLOSE_FORBIDDEN, "forbidden")
         return
     owner = await run_in_threadpool(websocket_game, database, game_id, principal)
-    if owner is None:
+    # Neither a player of it nor staff: a coach, where one of its players lets them see their
+    # seat, or a spectator, where the game's table lets them watch (v1.0.0). Anyone else is told
+    # of no game.
+    coached = (
+        await run_in_threadpool(coaches, database, game_id, principal) if owner is None else None
+    )
+    spectator = (
+        owner is None
+        and coached is None
+        and await run_in_threadpool(watches, database, game_id, principal)
+    )
+    if owner is None and not spectator and coached is None:
         await refuse(websocket, CLOSE_NOT_FOUND, "not_found")
         return
     game = hub.games.get(game_id)
@@ -3303,8 +3565,23 @@ async def game_events(websocket: WebSocket, game_id: UUID) -> None:
     if not secrets.compare_digest(hello.csrf_token.encode(), principal.session.csrf_token.encode()):
         await refuse(websocket, CLOSE_FORBIDDEN, "csrf_failed")
         return
-    if hello.inspect and not await run_in_threadpool(inspects, database, game_id, principal):
+    if hello.inspect and (
+        spectator
+        or coached is not None
+        or not await run_in_threadpool(inspects, database, game_id, principal)
+    ):
         await refuse(websocket, CLOSE_FORBIDDEN, "forbidden")
+        return
+    if spectator and (
+        game.public is None
+        or sum(found.spectator for found in game.connections.values()) >= SPECTATORS_PER_GAME
+    ):
+        # A game whose table let nobody watch as it started has no public view to follow.
+        await refuse(
+            websocket,
+            CLOSE_GONE if game.public is None else CLOSE_TOO_MANY,
+            "not_watchable" if game.public is None else "too_many_connections",
+        )
         return
     # Counted and added with no await between, so handshakes at once cannot all pass.
     counted = not full_access(principal)
@@ -3320,6 +3597,8 @@ async def game_events(websocket: WebSocket, game_id: UUID) -> None:
         seat=seat.seat if seat is not None else None,
         inspect=hello.inspect,
         counted=counted,
+        spectator=spectator,
+        coached=coached,
     )
     game.connections[connection.id] = connection
     try:
@@ -3347,7 +3626,10 @@ async def converse(
     hello: Hello,
 ) -> None:
     """Welcomes the connection, then serves its messages until it closes."""
-    for action in (["game.observed"] if connection.seat is None else []) + (
+    # Staff watching a seat is audited; a spectator sees what the table lets anyone it invited
+    # see, and a coach what a player lets them, and neither is.
+    watched = connection.seat is None and not connection.guest
+    for action in (["game.observed"] if watched else []) + (
         ["game.inspection_opened"] if hello.inspect else []
     ):
         await run_in_threadpool(audited, hub.database, websocket, principal, game.id, action)
@@ -3357,18 +3639,30 @@ async def converse(
             "game_id": str(game.id),
             "connection_id": connection.id,
             "seat": connection.seat,
-            "role": "observer",
+            "role": (
+                "spectator"
+                if connection.spectator
+                else "coach"
+                if connection.coached is not None
+                else "observer"
+            ),
+            # A coach's (v1.0.0): the seat they see as its player does.
+            "coached": connection.coached,
             "controlled": game.viewed(connection).controller is not None,
         }
     )
-    if hello.control:
+    if hello.control and not connection.guest:
         claim(hub, game, connection)
     await resync(hub, game, connection, hello.since)
     hub.arrived(game, connection)
-    if game.kind == "table":
+    if game.kind == "table" and connection.coached is None:
         from api import table_chat  # Imported here: see GameHub.seat_left.
 
         await table_chat.welcome(hub, game, connection)
+    # Which seats have a coach (v1.0.0): said to everyone at the game, as they arrive.
+    told = await run_in_threadpool(coaches_now, hub.database, game.id)
+    if told:
+        connection.send({"type": "coaches", "coaches": told})
     if hello.inspect:
         hub.inspect_soon(game)
     await receive_loop(hub, game, connection, websocket)
@@ -3398,6 +3692,8 @@ async def resync(hub: GameHub, game: LiveGame, connection: Connection, since: in
         snapshot = await hub.page(game, seat)
     except EngineUnavailable:
         snapshot = seat.snapshot
+    if connection.spectator and snapshot is not None:
+        snapshot = behind(snapshot)
     sent = snapshot is not None and (since < 0 or snapshot["revision"] != since)
     connection.opened({"type": "snapshot", "snapshot": snapshot} if sent else None)
 
@@ -3415,6 +3711,22 @@ async def receive_loop(
             kind = message["type"]
         except (ValueError, TypeError, KeyError):
             connection.send({"type": "error", "code": "invalid_message"})
+            continue
+        if connection.guest and kind not in (
+            ("ping", "resync", "chat") if connection.spectator else ("ping", "resync")
+        ):
+            # A spectator and a coach act on nothing (v1.0.0): no command, vote, emote or
+            # control. What a spectator writes goes to the other spectators alone
+            # (api/table_chat.py); a coach advises in the friends' chat, not here.
+            connection.send(
+                {
+                    "type": "error",
+                    "code": "read_only",
+                    "message": "A spectator only watches."
+                    if connection.spectator
+                    else "A coach only watches.",
+                }
+            )
             continue
         if kind in ("command", "vote", "chat", "emote", "alliance"):
             # Every command, vote and chat message checks that the session still stands, and

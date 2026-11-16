@@ -21,6 +21,8 @@ import type { Snapshot } from "../src/game/types";
 // journey makes and ends while this one runs.
 // And a fourth, for the same reason (an account plays one game at a time): the sandbox, played by
 // that same account, which owns none of its sandbox deck's cards but the basic lands.
+// And a fifth: a private table watched by a friend, who is then the host's coach (docs/tables.md,
+// docs/games.md). SysOp hosts, the first team account plays, the second watches.
 const sysopPassword = process.env.CD_E2E_SYSOP_PASSWORD;
 const playerSession = process.env.CD_E2E_PLAYER_SESSION;
 const teamSessions = (process.env.CD_E2E_TEAM_SESSIONS ?? "")
@@ -737,6 +739,341 @@ test.describe("a deck lent to a friend, in two browsers (v1.0.0)", () => {
       ).toHaveCount(0);
     } finally {
       await closeGame(lender);
+      for (const context of made) await context.close();
+    }
+  });
+});
+
+test.describe("a private table watched by a friend and then coached, in three browsers (v1.0.0)", () => {
+  test.setTimeout(12 * 60_000);
+  test.use({ actionTimeout: 30_000 });
+
+  test("an invited friend watches the public view and talks apart; as a coach they see one hand; each is ended", async ({
+    browser,
+  }, testInfo) => {
+    test.skip(
+      !gamesOn || !sysopPassword || teamSessions.length < 2,
+      "Needs the engine, SysOp and two more accounts: CD_E2E_GAMES=1, CD_E2E_SYSOP_PASSWORD and " +
+        "two tokens in CD_E2E_TEAM_SESSIONS (scripts/e2e_player.py).",
+    );
+    const base = testInfo.project.use.baseURL!;
+    const made = await contexts(browser, 3);
+    const [hostContext, guestContext, friendContext] = made;
+    await signIn(guestContext, teamSessions[0], base);
+    await signIn(friendContext, teamSessions[1], base);
+    const host = await hostContext.newPage();
+    const guest = await guestContext.newPage();
+    const friend = await friendContext.newPage();
+    const stamp = Date.now();
+    const whoAmI = (page: Page) =>
+      page.evaluate(async () => {
+        const me = (await (await fetch("/api/v1/me")).json()) as {
+          id: string;
+          handle: string;
+        };
+        return { id: me.id, handle: me.handle };
+      });
+    try {
+      await signInSysop(host);
+      await importDeck(host, `Watched forests ${stamp}`, ["60 Forest"]);
+      await importDeck(guest, `Watched mountains ${stamp}`, ["60 Mountain"]);
+      await friend.goto("/#tables");
+      const watcher = await whoAmI(friend);
+      const second = await whoAmI(guest);
+
+      // Both workflows are behind their gates: SysOp opens them to everyone and leaves them
+      // open, as the other journeys do with theirs. The host and the friend become friends.
+      const owner = await host.evaluate(async (friendId) => {
+        const me = (await (await fetch("/api/v1/me")).json()) as {
+          id: string;
+          handle: string;
+          csrf_token: string;
+        };
+        const headers = {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": me.csrf_token,
+        };
+        const gates: number[] = [];
+        for (const workflow of ["spectators", "coaching"])
+          gates.push(
+            (
+              await fetch(`/api/v1/admin/rollout/${workflow}`, {
+                method: "PUT",
+                headers,
+                body: JSON.stringify({ stage: "on" }),
+              })
+            ).status,
+          );
+        const asked = await fetch(`/api/v1/friends/${friendId}`, {
+          method: "PUT",
+          headers,
+        });
+        return { id: me.id, handle: me.handle, gates, asked: asked.status };
+      }, watcher.id);
+      expect(owner).toMatchObject({ gates: [200, 200], asked: 200 });
+      const friendship = await friend.evaluate(async (hostId) => {
+        const me = (await (await fetch("/api/v1/me")).json()) as {
+          csrf_token: string;
+        };
+        const answered = await fetch(`/api/v1/friends/${hostId}`, {
+          method: "PUT",
+          headers: { "X-CSRF-Token": me.csrf_token },
+        });
+        return ((await answered.json()) as { friendship: string }).friendship;
+      }, owner.id);
+      expect(friendship).toBe("friends");
+
+      // The host opens a private table that the friends its players invite may watch.
+      await host.goto("/#tables");
+      await host.reload();
+      await host
+        .getByRole("button", { name: "Open a table", exact: true })
+        .click();
+      const form = host.getByRole("region", { name: "Open a table" });
+      await form.getByRole("radio", { name: /^Legacy/ }).check();
+      await form
+        .getByLabel("Your deck")
+        .selectOption({ label: `Watched forests ${stamp}` });
+      await form.getByLabel("Who may join").selectOption("private");
+      const watch = form.getByLabel("Who may watch");
+      await expect(
+        watch.getByRole("option", { name: /^Anyone/ }),
+      ).toHaveJSProperty("disabled", true);
+      await watch.selectOption("invited");
+      await form.getByRole("button", { name: "Open the table" }).click();
+      await expect(host).toHaveURL(/#tables\/[A-Za-z0-9_-]{8,32}$/);
+      const code = host.url().split("#tables/")[1];
+      const invite = await host.getByLabel("Invite link").inputValue();
+      await guest.goto(invite);
+      await guest
+        .getByLabel("Your deck")
+        .selectOption({ label: `Watched mountains ${stamp}` });
+      await guest.getByRole("button", { name: "Take a seat" }).click();
+      await guest.getByRole("button", { name: "Ready" }).click();
+
+      // The host invites the friend to watch, who is told by the bell and waits at the table.
+      const panel = host.getByRole("region", { name: "Spectators" });
+      await panel
+        .getByRole("button", { name: "Invite friends to watch" })
+        .click();
+      const inviting = host.getByRole("dialog", {
+        name: "Invite friends to watch",
+      });
+      await inviting
+        .getByRole("checkbox", { name: new RegExp(`^${watcher.handle}`) })
+        .check();
+      await inviting.getByRole("button", { name: "Invite to watch" }).click();
+      await expect(
+        panel.getByRole("list", { name: "Invited to watch" }),
+      ).toContainText(watcher.handle);
+      await host.screenshot({
+        path: testInfo.outputPath("spectators-panel.jpg"),
+        type: "jpeg",
+        quality: 80,
+      });
+      await friend.goto("/#notifications");
+      await expect(
+        friend
+          .getByText(`${owner.handle} invites you to watch a Legacy table.`)
+          .first(),
+      ).toBeVisible();
+      await friend.goto(`/#tables/${code}`);
+      await friend.reload();
+      await expect(
+        friend.getByText("You may watch this table’s game once it starts"),
+      ).toBeVisible();
+
+      // The game starts: the spectator is taken to it, and is sent the public view alone.
+      const seats = [
+        new Seat(host, "host", () => false),
+        new Seat(guest, "guest", () => false),
+      ];
+      const spectator = new Seat(friend, "spectator", () => false);
+      const start = host.getByRole("button", { name: "Start the game" });
+      await expect(start).toBeEnabled({ timeout: 15_000 });
+      await start.click();
+      await expect(host).toHaveURL(/#game\/[0-9a-f-]{36}$/, {
+        timeout: 30_000,
+      });
+      const gameId = host.url().split("#game/")[1];
+      for (const page of [guest, friend])
+        await expect(page).toHaveURL(new RegExp(`#game/${gameId}$`), {
+          timeout: 20_000,
+        });
+      await expect(friend.getByText("Spectating · live")).toBeVisible({
+        timeout: 30_000,
+      });
+      await Promise.all(seats.map((seat) => playUntil(seat, 2)));
+      await expect
+        .poll(() => spectator.latest?.view?.turn ?? 0, { timeout: 60_000 })
+        .toBeGreaterThanOrEqual(2);
+      const watched = spectator.latest!;
+      expect(watched.status).toBe("spectating");
+      expect(watched.prompt).toBeNull();
+      expect(watched.view!.hand).toEqual([]);
+      expect(watched.view!.you?.hand ?? null).toBeNull();
+      expect(
+        [watched.view!.you, ...watched.view!.opponents]
+          .map((player) => player?.seat)
+          .sort(),
+      ).toEqual([0, 1]);
+
+      // From behind either player, with no Concede; and the spectators' own chat.
+      await friend.getByRole("button", { name: "Game menu" }).click();
+      const menu = friend.getByRole("group", { name: "Game menu" });
+      await expect(menu.getByRole("button", { name: /Concede/ })).toHaveCount(
+        0,
+      );
+      await menu
+        .getByRole("button", { name: `Watch from behind ${second.handle}` })
+        .click();
+      // The table is redrawn around them: its regions are named for the scene that paints them.
+      await expect(
+        friend.getByRole("region", {
+          name: `${second.handle}'s side of the table`,
+        }),
+      ).toHaveCount(1);
+      await expect(
+        friend.getByText("You are watching this game as a spectator."),
+      ).toBeVisible();
+      await friend.keyboard.press("Escape");
+      await friend.getByRole("button", { name: "Spectators’ chat" }).click();
+      const said = `watching ${stamp}`;
+      const box = friend.getByRole("textbox", {
+        name: "Message to the other spectators",
+      });
+      await box.fill(said);
+      await box.press("Enter");
+      await expect(
+        friend.getByRole("list", { name: "Messages among the spectators" }),
+      ).toContainText(`You: ${said}`);
+      await friend.screenshot({
+        path: testInfo.outputPath("spectating.jpg"),
+        type: "jpeg",
+        quality: 80,
+      });
+      // No player is sent a word of it.
+      for (const page of [host, guest])
+        await expect(page.getByText(said)).toHaveCount(0);
+
+      // The host removes the spectator: their table closes, and the game is theirs no more.
+      const removed = await host.evaluate(
+        async ([table, player, game]) => {
+          const me = (await (await fetch("/api/v1/me")).json()) as {
+            csrf_token: string;
+          };
+          const gone = await fetch(
+            `/api/v1/tables/${table}/spectators/${player}`,
+            { method: "DELETE", headers: { "X-CSRF-Token": me.csrf_token } },
+          );
+          return { gone: gone.status, game };
+        },
+        [code, watcher.id, gameId],
+      );
+      expect(removed.gone).toBe(200);
+      await expect(
+        friend.getByText("This game is not available to this account."),
+      ).toBeVisible({ timeout: 20_000 });
+      const refused = await friend.evaluate(
+        async (id) => (await fetch(`/api/v1/games/${id}`)).status,
+        gameId,
+      );
+      expect(refused).toBe(404);
+      expect(spectator.problems).toEqual([]);
+
+      // Coaching: the host takes the same friend as their coach, and the table is told.
+      await host.getByRole("button", { name: "Game menu" }).click();
+      await host
+        .getByRole("group", { name: "Game menu" })
+        .getByRole("button", { name: "Coach", exact: true })
+        .click();
+      const coachDialog = host.getByRole("dialog", {
+        name: "A coach for this game",
+      });
+      await coachDialog
+        .getByLabel("Your coach")
+        .selectOption({ label: watcher.handle });
+      await coachDialog
+        .getByRole("button", { name: "Show them my hand" })
+        .click();
+      await expect(coachDialog).toContainText(
+        `${watcher.handle} is your coach`,
+      );
+      await coachDialog.getByRole("button", { name: "Keep playing" }).click();
+      await expect(
+        host.getByText(`Your coach: ${watcher.handle}`),
+      ).toBeVisible();
+      await expect(
+        guest.getByText(`${owner.handle} has a coach: ${watcher.handle}`),
+      ).toBeVisible({ timeout: 15_000 });
+
+      // The coach is told by the bell, and sees the seat as its player does: the same hand.
+      await friend.goto("/#notifications");
+      await expect(
+        friend
+          .getByText(`${owner.handle} asks you to coach them`, { exact: false })
+          .first(),
+      ).toBeVisible();
+      const coach = new Seat(friend, "coach", () => false);
+      await friend.goto(`/#game/${gameId}`);
+      await friend.reload();
+      await expect(
+        friend.getByText(
+          `Coaching ${owner.handle}: you see what they see, and cannot act`,
+        ),
+      ).toBeVisible({ timeout: 30_000 });
+      await expect
+        .poll(() => coach.latest?.view?.hand.length ?? 0, { timeout: 30_000 })
+        .toBeGreaterThan(0);
+      const names = (snapshot: Snapshot | null) =>
+        (snapshot?.view?.hand ?? []).map((card) => card.name).sort();
+      await expect
+        .poll(() => names(coach.latest).join("|"), { timeout: 30_000 })
+        .toBe(names(seats[0].latest).join("|"));
+      expect(coach.latest!.view!.seat).toBe(seats[0].latest!.view!.seat);
+      await friend.getByRole("button", { name: "Game menu" }).click();
+      const coachMenu = friend.getByRole("group", { name: "Game menu" });
+      await expect(
+        coachMenu.getByRole("button", { name: /Concede/ }),
+      ).toHaveCount(0);
+      await expect(
+        coachMenu.getByRole("button", { name: "Stop coaching" }),
+      ).toBeVisible();
+      await friend.keyboard.press("Escape");
+      await friend.screenshot({
+        path: testInfo.outputPath("coaching.jpg"),
+        type: "jpeg",
+        quality: 80,
+      });
+
+      // The player ends it: the coach's table closes, and the others are told.
+      await host.getByRole("button", { name: "Game menu" }).click();
+      await host
+        .getByRole("group", { name: "Game menu" })
+        .getByRole("button", { name: "Coach", exact: true })
+        .click();
+      await coachDialog.getByRole("button", { name: "End coaching" }).click();
+      await expect(coachDialog.getByLabel("Your coach")).toBeVisible();
+      await coachDialog.getByRole("button", { name: "Close" }).click();
+      await expect(
+        friend.getByText("This game is not available to this account."),
+      ).toBeVisible({ timeout: 20_000 });
+      await expect(
+        guest.getByText(`${owner.handle} has a coach: ${watcher.handle}`),
+      ).toHaveCount(0);
+      expect(coach.problems).toEqual([]);
+
+      await concede(guest);
+      await expect(host.getByRole("dialog", { name: "Victory" })).toBeVisible({
+        timeout: 90_000,
+      });
+      console.log(
+        `[watching] game ${gameId}: ${[...seats, spectator, coach].map((s) => `${s.name} ${s.frames}`).join(", ")} frames, ` +
+          `turn ${seats[0].latest?.view?.turn}, result ${seats[0].latest?.result?.kind}`,
+      );
+      expect(seats.flatMap((seat) => seat.problems)).toEqual([]);
+    } finally {
+      await closeGame(host);
       for (const context of made) await context.close();
     }
   });

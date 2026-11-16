@@ -21,6 +21,7 @@ from api import (
     card_images,
     cards,
     chat,
+    coaching,
     cosmetics,
     custom_cards,
     decks,
@@ -46,6 +47,7 @@ from api import (
     shop,
     sleeves,
     social,
+    spectators,
     starter_tables,
     stats,
     table_fit,
@@ -416,6 +418,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(replays.router)
     app.include_router(loans.router)
     app.include_router(sandbox.router)
+    app.include_router(spectators.router)
+    app.include_router(coaching.router)
     app.include_router(auctions.router)
     app.include_router(reports.router)
     app.include_router(social.router)

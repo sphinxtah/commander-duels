@@ -65,9 +65,9 @@ export function useChatReading({
   refusal: string | null;
   people: ChatPeople;
   /** The channel shown in the open panel; null while it is folded. */
-  reading: Channel | null;
+  reading: ChatLine["channel"] | null;
   say(text: string): void;
-}): Record<Channel, number> {
+}): Record<ChatLine["channel"], number> {
   const [seen, setSeen] = useState<ReadonlySet<string> | null>(null);
   const known = useRef<Set<string> | null>(null);
   const failed = useRef(new Set<string>());
@@ -123,7 +123,7 @@ export function useChatReading({
   }, [chat, reading, seen]);
 
   return useMemo(() => {
-    const count = (channel: Channel) =>
+    const count = (channel: ChatLine["channel"]) =>
       chat && seen
         ? chat.filter(
             (line) =>
@@ -132,7 +132,12 @@ export function useChatReading({
               !ownLine(line, people),
           ).length
         : 0;
-    return { table: count("table"), allies: count("allies") };
+    return {
+      table: count("table"),
+      allies: count("allies"),
+      // A spectator's connection is sent this channel alone (v1.0.0).
+      spectators: count("spectators"),
+    };
   }, [chat, seen, people]);
 }
 
@@ -382,7 +387,7 @@ export function TableChat({
 }
 
 /** A line the server sent: a player's text or emote, or an alliance's event. */
-function Line({
+export function Line({
   line,
   people,
   onReport,
@@ -411,7 +416,9 @@ function Line({
     >
       <span className={styles.from}>
         <span className={styles.sender}>{sender}</span>
-        {line.seat === null && <span className={styles.meta}> (watching)</span>}
+        {line.seat === null && line.channel !== "spectators" && (
+          <span className={styles.meta}> (watching)</span>
+        )}
         {line.channel === "allies" && (
           <span className={styles.meta}> {recipients(line, people)}</span>
         )}
@@ -486,7 +493,7 @@ function LineMenu({ name, onReport }: { name: string; onReport(): void }) {
 
 /** A message of this tab's that the server has not sent back: greyed while it waits, and with
  * why and Try again once it was refused. */
-function Waiting({
+export function Waiting({
   entry,
   allies,
   connected,
@@ -545,7 +552,7 @@ function Waiting({
 }
 
 /** The box to write in: Enter sends, Shift+Enter starts a new line. */
-function Composer({
+export function Composer({
   channel,
   box,
   text,
@@ -555,7 +562,7 @@ function Composer({
   connected,
   onSend,
 }: {
-  channel: Channel;
+  channel: ChatLine["channel"];
   box: RefObject<HTMLTextAreaElement | null>;
   text: string;
   onText(text: string): void;
@@ -576,9 +583,11 @@ function Composer({
   const label =
     channel === "table"
       ? "Message to the table"
-      : teams
-        ? "Message to your team"
-        : "Message to your allies";
+      : channel === "spectators"
+        ? "Message to the other spectators"
+        : teams
+          ? "Message to your team"
+          : "Message to your allies";
   return (
     <form
       className={styles.compose}
@@ -598,7 +607,11 @@ function Composer({
         maxLength={CHAT_LENGTH}
         value={text}
         placeholder={
-          channel === "table" ? "Write to the table" : `Write to ${to}`
+          channel === "table"
+            ? "Write to the table"
+            : channel === "spectators"
+              ? "Write to the other spectators"
+              : `Write to ${to}`
         }
         aria-describedby={`${id}-hint`}
         onChange={(event) => onText(event.target.value)}

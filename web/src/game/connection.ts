@@ -14,6 +14,7 @@ import type {
   Snapshot,
   PriorityControls,
   PrioritySettings,
+  SeatCoach,
 } from "./types";
 
 // One game's WebSocket (docs/games.md): the hello with the CSRF token, the controller lease,
@@ -27,6 +28,12 @@ export interface GameState {
   /** The seat this account owns, or null when observing someone else's game (SysOp). */
   seat: number | null;
   role: "controller" | "observer";
+  /** A spectator's connection (v1.0.0): the game's public view, and nothing to act on. */
+  spectating: boolean;
+  /** A coach's connection (v1.0.0): the seat whose own view its player lets them see. */
+  coaching: number | null;
+  /** The seats that have a coach (v1.0.0), as the server tells everyone at the game. */
+  coaches: SeatCoach[];
   /** Whether any tab holds the seat's lease. */
   controlled: boolean;
   /** This tab lost control to another tab and waits for "Play here". */
@@ -87,7 +94,7 @@ export interface Suspension {
 export interface OutgoingChat {
   client_id: string;
   kind: "text" | "emote";
-  channel: "table" | "allies";
+  channel: ChatLine["channel"];
   /** The text, or the emote's name. */
   body: string;
   status: "pending" | "failed";
@@ -109,6 +116,9 @@ const initial: GameState = {
   ended: null,
   seat: null,
   role: "observer",
+  spectating: false,
+  coaching: null,
+  coaches: [],
   controlled: false,
   takenOver: false,
   snapshot: null,
@@ -320,8 +330,9 @@ export class GameConnection {
     this.send({ type: "vote", seat, remove });
   }
 
-  /** At a human table (v0.4.4): a message to the whole table, or to this seat's allies alone. It
-   * waits in the outbox until the server sends it back. */
+  /** At a human table (v0.4.4): a message to the whole table, or to this seat's allies alone; a
+   * spectator's (v1.0.0) to the other spectators. It waits in the outbox until the server sends
+   * it back. */
   chat(channel: OutgoingChat["channel"], text: string): void {
     this.post({ client_id: newActionId(), kind: "text", channel, body: text });
   }
@@ -531,6 +542,8 @@ export class GameConnection {
           phase: "open",
           seat: message.seat,
           role: "observer",
+          spectating: message.role === "spectator",
+          coaching: message.role === "coach" ? (message.coached ?? null) : null,
           controlled: message.controlled,
           crowded: false,
           // Refused as being recovered, and now reached: the game is back.
@@ -722,6 +735,9 @@ export class GameConnection {
           });
         break;
       }
+      case "coaches":
+        this.update({ coaches: message.coaches });
+        break;
       case "pong":
         window.clearTimeout(this.pongDeadline);
         this.pongDeadline = undefined;

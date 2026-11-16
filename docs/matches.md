@@ -25,6 +25,7 @@ Since v0.5.0 Legacy is played best of three, with sideboards: the scope's FMT05 
 - **Play or draw (FMT06).** The loser of a game chooses whether they play first or draw first in the next. After a game without a winner, whoever chose for it chooses again; after a first game without one, a player is drawn to choose. A bot that lost plays first. The API tells the engine which seat starts, and the engine asks nobody.
 - **Ready.** The next game starts as soon as every player is ready. Saving an arrangement makes a player not ready again.
 - **The clock.** Sideboarding lasts 5 minutes at most (`SIDEBOARD_SECONDS`). Then the next game starts with every deck as it is saved; a chooser who has not chosen plays first. The clock survives a restart of the API.
+- **Spectators** (v1.0.0). Every game of a table's match is watched as its first was ([spectators](tables.md#spectators-v100)): by the same people, as far behind, the engine told the delay again as each game starts. One who watches is led to the game played now by the table and by the lobby's "Watch a game".
 - **Waiting for a slot.** When every game slot is in use (`CD_GAMES_MAX`), or the engine does not answer, the next game waits and the match page says why; it asks again every 5 seconds while the slots are full, and every 30 while the engine does not answer. If the engine refuses the decks (a card it no longer knows), the match ends without a result (`failed`).
 
 ## Leaving

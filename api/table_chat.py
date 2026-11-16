@@ -22,6 +22,10 @@ describes them for players and staff.
   game, in this process's memory.
 - **Limits.** The text rules and the rate of api/chat.py, shared with friends' messages; SysOp has
   no limit.
+- **Spectators** (v1.0.0, api/spectators.py). The people watching a table's game talk among
+  themselves, in text, on a channel of their own (``spectators``): no player of the game reads
+  it or writes to it, and a spectator reads and writes nothing of the table's or the allies'.
+  Kept, limited and reported as every other line; SysOp reads it in Administration.
 """
 
 from collections.abc import Callable, Mapping
@@ -33,6 +37,7 @@ from sqlalchemy import Engine, and_, or_, select
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
+from api import watching
 from api.chat import REPORT_CONTEXT, MessageText, chat_hub_of
 from api.identity import ApiError, Principal, not_found, utcnow
 from api.models import GameSeat, TableMessage, User
@@ -67,6 +72,8 @@ EmoteName = Literal[
     "good_game",
 ]
 HISTORY = 200
+# The spectators' own channel (v1.0.0).
+SPECTATORS = "spectators"
 # Lines read back to find the REPORT_CONTEXT a reporter saw before a reported one.
 REPORT_SCAN = 500
 
@@ -74,7 +81,7 @@ REPORT_SCAN = 500
 class ChatIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     type: Literal["chat"]
-    channel: Literal["table", "allies"] = "table"
+    channel: Literal["table", "allies", "spectators"] = "table"
     text: MessageText
     client_id: UUID
 
@@ -101,20 +108,28 @@ MESSAGES: dict[str, type[ChatIn] | type[EmoteIn] | type[AllianceIn]] = {
 
 
 def sees_everything(connection: "Connection") -> bool:
-    """SysOp watching the game (only SysOp may), or inspecting it from its own seat."""
-    return connection.seat is None or connection.inspect
+    """SysOp watching the game (only SysOp may), or inspecting it from its own seat. Never a
+    spectator or a coach (v1.0.0), who have no seat either and see nothing of the table's chat."""
+    return not connection.guest and (connection.seat is None or connection.inspect)
 
 
 def visible(
     channel: str, sender_seat: int | None, seats: list[int] | None, viewer: int | None
 ) -> bool:
-    """Whether a player's seat sees a line: the table's, or one to allies it sent or received."""
+    """Whether a player's seat sees a line: the table's, or one to allies it sent or received.
+    Never the spectators' (v1.0.0)."""
     if channel == "table":
         return True
+    if channel == SPECTATORS:
+        return False
     return viewer is not None and (viewer == sender_seat or viewer in (seats or []))
 
 
 def sees(connection: "Connection", row: TableMessage) -> bool:
+    if connection.guest or row.channel == SPECTATORS:
+        # The table's chat is its players'; spectators talk among themselves (v1.0.0), and
+        # nobody else at the game reads them. A coach reads no chat here at all.
+        return connection.spectator and row.channel == SPECTATORS
     return sees_everything(connection) or visible(row.channel, row.seat, row.seats, connection.seat)
 
 
@@ -208,15 +223,18 @@ def alliances_of(game: "LiveGame", connection: "Connection") -> dict[str, Any]:
 
 def alliances_changed(game: "LiveGame") -> None:
     for connection in list(game.connections.values()):
-        connection.send(alliances_of(game, connection))
+        if not connection.guest:
+            connection.send(alliances_of(game, connection))
 
 
 async def welcome(hub: "GameHub", game: "LiveGame", connection: "Connection") -> None:
-    """A table's new connection: the chat it may see so far, and the alliances."""
+    """A table's new connection: the chat it may see so far, and the alliances. A spectator's
+    (v1.0.0) is the spectators' own, and it is told of no alliance."""
     rows, handles = await run_in_threadpool(recent, hub.database, game.id)
     shown = [wire(row, handles) for row in rows if sees(connection, row)][-HISTORY:]
     connection.send({"type": "chat_history", "messages": shown})
-    connection.send(alliances_of(game, connection))
+    if not connection.spectator:
+        connection.send(alliances_of(game, connection))
 
 
 async def post(hub: "GameHub", game: "LiveGame", row: TableMessage) -> None:
@@ -283,6 +301,14 @@ async def receive(
     if game.kind != "table":
         refuse("no_chat", "Chat is for tables with other players.", client_id=client_id)
         return
+    # The spectators' channel is theirs alone, and their only one (v1.0.0).
+    among_spectators = message.get("type") == "chat" and message.get("channel") == SPECTATORS
+    if connection.spectator and not among_spectators:
+        refuse("read_only", "A spectator only watches.", client_id=client_id)
+        return
+    if among_spectators and not connection.spectator:
+        refuse("invalid_message", "Only the game's spectators write there.", client_id=client_id)
+        return
     try:
         parsed = MESSAGES[message["type"]].model_validate(message)
     except ValidationError:
@@ -319,6 +345,16 @@ async def receive(
             channel="table",
             kind="emote",
             body=parsed.emote,
+            client_id=parsed.client_id,
+        )
+    elif parsed.channel == SPECTATORS:
+        row = line(
+            game,
+            sender=connection.user_id,
+            seat=None,
+            channel=SPECTATORS,
+            kind="text",
+            body=parsed.text,
             client_id=parsed.client_id,
         )
     elif parsed.channel == "allies":
@@ -469,7 +505,9 @@ def reported_table(
     db: Session, principal: Principal, message_id: UUID
 ) -> tuple[UUID, ReportedChat]:
     """A line of a table's chat the account saw, and the REPORT_CONTEXT lines before it that it
-    saw: what a report of it keeps. Another seat's allies-only line looks like a missing one."""
+    saw: what a report of it keeps. Another seat's allies-only line looks like a missing one. A
+    spectator (v1.0.0) reports a line of the spectators' channel, with that channel's lines
+    before it, while the table still lets them watch."""
     me = principal.user.id
     row = db.get(TableMessage, message_id)
     if row is None:
@@ -481,7 +519,20 @@ def reported_table(
     from api.games import concealed_in
 
     everything = concealed_in(db, principal, row.game_id)
-    if not (everything or (seat is not None and visible(row.channel, row.seat, row.seats, seat))):
+    among = (
+        row.channel == SPECTATORS
+        and seat is None
+        and watching.may_watch(db, row.game_id, principal.user) is not None
+    )
+
+    def saw(each: TableMessage) -> bool:
+        if everything:
+            return True
+        if among:
+            return each.channel == SPECTATORS
+        return seat is not None and visible(each.channel, each.seat, each.seats, seat)
+
+    if not saw(row):
         raise not_found()
     if row.kind == "event" or row.sender_id is None:
         raise ApiError(409, "not_reportable", "Only a player's message can be reported.")
@@ -499,9 +550,7 @@ def reported_table(
         .order_by(TableMessage.created_at.desc(), TableMessage.id.desc())
         .limit(REPORT_SCAN)
     )
-    before = [
-        each for each in earlier if everything or visible(each.channel, each.seat, each.seats, seat)
-    ][:REPORT_CONTEXT]
+    before = [each for each in earlier if saw(each)][:REPORT_CONTEXT]
     shown = [*reversed(before), row]
     handles = handles_of(db, {each.sender_id for each in shown if each.sender_id})
     lines = [line_of(each, handles) for each in shown]

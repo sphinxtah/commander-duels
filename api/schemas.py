@@ -768,6 +768,21 @@ class GameSummary(Contract):
         description="Since v1.0.0: a sandbox game (docs/games.md): it earns nothing and leaves "
         "nothing in the record, and its player restarts it and switches its bots.",
     )
+    spectating: bool = Field(
+        default=False,
+        description="Since v1.0.0: you watch this game as a spectator (docs/tables.md): you "
+        "see what every seat sees and nothing else, and you act on nothing.",
+    )
+    spectator_delay: int = Field(
+        default=0,
+        description="How far behind the game a spectator's view runs, in seconds: 0 where "
+        "spectators were invited, 60 where anyone may watch. Said to its spectators.",
+    )
+    coaching: int | None = Field(
+        default=None,
+        description="Since v1.0.0: the seat you coach in this game (docs/games.md), whose "
+        "player lets you see what they see. You act on nothing. Null for everyone else.",
+    )
     inspectable: bool = Field(
         default=False,
         description="Whether the viewer sees this game's concealed information, every hand and "
@@ -822,7 +837,7 @@ class ChatLine(Contract):
 
     id: UUID
     sender: ChatPerson | None = Field(description="Null for an alliance's event.")
-    channel: Literal["direct", "table", "allies"]
+    channel: Literal["direct", "table", "allies", "spectators"]
     kind: Literal["text", "emote", "event"]
     body: str = Field(description="The text; an emote's or an event's name.")
     seats: list[int] = Field(

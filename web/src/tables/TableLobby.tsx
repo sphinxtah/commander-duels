@@ -12,6 +12,8 @@ import { DECK_LENDING, useLoans } from "../decks/loans";
 import { tableFullscreen } from "../game/practice";
 import { getSoundEngine } from "../game/sound/engine";
 import { InviteFriendsButton } from "./InviteFriends";
+import { SpectatorsPanel } from "./Spectators";
+import { SPECTATORS, type WatchSetting } from "./watching";
 import { keepRead, keptRead, type Profile } from "./profile";
 import { SuspendedPanel } from "./SuspendedPanel";
 import { HostProfile, ProfileChanged, ProfilePanel } from "./TableProfile";
@@ -103,6 +105,10 @@ export function TableLobby({
   // Friend deck lending (v1.0.0), where it is open to the account.
   const lending = useWorkflow(DECK_LENDING);
   const book = useLoans(lending);
+  // Spectators (v1.0.0, Spectators.tsx), where they are open to the account.
+  const watchAllowed = useWorkflow(SPECTATORS);
+  // A spectator who waited here while the table was open goes to its game as it starts.
+  const waited = useRef(false);
   const [choice, setChoice] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -135,12 +141,14 @@ export function TableLobby({
       keepRead(code, table.profile ?? null);
   }, [table, code]);
 
-  // Once the game starts, every player at the table goes to it.
+  // Once the game starts, every player at the table goes to it, and so does one who may watch
+  // it and waited here for it (v1.0.0). One who arrives at a running game is shown the way.
   useEffect(() => {
+    if (table?.status === "open" && table.watching) waited.current = true;
     if (
       table?.status === "started" &&
       table.game_id &&
-      table.your_seat !== null &&
+      (table.your_seat !== null || (table.watching && waited.current)) &&
       !opened.current
     ) {
       opened.current = true;
@@ -285,6 +293,8 @@ export function TableLobby({
     kings_table?: Partial<KingsTableSettings>;
     bot_seats?: number[];
     move?: { seat: number; to: number };
+    /** Who may watch (v1.0.0): no player is made not ready by it. */
+    spectators?: WatchSetting;
   }) {
     void act(() => client.PATCH("/api/v1/tables/{code}", { ...path, body }));
   }
@@ -570,6 +580,21 @@ export function TableLobby({
           onSave={saveProfile}
         />
       )}
+
+      {watchAllowed &&
+        !table.campaign &&
+        (table.status === "open" || table.status === "started") &&
+        (mine || table.watching) &&
+        (table.spectators !== "nobody" ||
+          (host && table.status === "open")) && (
+          <SpectatorsPanel
+            table={table}
+            host={host}
+            seated={Boolean(mine)}
+            busy={busy}
+            onSetting={(spectators) => change({ spectators })}
+          />
+        )}
 
       {table.status === "open" && mine && (
         <div className={styles.invite}>

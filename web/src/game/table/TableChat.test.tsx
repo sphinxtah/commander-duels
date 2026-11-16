@@ -448,7 +448,7 @@ describe("reading the chat", () => {
     const { result, rerender, say } = reading();
     const history = [line(), line()];
     rerender({ chat: history, reading: null });
-    expect(result.current).toEqual({ table: 0, allies: 0 });
+    expect(result.current).toEqual({ table: 0, allies: 0, spectators: 0 });
 
     const theirs = line({ body: "Your turn soon" });
     const mine = line({ seat: 0, sender: { id: "u-ada", handle: "ada" } });
@@ -459,13 +459,13 @@ describe("reading the chat", () => {
     expect(say).toHaveBeenLastCalledWith("bob: Your turn soon");
     rerender({ chat: [...history, mine, theirs, allies], reading: null });
     expect(say).toHaveBeenLastCalledWith("bob to you: Psst");
-    expect(result.current).toEqual({ table: 1, allies: 1 });
+    expect(result.current).toEqual({ table: 1, allies: 1, spectators: 0 });
 
     // Unfolded on the Table tab, its lines are read; the Allies tab's are not yet.
     rerender({ chat: [...history, mine, theirs, allies], reading: "table" });
-    expect(result.current).toEqual({ table: 0, allies: 1 });
+    expect(result.current).toEqual({ table: 0, allies: 1, spectators: 0 });
     rerender({ chat: [...history, mine, theirs, allies], reading: "allies" });
-    expect(result.current).toEqual({ table: 0, allies: 0 });
+    expect(result.current).toEqual({ table: 0, allies: 0, spectators: 0 });
 
     // Several at once (a reconnect's history) are counted, not read out.
     rerender({
