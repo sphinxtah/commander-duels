@@ -936,7 +936,7 @@ export function Admin({
         ) : shown === "audit" ? (
           <Audit />
         ) : shown === "numbers" ? (
-          <SiteNumbers />
+          <SiteNumbers canStage={me!.permissions.includes("rollout.manage")} />
         ) : shown === "catalog" ? (
           <CatalogAdmin />
         ) : shown === "shop" ? (

@@ -14,7 +14,7 @@ The Preparation Framework's last foundation (the specification's section 15). It
 
 `GET /api/v1/admin/operations`, for SysOp and administrators (`admin.audit.read`): signed in, open `https://<the site>/api/v1/admin/operations` in the browser. One answer gathers what was read in three places before and what was not counted at all.
 
-Since v1.0.0 Administration has a **Numbers** tab over the same answer, for the same readers (`web/src/admin/SiteNumbers.tsx`): it begins with the games' record (`games`) and with how tables fit what they described (`table_fit`, with each answer's share), and has a button to read again. The rest of the answer, the workflows' stages among it, is still read as JSON; a panel over all of it is part of v1.0.0's close.
+Since v1.0.0 Administration has a **Numbers** tab over the same answer, for the same readers (`web/src/admin/SiteNumbers.tsx`): it begins with the games' record (`games`) and with how tables fit what they described (`table_fit`, with each answer's share), and has a button to read again. Under them are [the gates](#the-gates): every workflow's stage, who reaches it and when it was set; SysOp chooses another stage there and sets it. The rest of the answer (the API's counts, access by its state, the worker's jobs, the engine's own numbers) is still read as JSON; a panel over it is part of v1.0.0's close.
 
 | Field | What |
 | --- | --- |
@@ -81,7 +81,7 @@ Every workflow is `off` until it is set.
 | `coaching` | Coaching (24) | A coach's access to a seat's hand | `/games/{id}/coaches` |
 | `starter_tables` | A starter deck bought at the table (the owner's own request, 2026-11-14) | A table or a practice game asked to be one (`starter`) | `/starter-decks` |
 
-**Setting a stage.** SysOp: `PUT /api/v1/admin/rollout/{workflow}` with `{"stage": "staff"}` (the permission `rollout.manage`, SysOp's alone). At the console, on the VM: `docker compose exec api python -m api.cli rollout sandbox staff`; `rollout` alone prints every stage. Either way the change is in the audit record (`rollout.stage_changed`, the console's with `"by": "console"`). `GET /api/v1/admin/rollout` shows the stages to staff, and `GET /api/v1/rollout` tells any signed-in account which workflows it may reach, which is what a page asks before it shows the way into one.
+**Setting a stage.** SysOp, since v1.0.0 in Administration's Numbers tab: under "The gates" each workflow has its stage as a choice and a "Set" button beside it, two steps, since a stage decides who meets a workflow on the live site; an administrator sees the stages there and sets none. It sends `PUT /api/v1/admin/rollout/{workflow}` with `{"stage": "staff"}` (the permission `rollout.manage`, SysOp's alone). At the console, on the VM: `docker compose exec api python -m api.cli rollout sandbox staff`; `rollout` alone prints every stage. Either way the change is in the audit record (`rollout.stage_changed`, the console's with `"by": "console"`). `GET /api/v1/admin/rollout` shows the stages to staff, and `GET /api/v1/rollout` tells any signed-in account which workflows it may reach, which is what a page asks before it shows the way into one.
 
 **What a gate guards.**
 

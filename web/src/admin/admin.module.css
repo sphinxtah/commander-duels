@@ -371,3 +371,28 @@
   font-size: 1rem;
   color: #ebece6;
 }
+/* A gate's stage, chosen and set (v1.0.0). */
+.gateSet {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.gateSet select {
+  background: #101819;
+  border: 1px solid #ffffff26;
+  border-radius: 4px;
+  color: #ebece6;
+  padding: 8px 10px;
+  font-size: 0.78rem;
+}
+.gateSet select:focus-visible {
+  outline: 2px solid #efcc8d;
+  outline-offset: 2px;
+}
+.gateSet button {
+  padding: 8px 14px;
+}
+.gateSet button:disabled {
+  opacity: 0.45;
+}

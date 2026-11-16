@@ -473,6 +473,13 @@ test.describe("a human table in two browsers", () => {
         tally.getByRole("row", { name: /^High power/ }),
       ).toBeVisible();
       await expect(tally).not.toContainText("rival");
+      // The gates are there too, each with its stage for SysOp to set; none is set here, since
+      // the journeys of other files run on the same installation and share them.
+      await expect(
+        host
+          .getByRole("table", { name: "The gates" })
+          .getByRole("combobox", { name: "Stage of Friend deck lending" }),
+      ).toBeVisible();
     } finally {
       // A failed journey's game is closed, so the next journeys find a table.
       await host
