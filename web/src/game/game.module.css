@@ -47,13 +47,17 @@
   border-color: #e6c68c55;
   color: var(--gold);
 }
+/* The colours are named again as fallbacks: the variables are the game screen's (.screen), and
+   these buttons are drawn on other pages too (a table's "Close the table", a save's "Discard"),
+   where a danger button without them had a dark label on no background (found at v1.0.0). */
 .dangerButton {
-  background: var(--danger);
+  background: var(--danger, #e27d6c);
   color: #1b0f0d;
   font-weight: 600;
 }
 .primaryButton:disabled,
-.secondaryButton:disabled {
+.secondaryButton:disabled,
+.dangerButton:disabled {
   opacity: 0.45;
 }
 .screen select:focus-visible,
@@ -640,7 +644,7 @@ button.life[data-selected] {
   border-radius: 5px;
 }
 .refusal {
-  color: var(--danger);
+  color: var(--danger, #e27d6c);
   font-size: 0.85rem;
   margin: 8px 0 0;
 }
