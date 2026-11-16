@@ -23,6 +23,7 @@ import { DeleteAccount } from "./admin/DeleteAccount";
 import { Reports } from "./admin/Reports";
 import { ResetAccount, resetWords } from "./admin/ResetAccount";
 import { SetWins } from "./admin/SetWins";
+import { SiteNumbers } from "./admin/SiteNumbers";
 import { TestingGrants } from "./admin/TestingGrants";
 import { tierNames } from "./alliance/alliance";
 import { Portrait } from "./alliance/Portrait";
@@ -722,6 +723,7 @@ type Tab =
   | "chats"
   | "economy"
   | "audit"
+  | "numbers"
   | "catalog"
   | "shop"
   | "auctions"
@@ -800,6 +802,7 @@ export function Admin({
     chats && "chats",
     users && "economy",
     audit && "audit",
+    audit && "numbers",
     catalog && "catalog",
     shop && "shop",
     auctions && "auctions",
@@ -868,6 +871,16 @@ export function Admin({
             Audit log
           </button>
         )}
+        {/* The site's numbers (v1.0.0), for who reads the audit log: SysOp and administrators. */}
+        {audit && (
+          <button
+            role="tab"
+            aria-selected={shown === "numbers"}
+            onClick={() => setTab("numbers")}
+          >
+            Numbers
+          </button>
+        )}
         {catalog && (
           <button
             role="tab"
@@ -922,6 +935,8 @@ export function Admin({
           />
         ) : shown === "audit" ? (
           <Audit />
+        ) : shown === "numbers" ? (
+          <SiteNumbers />
         ) : shown === "catalog" ? (
           <CatalogAdmin />
         ) : shown === "shop" ? (

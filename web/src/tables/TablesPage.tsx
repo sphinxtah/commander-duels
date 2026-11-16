@@ -47,6 +47,24 @@ import {
 } from "./tables";
 import { LIVE_POLL_MS, useLobby } from "./lobby";
 import {
+  DURATIONS,
+  INTENTS,
+  INTENT_NAMES,
+  PACES,
+  PACE_NAMES,
+  PRESET_NAME_LIMIT,
+  findPreset,
+  plain,
+  presetKey,
+  usePresets,
+  type Duration,
+  type Intent,
+  type Pace,
+  type PresetSettings,
+  type Profile,
+} from "./profile";
+import { PresetSelect, ProfileFields, ProfileSummary } from "./TableProfile";
+import {
   STARTER_TABLES,
   StarterOfferFields,
   StarterReveal,
@@ -69,6 +87,9 @@ import styles from "./tables.module.css";
 // for players as a card, filtered live by checkboxes, 20, 50 or 100 a page. "Open a table" is a
 // button at the top whose pop-up holds the table's settings and the friends to invite, and "Quick
 // match" beside it holds the public queues (#find opens it), which this section was before.
+// Since v1.0.0 a table says what it is for (Rule Zero, TableProfile.tsx): the pop-up opens one
+// from a preset, the six built in or a table the account saved, and the lobby finds tables by
+// what their hosts describe. A card keeps what is described apart from what is checked on decks.
 
 const FORMATS: Format[] = ["legacy", "commander", TEAM_FORMAT, KINGS_TABLE];
 const FORMAT_WORDS: Record<Format, string> = {
@@ -103,6 +124,11 @@ export type Filters = {
   /** v0.9.3: the order, kept with the filters, and a search by host, which isn't kept. */
   sort: TableSort;
   host: string;
+  /** v1.0.0, Rule Zero: only tables whose host describes them so. None ticked, no pace and no
+   * length ask for nothing: a table that describes nothing matches none of the three. */
+  intents: Intent[];
+  paces: Pace[];
+  maxDuration: Duration | null;
 };
 export const DEFAULT_FILTERS: Filters = {
   formats: [...FORMATS],
@@ -113,6 +139,9 @@ export const DEFAULT_FILTERS: Filters = {
   friends: false,
   sort: "newest",
   host: "",
+  intents: [],
+  paces: [],
+  maxDuration: null,
 };
 const FILTERS_KEY = "cd.tables.filters";
 
@@ -139,6 +168,14 @@ function keptFilters(): { filters: Filters; perPage: PageSize } {
         friends: Boolean(kept.friends),
         sort: SORTS.find(([sort]) => sort === kept.sort)?.[0] ?? "newest",
         host: "",
+        intents: Array.isArray(kept.intents)
+          ? INTENTS.filter((intent) => kept.intents!.includes(intent))
+          : [],
+        paces: Array.isArray(kept.paces)
+          ? PACES.filter((pace) => kept.paces!.includes(pace))
+          : [],
+        maxDuration:
+          DURATIONS.find((minutes) => minutes === kept.maxDuration) ?? null,
       },
       perPage,
     };
@@ -230,6 +267,9 @@ function Lobby({
           friends: filters.friends,
           ...(filters.sort !== "newest" ? { sort: filters.sort } : {}),
           ...(filters.host.trim() ? { host: filters.host.trim() } : {}),
+          ...(filters.intents.length ? { intent: filters.intents } : {}),
+          ...(filters.paces.length ? { pace: filters.paces } : {}),
+          ...(filters.maxDuration ? { max_duration: filters.maxDuration } : {}),
           page,
           per_page: perPage,
         },
@@ -326,6 +366,12 @@ function Lobby({
         <span className={game.eyebrow}>OPEN TABLES</span>
         <h2 id="tables-title">Find a game</h2>
         <FilterBar filters={filters} onChange={filter} />
+        {described(filters) && (
+          <p className={game.hint}>
+            Only tables whose host describes them this way are listed. A
+            description is the host&apos;s word: nothing checks it.
+          </p>
+        )}
         <div className={styles.listHead}>
           <p role="status" className={styles.count}>
             {nothing
@@ -373,6 +419,7 @@ function Lobby({
           <p className={game.hint}>
             {Object.values(filters).some((value) => value === true) ||
             filters.host.trim() !== "" ||
+            described(filters) ||
             filters.formats.length < FORMATS.length ||
             filters.rules.length < 2
               ? "No table waiting for players matches these filters. Untick some, or open a table of your own."
@@ -483,6 +530,15 @@ function Popup({
   );
 }
 
+/** Whether the filters ask for what a host describes (v1.0.0). */
+function described(filters: Filters): boolean {
+  return (
+    filters.intents.length > 0 ||
+    filters.paces.length > 0 ||
+    filters.maxDuration !== null
+  );
+}
+
 function FilterBar({
   filters,
   onChange,
@@ -492,6 +548,13 @@ function FilterBar({
 }) {
   const toggle = <T,>(list: T[], item: T, on: boolean): T[] =>
     on ? [...list, item] : list.filter((other) => other !== item);
+  // What a host describes (v1.0.0) is three more groups: on a phone they stay folded behind a
+  // button until asked for, so the tables are not a screen further down; open when one is set.
+  const [more, setMore] = useState(() => described(filters));
+  const chosen =
+    filters.intents.length +
+    filters.paces.length +
+    (filters.maxDuration ? 1 : 0);
   return (
     <div className={styles.filters} role="group" aria-label="Filters">
       <fieldset>
@@ -561,6 +624,82 @@ function FilterBar({
         value={filters.host}
         onChange={(host) => onChange({ host })}
       />
+      <button
+        type="button"
+        className={styles.moreFilters}
+        aria-expanded={more}
+        aria-controls="described-filters"
+        onClick={() => setMore((open) => !open)}
+      >
+        Kind of game, pace and length
+        {chosen > 0 ? ` · ${chosen} chosen` : ""}
+      </button>
+      <div
+        id="described-filters"
+        className={styles.describedFilters}
+        data-open={more}
+      >
+        <fieldset>
+          <legend>Described as</legend>
+          {INTENTS.map((intent) => (
+            <label key={intent} className={styles.filter}>
+              <input
+                type="checkbox"
+                checked={filters.intents.includes(intent)}
+                onChange={(event) =>
+                  onChange({
+                    intents: toggle(
+                      filters.intents,
+                      intent,
+                      event.target.checked,
+                    ),
+                  })
+                }
+              />
+              {INTENT_NAMES[intent]}
+            </label>
+          ))}
+        </fieldset>
+        <fieldset>
+          <legend>Pace</legend>
+          {PACES.map((pace) => (
+            <label key={pace} className={styles.filter}>
+              <input
+                type="checkbox"
+                checked={filters.paces.includes(pace)}
+                onChange={(event) =>
+                  onChange({
+                    paces: toggle(filters.paces, pace, event.target.checked),
+                  })
+                }
+              />
+              {PACE_NAMES[pace]}
+            </label>
+          ))}
+        </fieldset>
+        <fieldset>
+          <legend>Length</legend>
+          <select
+            className={styles.hostSearch}
+            aria-label="Expected length"
+            value={filters.maxDuration ?? ""}
+            onChange={(event) =>
+              onChange({
+                maxDuration: event.target.value
+                  ? (Number(event.target.value) as Duration)
+                  : null,
+              })
+            }
+          >
+            <option value="">Any length</option>
+            {DURATIONS.map((minutes) => (
+              <option key={minutes} value={minutes}>
+                At most {minutes} minutes
+              </option>
+            ))}
+          </select>
+        </fieldset>
+      </div>
     </div>
   );
 }
@@ -635,6 +774,7 @@ export function TableCard({ table }: { table: TableView }) {
         </div>
       </header>
       <TableTags table={table} />
+      {table.profile && <ProfileSummary profile={table.profile} />}
       <dl className={styles.cardFacts}>
         <div>
           <dt>Players</dt>
@@ -735,6 +875,18 @@ function OpenTable({
   } | null>(null);
   const buyKey = useRef(purchaseKey());
   const offer = offers?.offers.find((found) => found.id === offerId);
+  // What the table is for (v1.0.0, Rule Zero): none, or a profile started from a preset and
+  // changed as the host likes. A saved table brings its other settings with it.
+  const { presets, save: savePreset, remove: removePreset } = usePresets();
+  const [start, setStart] = useState("");
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [presetName, setPresetName] = useState("");
+  const [presetNote, setPresetNote] = useState<{
+    refused: boolean;
+    text: string;
+  } | null>(null);
+  const [presetBusy, setPresetBusy] = useState(false);
+  const savedPreset = findPreset(presets, start);
 
   const teams = format === TEAM_FORMAT;
   const kingsTable = format === KINGS_TABLE;
@@ -761,6 +913,76 @@ function OpenTable({
     setTeammateBot(false);
     setOtherBots(0);
     setBotSeats([]);
+  }
+
+  /** Starts the table from a preset: its profile, and a saved table's other settings. */
+  function choosePreset(key: string) {
+    setStart(key);
+    setPresetNote(null);
+    const preset = findPreset(presets, key);
+    if (!preset) {
+      setProfile(null);
+      setPresetName("");
+      return;
+    }
+    setProfile(plain(preset.profile));
+    setPresetName(preset.built_in ? "" : preset.name);
+    if (preset.built_in) return;
+    const kept = preset.settings;
+    const next = kept.format ?? format;
+    if (next !== format) chooseFormat(next);
+    if (next === "commander") {
+      // Two to four seats, and never fewer than two of them for players.
+      const count = Math.min(4, Math.max(2, kept.seats ?? seats));
+      setSeats(count);
+      setBots(Math.min(kept.bots ?? 0, count - 2));
+    }
+    if (kept.bot_skill) setSkill(kept.bot_skill);
+    if (kept.visibility) setVisibility(kept.visibility);
+    if (kept.rules) setRules(kept.rules);
+    if (next === "legacy" && kept.best_of) setBestOf(kept.best_of);
+  }
+
+  /** The table's settings a saved table keeps beside its profile. */
+  function presetSettings(): PresetSettings {
+    return {
+      format,
+      seats,
+      bots: allBots,
+      bot_skill: skill,
+      visibility,
+      rules,
+      best_of: format === "legacy" ? bestOf : 1,
+    };
+  }
+
+  async function keepPreset() {
+    const name = presetName.trim();
+    if (!profile || !name) return;
+    setPresetBusy(true);
+    const answer = await savePreset(name, profile, presetSettings());
+    setPresetBusy(false);
+    if (typeof answer === "string")
+      return setPresetNote({ refused: true, text: answer });
+    setPresetNote({ refused: false, text: `Saved as ${name}.` });
+    // The list holds the table under its name now: the choice follows it.
+    const saved = answer.saved.find(
+      (preset) => preset.name.toLowerCase() === name.toLowerCase(),
+    );
+    if (saved) setStart(presetKey(saved));
+  }
+
+  async function dropPreset() {
+    if (!savedPreset?.id) return;
+    setPresetBusy(true);
+    const answer = await removePreset(savedPreset.id);
+    setPresetBusy(false);
+    if (typeof answer === "string")
+      return setPresetNote({ refused: true, text: answer });
+    setPresetNote({ refused: false, text: `Removed ${savedPreset.name}.` });
+    // The form keeps what it holds; it now starts from the kind of game it describes.
+    setStart(profile ? `built:${profile.intent}` : "");
+    setPresetName("");
   }
 
   /** Your seat at a King's Table table: a bot never takes it. */
@@ -802,6 +1024,8 @@ function OpenTable({
         deck_id: starter && deal ? deal.deck_id : chosen,
         starter,
         invite,
+        // A starter-deck table has no profile: its decks are dealt.
+        ...(profile && !starter ? { profile } : {}),
         ...(kingsTable
           ? {
               seat: hostSeat,
@@ -1079,6 +1303,83 @@ function OpenTable({
             kings={kings}
             onChange={setRules}
           />
+        )}
+        {!starter && (
+          <div className={styles.ruleZero}>
+            <h3>What the table is for</h3>
+            <p className={game.hint}>
+              Rule Zero: say what kind of game this is, so players find a table
+              that suits them. What you describe is your word; what you enforce
+              the server checks on every deck.
+            </p>
+            <PresetSelect
+              presets={presets}
+              value={start}
+              onChange={choosePreset}
+            />
+            {profile && (
+              <>
+                <ProfileFields profile={profile} onChange={setProfile} />
+                <div className={styles.presetSave}>
+                  <label className={game.field}>
+                    <span>
+                      Save this table to open it again{" "}
+                      {presets && (
+                        <small>
+                          {presets.saved.length} of {presets.limit} saved
+                        </small>
+                      )}
+                    </span>
+                    <input
+                      value={presetName}
+                      maxLength={PRESET_NAME_LIMIT}
+                      placeholder="A name of your own"
+                      onChange={(event) => setPresetName(event.target.value)}
+                      onKeyDown={(event) => {
+                        // Enter saves the table; it does not open it.
+                        if (event.key !== "Enter") return;
+                        event.preventDefault();
+                        void keepPreset();
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className={game.secondaryButton}
+                    disabled={presetBusy || !presetName.trim()}
+                    onClick={() => void keepPreset()}
+                  >
+                    Save the table
+                  </button>
+                  {savedPreset && !savedPreset.built_in && (
+                    <button
+                      type="button"
+                      className={game.dangerButton}
+                      disabled={presetBusy}
+                      onClick={() => void dropPreset()}
+                    >
+                      Remove {savedPreset.name}
+                    </button>
+                  )}
+                  {presetNote && (
+                    <p
+                      role={presetNote.refused ? "alert" : "status"}
+                      className={
+                        presetNote.refused ? game.refusal : styles.status
+                      }
+                    >
+                      {presetNote.text}
+                    </p>
+                  )}
+                  <small className={styles.presetHint}>
+                    It keeps what you describe and enforce with the format, the
+                    seats, the bots, who may join and the cards the decks may
+                    hold.
+                  </small>
+                </div>
+              </>
+            )}
+          </div>
         )}
         {starter ? (
           bought ? (

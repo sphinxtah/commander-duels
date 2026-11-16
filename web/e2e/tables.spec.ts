@@ -4,7 +4,9 @@ import type { Snapshot } from "../src/game/types";
 // A human table (v0.4.0) played in two browsers against the real engine: SysOp hosts a Legacy
 // table, a player joins it by its invite link, both play a few turns, the player concedes, and both
 // see the result, the winner with the tokens the win paid. Every WebSocket frame of each browser is
-// checked for the other's concealed cards. It needs the engine, SysOp and a second account, which
+// checked for the other's concealed cards. Since v1.0.0 the table says what it is for (Rule Zero):
+// opened from a preset, changed by its host under the seated player, who reads the change before
+// getting ready again; on the result each says how the table fit, and SysOp reads the tally. It needs the engine, SysOp and a second account, which
 // cannot sign in with Google: scripts/e2e_player.py makes one and prints its session token.
 const sysopPassword = process.env.CD_E2E_SYSOP_PASSWORD;
 const playerSession = process.env.CD_E2E_PLAYER_SESSION;
@@ -224,35 +226,90 @@ test.describe("a human table in two browsers", () => {
       await form.getByLabel("Your deck").selectOption({
         label: `Table host ${stamp}`,
       });
+      // The table says what it is for (v1.0.0, Rule Zero), from a built-in preset.
+      await form
+        .getByLabel("Start from")
+        .selectOption({ label: "Upgraded casual" });
       await form.getByRole("button", { name: "Open the table" }).click();
       await expect(host).toHaveURL(/#tables\/[A-Za-z0-9_-]{8,32}$/);
       const invite = await host.getByLabel("Invite link").inputValue();
       expect(invite).toMatch(/#tables\/[A-Za-z0-9_-]{8,32}$/);
+      await expect(
+        host.getByRole("region", { name: "What this table is for" }),
+      ).toContainText("Kind of gameUpgraded casual");
 
       // The player finds it in the lobby, then follows the link and sits down.
       await guest.goto("/#tables");
-      await expect(
-        guest
-          .getByRole("region", { name: "Find a game", exact: true })
-          .getByRole("link", { name: "Join sysop's Legacy table" }),
-      ).toBeVisible({ timeout: 15_000 });
+      const listed = guest
+        .getByRole("region", { name: "Find a game", exact: true })
+        .getByRole("listitem")
+        .filter({
+          has: guest.getByRole("link", { name: "Join sysop's Legacy table" }),
+        });
+      await expect(listed).toBeVisible({ timeout: 15_000 });
+      // Its card keeps what the host describes apart from what is checked on every deck.
+      await expect(listed).toContainText(
+        "Host describes: Upgraded casual · Steady · about 90 minutes",
+      );
+      await expect(listed).toContainText(
+        "Checked on every deck: At most 3 Game Changers a deck",
+      );
       await guest.goto(invite);
       await expect(
         guest.getByRole("heading", { name: "Legacy table" }),
       ).toBeVisible();
+      await expect(
+        guest
+          .getByRole("region", { name: "What this table is for" })
+          .getByRole("list", { name: "Checked on every deck" }),
+      ).toHaveText("At most 3 Game Changers a deck");
       // Others see SysOp's handle, never its deck.
       await expect(guest.getByText(`Table host ${stamp}`)).toHaveCount(0);
       await guest.getByRole("button", { name: "Take a seat" }).click();
       await expect(
         guest.getByText(`Playing Table guest ${stamp}`),
       ).toBeVisible();
-      await guest.getByRole("button", { name: "Ready" }).click();
+      await guest.getByRole("button", { name: "Ready", exact: true }).click();
+      await expect(
+        guest.getByRole("button", { name: "Not ready" }),
+      ).toBeVisible();
+
+      // The host changes what the table is for under the seated, ready player (v1.0.0): the
+      // player is not ready again, reads what differs, and their one button gets them ready and
+      // says they have read it. Until then the host cannot start.
+      const start = host.getByRole("button", { name: "Start the game" });
+      await expect(start).toBeEnabled({ timeout: 15_000 });
+      const change = host.getByRole("region", {
+        name: "Change what the table is for",
+      });
+      await change.getByRole("button", { name: "Change it" }).click();
+      await change
+        .getByLabel("Kind of game")
+        .selectOption({ label: "High power" });
+      await change.getByRole("button", { name: "Change the table" }).click();
+      await expect(
+        host.getByRole("region", { name: "What this table is for" }),
+      ).toContainText("Kind of gameHigh power");
+      await expect(start).toBeDisabled();
+      const notice = guest.getByRole("status", {
+        name: "The host changed what this table is for",
+      });
+      await expect(notice).toBeVisible({ timeout: 15_000 });
+      await expect(notice.getByRole("listitem")).toHaveText([
+        "Kind of game: High power (was Upgraded casual)",
+      ]);
+      await expect(
+        guest.getByRole("button", { name: "Ready", exact: true }),
+      ).toHaveCount(0);
+      await notice
+        .getByRole("button", { name: "I have read it: ready" })
+        .click();
+      await expect(notice).toHaveCount(0);
       await expect(
         guest.getByRole("button", { name: "Not ready" }),
       ).toBeVisible();
 
       // The host starts when the player is ready; both go to the game.
-      const start = host.getByRole("button", { name: "Start the game" });
       await expect(start).toBeEnabled({ timeout: 15_000 });
       await start.click();
       await expect(host).toHaveURL(/#game\/[0-9a-f-]{36}$/, {
@@ -374,12 +431,48 @@ test.describe("a human table in two browsers", () => {
         lost.getByRole("link", { name: "Back to the lobby" }),
       ).toHaveAttribute("href", "#tables");
 
+      // How the table fit (v1.0.0): the result asks each player once, by the kind of game the
+      // table named as the game started, and says that only the site's numbers see the answer.
+      const asked = lost.getByRole("group", { name: "How did the table fit?" });
+      await expect(asked).toContainText(
+        "Its host described this table as High power.",
+        { timeout: 30_000 },
+      );
+      await expect(asked).toContainText(
+        "no player and no host sees your answer",
+      );
+      await asked.getByRole("button", { name: "As described" }).click();
+      await expect(asked.getByRole("status")).toContainText("Counted.");
+      const hostAsked = won.getByRole("group", {
+        name: "How did the table fit?",
+      });
+      await hostAsked
+        .getByRole("button", { name: "Stronger than described" })
+        .click();
+      await expect(
+        hostAsked.getByRole("button", { name: "Stronger than described" }),
+      ).toHaveAttribute("aria-pressed", "true");
+
       console.log(
         `[tables] game ${gameId}: host ${hostFrames.frames} frames, guest ${guestFrames.frames} frames, ` +
           `turn ${hostFrames.latest?.view?.turn}, result ${hostFrames.latest?.result?.kind}`,
       );
       expect(hostFrames.check()).toEqual([]);
       expect(guestFrames.check()).toEqual([]);
+
+      // SysOp reads the tally in Administration's Numbers: counts by the kind of game, and
+      // nobody's name.
+      await won.getByRole("link", { name: "Back to the lobby" }).click();
+      await expect(host).toHaveURL(/#tables$/);
+      await host.goto("/#admin");
+      await host.getByRole("tab", { name: "Numbers" }).click();
+      const tally = host.getByRole("table", {
+        name: "How tables fit what they described",
+      });
+      await expect(
+        tally.getByRole("row", { name: /^High power/ }),
+      ).toBeVisible();
+      await expect(tally).not.toContainText("rival");
     } finally {
       // A failed journey's game is closed, so the next journeys find a table.
       await host

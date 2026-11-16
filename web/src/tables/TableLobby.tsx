@@ -10,7 +10,9 @@ import { exitTableFullscreen } from "../app/fullscreen";
 import { tableFullscreen } from "../game/practice";
 import { getSoundEngine } from "../game/sound/engine";
 import { InviteFriendsButton } from "./InviteFriends";
+import { keepRead, keptRead, type Profile } from "./profile";
 import { SuspendedPanel } from "./SuspendedPanel";
+import { HostProfile, ProfileChanged, ProfilePanel } from "./TableProfile";
 import {
   StarterOfferFields,
   StarterReveal,
@@ -65,6 +67,10 @@ import styles from "./tables.module.css";
 // any open seat or moves to one; the host changes the settings, which seats bots take, and moves a
 // player to an open seat. Every such change makes every player not ready again. Since v0.9.2 its
 // players invite friends from here (InviteFriends.tsx).
+// Since v1.0.0 the page says what the table is for (Rule Zero, TableProfile.tsx): what its host
+// describes apart from what the server checks on every deck. The host describes the table,
+// changes that or takes it away; a seated player whose table changed under them reads what
+// differs, and their one button gets them ready and says they have read it.
 
 /** The table's own address: its invite link. */
 export function inviteLink(code: string): string {
@@ -115,6 +121,12 @@ export function TableLobby({
   useEffect(() => {
     if (loaded?.table) setTable(loaded.table);
   }, [loaded]);
+  // The profile a seated player has read is kept by the browser (v1.0.0), so that a change the
+  // host makes later is shown as what differs from it.
+  useEffect(() => {
+    if (table && table.your_seat !== null && !table.profile_changed)
+      keepRead(code, table.profile ?? null);
+  }, [table, code]);
 
   // Once the game starts, every player at the table goes to it.
   useEffect(() => {
@@ -247,6 +259,20 @@ export function TableLobby({
   const botSeats = table.players
     .filter((player) => player.player === "bot")
     .map((player) => player.seat);
+  /** The host's change to what the table is for (v1.0.0): a profile from now on, or none. */
+  async function saveProfile(profile: Profile | null): Promise<boolean> {
+    const changed = await act(() =>
+      client.PATCH("/api/v1/tables/{code}", { ...path, body: { profile } }),
+    );
+    return changed !== undefined;
+  }
+  // The host changed what the table is for under this seated player (v1.0.0): they read it
+  // before getting ready again.
+  const unread =
+    table.status === "open" &&
+    mine !== undefined &&
+    !host &&
+    table.profile_changed;
 
   /** Joins a team (v0.5.1), or moves to it when already seated. */
   function joinTeam(team: number) {
@@ -337,6 +363,7 @@ export function TableLobby({
         Others see your handle and portrait, never your deck.{" "}
         <a href="#tables">Back to the lobby</a>
       </p>
+      {table.profile && <ProfilePanel profile={table.profile} />}
       {table.status === "suspended" && table.suspended && (
         <SuspendedPanel
           suspended={table.suspended}
@@ -504,6 +531,14 @@ export function TableLobby({
         </section>
       )}
 
+      {host && table.status === "open" && !table.campaign && !table.starter && (
+        <HostProfile
+          current={table.profile ?? null}
+          busy={busy}
+          onSave={saveProfile}
+        />
+      )}
+
       {table.status === "open" && mine && (
         <div className={styles.invite}>
           <label className={game.field}>
@@ -541,6 +576,23 @@ export function TableLobby({
           title={reveal.title}
           doneLabel="Back to the table"
           onDone={() => setReveal(null)}
+        />
+      )}
+      {unread && (
+        <ProfileChanged
+          before={keptRead(code)}
+          after={table.profile ?? null}
+          busy={busy}
+          onReady={() => {
+            // Sound starts only from a click: this is the last one before the game opens.
+            getSoundEngine().unlock();
+            void act(() =>
+              client.PATCH("/api/v1/tables/{code}/seat", {
+                ...path,
+                body: { ready: true, acknowledge_profile: true },
+              }),
+            );
+          }}
         />
       )}
       {table.status === "open" && (
@@ -627,7 +679,7 @@ export function TableLobby({
           {!mine && !free && (
             <p className={game.hint}>Every player's seat is taken.</p>
           )}
-          {mine && !host && (
+          {mine && !host && !unread && (
             <button
               type="button"
               className={mine.ready ? game.secondaryButton : game.primaryButton}

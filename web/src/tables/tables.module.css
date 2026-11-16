@@ -662,3 +662,297 @@
 .suspendedPlayers li[data-ready="true"] strong {
   color: #9fd6b8;
 }
+/* Rule Zero at the table (v1.0.0): a profile's two parts stand apart wherever it is shown. What
+   the host describes is drawn with a dashed edge and a pencil; what the server checks on every
+   deck with a solid edge and a tick; each under its own words, so neither is told by colour. */
+.profile {
+  margin: 18px 0;
+}
+.profile h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+.profileParts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+.profilePart,
+.changedPart {
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #ffffff04;
+}
+.profilePart[data-part="described"],
+.changedPart[data-part="described"],
+.profileEditor[data-part="described"] {
+  border: 1px dashed #9db4c488;
+}
+.profilePart[data-part="enforced"],
+.changedPart[data-part="enforced"],
+.profileEditor[data-part="enforced"] {
+  border: 2px solid #84ac93aa;
+}
+.profilePart h3,
+.changedPart h3 {
+  margin: 0 0 2px;
+  font-size: 0.92rem;
+}
+.profilePart[data-part="described"] h3,
+.changedPart[data-part="described"] h3,
+.profileEditor[data-part="described"] legend,
+.cardProfile [data-part="described"] strong {
+  color: #c3d6e2;
+}
+.profilePart[data-part="enforced"] h3,
+.changedPart[data-part="enforced"] h3,
+.profileEditor[data-part="enforced"] legend,
+.cardProfile [data-part="enforced"] strong {
+  color: #a9cdb5;
+}
+.partNote {
+  flex-basis: 100%;
+  margin: 0 0 8px;
+  color: #8fa09a;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+.profilePart dl {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.profilePart dl div {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, auto) 1fr;
+  gap: 10px;
+}
+.profilePart dt {
+  color: #7c8b86;
+  font-size: 0.8rem;
+}
+.profilePart dd {
+  margin: 0;
+  color: #e6dcc4;
+  overflow-wrap: anywhere;
+}
+.profilePart ul,
+.changedPart ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+  color: #e6dcc4;
+}
+.profilePart > p:last-child {
+  margin: 0;
+  color: #e6dcc4;
+}
+/* On a lobby card: a line a part. */
+.cardProfile {
+  display: grid;
+  gap: 4px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #c9d1c6;
+}
+.cardProfile p {
+  margin: 0;
+  padding-left: 8px;
+  overflow-wrap: anywhere;
+}
+.cardProfile p[data-part="described"] {
+  border-left: 2px dashed #9db4c488;
+}
+.cardProfile p[data-part="enforced"] {
+  border-left: 2px solid #84ac93aa;
+}
+.cardProfile strong {
+  font-weight: 600;
+}
+.cardProfile q {
+  display: block;
+  color: #aeb8ac;
+  font-style: italic;
+}
+/* The profile's editor, in "Open a table" and on the host's own page. */
+.ruleZero {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ffffff14;
+}
+.ruleZero h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.ruleZero > p {
+  margin: 0;
+  max-width: 72ch;
+}
+.ruleZero > label {
+  max-width: 28rem;
+}
+.profileEditor[data-part] {
+  padding: 10px 14px 14px;
+  border-radius: 8px;
+  align-items: start;
+  min-width: 0;
+}
+.profileEditor legend {
+  padding: 0 6px;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+.profileEditor > label,
+.profileEditor > div {
+  flex: 1 1 200px;
+}
+.profileEditor > div.profileNote {
+  flex: 1 1 100%;
+}
+.profileNote textarea {
+  font-family: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+}
+.presetSave {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+}
+.presetSave > label {
+  flex: 1 1 240px;
+  max-width: 28rem;
+}
+.presetSave > p {
+  margin: 0;
+}
+.presetHint {
+  flex-basis: 100%;
+  color: #7c8b86;
+  font-size: 0.76rem;
+}
+/* A change a seated player reads before getting ready again. */
+.changed {
+  margin: 18px 0;
+  padding: 14px 18px;
+  border: 2px solid #d4b47a;
+  border-radius: 8px;
+  background: #d4b47a12;
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+.changed h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #f0e2c2;
+}
+.changed p {
+  margin: 0;
+  max-width: 72ch;
+  line-height: 1.5;
+}
+.changed .changedPart {
+  justify-self: stretch;
+}
+.changed small {
+  color: #aeb8ac;
+  font-size: 0.78rem;
+}
+/* How the table fit (v1.0.0): the one optional question on a table game's result. */
+.fit {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #ffffff22;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  text-align: left;
+}
+.fit legend {
+  padding: 0 6px;
+  font-size: 0.86rem;
+}
+.fit p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+.fitChoices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.fitChoices button {
+  padding: 6px 12px;
+  border: 1px solid #ffffff33;
+  border-radius: 16px;
+  background: #ffffff08;
+  color: inherit;
+  font: inherit;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+.fitChoices button[aria-pressed="true"] {
+  border-color: #d4b47a;
+  background: #d4b47a26;
+  color: #f0e2c2;
+  font-weight: 600;
+}
+.fitChoices button[aria-pressed="true"]::before {
+  content: "✓ ";
+}
+.fitChoices button:focus-visible {
+  outline: 2px solid #e3c68f;
+  outline-offset: 2px;
+}
+.fitChoices button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.fit small {
+  color: #8fa09a;
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+/* The lobby's filters by what a host describes (v1.0.0): beside the others on a wide screen;
+   on a phone folded behind a button, so the tables are not a screen further down. */
+.moreFilters {
+  display: none;
+  padding: 5px 12px;
+  border: 1px solid #d4b47a55;
+  border-radius: 14px;
+  background: #ffffff05;
+  color: #e3c68f;
+  font: inherit;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+.moreFilters::after {
+  content: " ▸";
+}
+.moreFilters[aria-expanded="true"]::after {
+  content: " ▾";
+}
+.moreFilters:focus-visible {
+  outline: 2px solid #e3c68f;
+  outline-offset: 2px;
+}
+.describedFilters {
+  display: contents;
+}
+.filters select.hostSearch {
+  width: auto;
+}
+@media (max-width: 720px) {
+  .moreFilters {
+    display: inline-block;
+  }
+  .describedFilters[data-open="false"] {
+    display: none;
+  }
+}

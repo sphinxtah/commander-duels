@@ -738,6 +738,111 @@ describe("a human table's game (v0.4.0)", () => {
   });
 });
 
+describe("a described table's game (v1.0.0, Rule Zero)", () => {
+  it("asks how the table fit once its end is recorded, and not while it runs", async () => {
+    const { client } = await import("../api");
+    const get = vi.mocked(client.GET);
+    const original = get.getMockImplementation()!;
+    const result = {
+      kind: "completed",
+      winner_seat: 0,
+      draw: false,
+      conceded_seats: [1],
+      turns: 12,
+    };
+    const human = (seat: number, handle: string) => ({
+      seat,
+      player: "human",
+      handle,
+      portrait: null,
+      deck: seat === 0 ? "Red deck" : null,
+      left: null,
+    });
+    let finished = false;
+    const asked: string[] = [];
+    get.mockImplementation((async (path: string) => {
+      if (path.endsWith("/rematch")) return { data: undefined };
+      if (path.endsWith("/table-fit")) {
+        asked.push(path);
+        return {
+          data: { asked: true, intent_name: "Upgraded casual", fit: null },
+        };
+      }
+      return {
+        data: {
+          game: {
+            id: "g1",
+            kind: "table",
+            format: "legacy",
+            status: finished ? "finished" : "active",
+            seats: [human(0, "alice"), human(1, "bob")],
+            your_seat: 0,
+            bot_skill: 4,
+            turn_cap: 60,
+            created_at: "2026-10-21T10:00:00Z",
+            finished_at: finished ? "2026-10-21T10:30:00Z" : null,
+            result: finished ? result : null,
+            tokens: finished ? 50 : null,
+          },
+          snapshot: null,
+        },
+      };
+    }) as never);
+    try {
+      render(<GameScreen gameId="g1" me={null} />);
+      const socket = FakeSocket.made[0];
+      act(() => {
+        socket.accept();
+        socket.deliver(welcome(0, false));
+        socket.deliver({
+          type: "lease",
+          role: "controller",
+          controlled: true,
+          reason: "granted",
+        });
+        socket.deliver({
+          type: "snapshot",
+          snapshot: snapshot(5, priority("A")),
+        });
+      });
+      await screen.findByRole("heading", { level: 1, name: /Table game/ });
+      // A running game asks nothing, of the server or of the player.
+      expect(asked).toEqual([]);
+      expect(screen.queryByText("How did the table fit?")).toBeNull();
+
+      finished = true;
+      act(() =>
+        socket.deliver({
+          type: "snapshot",
+          snapshot: {
+            ...snapshot(6, null),
+            status: "finished",
+            result: { ...result, error: null },
+          },
+        }),
+      );
+      // On the result, wherever it is shown: the one question and who sees the answer.
+      await waitFor(() =>
+        expect(screen.getAllByText("How did the table fit?")).not.toHaveLength(
+          0,
+        ),
+      );
+      expect(asked).toEqual(["/api/v1/games/{game_id}/table-fit"]);
+      expect(
+        screen.getAllByText(/Only the site's numbers count it/),
+      ).not.toHaveLength(0);
+      expect(
+        screen.getAllByRole("button", {
+          name: "As described",
+          hidden: true,
+        }),
+      ).not.toHaveLength(0);
+    } finally {
+      get.mockImplementation(original);
+    }
+  });
+});
+
 describe("a game played with passive bots (v0.9.7)", () => {
   it("shows its result and its tokens as any other game's", async () => {
     const { client } = await import("../api");

@@ -37,6 +37,7 @@ import {
 import { campaignLink } from "../campaign/campaign";
 import { CampaignLayer } from "../campaign/CampaignLayer";
 import { RematchPanel, useRematch } from "../queues/Rematch";
+import { TableFitPanel, useTableFit } from "../tables/TableFit";
 import { AwayPlayers } from "./AwayPlayers";
 import { GameContext, boxStyle, type GameContextValue } from "./Board";
 import { CardZoom } from "./Card";
@@ -682,6 +683,15 @@ export function GameScreen({
     (Boolean(snapshot?.result) || state.ended !== null) && !savedGame;
   // The result screen's Rematch (v0.5.0), once the game's end is recorded.
   const rematch = useRematch(gameId, summary, over);
+  // How the table fit what its host described (v1.0.0, Rule Zero): one optional question on a
+  // table game's result, for one who played in it, once the game's end is recorded.
+  const tableFit = useTableFit(
+    gameId,
+    over &&
+      summary?.kind === "table" &&
+      summary.your_seat !== null &&
+      summary.status === "finished",
+  );
   const alliances = useMemo<TableAlliances | null>(
     () =>
       chatting
@@ -1160,6 +1170,7 @@ export function GameScreen({
                       {!matchGoesOn && !campaign && (
                         <RematchPanel rematch={rematch} />
                       )}
+                      {!matchGoesOn && <TableFitPanel fit={tableFit} />}
                       <a
                         href={back.href}
                         className={styles.secondaryButton}
@@ -1444,6 +1455,7 @@ export function GameScreen({
                 />
               )}
               {!matchGoesOn && !campaign && <RematchPanel rematch={rematch} />}
+              {!matchGoesOn && <TableFitPanel fit={tableFit} />}
               <form method="dialog" className={styles.confirmButtons}>
                 <button
                   type="submit"

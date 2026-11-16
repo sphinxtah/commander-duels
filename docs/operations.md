@@ -14,6 +14,8 @@ The Preparation Framework's last foundation (the specification's section 15). It
 
 `GET /api/v1/admin/operations`, for SysOp and administrators (`admin.audit.read`): signed in, open `https://<the site>/api/v1/admin/operations` in the browser. One answer gathers what was read in three places before and what was not counted at all.
 
+Since v1.0.0 Administration has a **Numbers** tab over the same answer, for the same readers (`web/src/admin/SiteNumbers.tsx`): it begins with the games' record (`games`) and with how tables fit what they described (`table_fit`, with each answer's share), and has a button to read again. The rest of the answer, the workflows' stages among it, is still read as JSON; a panel over all of it is part of v1.0.0's close.
+
 | Field | What |
 | --- | --- |
 | `version`, `migration` | The API's version and the migration it runs on |
