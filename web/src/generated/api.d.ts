@@ -1923,6 +1923,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/decks/{deck_id}/loans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Deck Loans
+         * @description The open loan of one of the caller's decks: none, or the one (a deck is lent to one
+         *     friend at a time).
+         */
+        get: operations["deck_loans_api_v1_decks__deck_id__loans_get"];
+        put?: never;
+        /**
+         * Offer Deck
+         * @description Offers one of the caller's decks to a friend: the deck as it stands, bound to a version.
+         *     It must be playable, hold none of the game's custom cards, and not be offered or lent
+         *     already. The friend is told, and has it once they accept.
+         */
+        post: operations["offer_deck_api_v1_decks__deck_id__loans_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/decks/{deck_id}/missing": {
         parameters: {
             query?: never;
@@ -2658,6 +2685,106 @@ export interface paths {
         get: operations["my_library_api_v1_library_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/loans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Loans
+         * @description The decks the caller has offered or lent, and those offered or lent to them.
+         */
+        get: operations["my_loans_api_v1_loans_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/loans/{loan_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * End
+         * @description Ends a loan: its lender takes the deck back, or the friend gives it back. A game already
+         *     started with it plays on; a seat at a table that has not started must choose another deck.
+         */
+        delete: operations["end_api_v1_loans__loan_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/loans/{loan_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept
+         * @description The friend accepts: the deck is theirs to play for seven days, and its owner's to play
+         *     again only once the loan ends.
+         */
+        post: operations["accept_api_v1_loans__loan_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/loans/{loan_id}/deck": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Look
+         * @description The lent deck's list, for the friend it is offered or lent to: the version the loan is
+         *     of, with how many of each card their own library holds.
+         */
+        get: operations["look_api_v1_loans__loan_id__deck_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/loans/{loan_id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decline */
+        post: operations["decline_api_v1_loans__loan_id__decline_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7382,6 +7509,19 @@ export interface components {
              */
             life: "all_20" | "all_40" | "generals_20_kings_40";
         };
+        /**
+         * LentDeck
+         * @description A lent deck's list, for its borrower to look at: the version the loan is of.
+         */
+        LentDeck: {
+            /** Cards */
+            cards: {
+                [key: string]: components["schemas"]["CardSummary"];
+            };
+            /** Entries */
+            entries: components["schemas"]["DeckEntry"][];
+            loan: components["schemas"]["Loan"];
+        };
         /** LibraryCard */
         LibraryCard: {
             /** @description The card, its image that of the edition (v0.5.0); owned counts every edition of it. */
@@ -7488,6 +7628,98 @@ export interface components {
             quantity: number;
             /** Starting Bid */
             starting_bid: number;
+        };
+        /** Loan */
+        Loan: {
+            borrower: components["schemas"]["PlayerRef"];
+            deck: components["schemas"]["LoanDeck"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            lender: components["schemas"]["PlayerRef"];
+            /**
+             * Offered At
+             * Format: date-time
+             */
+            offered_at: string;
+            /**
+             * State
+             * @description offered: it waits for the friend's answer; accepted: the friend has the deck, and its owner cannot play it.
+             * @enum {string}
+             */
+            state: "offered" | "accepted";
+            /**
+             * Until
+             * Format: date-time
+             * @description When it ends by itself.
+             */
+            until: string;
+            /**
+             * Yours
+             * @description Whether the caller is its lender.
+             */
+            yours: boolean;
+        };
+        /** LoanDeck */
+        LoanDeck: {
+            /**
+             * Card Count
+             * @description Its cards, the maybeboard apart.
+             */
+            card_count: number;
+            /** Commanders */
+            commanders: string[];
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Version
+             * @description The saved version the loan is of.
+             */
+            version: number;
+        };
+        /** LoanOffer */
+        LoanOffer: {
+            /**
+             * Player Id
+             * Format: uuid
+             * @description The friend the deck is offered to.
+             */
+            player_id: string;
+        };
+        /** Loans */
+        Loans: {
+            /**
+             * Days
+             * @description How long a loan lasts once accepted.
+             */
+            days: number;
+            /**
+             * Given
+             * @description The caller's decks offered or lent to friends.
+             */
+            given: components["schemas"]["Loan"][];
+            /**
+             * Limit
+             * @description The most decks an account has out at once.
+             */
+            limit: number;
+            /**
+             * Taken
+             * @description Friends' decks offered or lent to the caller.
+             */
+            taken: components["schemas"]["Loan"][];
         };
         /** MarkBody */
         MarkBody: {
@@ -7798,7 +8030,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "friend_request" | "friend_accepted" | "friend_online" | "message" | "quest_completed" | "achievement_earned" | "rematch" | "team_invite" | "auction_outbid" | "auction_won" | "auction_sold" | "auction_unsold" | "auction_cancelled" | "table_invite" | "warden_deck" | "replay_shared";
+            kind: "friend_request" | "friend_accepted" | "friend_online" | "message" | "quest_completed" | "achievement_earned" | "rematch" | "team_invite" | "auction_outbid" | "auction_won" | "auction_sold" | "auction_unsold" | "auction_cancelled" | "table_invite" | "warden_deck" | "replay_shared" | "deck_offered";
             /**
              * Messages
              * @description For new messages (v0.4.4): how many from this friend are still unread.
@@ -11307,6 +11539,12 @@ export interface components {
         };
         /** TablePlayer */
         TablePlayer: {
+            /**
+             * Borrowed
+             * @description Since v1.0.0: the seat's player sits with a deck a friend lent them (api/loans.py). Said to the whole table; whose deck and what it holds stay private.
+             * @default false
+             */
+            borrowed: boolean;
             /**
              * Deck
              * @description Your own seat's deck title; others' decks are private.
@@ -22249,6 +22487,198 @@ export interface operations {
             };
         };
     };
+    deck_loans_api_v1_decks__deck_id__loans_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Loan"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    offer_deck_api_v1_decks__deck_id__loans_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoanOffer"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Loan"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     deck_missing_api_v1_decks__deck_id__missing_get: {
         parameters: {
             query?: never;
@@ -25734,6 +26164,474 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LibraryView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    my_loans_api_v1_loans_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Loans"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    end_api_v1_loans__loan_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                loan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Loans"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    accept_api_v1_loans__loan_id__accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                loan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Loans"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    look_api_v1_loans__loan_id__deck_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                loan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LentDeck"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    decline_api_v1_loans__loan_id__decline_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                loan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Loans"];
                 };
             };
             /** @description Bad Request */

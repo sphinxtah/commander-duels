@@ -11,7 +11,7 @@ Every game has a **mode**, and one function decides what a game of a mode may ea
 | `campaign` | A campaign duel, the Unbound Court, Apex Unbound | v0.8.0 |
 | `testing` | A result SysOp grants for testing; no game is played | v0.8.8 |
 | `sandbox` | Any implemented card, owned or not | v1.0.0 (policy approved 2026-11-13) |
-| `borrowed` | A seat plays a friend's lent deck | v1.0.0 (policy approved 2026-11-13) |
+| `borrowed` | A seat plays a friend's lent deck: a private table's game, or its rematch ([friend deck lending](decks.md#friend-deck-lending-v100)) | v1.0.0 (policy approved 2026-11-13) |
 
 `games.mode` is set when the game is made: `practice` or `table` from its kind, and `campaign` when a campaign duel links it (a link always makes it the campaign's). `player_results.mode` is its game's, and `testing` for a granted result. Migration 0045 gave every game and result made before v0.9.10 its mode from what it is; results are append-only in PostgreSQL, so their guard is lifted for that one statement.
 
@@ -30,7 +30,7 @@ The words in the table are the reason codes recorded for a reward withheld. A ga
 
 **Nothing changed for the modes that exist.** practice, table, campaign and testing earn exactly what they earned before v0.9.10: a campaign duel's own rewards (spoils, chapter tokens, decks) are still `api/campaign.py`'s, and passive bots still count as any other game (the owner, v0.9.7). `tests/test_modes.py` pins the matrix and settles a game of each kind that exists to show it; the suites of the six modules pass unchanged.
 
-**The two modes v1.0.0 will make have their policies**, approved by the owner on 2026-11-13: the sandbox earns nothing, so that unowned cards create no asset; a borrowed deck earns as a table does, since its player plays the game. No game is made in either until its workflow is rolled out (`api/rollout.py` `mode_available`; [the gates](operations.md#the-gates)). **The leagues' two modes are gone** with the leagues (the owner, 2026-11-14): v0.9.10 classified `league_practice` and `league`, no game was ever made in them, and a game named one would earn nothing, as any mode the code does not know.
+**The two modes v1.0.0 will make have their policies**, approved by the owner on 2026-11-13: the sandbox earns nothing, so that unowned cards create no asset; a borrowed deck earns as a table does, since its player plays the game. No game is made in either until its workflow is rolled out (`api/rollout.py` `mode_available`; [the gates](operations.md#the-gates)). Since v1.0.0 a private table's game in which a seat plays a deck a friend lent is made in the borrowed mode, for every seat of it, and so are its rematch and the later games of its best-of-three match ([friend deck lending](decks.md#friend-deck-lending-v100)); the sandbox's games are still to come. **The leagues' two modes are gone** with the leagues (the owner, 2026-11-14): v0.9.10 classified `league_practice` and `league`, no game was ever made in them, and a game named one would earn nothing, as any mode the code does not know.
 
 ## How it is asked, and recorded
 

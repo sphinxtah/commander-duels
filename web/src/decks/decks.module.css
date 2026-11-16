@@ -1391,3 +1391,32 @@ a.deckTitle:hover {
   font-size: 0.82rem;
   color: #aeb8ac;
 }
+
+/* Friend deck lending (v1.0.0): a deck's loan on its row, and a lent deck's list. */
+.loanLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-top: 6px;
+  font-size: 0.84rem;
+  color: #c9d8c4;
+}
+.loanLine[data-state="accepted"] {
+  color: #e3c68f;
+}
+.lentPlace {
+  margin: 14px 0 4px;
+  color: #e3c68f;
+  font-size: 0.74rem;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+.lentList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  columns: 2 14rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}

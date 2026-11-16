@@ -76,7 +76,14 @@ from api.queues import bot_plans, waiting_of
 from api.roster import roster_of
 from api.schemas import Contract, Error, PracticeGameRequest
 from api.social import notify
-from api.tables import add_table_game, open_table_of, rules_of, team_banned, under_limits
+from api.tables import (
+    add_table_game,
+    lent_seat,
+    open_table_of,
+    rules_of,
+    team_banned,
+    under_limits,
+)
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 
@@ -436,12 +443,25 @@ def plan_rematch(
             if revision is None:
                 raise ApiError(422, "invalid_deck", "That deck is gone.")
             library = library_of(db, user, permissions, roster)
-            seat, bound, title = own_deck(
+            deck_format = deck_format_of(game.format, game.kings_table)
+            # A deck a friend lent (v1.0.0, api/loans.py) is played again while the loan
+            # stands and its lender plays the rematch too: the version the loan is of.
+            lent = lent_seat(
+                db,
+                request,
+                user,
+                revision.deck_id,
+                table,
+                deck_format,
+                rules_of(table),
+                together={player.user_id for player in rows},
+            )
+            seat, bound, title = lent or own_deck(
                 db,
                 user,
                 permissions,
                 revision.deck_id,
-                deck_format_of(game.format, game.kings_table),
+                deck_format,
                 library,
                 rules_of(table),
                 # A starter-deck table's rematch plays the decks as they came again (v1.0.0).
@@ -464,7 +484,7 @@ def plan_rematch(
             if user.id == principal.user.id:
                 raise
             raise ApiError(409, "deck_not_playable", message) from refused
-        plans.append(SeatPlan({"player": "human", **seat}, bound, title))
+        plans.append(SeatPlan({"player": "human", **seat}, bound, title, borrowed=lent is not None))
         users.append(user.id)
         decks.append(revision.deck_id)
     if kept_seats is not None:

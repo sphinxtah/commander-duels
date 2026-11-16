@@ -253,3 +253,26 @@ def deck_usable(db: Session, user_id: UUID, deck: Deck, now: datetime | None = N
     if deck.deleted_at is not None:
         return False
     return deck.owner_id == user_id or bool(active(db, user_id, "deck", deck.id, now))
+
+
+def lent_out(db: Session, deck: Deck, now: datetime | None = None) -> AccessGrant | None:
+    """The loan that has the deck out of its owner's hands now (v1.0.0, the owner's decision of
+    2026-11-15: a lent deck is as a real one handed over): accepted, not ended, and still good
+    as ``active`` judges it. While there is one its owner cannot play the deck; an offer that
+    has not been accepted keeps nothing from them."""
+    now = now or utcnow()
+    accepted = db.scalars(
+        select(AccessGrant).where(
+            AccessGrant.resource_kind == "deck",
+            AccessGrant.resource_id == deck.id,
+            AccessGrant.grantor_id == deck.owner_id,
+            AccessGrant.consent == "accepted",
+            AccessGrant.revoked_at.is_(None),
+            or_(AccessGrant.expires_at.is_(None), AccessGrant.expires_at > now),
+        )
+    )
+    for grant in accepted:
+        usable = active(db, grant.subject_id, "deck", deck.id, now)
+        if any(found.id == grant.id for found in usable):
+            return grant
+    return None

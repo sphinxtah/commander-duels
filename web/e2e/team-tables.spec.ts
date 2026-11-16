@@ -14,6 +14,11 @@ import type { Snapshot } from "../src/game/types";
 // side concedes and the other wins as a team. Every game frame is checked for the hands no seat may
 // see. SysOp hosts; the others are made by scripts/e2e_player.py, whose session tokens come in
 // CD_E2E_PLAYER_SESSION (rival) and CD_E2E_TEAM_SESSIONS (two more, comma-separated, CI's ogre and troll).
+// Since v1.0.0 a third journey is here too, because it seats one of the same accounts and an
+// account sits at one open table at a time: a deck lent to a friend, played at its lender's
+// private table (docs/decks.md). SysOp lends; the first of CD_E2E_TEAM_SESSIONS borrows. It is
+// not the second player of the friends' journey (rival), whose friendship with SysOp that
+// journey makes and ends while this one runs.
 const sysopPassword = process.env.CD_E2E_SYSOP_PASSWORD;
 const playerSession = process.env.CD_E2E_PLAYER_SESSION;
 const teamSessions = (process.env.CD_E2E_TEAM_SESSIONS ?? "")
@@ -438,8 +443,7 @@ test.describe("team tables in several browsers", () => {
         timeout: 120_000,
       });
       const result = seats[0].latest?.result as
-        | { winner_team?: number | null }
-        | undefined;
+        { winner_team?: number | null } | undefined;
       expect(result?.winner_team).toBe(0);
       console.log(
         `[kings] game ${gameId}: ${seats.map((s) => `${s.name} ${s.frames}`).join(", ")} frames, ` +
@@ -448,6 +452,289 @@ test.describe("team tables in several browsers", () => {
       expect(seats.flatMap((seat) => seat.problems)).toEqual([]);
     } finally {
       await closeGame(host);
+      for (const context of made) await context.close();
+    }
+  });
+});
+
+test.describe("a deck lent to a friend, in two browsers (v1.0.0)", () => {
+  test.setTimeout(10 * 60_000);
+  test.use({ actionTimeout: 30_000 });
+
+  test("a friend looks at an offered deck, accepts it, and plays it at its lender's private table", async ({
+    browser,
+  }, testInfo) => {
+    test.skip(
+      !gamesOn || !sysopPassword || teamSessions.length < 1,
+      "Needs the engine, SysOp and one more account: CD_E2E_GAMES=1, CD_E2E_SYSOP_PASSWORD and " +
+        "CD_E2E_TEAM_SESSIONS (scripts/e2e_player.py).",
+    );
+    const base = testInfo.project.use.baseURL!;
+    const made = await contexts(browser, 2);
+    const [lenderContext, friendContext] = made;
+    await signIn(friendContext, teamSessions[0], base);
+    const lender = await lenderContext.newPage();
+    const friend = await friendContext.newPage();
+    const stamp = Date.now();
+    const lent = `Lent burn ${stamp}`;
+    const own = `Lender's own ${stamp}`;
+    // The friend owns none of the lent deck's cards but its basic lands.
+    const lentCards = ["4 Lightning Bolt", "4 Hill Giant", "52 Mountain"];
+    try {
+      await signInSysop(lender);
+      await importDeck(lender, lent, lentCards);
+      await importDeck(lender, own, ["60 Forest"]);
+
+      // Lending is behind its gate: SysOp opens it to everyone (the friend is no staff) and
+      // leaves it open, as the other journeys do with theirs. The two become friends.
+      await friend.goto("/#decks");
+      const borrower = await friend.evaluate(async () => {
+        const me = (await (await fetch("/api/v1/me")).json()) as {
+          id: string;
+          handle: string;
+        };
+        return { id: me.id, handle: me.handle };
+      });
+      const owner = await lender.evaluate(async (friendId) => {
+        const me = (await (await fetch("/api/v1/me")).json()) as {
+          id: string;
+          handle: string;
+          csrf_token: string;
+        };
+        const headers = {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": me.csrf_token,
+        };
+        const gate = await fetch("/api/v1/admin/rollout/deck_lending", {
+          method: "PUT",
+          headers,
+          body: JSON.stringify({ stage: "on" }),
+        });
+        const asked = await fetch(`/api/v1/friends/${friendId}`, {
+          method: "PUT",
+          headers,
+        });
+        return {
+          id: me.id,
+          handle: me.handle,
+          gate: gate.status,
+          asked: asked.status,
+        };
+      }, borrower.id);
+      expect(owner).toMatchObject({ gate: 200, asked: 200 });
+      const friendship = await friend.evaluate(async (lenderId) => {
+        const me = (await (await fetch("/api/v1/me")).json()) as {
+          csrf_token: string;
+        };
+        const answered = await fetch(`/api/v1/friends/${lenderId}`, {
+          method: "PUT",
+          headers: { "X-CSRF-Token": me.csrf_token },
+        });
+        return ((await answered.json()) as { friendship: string }).friendship;
+      }, owner.id);
+      expect(friendship).toBe("friends");
+      // A page asks which workflows are open to it once, as it loads: both load again.
+      await Promise.all([lender.reload(), friend.reload()]);
+
+      // The lender offers the deck from its row, after the page says what lending means.
+      await lender.goto("/#decks");
+      const lentRow = lender
+        .getByRole("listitem")
+        .filter({ has: lender.getByRole("link", { name: lent, exact: true }) });
+      await lentRow.getByRole("button", { name: "Lend", exact: true }).click();
+      const lend = lender.getByRole("dialog", {
+        name: `Lend ${lent} to a friend`,
+      });
+      await expect(lend).toContainText(
+        "While they have it, you cannot play this deck yourself",
+      );
+      await expect(lend).toContainText(
+        "They play it only at a private table where you sit too.",
+      );
+      await lend
+        .getByRole("radio", { name: borrower.handle, exact: true })
+        .check();
+      await lend
+        .getByRole("button", { name: `Offer it to ${borrower.handle}` })
+        .click();
+      await expect(lentRow).toContainText(
+        `Offered to ${borrower.handle}, who has not answered yet.`,
+      );
+
+      // The friend is told by the bell, looks at the list, and accepts.
+      await friend.goto("/#notifications");
+      await expect(
+        friend.getByText(`${owner.handle} offers to lend you a deck.`).first(),
+      ).toBeVisible();
+      await friend.goto("/#decks");
+      const theirs = friend.getByRole("region", { name: "Decks lent to you" });
+      await expect(theirs).toContainText(`from ${owner.handle}`);
+      await theirs.getByRole("button", { name: `Look at it: ${lent}` }).click();
+      const list = friend.getByRole("dialog", {
+        name: `${lent}, from ${owner.handle}`,
+      });
+      await expect(list).toContainText("Version 1, as it was lent");
+      for (const line of lentCards)
+        await expect(
+          list
+            .getByRole("listitem")
+            .filter({ hasText: line.replace(" ", " × ") }),
+        ).toHaveCount(1);
+      await list.getByRole("button", { name: "Close" }).click();
+      await theirs.getByRole("button", { name: `Accept: ${lent}` }).click();
+      await expect(theirs).toContainText("Yours to play until");
+      await friend.screenshot({
+        path: testInfo.outputPath("lent-to-you.jpg"),
+        type: "jpeg",
+        quality: 80,
+      });
+
+      // As a real deck handed over: its owner cannot open a table with it now. (The Decks
+      // page would learn of the answer within half a minute by itself; loaded again, at once.)
+      await lender.reload();
+      await expect(lentRow).toContainText(`Lent to ${borrower.handle} until`);
+      await expect(lentRow).toContainText("you cannot play it meanwhile");
+      await lender.goto("/#tables");
+      await lender
+        .getByRole("button", { name: "Open a table", exact: true })
+        .click();
+      const form = lender.getByRole("region", { name: "Open a table" });
+      await form.getByRole("radio", { name: /^Legacy/ }).check();
+      const choice = form.getByLabel("Your deck");
+      await expect(
+        choice.getByRole("option", {
+          name: `${lent} (lent to ${borrower.handle})`,
+        }),
+      ).toHaveJSProperty("disabled", true);
+      // The server says the same to a request that names it.
+      const refused = await lender.evaluate(async (title) => {
+        const me = (await (await fetch("/api/v1/me")).json()) as {
+          csrf_token: string;
+        };
+        const decks = (await (await fetch("/api/v1/decks")).json()) as {
+          id: string;
+          title: string;
+        }[];
+        const answered = await fetch("/api/v1/tables", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": me.csrf_token,
+          },
+          body: JSON.stringify({
+            format: "legacy",
+            visibility: "private",
+            deck_id: decks.find((deck) => deck.title === title)!.id,
+          }),
+        });
+        return {
+          status: answered.status,
+          code: ((await answered.json()) as { code: string }).code,
+        };
+      }, lent);
+      expect(refused).toEqual({ status: 409, code: "deck_lent" });
+
+      // The lender opens a private table with another deck; the friend sits down with the
+      // borrowed one, and the seat says so to both.
+      await choice.selectOption({ label: own });
+      await form.getByLabel("Who may join").selectOption("private");
+      await form.getByRole("button", { name: "Open the table" }).click();
+      await expect(lender).toHaveURL(/#tables\/[A-Za-z0-9_-]{8,32}$/);
+      const invite = await lender.getByLabel("Invite link").inputValue();
+      await friend.goto(invite);
+      await friend
+        .getByLabel("Your deck")
+        .selectOption({ label: `${lent} (borrowed from ${owner.handle})` });
+      await friend.getByRole("button", { name: "Take a seat" }).click();
+      for (const page of [friend, lender])
+        await expect(page.getByText("Borrowed deck").first()).toBeVisible({
+          timeout: 15_000,
+        });
+      await lender.screenshot({
+        path: testInfo.outputPath("borrowed-seat.jpg"),
+        type: "jpeg",
+        quality: 80,
+      });
+      await friend.getByRole("button", { name: "Ready" }).click();
+      const start = lender.getByRole("button", { name: "Start the game" });
+      await expect(start).toBeEnabled({ timeout: 15_000 });
+
+      // The game plays the deck that was lent: the friend's hand holds its cards.
+      const seats = [
+        new Seat(lender, "lender", () => false),
+        new Seat(friend, "friend", () => false),
+      ];
+      await start.click();
+      await expect(lender).toHaveURL(/#game\/[0-9a-f-]{36}$/, {
+        timeout: 30_000,
+      });
+      const gameId = lender.url().split("#game/")[1];
+      await expect(friend).toHaveURL(new RegExp(`#game/${gameId}$`), {
+        timeout: 15_000,
+      });
+      await Promise.all(seats.map((seat) => playUntil(seat, 2)));
+      const hand = seats[1].latest!.view!.hand.map((card) => card.name);
+      expect(hand.length).toBeGreaterThan(0);
+      for (const name of hand)
+        expect(["Lightning Bolt", "Hill Giant", "Mountain"]).toContain(name);
+
+      // Taken back while the game runs: the loan ends, and the game plays on to its end.
+      const mode = await lender.evaluate(
+        async ([title, id]) => {
+          const me = (await (await fetch("/api/v1/me")).json()) as {
+            csrf_token: string;
+          };
+          const loans = (await (await fetch("/api/v1/loans")).json()) as {
+            given: { id: string; deck: { title: string } }[];
+          };
+          const loan = loans.given.find((found) => found.deck.title === title);
+          const ended = await fetch(`/api/v1/loans/${loan!.id}`, {
+            method: "DELETE",
+            headers: { "X-CSRF-Token": me.csrf_token },
+          });
+          const game = (await (await fetch(`/api/v1/games/${id}`)).json()) as {
+            game: { status: string };
+          };
+          return { ended: ended.status, status: game.game.status };
+        },
+        [lent, gameId],
+      );
+      expect(mode).toEqual({ ended: 200, status: "active" });
+      await concede(friend);
+      await expect(lender.getByRole("dialog", { name: "Victory" })).toBeVisible(
+        { timeout: 90_000 },
+      );
+      await expect(friend.getByRole("dialog", { name: "Defeat" })).toBeVisible({
+        timeout: 90_000,
+      });
+      console.log(
+        `[lending] game ${gameId}: ${seats.map((s) => `${s.name} ${s.frames}`).join(", ")} frames, ` +
+          `turn ${seats[0].latest?.view?.turn}, result ${seats[0].latest?.result?.kind}`,
+      );
+      expect(seats.flatMap((seat) => seat.problems)).toEqual([]);
+
+      // The deck is its owner's again, and no longer among the friend's.
+      await lender.goto("/#decks");
+      await expect(
+        lentRow.getByRole("button", { name: "Lend", exact: true }),
+      ).toBeVisible();
+      await expect(lentRow).not.toContainText("Lent to");
+      const left = await friend.evaluate(async () => {
+        const loans = (await (await fetch("/api/v1/loans")).json()) as {
+          taken: { deck: { title: string } }[];
+        };
+        return loans.taken.map((loan) => loan.deck.title);
+      });
+      expect(left).not.toContain(lent);
+      await friend.goto("/#decks");
+      await expect(
+        friend.getByRole("heading", { name: "A strategy to call your own." }),
+      ).toBeVisible();
+      await expect(
+        friend.getByRole("button", { name: `Look at it: ${lent}` }),
+      ).toHaveCount(0);
+    } finally {
+      await closeGame(lender);
       for (const context of made) await context.close();
     }
   });

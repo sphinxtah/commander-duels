@@ -7,6 +7,8 @@ import {
 } from "react";
 import { client, describe } from "../api";
 import { exitTableFullscreen } from "../app/fullscreen";
+import { useWorkflow } from "../app/rollout";
+import { DECK_LENDING, useLoans } from "../decks/loans";
 import { tableFullscreen } from "../game/practice";
 import { getSoundEngine } from "../game/sound/engine";
 import { InviteFriendsButton } from "./InviteFriends";
@@ -70,7 +72,9 @@ import styles from "./tables.module.css";
 // Since v1.0.0 the page says what the table is for (Rule Zero, TableProfile.tsx): what its host
 // describes apart from what the server checks on every deck. The host describes the table,
 // changes that or takes it away; a seated player whose table changed under them reads what
-// differs, and their one button gets them ready and says they have read it.
+// differs, and their one button gets them ready and says they have read it. A deck a friend
+// lent the player (decks/loans.ts) is among their choices at a private table where that friend
+// sits, and a seat that plays one says "Borrowed deck" to the table.
 
 /** The table's own address: its invite link. */
 export function inviteLink(code: string): string {
@@ -96,6 +100,9 @@ export function TableLobby({
   // The table as the latest answer has it: the page's own asking, or an action's reply.
   const [table, setTable] = useState<TableView>();
   const decks = useOwnDecks();
+  // Friend deck lending (v1.0.0), where it is open to the account.
+  const lending = useWorkflow(DECK_LENDING);
+  const book = useLoans(lending);
   const [choice, setChoice] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -166,9 +173,34 @@ export function TableLobby({
   const kings = kingsTable ? (table.kings_table ?? DEFAULT_KINGS_TABLE) : null;
   const decksFormat = deckFormat(table.format, kings);
   const here = (decks ?? []).filter((deck) => deck.format === decksFormat);
+  // The decks friends lent the player, of this table's decks' format: each is played only at a
+  // private table where its lender sits (the owner's decision of 2026-11-15).
+  const borrowed = (book.loans?.taken ?? [])
+    .filter(
+      (loan) => loan.state === "accepted" && loan.deck.format === decksFormat,
+    )
+    .map((loan) => ({
+      loan,
+      usable:
+        table.visibility === "private" &&
+        table.players.some(
+          (player) => player.taken && player.handle === loan.lender.handle,
+        ),
+    }));
+  // The player's own decks a friend has now: not theirs to play until the loan ends.
+  const lentOut = Object.fromEntries(
+    (book.loans?.given ?? [])
+      .filter((loan) => loan.state === "accepted")
+      .map((loan) => [loan.deck.id, loan.borrower.handle]),
+  );
   const chosen =
-    (here.some((deck) => deck.id === choice) ? choice : "") ||
-    here.find((deck) => unfit(deck, table.rules) === null)?.id ||
+    (here.some((deck) => deck.id === choice) ||
+    borrowed.some((found) => found.usable && found.loan.deck.id === choice)
+      ? choice
+      : "") ||
+    here.find((deck) => !lentOut[deck.id] && unfit(deck, table.rules) === null)
+      ?.id ||
+    borrowed.find((found) => found.usable)?.loan.deck.id ||
     "";
   // King's Table: after a change of deck format your seated deck may be of the other one.
   const seatedDeck = decks?.find((deck) => deck.id === mine?.deck_id);
@@ -641,7 +673,24 @@ export function TableLobby({
                     Choose a {formatNames[decksFormat]} deck
                   </option>
                 )}
-                <DeckChoices decks={here} rules={table.rules} />
+                <DeckChoices decks={here} rules={table.rules} lent={lentOut} />
+                {borrowed.length > 0 && (
+                  <optgroup label="Lent to you">
+                    {borrowed.map(({ loan, usable }) => (
+                      <option
+                        key={loan.id}
+                        value={loan.deck.id}
+                        disabled={!usable}
+                      >
+                        {loan.deck.title} (borrowed from {loan.lender.handle}
+                        {usable
+                          ? ""
+                          : `: only at a private table where ${loan.lender.handle} sits`}
+                        )
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </label>
           )}
@@ -779,6 +828,10 @@ function Seat({ player, skill }: { player: TablePlayer; skill: number }) {
         </strong>
         {player.you && player.deck && <small>Playing {player.deck}</small>}
         <span className={styles.seatBadges}>
+          {/* Said to the whole table (v1.0.0); whose deck, and what it holds, are not. */}
+          {player.borrowed && (
+            <span className={styles.badge}>Borrowed deck</span>
+          )}
           {player.host && (
             <span className={styles.badge} data-tone="gold">
               Host
@@ -884,6 +937,9 @@ function KingsSeat({
                 <small>Playing {player.deck}</small>
               )}
               <span className={styles.seatBadges}>
+                {player.borrowed && (
+                  <span className={styles.badge}>Borrowed deck</span>
+                )}
                 {player.host ? (
                   <span className={styles.badge} data-tone="gold">
                     Host

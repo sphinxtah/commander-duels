@@ -70,6 +70,7 @@ function seat(fields: Partial<TablePlayer> & { seat: number }): TablePlayer {
     you: false,
     deck: null,
     deck_id: null,
+    borrowed: false,
     ...fields,
   };
 }

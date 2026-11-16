@@ -135,6 +135,18 @@ The owner's specification asks the Preparation Framework for what v1.0.0's deck 
 
 **Checked by** `tests/test_workshop.py`: folders, tags and the all-or-nothing batch; a diff's lines; a restore that leaves a played version's rows as they were; a record that matches the games played, version by version and split by split; the wishlist through a deck's deletion; the substitutions' rules one by one. `tests/test_account_data.py` writes a wish and a folder at migration 0048 and compares them at the head.
 
+### Cryptic Spires: a choice kept with each copy (v0.9.12)
+
+"As you create your deck, circle two of the colors below. This land enters tapped. {T}: Add one mana of either of the circled colors." Until v0.9.12 it played as a stand-in: XMage had no implementation, because the choice is made before any game and a deck list had nowhere to keep it.
+
+- **A deck entry has a `choice`**: two different letters of WUBRG, written in that order. It is kept in the draft, in a version's entries (`deck_entries.choice`), in a match's sideboard plans, and in the deck list a game sends the engine (`{"name", "count", "choice"}`). Copies with different colours circled are entries of their own.
+- **Only Cryptic Spires takes one** (`api/validation.py` `CHOICE_CARDS`). A copy outside the maybeboard with none keeps the deck from playing (`choice.missing`: "Cryptic Spires needs its two colours"); a choice on any other card is dropped as the draft is saved.
+- **A deck with no choice is written as before.** An entry's `choice` is kept only where one was made, so a deck's content hash is what it was, and an unchanged draft still makes no new version.
+- **The editor** shows "Circle two colours" in the card's dialog: five toggles, of which two stay pressed, and the row says the colours or "choose two colours".
+- **Import and export** write it at a line's end, `1 Cryptic Spires (2X2) 332 <WU>`, and as `"choice"` in a deck file; a typed deck list takes the same.
+- **The engine** has the card (XMage patch `0021-cryptic-spires.patch`): a land that enters tapped, with one mana ability for each circled colour, given as the deck is loaded (`DeckLists.circle`). A copy of it keeps them. The engine plays its own card even where a list still describes it as a stand-in, so the catalog may call it one until it has read the new engine's cards. `CrypticSpiresTest` plays it: the land enters tapped, pays for a green spell with red and green circled, and never with white and blue.
+- **Its colour identity is none**, as Scryfall has it and its rulings say ("They do not make Cryptic Spires those colors"): any Commander deck may hold it and circle any two colours.
+
 ## The deck workshop in the web (v1.0.0)
 
 The screens over those services (the specification's section 26), where the owner decided on 2026-11-15 they should live ([the v1.0.0 plan](plans/1.0.0.md#the-owners-decisions-at-its-start-2026-11-14), decisions 26 to 29). The pieces: `web/src/decks/workshop.ts` (the types, the filters, the organizer's request and its words, a swap), `DeckShelves.tsx` (the filter bar, a row's folder and tags, the organizer), `DeckWorkshop.tsx` (the page, its versions and results), `MissingCards.tsx`, and `web/src/catalog/Wishlist.tsx`.
@@ -155,17 +167,65 @@ The screens over those services (the specification's section 26), where the owne
 
 **Tests.** `workshop.test.ts` (14), `DeckShelves.test.tsx` (6), `DeckWorkshop.test.tsx` (17), `catalog/Wishlist.test.tsx` (6). Journeys: `web/e2e/deck-workshop.spec.ts` on a stand-in account (the Workshop's three parts with a restore, results and a swap undone; and at 390 px the shelves, the organizer by keyboard and each part of the Workshop within the window), and against the real API in `web/e2e/decks.spec.ts`: a deck filed and tagged by the organizer, its Workshop opened from its row, version 1 restored into the draft, no results, nothing missing, and the wishlist's view.
 
-### Cryptic Spires: a choice kept with each copy (v0.9.12)
+## Friend deck lending (v1.0.0)
 
-"As you create your deck, circle two of the colors below. This land enters tapped. {T}: Add one mana of either of the circled colors." Until v0.9.12 it played as a stand-in: XMage had no implementation, because the choice is made before any game and a deck list had nowhere to keep it.
+A player lends one of their decks to a friend, who plays it without owning its cards: the specification's section 20 (`api/loans.py`; in the web `web/src/decks/loans.ts` and `DeckLoans.tsx`). Behind the gate `deck_lending` ([the gates](operations.md#the-gates)): while the workflow is not an account's to reach, its routes answer as paths that do not exist, the pages offer nothing of it, a loan seats nothing and keeps nothing from its owner.
 
-- **A deck entry has a `choice`**: two different letters of WUBRG, written in that order. It is kept in the draft, in a version's entries (`deck_entries.choice`), in a match's sideboard plans, and in the deck list a game sends the engine (`{"name", "count", "choice"}`). Copies with different colours circled are entries of their own.
-- **Only Cryptic Spires takes one** (`api/validation.py` `CHOICE_CARDS`). A copy outside the maybeboard with none keeps the deck from playing (`choice.missing`: "Cryptic Spires needs its two colours"); a choice on any other card is dropped as the draft is saved.
-- **A deck with no choice is written as before.** An entry's `choice` is kept only where one was made, so a deck's content hash is what it was, and an unchanged draft still makes no new version.
-- **The editor** shows "Circle two colours" in the card's dialog: five toggles, of which two stay pressed, and the row says the colours or "choose two colours".
-- **Import and export** write it at a line's end, `1 Cryptic Spires (2X2) 332 <WU>`, and as `"choice"` in a deck file; a typed deck list takes the same.
-- **The engine** has the card (XMage patch `0021-cryptic-spires.patch`): a land that enters tapped, with one mana ability for each circled colour, given as the deck is loaded (`DeckLists.circle`). A copy of it keeps them. The engine plays its own card even where a list still describes it as a stand-in, so the catalog may call it one until it has read the new engine's cards. `CrypticSpiresTest` plays it: the land enters tapped, pays for a green spell with red and green circled, and never with white and blue.
-- **Its colour identity is none**, as Scryfall has it and its rulings say ("They do not make Cryptic Spires those colors"): any Commander deck may hold it and circle any two colours.
+**Nothing changes hands.** A loan is a grant of access ([access](access.md)), never cards. The cards stay in the lender's library, never enter the borrower's, and so reach neither an auction nor a sale. A borrowed deck is validated against its lender's library and permissions, never the borrower's; the borrower cannot change it, copy it or export it.
+
+**The owner's decisions** (2026-11-15; [the v1.0.0 plan](plans/1.0.0.md#the-owners-decisions-at-its-start-2026-11-14), decisions 30 to 32):
+
+- **Seven days.** A loan lasts seven days from the moment it is accepted, then ends by itself. An offer nobody answers lapses after as long.
+- **Only at a private table where its lender sits.** Not in a queue, not at a public table, not to open a table with, not at a starter-deck table, and not once the lender has left the table.
+- **As a real deck handed over.** A deck is lent to one friend at a time, and while a loan is accepted its owner cannot play that deck: wherever a deck is chosen for a game (practice, a table, a queue, the campaign, a rematch) the server answers `409 deck_lent`, naming the friend and the day the loan ends. An offer not yet accepted keeps nothing from its owner.
+
+**What is lent is one version.** Offering saves the deck as it stands as a version and binds the loan to it (`access_grants.scope`: the revision and its number). The friend looks at that version before answering and plays that version. The owner may go on editing the draft: nothing of it reaches the loan, and nothing reaches a game, which holds the revision it started with (`game_seats.deck_revision_id`). To lend the newer list, the owner takes the deck back and offers it again.
+
+**A loan's life.**
+
+| Step | Who | What happens |
+| --- | --- | --- |
+| Offer | The owner, to a friend | The deck must be the owner's, playable by its owner, without the game's custom cards, and not out already. The friend is told by the bell (`deck_offered`), which leads to the Decks page |
+| Look | The friend | The whole list of that version, before answering and for as long as the loan stands |
+| Accept or decline | The friend | Accepted: theirs to play for seven days from then. Declined: the loan is over |
+| Take back | The owner | At any time, an offer or an accepted loan. A game already started plays on with the deck; a seat at a table not yet started must choose another deck |
+| Give back | The friend | At any time, the same |
+| Runs out | Nobody | After seven days the deck is its owner's to play again, with nothing to do |
+
+**At a table.** A deck lent to a player is among their choices as they sit down at a private table where its lender sits, and the table's own rules, its Rule Zero restrictions and a team format's checks apply to it as to any deck ([tables](tables.md#a-borrowed-deck-v100)). The seat says **Borrowed deck** to everyone at the table (`TablePlayer.borrowed`); whose deck it is and what it holds, the table is not told. The server asks again as the player gets ready and as the host starts, so a loan that ended or a lender who left stops the start, naming the player. A game with a borrowed deck is of the mode `borrowed` ([modes](modes.md)): it earns as a table's game does and is not competitive, by the owner's policy of 2026-11-13. A rematch plays the borrowed deck again while the loan stands and its lender plays the rematch too. A best-of-three match binds its decks as it starts: it plays on with the borrowed deck to its end whatever becomes of the loan, every game of it in the borrowed mode, and between games the borrower's sideboarding is checked against the lender's library (`api/matches.py`).
+
+**In the web.**
+
+- **Decks page.** A playable deck that is not out has **Lend**. Its dialog says what lending means before anything is sent (the seven days, the private table, that the owner cannot play it meanwhile, that it is lent as it stands and nothing changes hands), then lists the account's friends. The deck's row then says "Offered to bob, who has not answered yet. It is still yours to play." with **Withdraw the offer**, or "Lent to bob until November 22: you cannot play it meanwhile." with **Take it back**.
+- **Decks lent to you**, under the account's own decks: each with its format, size, commanders and lender, **Look at it** (the list by its places), and **Accept** and **Decline**, or **Give it back** once accepted. The section says where a borrowed deck is played.
+- **A table's page.** The deck chooser lists "Lent to you" under the player's own decks. A borrowed deck that cannot be played at this table is greyed and says why ("only at a private table where bob sits"); the player's own deck that a friend has now is greyed too ("lent to bob"), there and in the form that opens a table.
+- **Kept fresh.** A loan changes in the other player's hands and by the clock, so an open page asks for the account's loans again every half minute while it is looked at, and as it is come back to. Which workflows are open to an account is asked once as the app loads: after SysOp opens the gate, a page shows lending once it is loaded again.
+
+**Refusals.**
+
+| Answer | When |
+| --- | --- |
+| `403 not_a_friend` | The deck is offered to someone who is not a friend |
+| `409 already_lent` | The deck is offered or lent already |
+| `409 loan_limit` | The account has 20 decks out |
+| `422 not_lendable` | The deck holds the game's custom cards |
+| `422 deck_not_playable` | Its owner could not play it as it stands |
+| `409 deck_lent` | Its owner chooses it for a game while a friend has it |
+| `409 borrowed_deck` | A borrowed deck is chosen anywhere but a private table where its lender sits |
+| `422 invalid_deck` | No loan gives the player that deck now |
+
+**Choices Claude made, for the owner to change:**
+
+- The loan is of one saved version, not of the deck as it changes.
+- A deck holding custom cards is not lent, as it is not shown when shared.
+- An account has at most 20 decks out at once.
+- Ending a friendship does not end a loan: its owner takes the deck back in one click. A block does: the loan gives nothing, is shown to neither, and its owner plays and lends the deck again.
+- The borrower's games with the deck are in their own history under the deck's name; they are not counted in the deck's results in its owner's Workshop.
+- **Lend** is on the Decks page only, not in the editor.
+
+**Storage.** No table of its own: a loan is a row of `access_grants` (v0.9.10). Migration `0055_deck_loans` (expand only) adds `deck_offered` to the notifications' kinds.
+
+**Tests.** `tests/test_loans.py` (7): the loan's life from offer to given back, with the version bound and the owner's edits kept out; the table's rules one by one, the seat's mark, the game's mode and the revision played; a loan taken back or run out; what is not lent, and the gate closed and at `staff`; a rematch; a blocked pair; a best-of-three match with its sideboarding. `web/src/decks/DeckLoans.test.tsx` (7) and `web/src/tables/BorrowedDecks.test.tsx` (5). A journey in two browsers against the real engine, in `web/e2e/team-tables.spec.ts` (beside the team journeys, because it seats one of their accounts and an account sits at one open table at a time): SysOp lends a deck to a player who owns none of its cards but the basic lands; the player is told by the bell, looks at the list and accepts; the deck is greyed in its owner's table-opening form and the server refuses it by name (`409 deck_lent`); the player sits at the lender's private table with it, the seat says Borrowed deck in both browsers, and the game is played with the lent cards; the lender takes the deck back while the game runs, the game plays on to its end, and the deck is its owner's again.
 
 ## Routes
 
@@ -191,3 +251,5 @@ All under `/api/v1`, for the signed-in owner only; another account's deck answer
 | `GET /decks/{id}/diff?before=&after=`, `POST /decks/{id}/revisions/{n}/restore` | v0.9.12: two versions compared; a version restored into the draft |
 | `GET /decks/{id}/performance`, `/missing`, `/substitutions?card_id=` | v0.9.12: the deck's record by version; what its library lacks; owned cards that could take a card's place |
 | `GET /me/wishlist`, `PUT`/`DELETE /me/wishlist/{card}` | v0.9.12: the cards an account wants |
+| `GET /loans`, `GET`/`POST /decks/{id}/loans` | v1.0.0, gate `deck_lending`: the loans given and taken; a deck's open loan; a deck offered to a friend (`{"player_id"}`) |
+| `GET /loans/{id}/deck`, `POST /loans/{id}/accept`, `/decline`, `DELETE /loans/{id}` | v1.0.0: the lent version's list; the friend's answer; the loan ended by either of them |

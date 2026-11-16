@@ -71,7 +71,15 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from api import kings_table, matches, starter_tables, table_profiles, teams
+from api import (
+    access,
+    kings_table,
+    matches,
+    rollout,
+    starter_tables,
+    table_profiles,
+    teams,
+)
 from api.auth import INPUT_ERRORS
 from api.custom_play import custom_in_seats
 from api.decks import entries_of, revision_entries, starters_of
@@ -335,6 +343,11 @@ class TablePlayer(Contract):
     you: bool
     deck: str | None = Field(description="Your own seat's deck title; others' decks are private.")
     deck_id: UUID | None = Field(description="Your own seat's deck.")
+    borrowed: bool = Field(
+        default=False,
+        description="Since v1.0.0: the seat's player sits with a deck a friend lent them "
+        "(api/loans.py). Said to the whole table; whose deck and what it holds stay private.",
+    )
     team: int | None = Field(default=None, description=f"{TEAM_TEXT} Null in other formats.")
     role: KingsTableRole | None = Field(
         default=None, description="King's Table (v0.8.7): king or general; null elsewhere."
@@ -612,6 +625,12 @@ def view_of(db: Session, table: GameTable, principal: Principal) -> TableView:
     you = principal.user.id
     mine = next((row for row in rows if row.user_id == you), None)
     deck = db.get(Deck, mine.deck_id) if mine is not None else None
+    # Whose each seat's deck is (v1.0.0): a deck not its player's own is one lent to them.
+    owners = dict(
+        db.execute(
+            select(Deck.id, Deck.owner_id).where(Deck.id.in_({row.deck_id for row in rows}))
+        ).all()
+    )
     bots = bot_seats_of(table)
     kings = kings_of(table)
     # The campaign's court (v0.9.6): team B's bots by name and portrait.
@@ -656,6 +675,7 @@ def view_of(db: Session, table: GameTable, principal: Principal) -> TableView:
                 you=own,
                 deck=deck.title if own and deck is not None else None,
                 deck_id=row.deck_id if own and row is not None else None,
+                borrowed=row is not None and owners.get(row.deck_id) not in (None, row.user_id),
                 team=team_of(table, index),
                 role=role,
                 starting_life=life,
@@ -785,9 +805,11 @@ def check_deck(
     profile: TableProfile | None = None,
     *,
     starter: bool = False,
+    table: GameTable | None = None,
 ) -> UUID:
     """A deck the player may sit down with: theirs, of the table's format, playable with their
     library now (as at the practice table), and holding no card the table's rules do not allow.
+    Since v1.0.0, at a table (``table``), also a deck a friend lent them (lent_seat).
     Two-Headed Giant (v0.5.1) takes a Legacy deck, and refuses its own banned card where banned
     cards are refused; King's Table (v0.8.7) a deck of its settings' (kings) deck format. Since
     v0.9.12 the table's Rule Zero profile's restrictions hold too, for every account (SysOp's
@@ -798,7 +820,8 @@ def check_deck(
         raise ApiError(403, "forbidden", "Your account cannot play its own decks.")
     library = library_of(db, user, permissions, roster_of(request))
     deck_format = deck_format_of(fmt, kings)
-    seat, revision, _ = own_deck(
+    lent = lent_seat(db, request, user, deck_id, table, deck_format, rules)
+    seat, revision, _ = lent or own_deck(
         db, user, permissions, deck_id, deck_format, library, rules, starter=starter
     )
     if fmt == TEAM_FORMAT:
@@ -807,6 +830,54 @@ def check_deck(
             raise refused
     table_profiles.refuse_revision(db, profile, revision)
     return revision
+
+
+def lent_seat(
+    db: Session,
+    request: Request,
+    user: User,
+    deck_id: UUID,
+    table: GameTable | None,
+    deck_format: str,
+    rules: TableRules,
+    *,
+    together: set[UUID] | None = None,
+) -> tuple[dict[str, object], UUID, str] | None:
+    """A deck a friend lent the player (v1.0.0, api/loans.py), as own_deck answers for their
+    own; none for a deck of their own, and none for a deck no loan gives them now, both of
+    which own_deck judges. The owner's decision of 2026-11-15: a borrowed deck is played only
+    at a private table where the friend who lent it sits, so it is refused where no table is
+    named (the queues, a table being opened), at a public table, and while its lender is not
+    seated; asked again as the player gets ready and at the start, so a lender who left takes
+    the deck with them. A rematch (api/rematches.py) names the players who play it as
+    ``together``, in place of the finished table's seats."""
+    deck = db.get(Deck, deck_id)
+    if deck is None or deck.deleted_at is not None or deck.owner_id == user.id:
+        return None
+    if not rollout.mode_available(db, "borrowed", user):
+        return None
+    if not any(g.consent == "accepted" for g in access.active(db, user.id, "deck", deck.id)):
+        return None
+    only = "A borrowed deck is played only at a private table where the friend who lent it sits."
+    if table is None or table.visibility != "private" or table.queued or table.starter:
+        raise ApiError(409, "borrowed_deck", only)
+    if together is not None:
+        lender_seated = deck.owner_id in together
+    else:
+        lender_seated = (
+            db.scalar(
+                select(TableSeat.id).where(
+                    TableSeat.table_id == table.id, TableSeat.user_id == deck.owner_id
+                )
+            )
+            is not None
+        )
+    if not lender_seated:
+        raise ApiError(409, "borrowed_deck", f"{only} Its lender is not at this table.")
+    # Imported here: api.loans reaches this module through api.social.
+    from api import loans
+
+    return loans.borrowed_seat(db, request, user, deck, deck_format, rules)
 
 
 def may_sit(db: Session, request: Request, principal: Principal) -> None:
@@ -1283,6 +1354,7 @@ def join_table(
         table.kings_table,
         table_profiles.profile_of(table),
         starter=table.starter,
+        table=table,
     )
     if purchase is not None:
         starter_tables.as_bought(purchase, revision)
@@ -1426,6 +1498,7 @@ def change_seat(
             rules_of(table),
             table.kings_table,
             table_profiles.profile_of(table),
+            table=table,
         )
         row.deck_id = body.deck_id
         row.ready = False
@@ -1446,7 +1519,11 @@ def change_seat(
                     "ready.",
                 )
             row.profile_seen = table.profile_changes
-        if body.ready and (table.format == KINGS or profile is not None):
+        # A deck a friend lent (v1.0.0) is asked for again too: its loan may have ended, or
+        # its lender left the table.
+        held = db.get(Deck, row.deck_id)
+        lent = held is not None and held.owner_id != principal.user.id
+        if body.ready and (table.format == KINGS or profile is not None or lent):
             # The settings' deck format may have changed since the deck was chosen, and since
             # v0.9.12 the table's profile: getting ready checks the deck by what stands now.
             row.deck_revision_id = check_deck(
@@ -1459,6 +1536,7 @@ def change_seat(
                 rules_of(table),
                 table.kings_table,
                 profile,
+                table=table,
             )
         row.ready = body.ready
     db.commit()
@@ -1592,6 +1670,7 @@ def check_team(
         row.deck_id,
         table.format,
         rules_of(table),
+        table=table,
     )
     if teams.teammate(row.seat) in bot_seats_of(table):
         if not teams.fits_a_fixture(bound_cards(db, row.deck_revision_id)):
@@ -1681,7 +1760,12 @@ def plan_table(
             raise ApiError(409, "player_unavailable", f"{user.handle} cannot play games now.")
         library = library_of(db, user, permissions, roster)
         try:
-            seat, revision, title = own_deck(
+            # A deck a friend lent the player (v1.0.0), while its lender still sits here; else
+            # the player's own.
+            lent = lent_seat(
+                db, request, user, row.deck_id, table, deck_format_for(table), rules_of(table)
+            )
+            seat, revision, title = lent or own_deck(
                 db,
                 user,
                 permissions,
@@ -1719,7 +1803,9 @@ def plan_table(
                 "deck_not_playable",
                 f"{user.handle}'s deck cannot be played now; they need to choose another.",
             ) from refused
-        plans.append(SeatPlan({"player": "human", **seat}, revision, title))
+        plans.append(
+            SeatPlan({"player": "human", **seat}, revision, title, borrowed=lent is not None)
+        )
         users.append(user.id)
     if table.format == TEAM_FORMAT:
         check_teams(db, table, plans, users, principal)
@@ -1858,6 +1944,9 @@ def add_table_game(
         kings_table=table.kings_table if table.format == KINGS else None,
         # The profile the players were ready for (v0.9.12): the game keeps what was agreed.
         table_profile=table.profile,
+        # A game with a borrowed deck is of its own mode (v1.0.0, api/modes.py): it earns as a
+        # table's game does. Any other table game's mode is read from its kind, as before.
+        **({"mode": "borrowed"} if any(plan.borrowed for plan in plans) else {}),
     )
     db.add(game)
     db.flush()

@@ -29,6 +29,7 @@ from api import (
     events,
     games,
     how_to_play,
+    loans,
     lobby,
     matches,
     metrics,
@@ -412,6 +413,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Save and resume (v1.0.0), behind its gate.
     app.include_router(saves.router)
     app.include_router(replays.router)
+    app.include_router(loans.router)
     app.include_router(auctions.router)
     app.include_router(reports.router)
     app.include_router(social.router)

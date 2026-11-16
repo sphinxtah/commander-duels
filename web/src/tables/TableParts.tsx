@@ -239,14 +239,20 @@ export function Face({
 export function DeckChoices({
   decks,
   rules,
+  lent = {},
 }: {
   decks: OwnDeck[];
   rules: TableRules;
+  /** The account's decks a friend has now (v1.0.0), each by the friend's handle: not theirs
+   * to play until the loan ends. */
+  lent?: Record<string, string>;
 }) {
   return (
     <>
       {decks.map((deck) => {
-        const reason = unfit(deck, rules);
+        const reason = lent[deck.id]
+          ? `lent to ${lent[deck.id]}`
+          : unfit(deck, rules);
         return (
           <option key={deck.id} value={deck.id} disabled={reason !== null}>
             {deck.title}

@@ -82,6 +82,8 @@ export function notificationLink(item: NotificationItem): string | null {
   // A replay a friend shared (v1.0.0): the game through that friend's seat.
   if (item.kind === "replay_shared" && item.game_id && item.actor)
     return `#replay/${item.game_id}/${item.actor.id}`;
+  // A deck a friend offers to lend (v1.0.0) waits under "Decks lent to you".
+  if (item.kind === "deck_offered") return "#decks";
   if (!item.actor) return null;
   return playerLink(item.actor.id);
 }
@@ -164,6 +166,9 @@ export function notificationWords(item: NotificationItem): string {
     }
     case "replay_shared":
       return `${who} shared a replay with you.`;
+    case "deck_offered":
+      // A friend offers to lend a deck (v1.0.0): looked at and answered on the Decks page.
+      return `${who} offers to lend you a deck.`;
     case "auction_outbid":
     case "auction_won":
     case "auction_sold":

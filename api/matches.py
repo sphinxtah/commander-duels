@@ -63,12 +63,21 @@ from api.games import (
     retried,
     seat_tokens,
 )
-from api.identity import ApiError, Db, Principal, not_found, utcnow
+from api.identity import (
+    ApiError,
+    Db,
+    Principal,
+    not_found,
+    permissions_for,
+    roles_of,
+    utcnow,
+)
 from api.library import at_godlike, library_of, won_custom
 from api.models import (
     CardConcept,
     CatalogRevision,
     CustomCard,
+    Deck,
     DeckEntryRow,
     DeckRevision,
     FormatVersion,
@@ -716,6 +725,7 @@ def record_next(db: Session, plan: NextGame, created: dict[str, Any]) -> Game:
     if match is None or match.status != "sideboarding" or match.game_number != plan.number:
         raise ApiError(409, "match_changed", "The match changed as its next game started.")
     now = utcnow()
+    first_mode = db.scalar(select(Game.mode).where(Game.match_id == match.id, Game.match_game == 1))
     game = Game(
         id=UUID(str(created["game_id"])),
         kind=plan.kind,
@@ -739,6 +749,9 @@ def record_next(db: Session, plan: NextGame, created: dict[str, Any]) -> Game:
         table_profile=db.scalar(
             select(Game.table_profile).where(Game.match_id == match.id, Game.match_game == 1)
         ),
+        # A match begun with a deck a friend lent is of the borrowed mode to its end (v1.0.0,
+        # api/loans.py): its decks are bound for the match, whatever becomes of the loan.
+        **({"mode": "borrowed"} if first_mode == "borrowed" else {}),
     )
     db.add(game)
     db.flush()
@@ -999,10 +1012,18 @@ def save_arrangement(
             "match started with: it holds exactly those cards, no others.",
         )
     proposed = with_choices(proposed, entries)
-    if not principal.can("cards.any"):
+    # A deck a friend lent (v1.0.0, api/loans.py) is checked against its lender's library, as
+    # it was when the match started: the player owns none of it. Their own, against theirs.
+    holder, held = principal.user, principal.permissions
+    revision = db.get(DeckRevision, mine.deck_revision_id)
+    deck = db.get(Deck, revision.deck_id) if revision is not None else None
+    lender = db.get(User, deck.owner_id) if deck is not None else None
+    if lender is not None and lender.id != principal.user.id:
+        holder, held = lender, permissions_for(lender, roles_of(db, lender))
+    if "cards.any" not in held:
         # SysOp's decks need only keep to the pool, as they need only cards in the game to start.
         kept = [entry for entry in entries if entry.location not in ("main", "sideboard")]
-        library = library_of(db, principal.user, principal.permissions, roster_of(request))
+        library = library_of(db, holder, held, roster_of(request))
         validation = validate_deck(
             db,
             DeckContent(format=match.format, entries=kept + proposed),  # type: ignore[arg-type]

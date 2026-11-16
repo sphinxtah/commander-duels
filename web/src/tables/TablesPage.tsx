@@ -10,6 +10,7 @@ import {
 } from "react";
 import { client, describe, type Me } from "../api";
 import { useWorkflow } from "../app/rollout";
+import { DECK_LENDING, useLoans } from "../decks/loans";
 import game from "../game/game.module.css";
 import { FindGame } from "../queues/FindGame";
 import { useQueue } from "../queues/queue";
@@ -838,6 +839,13 @@ function OpenTable({
   onRefused: () => void;
 }) {
   const decks = useOwnDecks();
+  // A deck a friend has now (v1.0.0, decks/loans.ts) is not its owner's to open a table with.
+  const book = useLoans(useWorkflow(DECK_LENDING));
+  const lentOut = Object.fromEntries(
+    (book.loans?.given ?? [])
+      .filter((loan) => loan.state === "accepted")
+      .map((loan) => [loan.deck.id, loan.borrower.handle]),
+  );
   const { friends, error: friendsError } = useFriendList();
   const [invite, setInvite] = useState<string[]>([]);
   const [format, setFormat] = useState<Format>("legacy");
@@ -898,7 +906,9 @@ function OpenTable({
   const decksFormat = deckFormat(format, kings);
   const here = (decks ?? []).filter((d) => d.format === decksFormat);
   // The deck chosen while the rules take it; else the first deck they take.
-  const fitting = here.filter((d) => unfit(d, rules) === null);
+  const fitting = here.filter(
+    (d) => !lentOut[d.id] && unfit(d, rules) === null,
+  );
   const chosen =
     (fitting.some((d) => d.id === deck) ? deck : fitting[0]?.id) ?? "";
 
@@ -1422,7 +1432,7 @@ function OpenTable({
               value={chosen}
               onChange={(event) => setDeck(event.target.value)}
             >
-              <DeckChoices decks={here} rules={rules} />
+              <DeckChoices decks={here} rules={rules} lent={lentOut} />
             </select>
           </label>
         )}

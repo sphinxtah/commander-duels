@@ -49,6 +49,8 @@ and `access.deck_usable` answers whether an account may play a deck: its own, or
 
 No route makes a grant in v0.9.10: the workflows that offer, accept and show them (lending, spectating, coaching, sharing a replay) are v1.0.0's, so nothing unfinished can be reached.
 
+**Since v1.0.0 a deck is lent by one** ([friend deck lending](decks.md#friend-deck-lending-v100)): `POST /api/v1/decks/{id}/loans` offers a friend the `deck` grant, bound to one saved version (`scope`: `revision`, `number`) and expiring in seven days; the friend's answer is the grant's consent, and accepting sets its seven days again; `DELETE /api/v1/loans/{id}` revokes it, by either of them. `access.lent_out` answers whether a deck is with a friend now, which keeps its owner from playing it (the owner's decision of 2026-11-15).
+
 **Since v1.0.0 a replay is shared by one** ([replays](replays.md#sharing)): `POST /api/v1/games/{id}/replay/shares` gives a friend the `replay` grant for the sharer's own seat, expiring with the game's events; `DELETE …/shares/{grant}` revokes it, by its player or by the friend. The replay's routes read the game through the grant's seat and nothing else; the timeline's route honours the same grant.
 
 ## Tested

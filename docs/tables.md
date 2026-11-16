@@ -229,6 +229,19 @@ The owner, 2026-11-14: "I want a gameplay option where when you get to the table
 
 **In the web.** `web/src/tables/starterDecks.tsx` holds what the three places share: the offers as a choice (`StarterOfferFields`), the purchase (`buyStarter`) and the reveal (`StarterReveal`, the shop's own pack reveal in its window, with "Skip the reveal"). The purchase is kept by the page that made it, so a table or a game the server then refused is asked for again without buying twice.
 
+## A borrowed deck (v1.0.0)
+
+A deck a friend lent a player ([friend deck lending](decks.md#friend-deck-lending-v100), behind the gate `deck_lending`) is played at a table and nowhere else, by the owner's decision of 2026-11-15: **only at a private table where the friend who lent it sits**.
+
+- **Where it is taken.** As the player sits down (`join`), changes their deck or gets ready (`PATCH …/seat`), and again as the host starts. `409 borrowed_deck` at a public table, a queue's table, a starter-deck table, a table being opened (its lender cannot be seated at it yet) and wherever its lender has no seat. A deck no loan gives the player now is `422 invalid_deck`, as any deck that is not theirs.
+- **What is checked.** The version the loan is of, against its lender's library and permissions, then everything the table checks of any deck: its rules on banned and not-legal cards and stand-ins, its Rule Zero restrictions, and a team format's own (Two-Headed Giant's pair, King's Table's fixture).
+- **What the table sees.** The seat's `borrowed` is true and the lobby shows **Borrowed deck** on it. The deck's name and id stay the player's own to see, as any seat's.
+- **The lender leaves, or the loan ends.** The seat stays, and the start is refused, naming the player ("bob's deck cannot be played now."); the player is refused as they get ready and chooses another deck.
+- **The game.** Its mode is `borrowed` ([modes](modes.md)); it holds the revision it started with, so nothing done to the loan or to the owner's draft afterwards changes it. A rematch plays the deck again while the loan stands and its lender plays the rematch. A best-of-three match keeps the deck and the mode for every game of it, and the borrower sideboards it between games as its lender could.
+- **The lender's own seat.** While a friend has the deck its owner cannot seat it: `409 deck_lent`.
+
+Checked by `tests/test_loans.py` and `web/src/tables/BorrowedDecks.test.tsx`.
+
 ## The campaign's court (v0.9.6)
 
 Ward 15 of [the campaign](campaign.md#the-unbound-court-ward-15-v096), with friends as the player's Generals, is a table the campaign opens (`POST /api/v1/campaign/encounters/15/court`): private, King's Table with Commander decks under the court's settings (everyone at 40 life; since v0.9.7 the house rule with its guard, and 240 turns, 40 for each player), casual rules, bots at skill 6. The player hosts it, seated as King A; team B's three seats are the court's bots, named and pictured in the table's view (The Sphinx, Nicol Bolas, Liliana); each friend invited has a General's seat waiting, the other is a bot's. The view says so (`campaign`: the encounter's title), and the page reads "Campaign · King's Table".
@@ -262,6 +275,7 @@ Every route needs `games.play`, and seats need `decks.edit`. Refusals:
 - 403 `not_host` for a start, or since v0.8.7 a change of the table, by anyone but the host.
 - Since v0.9.2: 422 `not_friend` (an invitation names someone who isn't your friend; opening a table with one opens nothing), 422 `invalid_page` (a page size other than 20, 50 or 100), 409 `not_seated` (an invitation from someone not seated at the table), `table_closed` and `too_many_invites` (past 50 for one table).
 - 422 `invalid_table` (since v0.8.7 also King's Table's settings, a `seat` or `bot_seats` at another table, a seat count other than 6 at King's Table, or a change to another table), the practice table's deck refusals (`invalid_deck`, `deck_not_playable`), and since v0.4.5 `deck_not_allowed`: your deck holds cards the table's rules do not allow, named in the message; since v0.5.1 `team_decks` as you get ready: your deck and your teammate's share cards, named, or beside a bot your deck shares a card with every bot deck.
+- Since v1.0.0: 409 `borrowed_deck` (a deck a friend lent, anywhere but a private table where that friend sits) and 409 `deck_lent` (your own deck while a friend has it): [a borrowed deck](#a-borrowed-deck-v100).
 - 429 `games_busy` and 503 as for practice games.
 
 Away players and votes go over the game's WebSocket: the `presence` message and the `vote` message ([games](games.md#the-websocket)).

@@ -9,6 +9,8 @@ import {
 } from "react";
 import { client, describe, type Me } from "../api";
 import { formatLabels } from "../catalog/catalog";
+import { useWorkflow } from "../app/rollout";
+import { BorrowedDecks, LendDialog, LoanLine } from "./DeckLoans";
 import { DeckFilterBar, Organizer, ShelfLine } from "./DeckShelves";
 import { GuidedDialog } from "./GuidedDialog";
 import { ImportDialog } from "./ImportDialog";
@@ -27,6 +29,7 @@ import {
   type DeckFilters,
   type Organize,
 } from "./workshop";
+import { DECK_LENDING, loanOf, useLoans } from "./loans";
 import styles from "./decks.module.css";
 
 // Since v1.0.0 (the deck workshop, docs/decks.md) the list has a filter bar (a search, a
@@ -171,6 +174,11 @@ function Decks({
   const [chosen, setChosen] = useState<string[] | null>(null);
   const [organizing, setOrganizing] = useState(false);
   const [organizeError, setOrganizeError] = useState("");
+  // Friend deck lending (v1.0.0), where it is open to the account: a deck is lent from its
+  // row, and the decks lent to the account are listed under its own.
+  const lending = useWorkflow(DECK_LENDING);
+  const book = useLoans(lending);
+  const [lent, setLent] = useState<DeckSummary | null>(null);
 
   const refresh = useCallback(async () => {
     // Only the newest list may show: an older answer landing last (the list asked for after
@@ -485,6 +493,9 @@ function Decks({
                   </span>
                   <NeedsTags needs={deck.needs} format={deck.format} />
                   {shelved && <ShelfLine deck={deck} />}
+                  {loanOf(book.loans, deck.id) && (
+                    <LoanLine loan={loanOf(book.loans, deck.id)!} book={book} />
+                  )}
                 </div>
                 <StateBadge
                   state={
@@ -530,6 +541,19 @@ function Decks({
                       >
                         Workshop
                       </a>
+                      {/* Lent as it stands (v1.0.0): a playable deck that is not out already. */}
+                      {lending &&
+                        view === "active" &&
+                        deck.playable &&
+                        !loanOf(book.loans, deck.id) && (
+                          <button
+                            type="button"
+                            className={styles.secondary}
+                            onClick={() => setLent(deck)}
+                          >
+                            Lend
+                          </button>
+                        )}
                       <button
                         type="button"
                         className={styles.secondary}
@@ -566,6 +590,19 @@ function Decks({
             ))}
           </ul>
         </>
+      )}
+      {lending && view === "active" && <BorrowedDecks book={book} />}
+      {lent && (
+        <LendDialog
+          deck={lent}
+          book={book}
+          onClose={() => setLent(null)}
+          onLent={(handle) =>
+            setMessage(
+              `${lent.title} is offered to ${handle}. It is theirs to play once they accept.`,
+            )
+          }
+        />
       )}
       {starters.length > 0 && view === "active" && (
         <section className={styles.starters} aria-labelledby="starters-title">

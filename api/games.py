@@ -61,8 +61,8 @@ from sqlalchemy.exc import InterfaceError, OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
+from api import access, kings_table, metrics, modes
 from api import events as events_module
-from api import kings_table, metrics, modes
 from api.auth import INPUT_ERRORS
 from api.config import Settings
 from api.custom_play import custom_in_seats
@@ -93,6 +93,7 @@ from api.models import (
     CatalogRevision,
     CustomCard,
     Deck,
+    DeckRevision,
     FormatVersion,
     Game,
     GameSeat,
@@ -2142,6 +2143,18 @@ def own_deck(
     deck = db.get(Deck, deck_id)
     if deck is None or deck.owner_id != owner.id or deck.deleted_at is not None:
         raise ApiError(422, "invalid_deck", "That is not one of your decks.")
+    # A lent deck is with the friend it was lent to (v1.0.0, the owner's decision of
+    # 2026-11-15): its owner plays it again once the loan ends or is taken back.
+    loan = access.lent_out(db, deck)
+    if loan is not None:
+        friend = db.get(User, loan.subject_id)
+        until = f" until {loan.expires_at:%B %-d}" if loan.expires_at else ""
+        raise ApiError(
+            409,
+            "deck_lent",
+            f"{deck.title} is lent to {friend.handle if friend else 'a friend'}{until}. "
+            "Take it back to play it yourself.",
+        )
     if deck.format != fmt:
         raise ApiError(
             422,
@@ -2149,6 +2162,23 @@ def own_deck(
             f"{deck.title} is a {FORMAT_NAMES[deck.format]} deck, not a {FORMAT_NAMES[fmt]} one.",
         )
     revision = publish(db, deck, library)
+    return revision_seat(db, deck, revision, permissions, fmt, library, rules, starter=starter)
+
+
+def revision_seat(
+    db: Session,
+    deck: Deck,
+    revision: DeckRevision,
+    permissions: frozenset[str],
+    fmt: str,
+    library: Library,
+    rules: TableRules,
+    *,
+    starter: bool = False,
+) -> tuple[dict[str, object], UUID, str]:
+    """A revision of a deck as the engine's deck list, checked as own_deck says: against the
+    library of whoever owns its cards, and the table's rules. Since v1.0.0 a lent deck is seated
+    by it too (api/loans.py), with its lender's library and the revision the loan names."""
     entries = [
         entry
         for entry in revision_entries(db, revision)
@@ -2298,6 +2328,8 @@ class SeatPlan:
     starter: bool = False
     # The Godlike tier's custom cards the deck holds (v0.4.0), by name.
     custom: list[str] = field(default_factory=list)
+    # Whether the deck is one a friend lent the seat's player (v1.0.0, api/loans.py).
+    borrowed: bool = False
 
 
 def starter_seat(db: Session, starter: Starter) -> SeatPlan | None:

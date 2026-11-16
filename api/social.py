@@ -116,6 +116,7 @@ NotificationKind = Literal[
     "table_invite",
     "warden_deck",
     "replay_shared",
+    "deck_offered",
 ]
 AuctionKind = Literal[
     "auction_outbid", "auction_won", "auction_sold", "auction_unsold", "auction_cancelled"

@@ -409,6 +409,8 @@ def test_a_table_from_the_lobby_to_the_result(client, engine):
         "you": True,
         "deck": "Burn",
         "deck_id": ada_deck,
+        # Whether the seat plays a deck a friend lent (v1.0.0, api/loans.py).
+        "borrowed": False,
         "team": None,
         "role": None,
         "starting_life": None,

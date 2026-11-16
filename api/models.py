@@ -1775,7 +1775,8 @@ class Notification(Base):
             "kind IN ('friend_request', 'friend_accepted', 'friend_online', 'message', "
             "'quest_completed', 'achievement_earned', 'rematch', 'team_invite', "
             "'auction_outbid', 'auction_won', 'auction_sold', 'auction_unsold', "
-            "'auction_cancelled', 'table_invite', 'warden_deck', 'replay_shared')",
+            "'auction_cancelled', 'table_invite', 'warden_deck', 'replay_shared', "
+            "'deck_offered')",
             name="ck_notifications_kind",
         ),
         # The bell's list, newest first, and its unread count.

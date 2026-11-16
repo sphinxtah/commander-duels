@@ -7683,6 +7683,39 @@
         "title": "KingsTableSettings",
         "type": "object"
       },
+      "LentDeck": {
+        "additionalProperties": false,
+        "description": "A lent deck's list, for its borrower to look at: the version the loan is of.",
+        "properties": {
+          "cards": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CardSummary"
+            },
+            "propertyNames": {
+              "format": "uuid"
+            },
+            "title": "Cards",
+            "type": "object"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/DeckEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "loan": {
+            "$ref": "#/components/schemas/Loan"
+          }
+        },
+        "required": [
+          "loan",
+          "entries",
+          "cards"
+        ],
+        "title": "LentDeck",
+        "type": "object"
+      },
       "LibraryCard": {
         "additionalProperties": false,
         "properties": {
@@ -7921,6 +7954,166 @@
           "key"
         ],
         "title": "Listing",
+        "type": "object"
+      },
+      "Loan": {
+        "additionalProperties": false,
+        "properties": {
+          "borrower": {
+            "$ref": "#/components/schemas/PlayerRef"
+          },
+          "deck": {
+            "$ref": "#/components/schemas/LoanDeck"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lender": {
+            "$ref": "#/components/schemas/PlayerRef"
+          },
+          "offered_at": {
+            "format": "date-time",
+            "title": "Offered At",
+            "type": "string"
+          },
+          "state": {
+            "description": "offered: it waits for the friend's answer; accepted: the friend has the deck, and its owner cannot play it.",
+            "enum": [
+              "offered",
+              "accepted"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "until": {
+            "description": "When it ends by itself.",
+            "format": "date-time",
+            "title": "Until",
+            "type": "string"
+          },
+          "yours": {
+            "description": "Whether the caller is its lender.",
+            "title": "Yours",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "deck",
+          "lender",
+          "borrower",
+          "state",
+          "offered_at",
+          "until",
+          "yours"
+        ],
+        "title": "Loan",
+        "type": "object"
+      },
+      "LoanDeck": {
+        "additionalProperties": false,
+        "properties": {
+          "card_count": {
+            "description": "Its cards, the maybeboard apart.",
+            "title": "Card Count",
+            "type": "integer"
+          },
+          "commanders": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Commanders",
+            "type": "array"
+          },
+          "format": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "version": {
+            "description": "The saved version the loan is of.",
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "format",
+          "version",
+          "card_count",
+          "commanders"
+        ],
+        "title": "LoanDeck",
+        "type": "object"
+      },
+      "LoanOffer": {
+        "additionalProperties": false,
+        "properties": {
+          "player_id": {
+            "description": "The friend the deck is offered to.",
+            "format": "uuid",
+            "title": "Player Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "player_id"
+        ],
+        "title": "LoanOffer",
+        "type": "object"
+      },
+      "Loans": {
+        "additionalProperties": false,
+        "properties": {
+          "days": {
+            "description": "How long a loan lasts once accepted.",
+            "title": "Days",
+            "type": "integer"
+          },
+          "given": {
+            "description": "The caller's decks offered or lent to friends.",
+            "items": {
+              "$ref": "#/components/schemas/Loan"
+            },
+            "title": "Given",
+            "type": "array"
+          },
+          "limit": {
+            "description": "The most decks an account has out at once.",
+            "title": "Limit",
+            "type": "integer"
+          },
+          "taken": {
+            "description": "Friends' decks offered or lent to the caller.",
+            "items": {
+              "$ref": "#/components/schemas/Loan"
+            },
+            "title": "Taken",
+            "type": "array"
+          }
+        },
+        "required": [
+          "given",
+          "taken",
+          "days",
+          "limit"
+        ],
+        "title": "Loans",
         "type": "object"
       },
       "MarkBody": {
@@ -8720,7 +8913,8 @@
               "auction_cancelled",
               "table_invite",
               "warden_deck",
-              "replay_shared"
+              "replay_shared",
+              "deck_offered"
             ],
             "title": "Kind",
             "type": "string"
@@ -16792,6 +16986,12 @@
       "TablePlayer": {
         "additionalProperties": false,
         "properties": {
+          "borrowed": {
+            "default": false,
+            "description": "Since v1.0.0: the seat's player sits with a deck a friend lent them (api/loans.py). Said to the whole table; whose deck and what it holds stay private.",
+            "title": "Borrowed",
+            "type": "boolean"
+          },
           "deck": {
             "anyOf": [
               {
@@ -31338,6 +31538,246 @@
         "summary": "Delete Forever"
       }
     },
+    "/api/v1/decks/{deck_id}/loans": {
+      "get": {
+        "description": "The open loan of one of the caller's decks: none, or the one (a deck is lent to one\nfriend at a time).",
+        "operationId": "deck_loans_api_v1_decks__deck_id__loans_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deck Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Loan"
+                  },
+                  "title": "Response Deck Loans Api V1 Decks  Deck Id  Loans Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Deck Loans",
+        "tags": [
+          "loans"
+        ]
+      },
+      "post": {
+        "description": "Offers one of the caller's decks to a friend: the deck as it stands, bound to a version.\nIt must be playable, hold none of the game's custom cards, and not be offered or lent\nalready. The friend is told, and has it once they accept.",
+        "operationId": "offer_deck_api_v1_decks__deck_id__loans_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deck Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoanOffer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Loan"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Offer Deck",
+        "tags": [
+          "loans"
+        ]
+      }
+    },
     "/api/v1/decks/{deck_id}/missing": {
       "get": {
         "description": "The cards of the deck its owner's library lacks, with the auctions open for each and the\nshop's packs that may hold it.",
@@ -35829,6 +36269,563 @@
           }
         },
         "summary": "My Library"
+      }
+    },
+    "/api/v1/loans": {
+      "get": {
+        "description": "The decks the caller has offered or lent, and those offered or lent to them.",
+        "operationId": "my_loans_api_v1_loans_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Loans"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "My Loans",
+        "tags": [
+          "loans"
+        ]
+      }
+    },
+    "/api/v1/loans/{loan_id}": {
+      "delete": {
+        "description": "Ends a loan: its lender takes the deck back, or the friend gives it back. A game already\nstarted with it plays on; a seat at a table that has not started must choose another deck.",
+        "operationId": "end_api_v1_loans__loan_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "loan_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Loan Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Loans"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "End",
+        "tags": [
+          "loans"
+        ]
+      }
+    },
+    "/api/v1/loans/{loan_id}/accept": {
+      "post": {
+        "description": "The friend accepts: the deck is theirs to play for seven days, and its owner's to play\nagain only once the loan ends.",
+        "operationId": "accept_api_v1_loans__loan_id__accept_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "loan_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Loan Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Loans"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Accept",
+        "tags": [
+          "loans"
+        ]
+      }
+    },
+    "/api/v1/loans/{loan_id}/deck": {
+      "get": {
+        "description": "The lent deck's list, for the friend it is offered or lent to: the version the loan is\nof, with how many of each card their own library holds.",
+        "operationId": "look_api_v1_loans__loan_id__deck_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "loan_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Loan Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LentDeck"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Look",
+        "tags": [
+          "loans"
+        ]
+      }
+    },
+    "/api/v1/loans/{loan_id}/decline": {
+      "post": {
+        "operationId": "decline_api_v1_loans__loan_id__decline_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "loan_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Loan Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Loans"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Decline",
+        "tags": [
+          "loans"
+        ]
       }
     },
     "/api/v1/matches": {
