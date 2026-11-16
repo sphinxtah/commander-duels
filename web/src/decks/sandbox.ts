@@ -73,11 +73,22 @@ export function botDecks(deck: DeckSummary, decks: DeckSummary[]) {
   );
 }
 
+/** How often, and how long apart, a restart asks again while the server has no room yet. */
+const RESTART_TRIES = 15;
+const RESTART_PAUSE_MS = 2000;
+/** The refusals that pass by themselves: the closed game's end is still being written, or the
+ * engine has not let go of it yet. */
+const NOT_YET = new Set(["game_running", "games_busy"]);
+
 /** Restarts a sandbox game: the running one is closed first, then its setup is played again
- * (the practice game's rematch, which replays the request kept with the game). */
+ * (the practice game's rematch, which replays the request kept with the game). The server may
+ * refuse the new game for a moment after the old one closed (its place is not free yet): asked
+ * again for half a minute before giving up, since the old game is already over by then. */
 export async function restartSandbox(
   gameId: string,
   running: boolean,
+  pause: (ms: number) => Promise<void> = (ms) =>
+    new Promise((resolve) => setTimeout(resolve, ms)),
 ): Promise<{ id?: string; error?: string }> {
   const path = { params: { path: { game_id: gameId } } };
   if (running) {
@@ -86,9 +97,17 @@ export async function restartSandbox(
       .catch(() => undefined);
     if (!closed?.data) return { error: describe(closed?.error) };
   }
-  const again = await client
-    .POST("/api/v1/games/{game_id}/rematch", path)
-    .catch(() => undefined);
-  const next = again?.data?.game_id;
-  return next ? { id: next } : { error: describe(again?.error) };
+  let refusal: unknown;
+  for (let attempt = 0; attempt < RESTART_TRIES; attempt++) {
+    const again = await client
+      .POST("/api/v1/games/{game_id}/rematch", path)
+      .catch(() => undefined);
+    const next = again?.data?.game_id;
+    if (next) return { id: next };
+    refusal = again?.error;
+    const code = (refusal as { code?: string } | undefined)?.code;
+    if (!code || !NOT_YET.has(code)) break;
+    await pause(RESTART_PAUSE_MS);
+  }
+  return { error: describe(refusal) };
 }

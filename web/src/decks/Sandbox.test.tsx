@@ -312,6 +312,40 @@ describe("restarting a sandbox game", () => {
     ]);
   });
 
+  it("asks again while the server has no room for the new game yet", async () => {
+    const api = mockApi();
+    api.on("POST /api/v1/games/{game_id}/close", () =>
+      reply(200, { id: "g-1" }),
+    );
+    const answers = [
+      reply(429, {
+        code: "games_busy",
+        message: "At most 2 games run at once; try again in a minute.",
+      }),
+      reply(409, {
+        code: "game_running",
+        message: "The game has not ended yet.",
+      }),
+      reply(200, { game_id: "g-2" }),
+    ];
+    api.on("POST /api/v1/games/{game_id}/rematch", () => answers.shift()!);
+    const waited: number[] = [];
+    const pause = async (ms: number) => {
+      waited.push(ms);
+    };
+    expect(await restartSandbox("g-1", true, pause)).toEqual({ id: "g-2" });
+    expect(waited).toEqual([2000, 2000]);
+    // Any other refusal is said at once.
+    api.on("POST /api/v1/games/{game_id}/rematch", () =>
+      reply(409, { code: "rematch_unavailable", message: "Start a new one." }),
+    );
+    waited.length = 0;
+    expect(await restartSandbox("g-1", false, pause)).toEqual({
+      error: "Start a new one.",
+    });
+    expect(waited).toEqual([]);
+  });
+
   it("says why it could not", async () => {
     const api = mockApi();
     api.on("POST /api/v1/games/{game_id}/close", () =>
