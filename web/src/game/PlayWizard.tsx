@@ -202,7 +202,9 @@ function Wizard({ me }: { me: Me }) {
         void client
           .GET("/api/v1/decks", { params: { query: { view: "active" } } })
           .then(({ data: decks }) => {
-            if (active) setOwnDecks(decks ?? []);
+            // A sandbox deck (v1.0.0) is played only in the sandbox, from its own button.
+            if (active)
+              setOwnDecks((decks ?? []).filter((deck) => !deck.sandbox));
           });
       else if (data) setOwnDecks([]);
     });
@@ -442,6 +444,8 @@ function Wizard({ me }: { me: Me }) {
           bots: Array.from({ length: bots }, () => ({})),
           deck_id: starterDeck,
           starter: true,
+          sandbox: false,
+          passive: false,
         }
       : {
           format,
@@ -457,6 +461,9 @@ function Wizard({ me }: { me: Me }) {
           // King's Table (v0.8.7): your seat and the settings; the bots in the other seats.
           ...(kingsTable ? { seat, kings_table: kings } : {}),
           starter: false,
+          // The sandbox's games are started from a sandbox deck (decks/SandboxDialog.tsx).
+          sandbox: false,
+          passive: false,
         };
     // A request that throws (the network dropped) is a failure like a refusal: no game, so the
     // full screen asked for above ends and the button comes back.

@@ -29,6 +29,7 @@ import {
   type Side,
   type Split,
 } from "./workshop";
+import { SampleHand } from "./SampleHand";
 import styles from "./decks.module.css";
 
 // A deck's Workshop (v1.0.0, docs/decks.md; the owner's decision 26: a page of its own, beside
@@ -37,11 +38,13 @@ import styles from "./decks.module.css";
 // the cards its player's library lacks, with where each might be had and the owned cards that
 // could take its place. Restoring makes a new draft: no version and no game's record changes.
 
-type Part = "versions" | "results" | "missing";
+type Part = "versions" | "results" | "missing" | "hands";
 const PARTS: [Part, string][] = [
   ["versions", "Versions"],
   ["results", "Results"],
   ["missing", "Missing cards"],
+  // Opening hands drawn with no game (v1.0.0, the owner's decision of 2026-11-16).
+  ["hands", "Sample hands"],
 ];
 
 export type Draft = DeckDetail["draft"];
@@ -106,8 +109,9 @@ export function DeckWorkshop({
       </h1>
       <p className={styles.lead}>
         {formatLabels[deck.format]} · {deck.card_count} cards. Its versions
-        compared and restored, its results by the version played, and the cards
-        it lacks. <a href={`#deck/${deck.id}`}>Open it in the editor</a> ·{" "}
+        compared and restored, its results by the version played, the cards it
+        lacks, and sample hands.{" "}
+        <a href={`#deck/${deck.id}`}>Open it in the editor</a> ·{" "}
         <a href="#decks">All decks</a>
       </p>
       <div
@@ -137,7 +141,17 @@ export function DeckWorkshop({
         {part === "versions" ? (
           <Versions deck={deck} draft={draft} onChanged={load} />
         ) : part === "results" ? (
-          <Results deckId={deck.id} />
+          <>
+            {deck.sandbox && (
+              <p className={styles.hint}>
+                A sandbox game leaves nothing in the record, so a sandbox deck
+                has no results until it is made a normal deck.
+              </p>
+            )}
+            <Results deckId={deck.id} />
+          </>
+        ) : part === "hands" ? (
+          <SampleHand deck={deck} draft={draft} />
         ) : (
           <MissingCards
             deck={deck}

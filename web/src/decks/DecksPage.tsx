@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -30,6 +31,13 @@ import {
   type Organize,
 } from "./workshop";
 import { DECK_LENDING, loanOf, useLoans } from "./loans";
+import { SandboxDialog } from "./SandboxDialog";
+import {
+  convertDeck,
+  NOTHING_EARNED,
+  SANDBOX,
+  SANDBOX_DECK_WORDS,
+} from "./sandbox";
 import styles from "./decks.module.css";
 
 // Since v1.0.0 (the deck workshop, docs/decks.md) the list has a filter bar (a search, a
@@ -37,10 +45,11 @@ import styles from "./decks.module.css";
 // all of them or none (DeckShelves.tsx); and each deck leads to its Workshop page.
 
 type View = "active" | "archived" | "trash";
-type DeckState = "playable" | "locked" | "legal" | "draft";
+type DeckState = "playable" | "sandbox" | "locked" | "legal" | "draft";
 
 const stateWords: Record<DeckState, string> = {
   playable: "Ready to play",
+  sandbox: "Ready for the sandbox",
   locked: "Needs cards you don't own",
   legal: "Legal, not playable yet",
   draft: "Draft",
@@ -123,6 +132,8 @@ export function DecksPage({
 export async function createDeck(body: {
   title: string;
   format: DeckFormat;
+  /** A sandbox deck (v1.0.0), where the sandbox is open to the account. */
+  sandbox?: boolean;
   entries?: DeckEntry[];
   source?: {
     kind: "empty" | "starter" | "duplicate" | "imported" | "guided";
@@ -179,6 +190,11 @@ function Decks({
   const lending = useWorkflow(DECK_LENDING);
   const book = useLoans(lending);
   const [lent, setLent] = useState<DeckSummary | null>(null);
+  // The sandbox (v1.0.0), where it is open to the account: sandbox decks are made here, listed
+  // apart, played from their own Sandbox button, and made normal decks once their cards are owned.
+  const sandbox = useWorkflow(SANDBOX);
+  const [sandboxNew, setSandboxNew] = useState(false);
+  const [played, setPlayed] = useState<DeckSummary | null>(null);
 
   const refresh = useCallback(async () => {
     // Only the newest list may show: an older answer landing last (the list asked for after
@@ -285,11 +301,27 @@ function Decks({
   async function submit(event: FormEvent) {
     event.preventDefault();
     const failure = await createDeck({
-      title: title.trim() || "New deck",
+      title: title.trim() || (sandboxNew ? "New sandbox deck" : "New deck"),
       format,
+      ...(sandboxNew ? { sandbox: true } : {}),
     });
     if (failure) setMessage(failure);
   }
+
+  async function convert(deck: DeckSummary) {
+    const failure = await convertDeck(deck.id);
+    setMessage(
+      failure ??
+        `${deck.title} is a normal deck now: it is played wherever your decks are, and its games count.`,
+    );
+    if (!failure) void latestRefresh.current();
+  }
+
+  // The list in its parts: the account's decks, then its sandbox decks, apart.
+  const parts = [
+    { sandbox: false, decks: (shown ?? []).filter((deck) => !deck.sandbox) },
+    { sandbox: true, decks: (shown ?? []).filter((deck) => deck.sandbox) },
+  ].filter((part) => !part.sandbox || part.decks.length > 0);
 
   return (
     <>
@@ -312,10 +344,25 @@ function Decks({
         <button
           type="button"
           className={styles.primary}
-          onClick={() => create.current?.showModal()}
+          onClick={() => {
+            setSandboxNew(false);
+            create.current?.showModal();
+          }}
         >
           New deck
         </button>
+        {sandbox && (
+          <button
+            type="button"
+            className={styles.secondary}
+            onClick={() => {
+              setSandboxNew(true);
+              create.current?.showModal();
+            }}
+          >
+            New sandbox deck
+          </button>
+        )}
         <button
           type="button"
           className={styles.secondary}
@@ -453,143 +500,237 @@ function Decks({
               )}
             </>
           )}
-          <ul className={styles.deckList}>
-            {shown!.map((deck) => (
-              <li key={deck.id} data-chosen={chosen?.includes(deck.id)}>
-                <div>
-                  {chosen !== null && (
-                    <input
-                      type="checkbox"
-                      className={styles.pick}
-                      aria-label={`Organize ${deck.title}`}
-                      checked={chosen.includes(deck.id)}
-                      onChange={(event) =>
-                        setChosen(
-                          event.target.checked
-                            ? [...chosen, deck.id]
-                            : chosen.filter((id) => id !== deck.id),
-                        )
+          {parts.map((part) => (
+            <Fragment key={part.sandbox ? "sandbox" : "decks"}>
+              {part.sandbox && (
+                <>
+                  <h2 className={styles.sandboxTitle}>Sandbox decks</h2>
+                  <p className={styles.hint}>
+                    {SANDBOX_DECK_WORDS} {NOTHING_EARNED}
+                  </p>
+                </>
+              )}
+              <ul
+                className={styles.deckList}
+                aria-label={part.sandbox ? "Sandbox decks" : undefined}
+              >
+                {part.decks.map((deck) => (
+                  <li key={deck.id} data-chosen={chosen?.includes(deck.id)}>
+                    <div>
+                      {chosen !== null && (
+                        <input
+                          type="checkbox"
+                          className={styles.pick}
+                          aria-label={`Organize ${deck.title}`}
+                          checked={chosen.includes(deck.id)}
+                          onChange={(event) =>
+                            setChosen(
+                              event.target.checked
+                                ? [...chosen, deck.id]
+                                : chosen.filter((id) => id !== deck.id),
+                            )
+                          }
+                        />
+                      )}
+                      <a
+                        href={view === "trash" ? undefined : `#deck/${deck.id}`}
+                        className={styles.deckTitle}
+                      >
+                        {deck.title}
+                      </a>
+                      {deck.sandbox && (
+                        <span className={styles.sandboxMark}>Sandbox deck</span>
+                      )}
+                      <span className={styles.deckMeta}>
+                        {formatLabels[deck.format]} ·{" "}
+                        <IdentityPips identity={deck.identity} /> ·{" "}
+                        {deck.card_count} cards
+                        {deck.commanders.length > 0 &&
+                          ` · ${deck.commanders.join(" & ")}`}
+                        {/* v0.4.5: the editor's note says which, and why. */}
+                        {deck.removed_cards.length > 0 &&
+                          ` · ${deck.removed_cards.length} ${deck.removed_cards.length === 1 ? "card" : "cards"} left the game`}
+                        {/* v0.5.0: copies switched to the editions the library holds. */}
+                        {(deck.switched_editions?.length ?? 0) > 0 &&
+                          ` · ${switchedWords(deck.switched_editions ?? [])}`}
+                      </span>
+                      <NeedsTags needs={deck.needs} format={deck.format} />
+                      {shelved && <ShelfLine deck={deck} />}
+                      {loanOf(book.loans, deck.id) && (
+                        <LoanLine
+                          loan={loanOf(book.loans, deck.id)!}
+                          book={book}
+                        />
+                      )}
+                    </div>
+                    <StateBadge
+                      state={
+                        deck.playable
+                          ? deck.sandbox
+                            ? "sandbox"
+                            : "playable"
+                          : deck.collection_locked
+                            ? "locked"
+                            : deck.legal
+                              ? "legal"
+                              : "draft"
                       }
                     />
-                  )}
-                  <a
-                    href={view === "trash" ? undefined : `#deck/${deck.id}`}
-                    className={styles.deckTitle}
-                  >
-                    {deck.title}
-                  </a>
-                  <span className={styles.deckMeta}>
-                    {formatLabels[deck.format]} ·{" "}
-                    <IdentityPips identity={deck.identity} /> ·{" "}
-                    {deck.card_count} cards
-                    {deck.commanders.length > 0 &&
-                      ` · ${deck.commanders.join(" & ")}`}
-                    {/* v0.4.5: the editor's note says which, and why. */}
-                    {deck.removed_cards.length > 0 &&
-                      ` · ${deck.removed_cards.length} ${deck.removed_cards.length === 1 ? "card" : "cards"} left the game`}
-                    {/* v0.5.0: copies switched to the editions the library holds. */}
-                    {(deck.switched_editions?.length ?? 0) > 0 &&
-                      ` · ${switchedWords(deck.switched_editions ?? [])}`}
-                  </span>
-                  <NeedsTags needs={deck.needs} format={deck.format} />
-                  {shelved && <ShelfLine deck={deck} />}
-                  {loanOf(book.loans, deck.id) && (
-                    <LoanLine loan={loanOf(book.loans, deck.id)!} book={book} />
-                  )}
-                </div>
-                <StateBadge
-                  state={
-                    deck.playable
-                      ? "playable"
-                      : deck.collection_locked
-                        ? "locked"
-                        : deck.legal
-                          ? "legal"
-                          : "draft"
-                  }
-                />
-                <div className={styles.rowActions}>
-                  {view === "trash" ? (
-                    <>
-                      <button
-                        type="button"
-                        className={styles.secondary}
-                        onClick={() => void act(deck, "restore")}
-                      >
-                        Restore
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.secondary}
-                        onClick={() => {
-                          setPurged(deck);
-                          purging.current?.showModal();
-                        }}
-                      >
-                        Delete for good
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <a className={styles.secondary} href={`#deck/${deck.id}`}>
-                        Open
-                      </a>
-                      {/* Its versions, its results and what it lacks (v1.0.0). */}
-                      <a
-                        className={styles.secondary}
-                        href={`#deck/${deck.id}/workshop`}
-                      >
-                        Workshop
-                      </a>
-                      {/* Lent as it stands (v1.0.0): a playable deck that is not out already. */}
-                      {lending &&
-                        view === "active" &&
-                        deck.playable &&
-                        !loanOf(book.loans, deck.id) && (
+                    <div className={styles.rowActions}>
+                      {view === "trash" ? (
+                        <>
                           <button
                             type="button"
                             className={styles.secondary}
-                            onClick={() => setLent(deck)}
+                            onClick={() => void act(deck, "restore")}
                           >
-                            Lend
+                            Restore
                           </button>
-                        )}
-                      <button
-                        type="button"
-                        className={styles.secondary}
-                        onClick={() => void act(deck, "duplicate")}
-                      >
-                        Duplicate
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.secondary}
-                        onClick={() =>
-                          void act(
-                            deck,
-                            view === "archived" ? "unarchive" : "archive",
-                          )
-                        }
-                      >
-                        {view === "archived" ? "Unarchive" : "Archive"}
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.secondary}
-                        onClick={() => {
-                          setDoomed(deck);
-                          deleting.current?.showModal();
-                        }}
-                      >
-                        Delete
-                      </button>
-                    </>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
+                          <button
+                            type="button"
+                            className={styles.secondary}
+                            onClick={() => {
+                              setPurged(deck);
+                              purging.current?.showModal();
+                            }}
+                          >
+                            Delete for good
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <a
+                            className={styles.secondary}
+                            href={`#deck/${deck.id}`}
+                          >
+                            Open
+                          </a>
+                          {/* Its versions, its results and what it lacks (v1.0.0). */}
+                          <a
+                            className={styles.secondary}
+                            href={`#deck/${deck.id}/workshop`}
+                          >
+                            Workshop
+                          </a>
+                          {/* Lent as it stands (v1.0.0): a playable deck that is not out already. */}
+                          {/* A deck that needs cards its owner lacks is copied as a sandbox deck,
+                          to try it as it is (v1.0.0). */}
+                          {sandbox &&
+                            view === "active" &&
+                            !deck.sandbox &&
+                            deck.collection_locked && (
+                              <button
+                                type="button"
+                                className={styles.secondary}
+                                aria-label={`Copy as a sandbox deck: ${deck.title}`}
+                                onClick={() =>
+                                  void createDeck({
+                                    title: `${deck.title} (sandbox)`.slice(
+                                      0,
+                                      80,
+                                    ),
+                                    format: deck.format,
+                                    sandbox: true,
+                                    source: {
+                                      kind: "duplicate",
+                                      deck_id: deck.id,
+                                    },
+                                  }).then(
+                                    (failure) => failure && setMessage(failure),
+                                  )
+                                }
+                              >
+                                Copy as a sandbox deck
+                              </button>
+                            )}
+                          {/* A sandbox deck's game is started from the deck (v1.0.0). */}
+                          {sandbox && view === "active" && deck.sandbox && (
+                            <button
+                              type="button"
+                              className={styles.secondary}
+                              disabled={!deck.playable}
+                              title={
+                                deck.playable
+                                  ? undefined
+                                  : "Fix the deck's problems in the builder first"
+                              }
+                              aria-label={`Sandbox: ${deck.title}`}
+                              onClick={() => setPlayed(deck)}
+                            >
+                              Sandbox
+                            </button>
+                          )}
+                          {sandbox &&
+                            view === "active" &&
+                            deck.sandbox &&
+                            deck.convertible && (
+                              <button
+                                type="button"
+                                className={styles.secondary}
+                                aria-label={`Convert to a normal deck: ${deck.title}`}
+                                onClick={() => void convert(deck)}
+                              >
+                                Convert to a normal deck
+                              </button>
+                            )}
+                          {lending &&
+                            view === "active" &&
+                            deck.playable &&
+                            !deck.sandbox &&
+                            !loanOf(book.loans, deck.id) && (
+                              <button
+                                type="button"
+                                className={styles.secondary}
+                                onClick={() => setLent(deck)}
+                              >
+                                Lend
+                              </button>
+                            )}
+                          <button
+                            type="button"
+                            className={styles.secondary}
+                            onClick={() => void act(deck, "duplicate")}
+                          >
+                            Duplicate
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.secondary}
+                            onClick={() =>
+                              void act(
+                                deck,
+                                view === "archived" ? "unarchive" : "archive",
+                              )
+                            }
+                          >
+                            {view === "archived" ? "Unarchive" : "Archive"}
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.secondary}
+                            onClick={() => {
+                              setDoomed(deck);
+                              deleting.current?.showModal();
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Fragment>
+          ))}
         </>
+      )}
+      {played && (
+        <SandboxDialog
+          deck={played}
+          decks={(decks ?? []).filter((deck) => !loanOf(book.loans, deck.id))}
+          onClose={() => setPlayed(null)}
+        />
       )}
       {lending && view === "active" && <BorrowedDecks book={book} />}
       {lent && (
@@ -671,13 +812,21 @@ function Decks({
         aria-labelledby="new-deck-title"
       >
         <form onSubmit={submit} method="dialog">
-          <h2 id="new-deck-title">A new deck</h2>
+          <h2 id="new-deck-title">
+            {sandboxNew ? "A new sandbox deck" : "A new deck"}
+          </h2>
+          {sandboxNew && (
+            <p className={styles.hint}>
+              {SANDBOX_DECK_WORDS} Once you own every card in it, you can make
+              it a normal deck.
+            </p>
+          )}
           <label className={styles.field}>
             <span>Name</span>
             <input
               value={title}
               maxLength={80}
-              placeholder="New deck"
+              placeholder={sandboxNew ? "New sandbox deck" : "New deck"}
               onChange={(event) => setTitle(event.target.value)}
             />
           </label>

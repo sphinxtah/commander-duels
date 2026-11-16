@@ -19,6 +19,8 @@ import type { Snapshot } from "../src/game/types";
 // private table (docs/decks.md). SysOp lends; the first of CD_E2E_TEAM_SESSIONS borrows. It is
 // not the second player of the friends' journey (rival), whose friendship with SysOp that
 // journey makes and ends while this one runs.
+// And a fourth, for the same reason (an account plays one game at a time): the sandbox, played by
+// that same account, which owns none of its sandbox deck's cards but the basic lands.
 const sysopPassword = process.env.CD_E2E_SYSOP_PASSWORD;
 const playerSession = process.env.CD_E2E_PLAYER_SESSION;
 const teamSessions = (process.env.CD_E2E_TEAM_SESSIONS ?? "")
@@ -735,6 +737,223 @@ test.describe("a deck lent to a friend, in two browsers (v1.0.0)", () => {
       ).toHaveCount(0);
     } finally {
       await closeGame(lender);
+      for (const context of made) await context.close();
+    }
+  });
+});
+
+test.describe("the sandbox, played by an account that owns none of its deck's cards (v1.0.0)", () => {
+  test.setTimeout(10 * 60_000);
+  test.use({ actionTimeout: 30_000 });
+
+  test("a sandbox deck is made, played against bots that do nothing, restarted, and earns nothing", async ({
+    browser,
+  }, testInfo) => {
+    test.skip(
+      !gamesOn || !sysopPassword || teamSessions.length < 1,
+      "Needs the engine, SysOp and one more account: CD_E2E_GAMES=1, CD_E2E_SYSOP_PASSWORD and " +
+        "CD_E2E_TEAM_SESSIONS (scripts/e2e_player.py).",
+    );
+    const base = testInfo.project.use.baseURL!;
+    const made = await contexts(browser, 2);
+    const [staffContext, playerContext] = made;
+    await signIn(playerContext, teamSessions[0], base);
+    const staff = await staffContext.newPage();
+    const page = await playerContext.newPage();
+    const title = `Sandbox burn ${Date.now()}`;
+    try {
+      // The sandbox is behind its gate: SysOp opens it to everyone and leaves it open.
+      await signInSysop(staff);
+      const gate = await staff.evaluate(async () => {
+        const me = (await (await fetch("/api/v1/me")).json()) as {
+          csrf_token: string;
+        };
+        const changed = await fetch("/api/v1/admin/rollout/sandbox", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": me.csrf_token,
+          },
+          body: JSON.stringify({ stage: "on" }),
+        });
+        return changed.status;
+      });
+      expect(gate).toBe(200);
+
+      // The player makes a sandbox deck, after the page says what one is.
+      await page.goto("/#decks");
+      await page.getByRole("button", { name: "New sandbox deck" }).click();
+      const create = page.getByRole("dialog", { name: "A new sandbox deck" });
+      await expect(create).toContainText(
+        "built from every card in the game, whether you own it or not",
+      );
+      await create.getByLabel("Name").fill(title);
+      await create.getByRole("radio", { name: /^Legacy/ }).check();
+      await create.getByRole("button", { name: "Create" }).click();
+      await expect(page).toHaveURL(/#deck\/[0-9a-f-]{36}$/);
+      const deckId = page.url().split("#deck/")[1];
+      // The editor's finder starts on every card for it, and says each card's own count.
+      await expect(
+        page
+          .getByRole("group", { name: "Search in" })
+          .getByRole("radio", { name: "All cards" }),
+      ).toBeChecked();
+
+      // Its list is written through the API, as the editor would save it: cards the player
+      // does not own beside the basic lands they do.
+      const saved = await page.evaluate(async (id) => {
+        const me = (await (await fetch("/api/v1/me")).json()) as {
+          csrf_token: string;
+        };
+        const found = async (name: string) => {
+          const cards = (await (
+            await fetch(`/api/v1/cards?q=${encodeURIComponent(name)}`)
+          ).json()) as { items: { id: string; name: string; owned: number }[] };
+          return cards.items.find((card) => card.name === name)!;
+        };
+        const [bolt, giant, mountain] = await Promise.all(
+          ["Lightning Bolt", "Hill Giant", "Mountain"].map(found),
+        );
+        const deck = (await (await fetch(`/api/v1/decks/${id}`)).json()) as {
+          draft: { version: number };
+        };
+        const answered = await fetch(`/api/v1/decks/${id}/draft`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": me.csrf_token,
+          },
+          body: JSON.stringify({
+            version: deck.draft.version,
+            entries: [
+              { card_id: bolt.id, quantity: 4, location: "main" },
+              { card_id: giant.id, quantity: 4, location: "main" },
+              { card_id: mountain.id, quantity: 52, location: "main" },
+            ],
+          }),
+        });
+        const body = (await answered.json()) as {
+          validation: { playable: boolean };
+        };
+        return {
+          status: answered.status,
+          playable: body.validation.playable,
+          owned: [bolt.owned, giant.owned],
+        };
+      }, deckId);
+      expect(saved).toEqual({ status: 200, playable: true, owned: [0, 0] });
+
+      // Listed apart, marked, ready for the sandbox; not among the decks a table is opened with.
+      await page.goto("/#decks");
+      await page.reload();
+      const row = page
+        .getByRole("list", { name: "Sandbox decks" })
+        .getByRole("listitem")
+        .filter({ has: page.getByRole("link", { name: title, exact: true }) });
+      await expect(row).toContainText("Sandbox deck");
+      await expect(row).toContainText("Ready for the sandbox");
+      await page.screenshot({
+        path: testInfo.outputPath("sandbox-decks.jpg"),
+        type: "jpeg",
+        quality: 80,
+      });
+
+      // The game is started from the deck: the setup says it earns nothing.
+      await row.getByRole("button", { name: `Sandbox: ${title}` }).click();
+      const setup = page.getByRole("dialog", {
+        name: `Play ${title} in the sandbox`,
+      });
+      await expect(setup).toContainText("A sandbox game earns nothing");
+      await setup
+        .getByRole("checkbox", { name: "Bots that do nothing" })
+        .check();
+      const seat = new Seat(page, "sandbox", () => false);
+      await setup
+        .getByRole("button", { name: "Start the sandbox game" })
+        .click();
+      await expect(page).toHaveURL(/#game\/[0-9a-f-]{36}$/, {
+        timeout: 30_000,
+      });
+      const first = page.url().split("#game/")[1];
+      await playUntil(seat, 2);
+      const hand = seat.latest!.view!.hand.map((card) => card.name);
+      expect(hand.length).toBeGreaterThan(0);
+      for (const name of hand)
+        expect(["Lightning Bolt", "Hill Giant", "Mountain"]).toContain(name);
+      const state = await page.evaluate(async (id) => {
+        const game = (await (await fetch(`/api/v1/games/${id}`)).json()) as {
+          game: { sandbox: boolean; passive_bots: boolean | null };
+        };
+        return [game.game.sandbox, game.game.passive_bots];
+      }, first);
+      expect(state).toEqual([true, true]);
+
+      // Restarted from the Game menu: this game ends, and the same setup starts again.
+      await page.getByRole("button", { name: "Game menu" }).click();
+      await page
+        .getByRole("group", { name: "Game menu" })
+        .getByRole("button", { name: "Restart" })
+        .click();
+      const restart = page.getByRole("dialog", {
+        name: "Restart this sandbox game?",
+      });
+      await expect(restart).toContainText("the same setup starts again");
+      await restart.getByRole("button", { name: "Restart" }).click();
+      await expect(page).not.toHaveURL(new RegExp(`#game/${first}$`), {
+        timeout: 60_000,
+      });
+      await expect(page).toHaveURL(/#game\/[0-9a-f-]{36}$/);
+      const second = page.url().split("#game/")[1];
+      // A new game's revisions begin again: its frames are read by a seat of its own.
+      const again = new Seat(page, "sandbox again", () => false);
+      await page.reload();
+      await playUntil(again, 1);
+
+      // Conceded: the result says nothing was earned, and the account's tokens are what they were.
+      const before = await page.evaluate(async () => {
+        const tokens = (await (await fetch("/api/v1/me/tokens")).json()) as {
+          balance: number;
+        };
+        return tokens.balance;
+      });
+      await concede(page);
+      const result = page.getByRole("dialog", { name: "Defeat" });
+      await expect(result).toBeVisible({ timeout: 90_000 });
+      await expect(
+        page.getByText("A sandbox game: nothing was earned").first(),
+      ).toBeVisible();
+      const after = await page.evaluate(async (id) => {
+        const tokens = (await (await fetch("/api/v1/me/tokens")).json()) as {
+          balance: number;
+        };
+        const game = (await (await fetch(`/api/v1/games/${id}`)).json()) as {
+          game: { status: string; sandbox: boolean };
+        };
+        return { tokens: tokens.balance, sandbox: game.game.sandbox };
+      }, second);
+      expect(after).toEqual({ tokens: before, sandbox: true });
+      console.log(
+        `[sandbox] games ${first} and ${second}: ${seat.frames} and ${again.frames} frames, ` +
+          `result ${again.latest?.result?.kind}`,
+      );
+      expect([...seat.problems, ...again.problems]).toEqual([]);
+
+      // Its Workshop: sample hands with no game, and what a normal deck would need.
+      await page.goto(`/?workshop#deck/${deckId}/workshop`);
+      await page.getByRole("tab", { name: "Sample hands" }).click();
+      await page.getByRole("button", { name: "Draw a sample hand" }).click();
+      await expect(
+        page.getByRole("list", { name: "The hand" }).getByRole("listitem"),
+      ).toHaveCount(7);
+      await page.getByRole("button", { name: "Mulligan" }).click();
+      await expect(
+        page.getByRole("status").filter({ hasText: "to put on the bottom" }),
+      ).toBeVisible();
+      await page.getByRole("tab", { name: "Missing cards" }).click();
+      await expect(page.getByRole("tabpanel")).toContainText("Lightning Bolt");
+      await expect(page.getByRole("tabpanel")).toContainText("Hill Giant");
+    } finally {
+      await closeGame(page);
       for (const context of made) await context.close();
     }
   });

@@ -94,6 +94,8 @@ export function DuelSetup({
         (deck) =>
           deck.format === "commander" &&
           deck.playable &&
+          // A sandbox deck (v1.0.0) is played only in the sandbox.
+          !deck.sandbox &&
           !deck.archived &&
           !deck.deleted_at,
       );

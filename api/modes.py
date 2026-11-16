@@ -88,10 +88,10 @@ POLICIES: dict[str, dict[str, str]] = {
     },
 }
 
-# Modes no game is made in yet: each waits for its workflow's rollout (api/rollout.py MODES,
-# mode_available), which is asked where v1.0.0 makes such a game. A borrowed deck's games are
-# made since v1.0.0 (api/tables.py), where the gate deck_lending is open to the borrower.
-NOT_YET = frozenset({"sandbox"})
+# Modes no game is made in yet: none since v1.0.0. A borrowed deck's games are made by
+# api/tables.py where the gate deck_lending is open to the borrower, and the sandbox's by
+# api/games.py (a practice game asked for as one) where the gate sandbox is open to the player.
+NOT_YET: frozenset[str] = frozenset()
 
 
 def eligibility(mode: str, *, result: bool = True, failed: bool = False) -> Eligibility:

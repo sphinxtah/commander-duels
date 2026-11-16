@@ -4616,6 +4616,12 @@
             "title": "Notes",
             "type": "string"
           },
+          "sandbox": {
+            "default": false,
+            "description": "Since v1.0.0: make it a sandbox deck. A duplicate of a sandbox deck is one whatever this says. Refused, as something that does not exist, while the sandbox is not the account's to reach.",
+            "title": "Sandbox",
+            "type": "boolean"
+          },
           "source": {
             "$ref": "#/components/schemas/DeckSource"
           },
@@ -4665,6 +4671,12 @@
             },
             "title": "Commanders",
             "type": "array"
+          },
+          "convertible": {
+            "default": false,
+            "description": "A sandbox deck whose every card the library holds now: it can be made a normal deck (POST /sandbox/decks/{id}/convert). Said by a deck's own answer and by the list; false elsewhere.",
+            "title": "Convertible",
+            "type": "boolean"
           },
           "deleted_at": {
             "anyOf": [
@@ -4760,6 +4772,12 @@
             },
             "title": "Revisions",
             "type": "array"
+          },
+          "sandbox": {
+            "default": false,
+            "description": "Since v1.0.0: a sandbox deck (docs/decks.md). It is built from every card in the game, owned or not, its flags say whether it can start a sandbox game, and it is played nowhere else.",
+            "title": "Sandbox",
+            "type": "boolean"
           },
           "share_code": {
             "anyOf": [
@@ -5226,6 +5244,12 @@
             "title": "Commanders",
             "type": "array"
           },
+          "convertible": {
+            "default": false,
+            "description": "A sandbox deck whose every card the library holds now: it can be made a normal deck (POST /sandbox/decks/{id}/convert). Said by a deck's own answer and by the list; false elsewhere.",
+            "title": "Convertible",
+            "type": "boolean"
+          },
           "deleted_at": {
             "anyOf": [
               {
@@ -5306,6 +5330,12 @@
             },
             "title": "Removed Cards",
             "type": "array"
+          },
+          "sandbox": {
+            "default": false,
+            "description": "Since v1.0.0: a sandbox deck (docs/decks.md). It is built from every card in the game, owned or not, its flags say whether it can start a sandbox game, and it is played nowhere else.",
+            "title": "Sandbox",
+            "type": "boolean"
           },
           "sleeve": {
             "anyOf": [
@@ -6736,6 +6766,12 @@
                 "type": "null"
               }
             ]
+          },
+          "sandbox": {
+            "default": false,
+            "description": "Since v1.0.0: a sandbox game (docs/games.md): it earns nothing and leaves nothing in the record, and its player restarts it and switches its bots.",
+            "title": "Sandbox",
+            "type": "boolean"
           },
           "seats": {
             "items": {
@@ -10296,9 +10332,21 @@
             ],
             "description": "King's Table (v0.8.7): its settings, the defaults when left out. Refused in other formats."
           },
+          "passive": {
+            "default": false,
+            "description": "Since v1.0.0, a sandbox game only: the bots do nothing but draw, pass and discard, from the start (goldfishing). The player switches them in the game too.",
+            "title": "Passive",
+            "type": "boolean"
+          },
           "rules": {
             "$ref": "#/components/schemas/TableRules",
             "description": "Which cards the game's own decks may hold by their legality; casual unless told otherwise."
+          },
+          "sandbox": {
+            "default": false,
+            "description": "Since v1.0.0: a sandbox game (docs/games.md). deck_id is one of your sandbox decks, which may hold cards you do not own; a bot may play one too. One game, by casual rules, in Legacy or Commander. It earns nothing and is counted apart (the mode sandbox). Refused while the sandbox is not the account's to reach.",
+            "title": "Sandbox",
+            "type": "boolean"
           },
           "seat": {
             "anyOf": [
@@ -42842,6 +42890,120 @@
           }
         },
         "summary": "Reach"
+      }
+    },
+    "/api/v1/sandbox/decks/{deck_id}/convert": {
+      "post": {
+        "description": "Makes a sandbox deck a normal deck, once its owner's library holds every copy it plays.\nIts copies take the editions the library holds; from then on it is validated against the\nlibrary and played wherever a deck is. It cannot be made a sandbox deck again: duplicate\nit as one instead.",
+        "operationId": "convert_api_v1_sandbox_decks__deck_id__convert_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deck Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Convert",
+        "tags": [
+          "sandbox"
+        ]
       }
     },
     "/api/v1/saves": {

@@ -121,6 +121,8 @@
 /* The deck list. */
 .tabs {
   display: flex;
+  /* Four parts on a phone (v1.0.0, the Workshop's sample hands) wrap onto a second line. */
+  flex-wrap: wrap;
   gap: 4px;
   border-bottom: 1px solid #ffffff12;
   margin: 26px 0 12px;
@@ -1419,4 +1421,73 @@ a.deckTitle:hover {
   columns: 2 14rem;
   font-size: 0.9rem;
   line-height: 1.6;
+}
+
+/* The sandbox (v1.0.0): its decks listed apart, each marked, and its setup's one checkbox. */
+.sandboxTitle {
+  margin: 28px 0 6px;
+  font-family: Cinzel, Georgia, serif;
+  font-size: 1.05rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #e3c68f;
+}
+.sandboxMark {
+  display: inline-block;
+  /* In a row's column, which stretches its children: as wide as its words. */
+  width: fit-content;
+  justify-self: start;
+  align-self: flex-start;
+  margin: 4px 0 2px;
+  padding: 1px 8px;
+  border: 1px dashed #8fb7c9;
+  border-radius: 999px;
+  color: #b9d8e6;
+  font-size: 0.68rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.sandboxCheck {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 2px;
+  font-weight: 600;
+}
+.sandboxCheck input {
+  width: 18px;
+  height: 18px;
+}
+
+/* The Workshop's sample hands (v1.0.0). */
+.sampleWords {
+  margin: 14px 0 8px;
+  color: #e3c68f;
+}
+.sampleHand {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 8px;
+}
+.sampleHand li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(227, 198, 143, 0.28);
+  border-radius: 8px;
+  background: rgba(10, 22, 20, 0.6);
+}
+.sampleHand li span {
+  display: grid;
+  gap: 2px;
+}
+.sampleHand small {
+  color: #a9b8a6;
+  font-size: 0.78rem;
 }

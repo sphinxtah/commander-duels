@@ -57,6 +57,9 @@ import {
   type Validation,
 } from "./decks";
 import { SleevePicker } from "./SleevePicker";
+import { useWorkflow } from "../app/rollout";
+import { SandboxDialog } from "./SandboxDialog";
+import { convertDeck, SANDBOX, SANDBOX_DECK_WORDS } from "./sandbox";
 import styles from "./decks.module.css";
 
 type SaveState = "saved" | "dirty" | "saving" | "error" | "conflict";
@@ -434,6 +437,7 @@ export function DeckEditor({
           format={deck.format}
           identity={commanderIdentity(entries, cards, deck.format)}
           known={deck.cards}
+          sandbox={deck.sandbox}
           onAdd={add}
           onOpen={(card) => setOpened({ card })}
         />
@@ -719,17 +723,22 @@ function CardFinder({
   format,
   identity,
   known,
+  sandbox,
   onAdd,
   onOpen,
 }: {
   format: DeckDetail["format"];
   identity: string | null;
+  /** A sandbox deck (v1.0.0) is built from every card in the game: the finder starts there. */
+  sandbox: boolean;
   /** The cards the deck opened with, which may already say whether the account has a library. */
   known: Record<string, CardSummary>;
   onAdd: (card: CardSummary, location: Location) => void;
   onOpen: (card: CardSummary) => void;
 }) {
-  const [search, setSearch] = useState<Search>(finderSearch);
+  const [search, setSearch] = useState<Search>(
+    sandbox ? { ...finderSearch, owned: false } : finderSearch,
+  );
   const [fits, setFits] = useState(true);
   const [page, setPage] = useState(1);
   const fixed = useMemo(() => {
@@ -775,8 +784,9 @@ function CardFinder({
       )}
       {scoped && !search.owned && (
         <p className={styles.hint}>
-          Cards you don't own can be added, but the deck then cannot start a
-          game until your library holds them.
+          {sandbox
+            ? "A sandbox deck may hold any card in the game. Each card says how many you own."
+            : "Cards you don't own can be added, but the deck then cannot start a game until your library holds them."}
         </p>
       )}
       <SearchControls
@@ -1388,9 +1398,21 @@ function DeckMeta({
     : "";
   // The deck's card sleeve (v0.8.9): its own setting, saved apart from the draft.
   const [sleeve, setSleeve] = useState<string | null>(deck.sleeve ?? null);
+  // A sandbox deck (v1.0.0) is played from here, in the sandbox, and nowhere else.
+  const sandboxOpen = useWorkflow(SANDBOX);
+  const [sandboxSetup, setSandboxSetup] = useState(false);
   return (
     <section className={styles.meta} aria-labelledby="meta-title">
       <h2 id="meta-title">This deck</h2>
+      {deck.sandbox && (
+        <p className={styles.hint}>
+          <span className={styles.sandboxMark}>Sandbox deck</span>{" "}
+          {SANDBOX_DECK_WORDS}{" "}
+          {deck.convertible
+            ? "You own every card in it now: it can be made a normal deck."
+            : "Its Workshop lists the cards you would need to play it as a normal deck."}
+        </p>
+      )}
       {locked && (
         <p className={styles.lockedPlay}>
           <LockIcon />
@@ -1402,10 +1424,34 @@ function DeckMeta({
         </p>
       )}
       <div className={styles.actions}>
-        {!locked && (
+        {!locked && !deck.sandbox && (
           <a className={styles.primary} href={`#play?deck=${deck.id}`}>
             Play it at the practice table
           </a>
+        )}
+        {deck.sandbox && sandboxOpen && (
+          <button
+            type="button"
+            className={styles.primary}
+            disabled={!deck.playable}
+            onClick={() => setSandboxSetup(true)}
+          >
+            Sandbox
+          </button>
+        )}
+        {deck.sandbox && sandboxOpen && deck.convertible && (
+          <button
+            type="button"
+            className={styles.secondary}
+            onClick={() =>
+              void convertDeck(deck.id).then((failure) => {
+                if (failure) onMessage(failure);
+                else window.location.reload();
+              })
+            }
+          >
+            Convert to a normal deck
+          </button>
         )}
         <button
           type="button"
@@ -1418,6 +1464,9 @@ function DeckMeta({
         <a className={styles.secondary} href={`#deck/${deck.id}/workshop`}>
           Workshop
         </a>
+        {sandboxSetup && (
+          <SandboxDialog deck={deck} onClose={() => setSandboxSetup(false)} />
+        )}
         <a
           className={styles.secondary}
           href={`/api/v1/decks/${deck.id}/export?kind=text`}

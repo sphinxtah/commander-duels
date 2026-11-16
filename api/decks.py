@@ -41,6 +41,7 @@ import json
 import secrets
 from collections import defaultdict
 from collections.abc import Iterable
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from typing import Annotated, Literal, cast
 from uuid import UUID
@@ -53,7 +54,7 @@ from sqlalchemy import delete as sql_delete
 from sqlalchemy import func, not_, or_, select, update
 from sqlalchemy.orm import Session
 
-from api import deckio, guided
+from api import deckio, guided, rollout
 from api.auth import INPUT_ERRORS
 from api.cards import CardSummary, mark_owned, summaries_by_id
 from api.custom_play import HIDDEN_NAME, custom_by_name, custom_ids, deck_cards, without_custom
@@ -147,6 +148,18 @@ class DeckSummary(Contract):
     id: UUID
     title: str
     format: GameFormatName
+    sandbox: bool = Field(
+        default=False,
+        description="Since v1.0.0: a sandbox deck (docs/decks.md). It is built from every card "
+        "in the game, owned or not, its flags say whether it can start a sandbox game, and it "
+        "is played nowhere else.",
+    )
+    convertible: bool = Field(
+        default=False,
+        description="A sandbox deck whose every card the library holds now: it can be made a "
+        "normal deck (POST /sandbox/decks/{id}/convert). Said by a deck's own answer and by "
+        "the list; false elsewhere.",
+    )
     visibility: Literal["private", "link"]
     card_count: int
     legal: bool
@@ -223,6 +236,12 @@ class DeckCreate(Contract):
     entries: list[DeckEntry] = Field(default_factory=list, max_length=MAX_ENTRIES)
     notes: StoredText = Field(default="", max_length=MAX_NOTES)
     source: DeckSource = Field(default_factory=DeckSource)
+    sandbox: bool = Field(
+        default=False,
+        description="Since v1.0.0: make it a sandbox deck. A duplicate of a sandbox deck is one "
+        "whatever this says. Refused, as something that does not exist, while the sandbox is "
+        "not the account's to reach.",
+    )
 
 
 class DeckUpdate(Contract):
@@ -557,6 +576,8 @@ def store_draft(
     edition the library holds too few of, and notes it (switch_editions). A card or printing ID
     that is in neither the catalog nor the custom cards is refused (422 unknown_card), unless the
     draft holds it already (a custom card SysOp removed since: validation names it)."""
+    if library is not None:
+        library = library_for(deck, library)
     cards, printings = unknown_ids(db, entries)
     if cards or printings:
         held = entries_of(deck) if deck.draft else []
@@ -595,11 +616,39 @@ def owned(db: Session, principal: Principal, deck_id: UUID, *, trashed: bool = F
     return deck
 
 
-def deck_summary(db: Session, deck: Deck) -> DeckSummary:
+def library_for(deck: Deck, library: Library) -> Library:
+    """The library a deck is validated against: its owner's, and for a sandbox deck (v1.0.0)
+    every card in the game. The sandbox's library is the owner's with no limit on copies or
+    editions; it still keeps what an account must hold itself: the Godlike tier's custom cards
+    and the one-of-a-kind printings."""
+    if deck.sandbox and not library.unlimited:
+        return replace(library, unlimited=True, by_card=None)
+    return library
+
+
+def convertible(db: Session, deck: Deck, library: Library) -> bool:
+    """Whether a sandbox deck could be a normal one now: its owner's own library holds every
+    copy it plays (its other problems, a size or a banned card, are the deck's own to fix)."""
+    if not deck.sandbox:
+        return False
+    # As a normal deck its copies would name the editions the library holds (store_draft).
+    entries, _ = owned_editions(db, normalized(entries_of(deck)), library, switch=True)
+    validation = validate_deck(
+        db,
+        DeckContent(format=deck.format, entries=normalized(entries)),  # type: ignore[arg-type]
+        today(),
+        library.collection(),
+    )
+    return not any(problem.kind == "collection_locked" for problem in validation.errors)
+
+
+def deck_summary(db: Session, deck: Deck, library: Library | None = None) -> DeckSummary:
     return DeckSummary(
         id=deck.id,
         title=deck.title,
         format=deck.format,  # type: ignore[arg-type]
+        sandbox=deck.sandbox,
+        convertible=library is not None and convertible(db, deck, library),
         visibility=deck.visibility,  # type: ignore[arg-type]
         card_count=deck.card_count,
         legal=deck.legal,
@@ -651,8 +700,9 @@ def deck_detail(
             db,
             DeckContent(format=deck.format, entries=entries),  # type: ignore[arg-type]
             today(),
-            library.collection(),
+            library_for(deck, library).collection(),
         )
+    # The copies the account holds are its own library's, for a sandbox deck too.
     cards = deck_cards(db, {entry.card_id for entry in entries}, library)
     revisions = db.scalars(
         select(DeckRevision)
@@ -660,7 +710,7 @@ def deck_detail(
         .order_by(DeckRevision.number.desc())
     )
     return DeckDetail(
-        **deck_summary(db, deck).model_dump(),
+        **deck_summary(db, deck, library).model_dump(),
         notes=deck.notes,
         share_code=deck.share_code if deck.visibility == "link" else None,
         draft=Draft(version=deck.draft_version, entries=entries),
@@ -770,6 +820,7 @@ def create_deck(
     *,
     notes: str = "",
     source: str = "empty",
+    sandbox: bool = False,
 ) -> tuple[Deck, Validation]:
     if count_decks(db, principal.user.id) >= MAX_DECKS:
         raise ApiError(
@@ -789,6 +840,7 @@ def create_deck(
         draft_version=1,
         draft_hash="",
         source=source,
+        sandbox=sandbox,
         created_at=stamp,
         updated_at=stamp,
     )
@@ -805,7 +857,7 @@ def revalidate(db: Session, decks: Iterable[Deck], library: Library) -> None:
             db,
             DeckContent(format=deck.format, entries=entries_of(deck)),  # type: ignore[arg-type]
             today(),
-            library.collection(),
+            library_for(deck, library).collection(),
         )
         store_flags(deck, validation)
 
@@ -919,7 +971,7 @@ def publish(db: Session, deck: Deck, library: Library) -> DeckRevision:
         db,
         DeckContent(format=deck.format, entries=entries),  # type: ignore[arg-type]
         today(),
-        library.collection(),
+        library_for(deck, library).collection(),
     )
     catalog = db.scalar(select(func.max(CatalogRevision.id)))
     revision = DeckRevision(
@@ -1055,7 +1107,12 @@ def list_decks(
     if stale:
         roster = roster_of(request)
         revalidate(db, stale, library_of(db, principal.user, principal.permissions, roster))
-    summaries = [deck_summary(db, deck) for deck in decks]
+    # A sandbox deck says whether its owner holds its cards now (v1.0.0): asked of the library
+    # only where the list holds one.
+    held = None
+    if any(deck.sandbox for deck in decks):
+        held = library_of(db, principal.user, principal.permissions, roster_of(request))
+    summaries = [deck_summary(db, deck, held if deck.sandbox else None) for deck in decks]
     if stale:
         db.commit()
     return summaries
@@ -1069,6 +1126,7 @@ def create(
     deck, or a duplicate of one of the player's own."""
     entries, notes, title, fmt = body.entries, body.notes, body.title, body.format
     kind = body.source.kind
+    sandbox = body.sandbox
     if kind == "starter":
         if body.source.starter is None:
             raise ApiError(422, "invalid_source", "Name the starter deck to copy.")
@@ -1086,8 +1144,13 @@ def create(
             original.notes,
             cast(GameFormatName, original.format),
         )
+        # A sandbox deck's duplicate is a sandbox deck: its cards are not all its owner's.
+        sandbox = sandbox or original.sandbox
+    if sandbox:
+        # Behind the sandbox's gate (v1.0.0): refused as something that does not exist.
+        rollout.require(db, "sandbox", principal.user)
     deck, validation = create_deck(
-        db, principal, title, fmt, entries, library, notes=notes, source=kind
+        db, principal, title, fmt, entries, library, notes=notes, source=kind, sandbox=sandbox
     )
     db.commit()
     return deck_detail(db, deck, library, validation)

@@ -61,13 +61,13 @@ from sqlalchemy.exc import InterfaceError, OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from api import access, kings_table, metrics, modes
+from api import access, kings_table, metrics, modes, rollout
 from api import events as events_module
 from api.auth import INPUT_ERRORS
 from api.config import Settings
 from api.custom_play import custom_in_seats
 from api.decklists import in_game, parse_deck_list, refuse_unplayable
-from api.decks import publish, revision_entries, starters_of
+from api.decks import library_for, publish, revision_entries, starters_of
 from api.economy import pay_game, tokens_from
 from api.engine_cards import engine_cards_of
 from api.identity import (
@@ -1879,7 +1879,8 @@ def passive_switchable(game: Game, rows: list[GameSeat], principal: Principal) -
     one), with them its only human seat and at least one bot."""
     humans = [row for row in rows if row.player == "human"]
     return (
-        principal.can("games.passive_bots")
+        # Since v1.0.0 any player's, in their own sandbox game: goldfishing (docs/games.md).
+        (principal.can("games.passive_bots") or game.mode == "sandbox")
         and game.status == "active"
         and game.kind == "practice"
         and len(humans) == 1
@@ -2002,6 +2003,7 @@ def summary_of(
         match=match_ref(db, game),
         kings_table=kings,
         passive_bots=(game.bots_passive if passive_switchable(game, rows, principal) else None),
+        sandbox=game.mode == "sandbox",
         inspectable=everything,
         table=table_ref,
         campaign=(
@@ -2143,6 +2145,15 @@ def own_deck(
     deck = db.get(Deck, deck_id)
     if deck is None or deck.owner_id != owner.id or deck.deleted_at is not None:
         raise ApiError(422, "invalid_deck", "That is not one of your decks.")
+    # A sandbox deck (v1.0.0) holds cards its owner does not own: it is played in the sandbox,
+    # which seats it itself (sandbox_seat), and nowhere a game counts.
+    if deck.sandbox:
+        raise ApiError(
+            422,
+            "sandbox_deck",
+            f"{deck.title} is a sandbox deck: it is played only in the sandbox, from its own "
+            "Sandbox button.",
+        )
     # A lent deck is with the friend it was lent to (v1.0.0, the owner's decision of
     # 2026-11-15): its owner plays it again once the loan ends or is taken back.
     loan = access.lent_out(db, deck)
@@ -2163,6 +2174,41 @@ def own_deck(
         )
     revision = publish(db, deck, library)
     return revision_seat(db, deck, revision, permissions, fmt, library, rules, starter=starter)
+
+
+def sandbox_seat(
+    db: Session,
+    owner: User,
+    permissions: frozenset[str],
+    deck_id: UUID,
+    fmt: str,
+    library: Library,
+    rules: TableRules,
+    *,
+    mine: bool,
+) -> tuple[dict[str, object], UUID, str]:
+    """A seat of a sandbox game (v1.0.0, docs/games.md). The player's own (``mine``) is one of
+    their sandbox decks, checked against every card in the game in place of their library; a
+    bot's is one of their sandbox decks or one of their normal ones."""
+    deck = db.get(Deck, deck_id)
+    if deck is None or deck.owner_id != owner.id or deck.deleted_at is not None:
+        raise ApiError(422, "invalid_deck", "That is not one of your decks.")
+    if not deck.sandbox:
+        if mine:
+            raise ApiError(
+                422,
+                "not_a_sandbox_deck",
+                f"{deck.title} is not a sandbox deck: play it from Play, where its games count.",
+            )
+        return own_deck(db, owner, permissions, deck_id, fmt, library, rules)
+    if deck.format != fmt:
+        raise ApiError(
+            422,
+            "invalid_deck",
+            f"{deck.title} is a {FORMAT_NAMES[deck.format]} deck, not a {FORMAT_NAMES[fmt]} one.",
+        )
+    revision = publish(db, deck, library)
+    return revision_seat(db, deck, revision, permissions, fmt, library_for(deck, library), rules)
 
 
 def revision_seat(
@@ -2428,16 +2474,28 @@ def plan_seats(
                 raise ApiError(422, "invalid_seat", "A seat takes one deck.")
             if not principal.can("decks.edit"):
                 raise ApiError(403, "forbidden", "Your account cannot play its own decks.")
-            seat, revision, title = own_deck(
-                db,
-                principal.user,
-                principal.permissions,
-                deck_id,
-                deck_format,
-                library,
-                body.rules,
-                starter=purchase is not None,
-            )
+            if body.sandbox:
+                seat, revision, title = sandbox_seat(
+                    db,
+                    principal.user,
+                    principal.permissions,
+                    deck_id,
+                    deck_format,
+                    library,
+                    body.rules,
+                    mine=player == "human",
+                )
+            else:
+                seat, revision, title = own_deck(
+                    db,
+                    principal.user,
+                    principal.permissions,
+                    deck_id,
+                    deck_format,
+                    library,
+                    body.rules,
+                    starter=purchase is not None,
+                )
             if purchase is not None:
                 starter_tables.as_bought(purchase, revision)
             if fmt == "two_headed_giant":
@@ -2545,6 +2603,9 @@ def record_game(
         ),
         # The request, for a rematch with the same settings (v0.5.0, api/rematches.py).
         settings=body.model_dump(mode="json"),
+        # A sandbox game (v1.0.0) is of its own mode: it earns nothing and is counted apart
+        # (api/modes.py). Any other practice game's mode is read from its kind, as before.
+        **({"mode": "sandbox"} if body.sandbox else {}),
         kings_table=(
             kings_table.engine_settings(kings_table.config_of(body.kings_table))
             if body.format == kings_table.FORMAT
@@ -2746,6 +2807,26 @@ async def engine_game(
     return cast(dict[str, Any], created)
 
 
+async def start_passive(engine: EngineClient, db: Session, game: Game) -> None:
+    """Makes a new sandbox game's bots passive from the start (v1.0.0). The game is made
+    whether or not this succeeds: its player has the switch in the game too."""
+    try:
+        status, answer = await engine.request(
+            "POST", f"/games/{game.id}/bots", body={"passive": True}
+        )
+    except EngineUnavailable:
+        return
+    if status != 200 or not isinstance(answer, dict) or not answer.get("passive"):
+        return
+
+    def record() -> None:
+        game.bots_passive = True
+        game.passive_bots_used = True
+        db.commit()
+
+    await run_in_threadpool(record)
+
+
 @router.post(
     "/practice-games",
     response_model=GameSummary,
@@ -2781,6 +2862,18 @@ async def create_practice_game(
         )
     if body.best_of not in BEST_OF[fmt]:
         raise ApiError(422, "invalid_table", "Only Legacy plays best of three.")
+    if body.passive and not body.sandbox:
+        raise ApiError(422, "invalid_table", "Only a sandbox game starts with passive bots.")
+    if body.sandbox:
+        # A sandbox game (v1.0.0): behind its workflow's gate, one game of Legacy or Commander
+        # with one of the player's sandbox decks.
+        await run_in_threadpool(rollout.require, db, "sandbox", principal.user)
+        if fmt not in ("legacy", "commander") or body.best_of != 1 or body.starter:
+            raise ApiError(
+                422, "invalid_table", "A sandbox game is one game of Legacy or Commander."
+            )
+        if body.deck_id is None:
+            raise ApiError(422, "not_a_sandbox_deck", "A sandbox game takes a sandbox deck.")
     if body.starter:
         # A starter-deck game (v1.0.0): behind its workflow's gate, Legacy or Commander, one game,
         # by casual rules, which its deck needs to play as it came.
@@ -2835,6 +2928,8 @@ async def create_practice_game(
                 )
         finally:
             hub.starting -= 1
+        if body.passive:
+            await start_passive(engine, db, game)
         return await run_in_threadpool(summary_of, db, game, principal, campaign_or_none(request))
 
 
@@ -2988,9 +3083,13 @@ async def set_bots(
     draw, pass and discard to hand size, from their next decision. Only in the switcher's own
     running practice game (a campaign duel included) with no other human seat. Since v0.9.7 the
     game counts as any other (until then its end paid nothing out). Audited."""
-    if not principal.can("games.passive_bots"):
-        raise ApiError(403, "forbidden", "Only SysOp and administrators can switch the bots.")
     game, _ = await run_in_threadpool(visible_game, db, game_id, principal)
+    if not principal.can("games.passive_bots") and game.mode != "sandbox":
+        raise ApiError(
+            403,
+            "forbidden",
+            "Only SysOp and administrators can switch the bots outside the sandbox.",
+        )
     rows = await run_in_threadpool(
         lambda: list(
             db.scalars(select(GameSeat).where(GameSeat.game_id == game_id).order_by(GameSeat.seat))

@@ -164,6 +164,8 @@ export function deckDetail(fields: Partial<DeckDetail> = {}): DeckDetail {
     id: "deck-1",
     title: "Red deck",
     format: "legacy",
+    sandbox: false,
+    convertible: false,
     visibility: "private",
     card_count: 0,
     legal: true,

@@ -3754,6 +3754,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sandbox/decks/{deck_id}/convert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Convert
+         * @description Makes a sandbox deck a normal deck, once its owner's library holds every copy it plays.
+         *     Its copies take the editions the library holds; from then on it is validated against the
+         *     library and played wherever a deck is. It cannot be made a sandbox deck again: duplicate
+         *     it as one instead.
+         */
+        post: operations["convert_api_v1_sandbox_decks__deck_id__convert_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/saves": {
         parameters: {
             query?: never;
@@ -6199,6 +6222,12 @@ export interface components {
              * @default
              */
             notes: string;
+            /**
+             * Sandbox
+             * @description Since v1.0.0: make it a sandbox deck. A duplicate of a sandbox deck is one whatever this says. Refused, as something that does not exist, while the sandbox is not the account's to reach.
+             * @default false
+             */
+            sandbox: boolean;
             source?: components["schemas"]["DeckSource"];
             /** Title */
             title: string;
@@ -6220,6 +6249,12 @@ export interface components {
             collection_locked: boolean;
             /** Commanders */
             commanders: string[];
+            /**
+             * Convertible
+             * @description A sandbox deck whose every card the library holds now: it can be made a normal deck (POST /sandbox/decks/{id}/convert). Said by a deck's own answer and by the list; false elsewhere.
+             * @default false
+             */
+            convertible: boolean;
             /** Deleted At */
             deleted_at: string | null;
             draft: components["schemas"]["Draft"];
@@ -6260,6 +6295,12 @@ export interface components {
             removed_cards: components["schemas"]["RemovedCard"][];
             /** Revisions */
             revisions: components["schemas"]["RevisionSummary"][];
+            /**
+             * Sandbox
+             * @description Since v1.0.0: a sandbox deck (docs/decks.md). It is built from every card in the game, owned or not, its flags say whether it can start a sandbox game, and it is played nowhere else.
+             * @default false
+             */
+            sandbox: boolean;
             /** Share Code */
             share_code: string | null;
             /**
@@ -6457,6 +6498,12 @@ export interface components {
             collection_locked: boolean;
             /** Commanders */
             commanders: string[];
+            /**
+             * Convertible
+             * @description A sandbox deck whose every card the library holds now: it can be made a normal deck (POST /sandbox/decks/{id}/convert). Said by a deck's own answer and by the list; false elsewhere.
+             * @default false
+             */
+            convertible: boolean;
             /** Deleted At */
             deleted_at: string | null;
             /**
@@ -6492,6 +6539,12 @@ export interface components {
              * @description Cards that left the draft because the game cannot play them (v0.4.5), until the owner dismisses the note.
              */
             removed_cards: components["schemas"]["RemovedCard"][];
+            /**
+             * Sandbox
+             * @description Since v1.0.0: a sandbox deck (docs/decks.md). It is built from every card in the game, owned or not, its flags say whether it can start a sandbox game, and it is played nowhere else.
+             * @default false
+             */
+            sandbox: boolean;
             /**
              * Sleeve
              * @description The card sleeve its cards wear at a table (v0.8.9): "sleeve:<id>", "back:<slug>", or null for the default.
@@ -7113,6 +7166,12 @@ export interface components {
              */
             passive_bots?: boolean | null;
             result: components["schemas"]["GameResult"] | null;
+            /**
+             * Sandbox
+             * @description Since v1.0.0: a sandbox game (docs/games.md): it earns nothing and leaves nothing in the record, and its player restarts it and switches its bots.
+             * @default false
+             */
+            sandbox: boolean;
             /** Seats */
             seats: components["schemas"]["GameSeat"][];
             /**
@@ -8634,8 +8693,20 @@ export interface components {
             format: "legacy" | "commander" | "two_headed_giant" | "kings_table";
             /** @description King's Table (v0.8.7): its settings, the defaults when left out. Refused in other formats. */
             kings_table?: components["schemas"]["KingsTableSettings"] | null;
+            /**
+             * Passive
+             * @description Since v1.0.0, a sandbox game only: the bots do nothing but draw, pass and discard, from the start (goldfishing). The player switches them in the game too.
+             * @default false
+             */
+            passive: boolean;
             /** @description Which cards the game's own decks may hold by their legality; casual unless told otherwise. */
             rules?: components["schemas"]["TableRules"];
+            /**
+             * Sandbox
+             * @description Since v1.0.0: a sandbox game (docs/games.md). deck_id is one of your sandbox decks, which may hold cards you do not own; a bot may play one too. One game, by casual rules, in Legacy or Commander. It earns nothing and is counted apart (the mode sandbox). Refused while the sandbox is not the account's to reach.
+             * @default false
+             */
+            sandbox: boolean;
             /**
              * Seat
              * @description King's Table (v0.8.7): 0 team A's Left General, 1 team A's King, 2 team A's Right General, 3 team B's Right General, 4 team B's King, 5 team B's Left General. Your seat; team A's King (1) when left out. Refused in other formats.
@@ -31909,6 +31980,100 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Reach"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    convert_api_v1_sandbox_decks__deck_id__convert_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeckDetail"];
                 };
             };
             /** @description Bad Request */

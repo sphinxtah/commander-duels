@@ -633,6 +633,7 @@ describe("Leng's starter decks (v0.4.2)", () => {
         format: "commander",
         notes: "",
         source: { kind: "starter", starter: "two" },
+        sandbox: false,
       },
     });
     fireEvent.click(screen.getByRole("button", { name: "Back to the shop" }));

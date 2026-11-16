@@ -525,6 +525,18 @@ class PracticeGameRequest(Contract):
         "as it came under casual rules, and each bot plays a starter deck of the same kind, so "
         "bots names none. Refused while the workflow is not the account's to reach.",
     )
+    sandbox: bool = Field(
+        default=False,
+        description="Since v1.0.0: a sandbox game (docs/games.md). deck_id is one of your "
+        "sandbox decks, which may hold cards you do not own; a bot may play one too. One game, "
+        "by casual rules, in Legacy or Commander. It earns nothing and is counted apart "
+        "(the mode sandbox). Refused while the sandbox is not the account's to reach.",
+    )
+    passive: bool = Field(
+        default=False,
+        description="Since v1.0.0, a sandbox game only: the bots do nothing but draw, pass and "
+        "discard, from the start (goldfishing). The player switches them in the game too.",
+    )
 
 
 class PracticeFormat(Contract):
@@ -750,6 +762,11 @@ class GameSummary(Contract):
         "game counts as any other; until then nothing about it paid out once they had been. "
         "Null for everyone else, and for a game where the viewer may not switch them: one that "
         "is not their own running practice or campaign game with them its only human seat.",
+    )
+    sandbox: bool = Field(
+        default=False,
+        description="Since v1.0.0: a sandbox game (docs/games.md): it earns nothing and leaves "
+        "nothing in the record, and its player restarts it and switches its bots.",
     )
     inspectable: bool = Field(
         default=False,

@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { client, type Me } from "../api";
+import { NOTHING_EARNED, restartSandbox } from "../decks/sandbox";
 import {
   ReportMessageDialog,
   type ReportedMessage,
@@ -207,6 +208,10 @@ export function GameScreen({
   // "Save and leave" (v1.0.0, saves.tsx), where save and resume is open to the account.
   const saveDialog = useRef<HTMLDialogElement>(null);
   const suspendDialog = useRef<HTMLDialogElement>(null);
+  // A sandbox game's Restart (v1.0.0): the game is closed and its setup played again.
+  const restartDialog = useRef<HTMLDialogElement>(null);
+  const [restarting, setRestarting] = useState(false);
+  const [restartError, setRestartError] = useState("");
   const saving = useWorkflow("save_resume");
   // "Watch the replay" on the result (v1.0.0, ../replay), where replays are open to the account.
   const replays = useWorkflow("replays");
@@ -756,8 +761,10 @@ export function GameScreen({
           : { href: "#play", text: "Back to the table" };
   const paid =
     summary?.status === "finished" && summary.tokens ? summary.tokens : null;
-  const tokensLine =
-    paid !== null
+  // A sandbox game (v1.0.0) says on its result that it earned nothing, and why.
+  const tokensLine = summary?.sandbox
+    ? "A sandbox game: nothing was earned, and nothing is in your record."
+    : paid !== null
       ? `This game paid you ${paid.toLocaleString()} tokens.`
       : null;
   // A player who comes back after the API stopped following the game sees how it ended.
@@ -969,6 +976,15 @@ export function GameScreen({
                     ? () => {
                         closeMenu(false);
                         suspendDialog.current?.showModal();
+                      }
+                    : undefined
+                }
+                onRestart={
+                  summary?.sandbox && !scripted
+                    ? () => {
+                        closeMenu(false);
+                        setRestartError("");
+                        restartDialog.current?.showModal();
                       }
                     : undefined
                 }
@@ -1201,6 +1217,12 @@ export function GameScreen({
                   )}
                   {/* Passive bots outside the Inspection drawer: only for a viewer without it.
                       Since v0.8.9 an administrator's switch is in that drawer, as SysOp's. */}
+                  {summary?.sandbox && (
+                    <p className={styles.hint} data-sandbox-note>
+                      <strong>Sandbox game.</strong> {NOTHING_EARNED} Restart it
+                      from the Game menu.
+                    </p>
+                  )}
                   {!sysop && summary?.passive_bots != null && (
                     <PassiveBots
                       gameId={gameId}
@@ -1406,6 +1428,52 @@ export function GameScreen({
                   Concede
                 </button>
               </form>
+            </dialog>
+            {/* A sandbox game (v1.0.0) is restarted: closed, and its setup played again. */}
+            <dialog
+              ref={restartDialog}
+              className={styles.confirm}
+              aria-labelledby="restart-title"
+            >
+              <h2 id="restart-title">Restart this sandbox game?</h2>
+              <p>
+                This game ends here, and the same setup starts again with a new
+                shuffle: your deck, the bots, their decks and their skill.
+                Nothing is earned or recorded either way.
+              </p>
+              {restartError && (
+                <p role="alert" className={styles.refusal}>
+                  {restartError}
+                </p>
+              )}
+              <div className={styles.confirmButtons}>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  autoFocus
+                  onClick={() => restartDialog.current?.close()}
+                >
+                  Keep playing
+                </button>
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  disabled={restarting}
+                  onClick={() => {
+                    setRestarting(true);
+                    setRestartError("");
+                    void restartSandbox(gameId, !over).then((answer) => {
+                      setRestarting(false);
+                      if (answer.id) {
+                        restartDialog.current?.close();
+                        window.location.hash = `#game/${answer.id}`;
+                      } else setRestartError(answer.error ?? "");
+                    });
+                  }}
+                >
+                  {restarting ? "Restarting…" : "Restart"}
+                </button>
+              </div>
             </dialog>
             {!scripted && (
               <SaveDialog

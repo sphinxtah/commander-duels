@@ -74,7 +74,7 @@ Every workflow is `off` until it is set.
 | Workflow | Delivers (spec §) | Guards today | Paths reserved for its routes (after `/api/v1`) |
 | --- | --- | --- | --- |
 | `save_resume` | Save and resume (17) | Since v1.0.0 saving, resuming and discarding a game against the bots, and a private table's suspension by its players' vote ([games](games.md#save-and-resume-v100)); recovery itself is on for everyone | `/saves`, `/games/{id}/save`, `/tables/{id}/suspension` |
-| `sandbox` | The practice sandbox (19) | Sandbox access; the `sandbox` mode | `/sandbox` |
+| `sandbox` | The practice sandbox (19) | Since v1.0.0 sandbox decks, sandbox games and the conversion ([the sandbox](decks.md#the-sandbox-v100)); the `sandbox` mode; sandbox access (not asked: the gate alone decides) | `/sandbox` |
 | `deck_lending` | Friend deck lending (20) | Since v1.0.0 a deck offered to a friend, looked at, accepted and given back, and seated at a private table where its lender sits ([friend deck lending](decks.md#friend-deck-lending-v100)); a lent deck's access; the `borrowed` mode; that a deck out on loan is not its owner's to play | `/loans`, `/decks/{id}/loans` |
 | `replays` | Replays and review (23) | Since v1.0.0 a game played back, a reader's bookmarks and notes, and a replay shared with a friend ([replays](replays.md)); a shared replay's access | `/replays`, `/games/{id}/replay` |
 | `spectators` | Spectators (24) | A spectator's access | `/games/{id}/spectators`, `/tables/{id}/spectators` |

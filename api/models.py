@@ -1161,6 +1161,9 @@ class Deck(Base):
     owner_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
     title: Mapped[str] = mapped_column(String(80))
     format: Mapped[str] = mapped_column(String(16))
+    # A sandbox deck (v1.0.0, api/sandbox.py): built from every card in the game, owned or not,
+    # and played only in the sandbox, until its owner converts it once they own its cards.
+    sandbox: Mapped[bool] = mapped_column(default=False, server_default=false())
     # private, or link: anyone signed in who has the link may view it (DECK11).
     visibility: Mapped[str] = mapped_column(String(16), default="private")
     share_code: Mapped[str | None] = mapped_column(String(32), unique=True)

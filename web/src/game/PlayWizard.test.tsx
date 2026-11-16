@@ -54,6 +54,8 @@ function summary(fields: Partial<DeckSummary>): DeckSummary {
     id: "deck-1",
     title: "Red deck",
     format: "legacy",
+    sandbox: false,
+    convertible: false,
     visibility: "private",
     card_count: 60,
     legal: true,

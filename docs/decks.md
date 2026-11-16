@@ -227,6 +227,50 @@ A player lends one of their decks to a friend, who plays it without owning its c
 
 **Tests.** `tests/test_loans.py` (7): the loan's life from offer to given back, with the version bound and the owner's edits kept out; the table's rules one by one, the seat's mark, the game's mode and the revision played; a loan taken back or run out; what is not lent, and the gate closed and at `staff`; a rematch; a blocked pair; a best-of-three match with its sideboarding. `web/src/decks/DeckLoans.test.tsx` (7) and `web/src/tables/BorrowedDecks.test.tsx` (5). A journey in two browsers against the real engine, in `web/e2e/team-tables.spec.ts` (beside the team journeys, because it seats one of their accounts and an account sits at one open table at a time): SysOp lends a deck to a player who owns none of its cards but the basic lands; the player is told by the bell, looks at the list and accepts; the deck is greyed in its owner's table-opening form and the server refuses it by name (`409 deck_lent`); the player sits at the lender's private table with it, the seat says Borrowed deck in both browsers, and the game is played with the lent cards; the lender takes the deck back while the game runs, the game plays on to its end, and the deck is its owner's again.
 
+## The sandbox (v1.0.0)
+
+A player tests cards they do not own, against bots, in games that earn nothing: the specification's section 19 (`api/sandbox.py`, with the deck's part in `api/decks.py` and the game's in `api/games.py`; in the web `web/src/decks/sandbox.ts`, `SandboxDialog.tsx`, `SampleHand.tsx`). Behind the gate `sandbox` ([the gates](operations.md#the-gates)): while it is not an account's to reach, a sandbox deck cannot be made, no sandbox game starts, the conversion's route answers as a path that does not exist, and the pages offer nothing of it. A sandbox deck made before stays its owner's to read and edit.
+
+**The owner's decisions** (2026-11-16; [the v1.0.0 plan](plans/1.0.0.md#the-owners-decisions-at-its-start-2026-11-14), decisions 33 to 36):
+
+- **Every player** has the sandbox once its gate is open. The grant of sandbox access that only SysOp could give (v0.9.10, [access](access.md)) is not asked.
+- **A sandbox deck is its own kind of deck** (`decks.sandbox`): made by "New sandbox deck", labelled, listed apart, never playable elsewhere, and made a normal deck once every card is owned.
+- **A sandbox game is started from the deck**: a Sandbox button among the deck's own, on the Decks page and in the editor. Not in the Play wizard, and no page of its own.
+- **Sample hands and a restart**: opening hands drawn on the deck's Workshop with no game, and a Restart in a sandbox game's menu.
+
+**A sandbox deck.**
+
+- **Built from every card in the game.** Its validation, its saved versions and its flags take every card as available, any number of copies, any edition (`decks.library_for`: its owner's library with no limit). The deck's own rules still hold: its format's size, its copy limits, its commander's identity. Two things stay what an account must hold itself: the Godlike tier's custom cards and the one-of-a-kind printings.
+- **Nothing is owned.** No route of the sandbox writes a library grant. A card a sandbox deck holds is in no collection, so it reaches neither a sale nor an auction. The editor still says how many copies of each card the account owns.
+- **Played only in the sandbox.** `games.own_deck` refuses it wherever a deck is chosen for a game that counts (practice, a table, a queue, the campaign, a rematch there): `422 sandbox_deck`. It is not lent (`422 not_lendable`). The web leaves it out of those choices.
+- **A duplicate** of a sandbox deck is a sandbox deck. Any deck may be duplicated as one (`sandbox` with a `duplicate` source): the Decks page offers **Copy as a sandbox deck** on a deck that needs cards its owner lacks (an imported list, a copied starter), to try it as it is.
+- **Made a normal deck** (`POST /sandbox/decks/{id}/convert`) once the library holds every copy it plays, counted after its copies take the editions the library holds: `convertible` on the deck says so, in its own answer and in the list. `409 cards_missing` until then. From then on it is validated against the library and played wherever a deck is; it is not made a sandbox deck again (duplicate it as one). The Workshop's **Missing cards** lists what a sandbox deck would need, with the open auctions and the packs, as for any deck.
+
+**A sandbox game** is a practice game asked for as one (`POST /practice-games` with `sandbox`): one game of Legacy or Commander, the player's seat a sandbox deck of theirs, each bot a deck of the game's own or one of the player's decks, sandbox or normal, at the skill chosen.
+
+- **It earns nothing.** Its mode is `sandbox` ([modes](modes.md)): tokens, progress, quests, achievements, the standings and the record are each withheld, with the reason `sandbox_cards_not_owned` kept on the game (`games.eligibility`). By the owner's policy of 2026-11-13 the record is among them: a sandbox game leaves no result, so neither the account's record nor a deck's results count it. The setup says so before the game starts, the game says so in its options, and its result says so.
+- **Bots that do nothing.** `passive` starts the game with passive bots (they draw, pass and discard), and the player has the switch in the game: the same switch SysOp and administrators have in their own practice games, here any player's in their own sandbox game.
+- **Restart.** The game's menu has Restart: the game is closed, and its setup is played again with a new shuffle (`POST /games/{id}/close`, then the game's rematch, which replays the request kept with it, the sandbox and the passive bots included).
+
+**Sample hands** (the Workshop's fourth part, for any deck): seven cards from the main deck as the draft stands, shuffled in the browser, with nothing asked of the server and nothing kept. Mulligan deals seven new cards and owes one to the bottom for each mulligan taken, as the game does; in Commander a box says whether three or more play, where the first mulligan is free. Draw a card takes the next one. The editor's figures keep their own plain seven ("Draw a sample hand" under Opening hand, since v0.2): the Workshop's is the one with the mulligan.
+
+**In the web.**
+
+- **Decks page.** "New sandbox deck" beside "New deck"; its dialog says what a sandbox deck is. Sandbox decks are listed under their own heading, each marked **Sandbox deck** and, when it can start, "Ready for the sandbox". A row has **Sandbox**, which opens the setup (opponents, each bot's deck, the bots' skill, "Bots that do nothing"), and **Convert to a normal deck** once its cards are owned.
+- **The editor.** The card finder starts on "All cards" for a sandbox deck. "This deck" marks it, says what it is, and has Sandbox and the conversion.
+- **The game.** Its options say it is a sandbox game and what that earns; the Game menu has Restart, which asks first.
+
+**Choices Claude made, for the owner to change:**
+
+- A sandbox game is Legacy or Commander against bots, one game: no Two-Headed Giant, no King's Table, no best of three, no table with friends.
+- A sandbox game leaves no result at all (the approved policy withholds the record with the rest), so "sandbox statistics told apart" is: there are none.
+- The conversion goes one way; a sandbox copy is made by duplicating.
+- A list is imported, or built with help, as a normal deck, then copied as a sandbox deck from its row.
+- The Godlike tier's custom cards and the one-of-a-kind printings are not the sandbox's unless the account holds them.
+- The list of the account's games does not mark a sandbox game; the game itself and its result do.
+
+**Tests.** `tests/test_sandbox.py` (4): a sandbox deck against a normal one with the same list, its duplicate, a normal deck copied as one, and where it is refused; a sandbox game's seats, passive bots, switch, restart and what it earns; the conversion before and after the cards are owned; the gate closed and at `staff`. `web/src/decks/Sandbox.test.tsx` (11) and `sampleHand.test.ts` (5). A journey against the real engine in `web/e2e/team-tables.spec.ts`: an account that owns none of the deck's cards but the basic lands makes a sandbox deck, plays it against bots that do nothing, restarts it, concedes, is told nothing was earned, and its tokens are what they were; then its Workshop draws a sample hand and lists the missing cards.
+
 ## Routes
 
 All under `/api/v1`, for the signed-in owner only; another account's deck answers 404, as a deck in the trash does except for restoring it.
@@ -253,3 +297,4 @@ All under `/api/v1`, for the signed-in owner only; another account's deck answer
 | `GET /me/wishlist`, `PUT`/`DELETE /me/wishlist/{card}` | v0.9.12: the cards an account wants |
 | `GET /loans`, `GET`/`POST /decks/{id}/loans` | v1.0.0, gate `deck_lending`: the loans given and taken; a deck's open loan; a deck offered to a friend (`{"player_id"}`) |
 | `GET /loans/{id}/deck`, `POST /loans/{id}/accept`, `/decline`, `DELETE /loans/{id}` | v1.0.0: the lent version's list; the friend's answer; the loan ended by either of them |
+| `POST /decks` with `sandbox`, `POST /sandbox/decks/{id}/convert` | v1.0.0, gate `sandbox`: a sandbox deck made; one made a normal deck once its cards are owned |

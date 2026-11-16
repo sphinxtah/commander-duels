@@ -125,6 +125,7 @@ function starterChoice(deck: DeckOffer, purchase: DeckPurchase): DeckChoice {
           format: "commander",
           notes: "",
           source: { kind: "starter", starter: deck.id },
+          sandbox: false,
         },
       });
       return data ? { id: data.id, title: data.title } : describe(error);

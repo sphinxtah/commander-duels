@@ -257,6 +257,12 @@ def offer_deck(
             "loan_limit",
             f"An account has at most {LOAN_LIMIT} decks out at once. Take one back first.",
         )
+    if deck.sandbox:
+        raise ApiError(
+            422,
+            "not_lendable",
+            f"{deck.title} is a sandbox deck: it is played only in the sandbox.",
+        )
     entries = entries_of(deck)
     if len(without_custom(db, entries)) != len(entries):
         raise ApiError(

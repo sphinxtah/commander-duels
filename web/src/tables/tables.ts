@@ -176,7 +176,8 @@ export function useOwnDecks(): OwnDeck[] | null {
     void client
       .GET("/api/v1/decks", { params: { query: { view: "active" } } })
       .then(({ data }) => {
-        if (active) setDecks(data ?? []);
+        // A sandbox deck (v1.0.0) is played only in the sandbox, from its own button.
+        if (active) setDecks((data ?? []).filter((deck) => !deck.sandbox));
       });
     return () => {
       active = false;

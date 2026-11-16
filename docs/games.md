@@ -292,6 +292,15 @@ A game against the bots can be closed into its recording and played on later ([r
 
 Migration `0052_game_saves` lets a game's status be `saved` and adds `game_saves`: each time a game was saved, until when, the engine build that holds it, and how the save ended. Its downgrade is refused while a game is saved.
 
+### Sandbox games (v1.0.0)
+
+A practice game asked for with `sandbox` ([the sandbox](decks.md#the-sandbox-v100), behind the gate `sandbox`): one game of Legacy or Commander, the player's seat one of their sandbox decks, checked against every card in the game in place of their library (`games.sandbox_seat`).
+
+- **Its mode is `sandbox`** ([modes](modes.md)): nothing is earned and no result is recorded; the game keeps why (`games.eligibility`). Its summary says `sandbox`.
+- **`passive`** starts it with passive bots, and its player switches them in the game (`PUT /games/{id}/bots`): outside the sandbox that switch stays SysOp's and the administrators'.
+- **A restart** is the game closed and its rematch asked for: the rematch replays the request kept with the game, the sandbox and the passive bots with it.
+- **Refusals.** `404` while the sandbox is not the account's to reach; `422 invalid_table` for another format, best of three, a starter-deck game, or `passive` outside the sandbox; `422 not_a_sandbox_deck` where the player's own deck is a normal one; `422 sandbox_deck` where a sandbox deck is chosen for any other game.
+
 ### Recordings and attaching (v0.9.9)
 
 With `CD_ENGINE_RECORDINGS` set to a folder (the engine's image sets it), every service game keeps a recording of itself there, and a game the engine no longer has in memory is taken up again from it ([recording and recovery](engine/recovery.md)). The engine takes nothing up by itself. The API asks:

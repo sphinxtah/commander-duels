@@ -125,6 +125,7 @@ describe("a deck's Workshop", () => {
       "Versions",
       "Results",
       "Missing cards",
+      "Sample hands",
     ]);
     expect(screen.getByRole("tab", { name: "Versions" })).toHaveAttribute(
       "aria-selected",
