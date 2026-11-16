@@ -518,6 +518,7 @@ describe("the Cards page", () => {
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
       "My library",
       "All cards",
+      "Wishlist",
       "Alliance cards",
     ]);
     expect(document.body).not.toHaveTextContent(/godlike|custom/i);

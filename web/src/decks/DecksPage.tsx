@@ -9,6 +9,7 @@ import {
 } from "react";
 import { client, describe, type Me } from "../api";
 import { formatLabels } from "../catalog/catalog";
+import { DeckFilterBar, Organizer, ShelfLine } from "./DeckShelves";
 import { GuidedDialog } from "./GuidedDialog";
 import { ImportDialog } from "./ImportDialog";
 import { LockIcon, NeedsTags } from "./ProblemList";
@@ -18,7 +19,19 @@ import {
   type DeckSummary,
   type StarterDeck,
 } from "./decks";
+import {
+  NO_FILTERS,
+  filtering,
+  foldersOf,
+  shownDecks,
+  type DeckFilters,
+  type Organize,
+} from "./workshop";
 import styles from "./decks.module.css";
+
+// Since v1.0.0 (the deck workshop, docs/decks.md) the list has a filter bar (a search, a
+// folder, tags, an order) and a batch organizer: several decks ticked are filed in one request,
+// all of them or none (DeckShelves.tsx); and each deck leads to its Workshop page.
 
 type View = "active" | "archived" | "trash";
 type DeckState = "playable" | "locked" | "legal" | "draft";
@@ -152,6 +165,12 @@ function Decks({
   const purging = useRef<HTMLDialogElement>(null);
   const [purged, setPurged] = useState<DeckSummary | "all" | null>(null);
   const lists = useRef(0);
+  // The shelves (v1.0.0): what the list is narrowed to, and the decks ticked for the organizer
+  // (null while none are being chosen).
+  const [filters, setFilters] = useState<DeckFilters>(NO_FILTERS);
+  const [chosen, setChosen] = useState<string[] | null>(null);
+  const [organizing, setOrganizing] = useState(false);
+  const [organizeError, setOrganizeError] = useState("");
 
   const refresh = useCallback(async () => {
     // Only the newest list may show: an older answer landing last (the list asked for after
@@ -234,6 +253,27 @@ function Decks({
     void latestRefresh.current();
   }
 
+  /** Files the decks ticked: all of them, or none and the reason. */
+  async function organize(request: Organize) {
+    setOrganizing(true);
+    setOrganizeError("");
+    setMessage("");
+    const { data, error } = await client
+      .POST("/api/v1/decks/organize", { body: request })
+      .catch(() => ({ data: undefined, error: undefined }));
+    setOrganizing(false);
+    if (!data) return setOrganizeError(describe(error));
+    const count = request.deck_ids.length;
+    setMessage(`${count} ${count === 1 ? "deck" : "decks"} organized.`);
+    setChosen(null);
+    void latestRefresh.current();
+  }
+
+  // The decks the filters leave; the trash is listed whole.
+  const shelved = view !== "trash";
+  const shown = decks && shelved ? shownDecks(decks, filters) : decks;
+  const ticked = (decks ?? []).filter((deck) => chosen?.includes(deck.id));
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     const failure = await createDeck({
@@ -295,7 +335,13 @@ function Decks({
             role="tab"
             type="button"
             aria-selected={view === item}
-            onClick={() => setView(item)}
+            onClick={() => {
+              setView(item);
+              // Each view has its own decks, folders and tags.
+              setFilters(NO_FILTERS);
+              setChosen(null);
+              setOrganizeError("");
+            }}
           >
             {
               { active: "Your decks", archived: "Archived", trash: "Trash" }[
@@ -331,10 +377,93 @@ function Decks({
               </button>
             </div>
           )}
+          {shelved && (
+            <>
+              <DeckFilterBar
+                decks={decks}
+                filters={filters}
+                onChange={setFilters}
+              />
+              <div className={styles.shelfActions}>
+                <p role="status" className={styles.shown}>
+                  {filtering(filters)
+                    ? `${shown!.length} of ${decks.length} ${decks.length === 1 ? "deck" : "decks"}`
+                    : `${decks.length} ${decks.length === 1 ? "deck" : "decks"}`}
+                </p>
+                {filtering(filters) && (
+                  <button
+                    type="button"
+                    className={styles.secondary}
+                    onClick={() =>
+                      setFilters({ ...NO_FILTERS, sort: filters.sort })
+                    }
+                  >
+                    Show every deck
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className={styles.secondary}
+                  aria-pressed={chosen !== null}
+                  onClick={() => {
+                    setChosen(chosen === null ? [] : null);
+                    setOrganizeError("");
+                  }}
+                >
+                  {chosen === null ? "Organize decks" : "Stop organizing"}
+                </button>
+                {chosen !== null && shown!.length > 0 && (
+                  <button
+                    type="button"
+                    className={styles.secondary}
+                    onClick={() => setChosen(shown!.map((deck) => deck.id))}
+                  >
+                    Tick all {shown!.length} shown
+                  </button>
+                )}
+              </div>
+              {chosen !== null &&
+                (ticked.length > 0 ? (
+                  <Organizer
+                    chosen={ticked}
+                    folders={foldersOf(decks).map((folder) => folder.name)}
+                    busy={organizing}
+                    error={organizeError}
+                    onOrganize={(request) => void organize(request)}
+                    onCancel={() => setChosen(null)}
+                  />
+                ) : (
+                  <p className={styles.hint}>
+                    Tick the decks to organize: they are moved into a folder or
+                    tagged together.
+                  </p>
+                ))}
+              {shown!.length === 0 && (
+                <p className={styles.hint}>
+                  No deck matches. Clear the search, the folder or the tags.
+                </p>
+              )}
+            </>
+          )}
           <ul className={styles.deckList}>
-            {decks.map((deck) => (
-              <li key={deck.id}>
+            {shown!.map((deck) => (
+              <li key={deck.id} data-chosen={chosen?.includes(deck.id)}>
                 <div>
+                  {chosen !== null && (
+                    <input
+                      type="checkbox"
+                      className={styles.pick}
+                      aria-label={`Organize ${deck.title}`}
+                      checked={chosen.includes(deck.id)}
+                      onChange={(event) =>
+                        setChosen(
+                          event.target.checked
+                            ? [...chosen, deck.id]
+                            : chosen.filter((id) => id !== deck.id),
+                        )
+                      }
+                    />
+                  )}
                   <a
                     href={view === "trash" ? undefined : `#deck/${deck.id}`}
                     className={styles.deckTitle}
@@ -355,6 +484,7 @@ function Decks({
                       ` · ${switchedWords(deck.switched_editions ?? [])}`}
                   </span>
                   <NeedsTags needs={deck.needs} format={deck.format} />
+                  {shelved && <ShelfLine deck={deck} />}
                 </div>
                 <StateBadge
                   state={
@@ -392,6 +522,13 @@ function Decks({
                     <>
                       <a className={styles.secondary} href={`#deck/${deck.id}`}>
                         Open
+                      </a>
+                      {/* Its versions, its results and what it lacks (v1.0.0). */}
+                      <a
+                        className={styles.secondary}
+                        href={`#deck/${deck.id}/workshop`}
+                      >
+                        Workshop
                       </a>
                       <button
                         type="button"

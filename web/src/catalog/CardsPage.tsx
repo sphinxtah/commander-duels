@@ -10,6 +10,7 @@ import {
 } from "./AllianceCards";
 import { useCustomCards } from "./CustomCards";
 import { MyLibrary } from "./MyLibrary";
+import { WishButton, WishlistView, useWishlist } from "./Wishlist";
 import {
   emptySearch,
   type CatalogStatus,
@@ -27,8 +28,9 @@ const PAGE_SIZE = 60;
  * play), and the allied Planeswalker's cards (v0.4.2), which at the Godlike tier's Planeswalker
  * are its custom cards. Since v0.5.0 the library comes first, and opens the page (the owner's
  * request). */
-type View = "catalog" | "library" | "alliance";
-const VIEWS: View[] = ["library", "catalog", "alliance"];
+type View = "catalog" | "library" | "wishlist" | "alliance";
+// Since v1.0.0 the wishlist is a view here, beside the library (the owner's decision 27).
+const VIEWS: View[] = ["library", "catalog", "wishlist", "alliance"];
 
 export function catalogLine(status: CatalogStatus | undefined): string {
   if (!status) return "";
@@ -127,6 +129,8 @@ function Browser({
   const status = useCatalogStatus();
   const custom = useCustomCards();
   const alliance = useAllianceCards();
+  // The account's wishlist (v1.0.0): its own view, and a button in every card's details.
+  const wishes = useWishlist();
   const { results, answered, error, loading } = useCardSearch(
     search,
     page,
@@ -159,6 +163,7 @@ function Browser({
               {
                 catalog: "All cards",
                 library: "My library",
+                wishlist: "Wishlist",
                 alliance: allianceTabName(alliance.cards),
               }[item]
             }
@@ -181,6 +186,9 @@ function Browser({
           view={shownAs}
           onView={setShownAs}
         />
+      )}
+      {view === "wishlist" && (
+        <WishlistView wishes={wishes} onOpen={openCard} />
       )}
       {view === "alliance" && (
         <AllianceCardsView
@@ -283,6 +291,7 @@ function Browser({
             printings={open.printings}
             finish={open.finish}
             onZoom={setZoom}
+            actions={<WishButton cardId={open.card.id} wishes={wishes} />}
           />
         )}
       </dialog>

@@ -40,6 +40,7 @@ import { returningGame } from "./campaign/campaign";
 import { CampaignPage } from "./campaign/CampaignPage";
 import { CardsPage } from "./catalog/CardsPage";
 import { DeckEditor } from "./decks/DeckEditor";
+import { DeckWorkshop } from "./decks/DeckWorkshop";
 import { DecksPage } from "./decks/DecksPage";
 import { SharedDeck } from "./decks/SharedDeck";
 import { ShopPage } from "./shop/ShopPage";
@@ -75,6 +76,8 @@ import styles from "./App.module.css";
 const RECHECK_MS = 30_000;
 const GAME_ROUTE = /^#game\/([0-9a-f-]{36})$/i;
 const DECK_ROUTE = /^#deck\/([0-9a-f-]{36})$/i;
+/** A deck's Workshop (v1.0.0): its versions, its results and what it lacks. */
+const WORKSHOP_ROUTE = /^#deck\/([0-9a-f-]{36})\/workshop$/i;
 const SHARED_ROUTE = /^#shared\/([A-Za-z0-9_-]{8,32})$/;
 const TABLE_ROUTE = /^#tables\/([A-Za-z0-9_-]{8,32})$/;
 const MATCH_ROUTE = /^#match\/([0-9a-f-]{36})$/i;
@@ -101,11 +104,13 @@ function hashOf(url: string): string {
     return "";
   }
 }
-/** #deck/<id> opens a deck in the editor; #shared/<code>, a deck shared by link. */
-function currentDeck(): { deck?: string; shared?: string } {
+/** #deck/<id> opens a deck in the editor; #deck/<id>/workshop, its Workshop (v1.0.0);
+ * #shared/<code>, a deck shared by link. */
+function currentDeck(): { deck?: string; workshop?: string; shared?: string } {
   const hash = window.location.hash;
   return {
     deck: DECK_ROUTE.exec(hash)?.[1]?.toLowerCase(),
+    workshop: WORKSHOP_ROUTE.exec(hash)?.[1]?.toLowerCase(),
     shared: SHARED_ROUTE.exec(hash)?.[1],
   };
 }
@@ -739,6 +744,12 @@ export function App() {
               <DeckEditor
                 key={deckRoute.deck}
                 deckId={deckRoute.deck}
+                heading={heading}
+              />
+            ) : page === "Decks" && deckRoute.workshop ? (
+              <DeckWorkshop
+                key={deckRoute.workshop}
+                deckId={deckRoute.workshop}
                 heading={heading}
               />
             ) : page === "Decks" && deckRoute.shared ? (

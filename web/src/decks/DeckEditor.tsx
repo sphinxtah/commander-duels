@@ -1414,6 +1414,10 @@ function DeckMeta({
         >
           Save a version
         </button>
+        {/* Its versions compared and restored, its results, what it lacks (v1.0.0). */}
+        <a className={styles.secondary} href={`#deck/${deck.id}/workshop`}>
+          Workshop
+        </a>
         <a
           className={styles.secondary}
           href={`/api/v1/decks/${deck.id}/export?kind=text`}

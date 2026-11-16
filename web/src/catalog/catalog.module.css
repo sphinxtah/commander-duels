@@ -957,3 +957,35 @@
 .rowActions > button + button {
   margin-left: 12px;
 }
+
+/* The wishlist (v1.0.0): a view beside My library, and a button in a card's details. */
+.wishTitle {
+  margin: 18px 0 6px;
+  font-size: 1.2rem;
+}
+.wishLead {
+  color: #aeb8ac;
+  max-width: 68ch;
+  line-height: 1.55;
+  margin: 6px 0 12px;
+}
+.wishCount {
+  width: 5.5rem;
+  background: #0c1314;
+  border: 1px solid #ffffff1f;
+  border-radius: 5px;
+  padding: 6px 8px;
+  color: inherit;
+  font: inherit;
+}
+.wishCount:focus-visible {
+  outline: 2px solid #e3c68f;
+  outline-offset: 2px;
+}
+.wishAction {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 12px 0;
+}

@@ -153,6 +153,66 @@ test.describe("decks and the card catalog", () => {
     await expect(
       page.getByText(`${title} is back with your decks.`),
     ).toBeVisible();
+
+    // The deck workshop (v1.0.0), against the real API. Filed from the list: the organizer says
+    // what it will change before it is sent, and the deck's row shows its folder and tags.
+    await page.getByRole("tab", { name: "Your decks" }).click();
+    const shelves = page.getByRole("search", { name: "Find a deck" });
+    await shelves.getByLabel("Search").fill(title);
+    await page.getByRole("button", { name: "Organize decks" }).click();
+    await page.getByRole("checkbox", { name: `Organize ${title}` }).check();
+    const organizer = page.getByRole("region", { name: "Organize 1 deck" });
+    await organizer.getByLabel("Move to a folder").fill("Journeys");
+    await organizer.getByLabel("Add tags").fill("burn, journey");
+    await expect(organizer.getByRole("status")).toContainText(
+      "Move them into the folder “Journeys”.",
+    );
+    await organizer.getByRole("button", { name: "Organize 1 deck" }).click();
+    await expect(page.getByText("1 deck organized.")).toBeVisible();
+    const filed = page
+      .getByRole("listitem")
+      .filter({ has: page.getByRole("link", { name: title }) });
+    await expect(filed).toContainText("In Journeys");
+    await expect(filed).toContainText("journey");
+    await shelves.getByRole("checkbox", { name: /^journey/ }).check();
+    await expect(filed).toBeVisible();
+
+    // Its Workshop: the saved version compared with the draft and restored into it, which
+    // changes no version; no results yet; and SysOp's library lacks nothing.
+    await filed.getByRole("link", { name: "Workshop" }).click();
+    await expect(page).toHaveURL(new RegExp(`#deck/${deckId}/workshop$`));
+    await expect(
+      page.getByRole("heading", { level: 1, name: title }),
+    ).toBeVisible();
+    await expect(page.getByText(/^From version 1 to the draft:/)).toBeVisible();
+    await page
+      .getByRole("button", { name: "Restore version 1 into the draft" })
+      .click();
+    const restore = page.getByRole("dialog", {
+      name: "Restore version 1 into the draft?",
+    });
+    await expect(restore).toContainText("No saved version is rewritten.");
+    await restore.getByRole("button", { name: "Restore version 1" }).click();
+    await expect(page.getByText(/Version 1 is the draft now\./)).toBeVisible();
+    await expect(
+      page
+        .getByRole("region", { name: "Saved versions" })
+        .getByRole("listitem"),
+    ).toHaveCount(1);
+    await page.getByRole("tab", { name: "Results" }).click();
+    await expect(
+      page.getByText(/No game has ended with a saved version of this deck/),
+    ).toBeVisible();
+    await page.getByRole("tab", { name: "Missing cards" }).click();
+    await expect(
+      page.getByText(/Your library holds every card of this deck's draft/),
+    ).toBeVisible();
+    // The wishlist is a view of Cards.
+    await page.goto("/#cards");
+    await page.getByRole("tab", { name: "Wishlist" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Your wishlist" }),
+    ).toBeVisible();
   });
 
   test("a Commander deck goes to the practice table in its own format", async ({
